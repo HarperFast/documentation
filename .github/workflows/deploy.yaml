@@ -81,8 +81,8 @@ jobs:
     needs: build
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
-    # Only deploy on push to main or manual trigger, not on PRs
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # Only deploy on push to main or manual trigger from main branch, not on PRs
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     permissions:
       pages: write
