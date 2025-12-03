@@ -9,7 +9,6 @@ Harper provides extended features using built-in extensions. They do **not** nee
 For more information read the [Components, Applications, and Extensions](../../developers/applications/) documentation section.
 
 - [Built-In Extensions](#built-in-extensions)
-  - [fastifyRoutes](#fastifyroutes)
   - [graphql](#graphql)
   - [graphqlSchema](#graphqlschema)
   - [jsResource](#jsresource)
@@ -29,19 +28,6 @@ Complete documentation for this feature is available here: [Data Loader](../../d
 ```yaml
 dataLoader:
   files: 'data/*.json'
-```
-
-## fastifyRoutes
-
-Specify custom endpoints using [Fastify](https://fastify.dev/).
-
-This component is a [Resource Extension](./extensions#resource-extension) and can be configured with the [`files` and `urlPath`](./extensions#resource-extension-configuration) configuration options.
-
-Complete documentation for this feature is available here: [Define Fastify Routes](../../developers/applications/define-routes)
-
-```yaml
-fastifyRoutes:
-  files: 'routes/*.js'
 ```
 
 ## graphql
