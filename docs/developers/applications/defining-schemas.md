@@ -218,7 +218,7 @@ HNSW supports several additional arguments to the `@indexed` directive to adjust
 - `mL` - The normalization factor for level generation, by default this is computed from `M`.
 - `efSearchConstruction` - Maximum number of nodes to keep in the list for finding nearest neighbors for searching. The default is 50.
 
-For exmpale
+For example
 
 ```graphql
 type Product @table {
