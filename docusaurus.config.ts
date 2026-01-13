@@ -271,10 +271,15 @@ const config: Config = {
       {
         siteTitle: 'Harper Documentation',
         siteDescription: 'Comprehensive guide to developing on and using the Harper platform',
-        depth: 2,
+				/* The depth option controls how deep the hierarchical organization goes in your document tree. This is crucial for determining how your URLs are categorized.
+				 For example:
+					depth: 1: /api/users → api category
+					depth: 2: /api/users/create → api/users category
+					depth: 3: /api/users/create/advanced → api/users/create category
+				*/
+        depth: 3,
         content: {
-          includeBlog: true,
-          includePages: true,
+          includePages: true, // Optional for content but it simply includes pages
           enableLlmsFullTxt: true  // Optional: generates llms-full.txt
         }
       },
