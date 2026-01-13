@@ -1,7 +1,7 @@
 name: Deploy PR Preview
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, closed]
 
 # Cancel previous runs when new commits are pushed to the PR
@@ -14,6 +14,7 @@ jobs:
     name: Deploy PR Preview
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
+    environment: ${{ github.event.pull_request.head.repo.full_name != github.repository && 'preview' || null }}
     permissions:
       pull-requests: write
       deployments: write
