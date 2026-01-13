@@ -266,6 +266,19 @@ const config: Config = {
 					],
 				]
 			: []),
+			[
+      '@signalwire/docusaurus-plugin-llms-txt',
+      {
+        siteTitle: 'Harper Documentation',
+        siteDescription: 'Comprehensive guide to developing on and using the Harper platform',
+        depth: 2,
+        content: {
+          includeBlog: true,
+          includePages: true,
+          enableLlmsFullTxt: true  // Optional: generates llms-full.txt
+        }
+      },
+    ],
 	],
 
 	themes: [
