@@ -173,7 +173,7 @@ jobs:
           echo "Cleaning up preview for PR #${{ github.event.pull_request.number }}"
 
       - name: Update deployment status
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
