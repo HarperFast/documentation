@@ -4,6 +4,21 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'docs/**'
+      - 'fabric/**'
+      - 'learn/**'
+      - 'release-notes/**'
+      - 'src/**'
+      - 'static/**'
+      - 'versioned_docs/**'
+      - 'versioned_sidebars/**'
+      - 'docusaurus.config.ts'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'redirects.ts'
+      - 'sidebars*.ts'
+      - 'versions.json'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 

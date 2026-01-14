@@ -3,6 +3,21 @@ name: Deploy PR Preview
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'docs/**'
+      - 'fabric/**'
+      - 'learn/**'
+      - 'release-notes/**'
+      - 'src/**'
+      - 'static/**'
+      - 'versioned_docs/**'
+      - 'versioned_sidebars/**'
+      - 'docusaurus.config.ts'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'redirects.ts'
+      - 'sidebars*.ts'
+      - 'versions.json'
 
 # Cancel previous runs when new commits are pushed to the PR
 concurrency:
@@ -172,17 +187,18 @@ jobs:
             restart=true
           echo "Cleaning up preview for PR #${{ github.event.pull_request.number }}"
 
-      - name: Update deployment status
+      - name: Update deployment status and delete environment
         uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
+            const environmentName = `pr-${prNumber}`;
 
             // Mark deployment as inactive
             const deployments = await github.rest.repos.listDeployments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              environment: `pr-${prNumber}`
+              environment: environmentName
             });
 
             for (const deployment of deployments.data) {
@@ -193,6 +209,18 @@ jobs:
                 state: 'inactive',
                 description: 'Preview deployment removed'
               });
+            }
+
+            // Delete the environment
+            try {
+              await github.rest.repos.deleteAnEnvironment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: environmentName
+              });
+              console.log(`Deleted environment: ${environmentName}`);
+            } catch (error) {
+              console.log(`Could not delete environment ${environmentName}: ${error.message}`);
             }
 
             // Add cleanup comment to PR
