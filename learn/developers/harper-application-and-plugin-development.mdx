@@ -1,0 +1,240 @@
+---
+title: Harper Application and Plugin Development
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+import HarperArchitectureDiagram from '../../src/components/learn/harper-architecture-diagram.mdx';
+
+{/* AI Generated Outline: Introduction paragraph - to be written in prose style explaining that this guide deepens the understanding of Harper Applications beyond the Getting Started section, focusing on the architecture, development patterns, and tooling that developers use day-to-day when building with Harper. */}
+
+In the Getting Started guides you successfully installed Harper and created your first application. You experienced Harper's schema and database system, and the automatic REST API feature too. This guide dives deeper into Harper's Component Architecture differentiating applications from plugins, and introduces multiple new ways to interact with Harper. By the end of this guide you will be a confident Harper application developer capable of creating just about anything with Harper!
+
+## What You Will Learn
+
+- The fundamental concepts and architecture of Harper Applications
+- How applications, plugins, and extensions work together in the Harper ecosystem
+- The distinction between applications and extensions/plugins, and when to use each
+- How to interact with Harper using the Operations API and CLI
+- Essential debugging techniques for Harper application development
+- Best practices for structuring and developing Harper applications
+
+## Prerequisites
+
+- Completed [Install and Connect Harper](../getting-started/install-and-connect-harper)
+- Completed [Create Your First Application](../getting-started/create-your-first-application)
+- Basic familiarity with Node.js and JavaScript
+- Working Harper installation (local or Fabric)
+
+## Revisiting Harper's Architecture
+
+{/* AI Generated Outline: Expand on the architecture introduced in Getting Started, providing deeper explanation of the component system. Use the architecture diagram/ASCII art from Getting Started as reference point but explain in more detail how the layers interact. */}
+
+In the previous guide we introduced a high-level Harper architecture diagram:
+
+<HarperArchitectureDiagram/>
+
+And defined some key Harper concepts:
+
+**Components** are extensions of the core Harper systems, and are further classified as **plugins** and **applications**.
+
+**Plugins** have access to APIs exposing many of Harper's core services, and are capable of implementing more advanced features than what the core services provide.
+
+**Applications** use plugins to implement user-facing functionality and business logic, such as implementing database schemas and creating web applications.
+
+The most important thing to remember is that plugins enable the functionality and applications implement it. Similar to that of a front-end framework. React is like a plugin; on its own it doesn't actually do anything. You actually need to build an application with React for it do anything meaningful.
+
+Plugins have replaced an old Harper component system called **extensions**. Plugins and extensions have essentially the same definition, but different APIs. In time, extensions will be deprecated, and we encourage all developers to use the plugins immediately. However, both systems are fully supported in Harper v4 and v5.
+
+### The Harper Stack in Detail
+
+{/* AI Generated Outline: Detailed prose explanation of each layer:
+- Core Services (database, networking, component management) - what they provide, why they matter
+- Plugins (built-in vs custom) - their role in extending core functionality
+- Applications - the user-facing implementations that tie everything together */}
+
+Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process. Harper instances are meant to be treated as "serverful" systems (contrary to ephemeral "serverless" services). As such, Harper's main thread is meant to always stay running. The concept of a "restart" is specific to restarting the worker threads, and persisting the main thread. Harper uses a rolling restart in order to ensure the Harper system remains functional throughout a restart. Furthermore, the entire Harper process can be safely stopped and started, but generally that should be unnecessary for application development.
+
+> Harper provides an environment variable, `HARPER_EXIT_ON_RESTART`, that will exit the process when it is instructed to restart. This is meant to be used along side a container environment restart policy such as docker's `--restart=unless-stopped` so that the entire Harper process can be restarted. Its important to keep in mind that full process restarts will disrupt functionality.
+
+Plugins run exclusively on worker threads, but the older version, extensions, can run on both the main and worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins and extensions. One critical advantage that plugins have over extensions is their ability to respond to configuration changes without restarting.
+
+Both the `graphqlSchema` database schema system and the `rest` automatic REST API features from the previous guide are technically implemented as built-in extensions still. If you were running Harper locally, the `harper dev` command automatically restarted Harper for you. And if you were using Fabric, this is why you had to click on the "Restart Cluster" button. We are actively migrating all built-in extensions to the plugin API, and once complete, a lot of Harper will run entirely in worker threads and require less restarts in order to respond to configuration and file changes. Aside from the subtle differences in execution context, extensions and plugins very much serve the same purpose. Aside from this section where we are deliberately specifying the technical differences between the two, we have switched to using the plugin terminology entirely. This is to simplify and align our documentation to Harpers ideal future.
+
+Since core services and plugins are the building blocks of applications, they too can run across all threads. As an application developer, you don't necessarily need to worry to much about what plugins are doing behind the scenes; however, its important to keep in mind that for now, restarting Harper is an important step throughout application development, deployment, and management. Later in this guide you will learn other methods for restarting Harper beyond just the `dev` command.
+
+### Component Classification: Built-in vs Custom
+
+{/* AI Generated Outline: Explain the distinction between built-in and custom components, why this matters for development, and how to reference each type. Include practical examples. */}
+
+Harper further classifies components (plugins and applications) as either built-in or custom. **Built-in** components are internal to Harper, require no additional installation steps, and are immediately accessible for use. The `graphqlSchema` and `rest` plugins are great examples of built-in plugins. **Custom** components are external to Harper, generally available as an npm package or git repository, and do require additional installation steps in order to be used. Custom components can be authored by anyone, including Harper. Any of Harper's official custom components are published using the `@harperdb` and `@harper` package scopes, such as the [`@harperdb/nextjs`](https://github.com/HarperDB/nextjs) plugin for developing Next.js applications or the [`@harperdb/status-check`](https://github.com/HarperDB/status-check) application.
+
+Harper's reference documentation contains detailed documentation for all built-in components. Custom components will be documented within their respective repositories.
+
+Harper does not currently include any built-in applications, making "custom applications" a bit redundant. Generally, we just refer to them as "applications". However, there is a multitude of both built-in and custom plugins, and so the documentation tends to specify whenever relevant.
+
+{/* The AI outline included a sub-section here for component lifecycle. I think we have enough text so far and need to move into some actual development. I think lifecycle will fit in better later too when the user has learned more about managing components, particularly applications using the Operations API and CLI. */}
+
+{/* I'm not sold on these next four sub-sections. I think they are good titles for the reference page on components. I think the content written above walks the line of informative but not-overly technical well-enough. For more in depth docs, that is where the components/applications/plugins reference page will come into play. Leaving the sections here for now as the rest of the guide is drafted, but will likely move them and rewrite the reference page quite a bit. */}
+
+{/* ### What Makes Something an Application? */}
+
+{/* AI Generated Outline: Elaborate on applications as user-facing implementations. Provide concrete examples:
+- A Next.js web application serving a UI
+- An Apollo GraphQL server providing an API
+- A custom REST API using resources.js
+Use the mermaid diagram from docs/developers/applications/index.md as visual aid. */}
+
+{/* ### What Makes Something a Plugin? */}
+
+{/* AI Generated Outline: Explain extensions as the building blocks that enable functionality. Examples:
+- `graphqlSchema` enables table definition (already used in Getting Started)
+- `rest` enables automatic REST API generation (already used in Getting Started)
+- `@harperdb/nextjs` enables building Next.js apps
+- Custom extensions can depend on other extensions */}
+
+{/* ### When to Build an Application vs an Plugin */}
+
+{/* AI Generated Outline: Practical guidance on decision-making. Key principle: extensions enable, applications implement. Provide decision tree or clear guidelines. */}
+
+{/* ### The Plugin API */}
+
+{/* AI Generated Outline: Briefly mention the v4.6+ plugin system as covered in docs/developers/applications/index.md, note it's experimental, and reference the plugin API docs for readers who want to explore. Don't go too deep since this is fundamentals. */}
+
+## Working with the Operations API
+
+{/* AI Generated Outline: Introduce the Operations API as the primary interface for managing Harper programmatically. Build on the /health endpoint from Getting Started. */}
+
+In the first guide, we introduced you to the `/health` endpoint. This is provided by Harper's built-in Operations API.
+
+The **Operations API** provides a full set of capabilities for configuring, deploying, administering, and controlling Harper. It is configured on port `9925` by default, and all requests are JSON-based POST requests to the root path (except for the `/health` endpoint of course).
+
+
+
+
+### Common Operations API Endpoints
+
+{/* [NOTE: Showcase a few key endpoints beyond /health:
+- restart_service (mentioned in docs/developers/applications/index.md)
+- read_log (mentioned in docs/developers/applications/debugging.md)
+- Other essential operations for application development
+Include code examples for 1-2 operations.] */}
+
+### Operations API vs Application REST APIs
+
+{/* [NOTE: Clarify the distinction - Operations API (port 9925) for system management vs REST API (port 9926) for application data. This reinforces concepts from Getting Started.] */}
+
+## Working with the Harper CLI
+
+{/* [NOTE: Expand on CLI usage beyond the basic `harper` and `harper dev` commands already introduced in Getting Started.] */}
+
+### Essential CLI Commands for Application Development
+
+{/* [NOTE: Cover key commands developers use regularly:
+- `harper` (already used in Getting Started - installation)
+- `harper dev` (already used in Getting Started - development)
+- `harper deploy` (briefly mentioned in Getting Started bonus section)
+- Commands for component management
+Include practical examples and when to use each.] */}
+
+### CLI vs Operations API: Choosing Your Tools
+
+{/* [NOTE: Explain when to use CLI (local development, deployments) vs Operations API (programmatic control, automation). They often accomplish the same things via different interfaces.] */}
+
+## Debugging Harper Applications
+
+{/* [NOTE: Essential debugging content from docs/developers/applications/debugging.md] */}
+
+### Development Mode and Debugging
+
+{/* [NOTE: Explain `harper dev` in more depth:
+- Single-threaded mode for easier debugging
+- File watching and auto-restart (already experienced in Getting Started)
+- How to connect a debugger (Chrome DevTools, VSCode, WebStorm)
+Include step-by-step instructions with code/configuration examples.] */}
+
+### Logging: Console vs Harper Logger
+
+{/* [NOTE: Explain the distinction:
+- console.log() for local development (fine for what was done in Getting Started)
+- `logger` global for production use
+- Different log levels (trace, debug, info, warn, error, fatal, notify)
+Include examples of using the logger in resources.js or other application code.] */}
+
+### Viewing and Querying Logs
+
+{/* [NOTE: Explain how to access logs:
+- Local file system (~/hdb/log/hdb.log)
+- Studio Status page (for Fabric users)
+- `read_log` operation from Operations API
+Include practical examples.] */}
+
+### Debugging Strategies and Common Issues
+
+{/* [NOTE: Practical tips for debugging:
+- Setting breakpoints in resources.js
+- Debugging schema loading issues
+- Troubleshooting plugin configuration
+- Common errors and how to resolve them] */}
+
+## Application Structure Best Practices
+
+{/* [NOTE: Guidance on organizing Harper applications for maintainability] */}
+
+### Core Application Files
+
+{/* [NOTE: Explain the purpose and best practices for:
+- config.yaml (introduced in Getting Started)
+- schema.graphql (introduced in Getting Started)
+- resources.js (will be covered in depth in next guide)
+- package.json (for dependencies)
+- Directory structure recommendations] */}
+
+### Configuration Management
+
+{/* [NOTE: Deeper dive into config.yaml:
+- How plugins are configured
+- Environment-specific configurations
+- Configuration validation and troubleshooting
+Build on the simple config.yaml example from Getting Started.] */}
+
+### File Organization and Conventions
+
+{/* [NOTE: Recommended patterns for growing applications:
+- When to split schemas into multiple files
+- Organizing resources by domain
+- Directory structures for larger applications] */}
+
+## Building on the Foundation
+
+{/* [NOTE: Transitional section that ties everything together and previews what comes next] */}
+
+### What You've Accomplished
+
+{/* [NOTE: Recap of the conceptual foundation laid:
+- Deep understanding of Harper's architecture
+- Knowledge of component types and when to use each
+- Familiarity with essential tooling (CLI, Operations API)
+- Debugging capabilities
+- Best practices for application structure] */}
+
+### Next Steps in Your Harper Journey
+
+{/* [NOTE: Preview upcoming Learn guides:
+- Deep dive into Custom Resources and JavaScript (resources.js in detail)
+- Schema definition and data modeling
+- Caching and performance
+- Authentication and security
+- Web applications and frontends
+Each preview should reference concepts introduced in this guide.] */}
+
+## Additional Resources
+
+- [Component System Reference](../../reference/components/) - Complete technical reference for components, applications, and extensions
+- [Built-In Extensions](../../reference/components/built-in-extensions) - Reference for all built-in Harper extensions
+- [Plugin API](../../reference/components/plugins) - Documentation for the experimental plugin system
+- [Operations API Reference](../../reference/operations-api/) - Complete Operations API documentation
+- [Harper CLI Reference](../../docs/deployments/harper-cli) - Full CLI command reference
+- [Harper Configuration](../../deployments/configuration) - Complete configuration options
+- [Resource API](../../reference/resources/) - Technical reference for the Resource interface (preview for next guide)
