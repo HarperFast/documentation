@@ -4,6 +4,7 @@ title: Create Your First Application
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import HarperArchitectureDiagram from '../../src/components/learn/harper-architecture-diagram.mdx';
 
 With Harper successfully installed and setup, let's dive into building your first Harper Application, a simple REST API. Harper lets you build powerful APIs with minimal effort.
 
@@ -24,22 +25,7 @@ With Harper successfully installed and setup, let's dive into building your firs
 
 Before diving into building your first Harper application, it is important to understand a bit about Harper's architecture. The simplest way to think about Harper is as a stack.
 
-```
-┏━━━━━━━━━━━━━━━━━━┓
-┃ Applications     ┃
-┠──────────────────┨
-┃ Plugins          ┃
-┃  - rest          ┃
-┃  - graphqlSchema ┃
-┃  - ...           ┃
-┠──────────────────┨
-┃ Core Services:   ┃
-┃  - database      ┃
-┃  - networking    ┃
-┃  - component     ┃
-┃    management    ┃
-┗━━━━━━━━━━━━━━━━━━┛
-```
+<HarperArchitectureDiagram/>
 
 At the bottom are the **core services** that make up the foundation of the Harper platform. This includes the high-performance **database**, extensible **networking** middleware, and **component** management system. Components are extensions of the core Harper system, and are further classified as **plugins** and **applications**.
 
