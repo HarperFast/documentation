@@ -266,25 +266,25 @@ const config: Config = {
 					],
 				]
 			: []),
-			[
-      '@signalwire/docusaurus-plugin-llms-txt',
-      {
-        siteTitle: 'Harper Documentation',
-        siteDescription: 'Comprehensive guide to developing on and using the Harper platform',
+		[
+			'@signalwire/docusaurus-plugin-llms-txt',
+			{
+				siteTitle: 'Harper Documentation',
+				siteDescription: 'Comprehensive guide to developing on and using the Harper platform',
 				/* The depth option controls how deep the hierarchical organization goes in your document tree. This is crucial for determining how your URLs are categorized.
 				 For example:
 					depth: 1: /api/users → api category
 					depth: 2: /api/users/create → api/users category
 					depth: 3: /api/users/create/advanced → api/users/create category
 				*/
-        depth: 3,
-        content: {
-          includePages: true, // Optional for content but it simply includes pages
-          enableLlmsFullTxt: true,  // Optional: generates llms-full.txt
-					includeVersionedDocs: false // Optional: includes versioned docs in the output
-        }
-      },
-    ],
+				depth: 3,
+				content: {
+					includePages: true, // Optional for content but it simply includes pages
+					enableLlmsFullTxt: true, // Optional: generates llms-full.txt
+					includeVersionedDocs: false, // Optional: includes versioned docs in the output
+				},
+			},
+		],
 	],
 
 	themes: [
