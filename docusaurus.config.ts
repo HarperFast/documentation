@@ -280,7 +280,8 @@ const config: Config = {
         depth: 3,
         content: {
           includePages: true, // Optional for content but it simply includes pages
-          enableLlmsFullTxt: true  // Optional: generates llms-full.txt
+          enableLlmsFullTxt: true,  // Optional: generates llms-full.txt
+					includeVersionedDocs: false // Optional: includes versioned docs in the output
         }
       },
     ],
