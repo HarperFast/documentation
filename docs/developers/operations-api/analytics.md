@@ -10,8 +10,8 @@ Retrieves analytics data from the server.
 
 - `operation` _(required)_ - must always be `get_analytics`
 - `metric` _(required)_ - any value returned by `list_metrics`
-- `start_time` _(optional)_ - Unix timestamp in seconds
-- `end_time` _(optional)_ - Unix timestamp in seconds
+- `start_time` _(optional)_ - Unix timestamp in milliseconds
+- `end_time` _(optional)_ - Unix timestamp in milliseconds
 - `get_attributes` _(optional)_ - array of attribute names to retrieve
 - `conditions` _(optional)_ - array of conditions to filter results (see [search_by_conditions docs](./nosql-operations) for details)
 
@@ -21,8 +21,8 @@ Retrieves analytics data from the server.
 {
 	"operation": "get_analytics",
 	"metric": "resource-usage",
-	"start_time": 1609459200,
-	"end_time": 1609545600,
+	"start_time": 1769198332754,
+	"end_time": 1769198532754,
 	"get_attributes": ["id", "metric", "userCPUTime", "systemCPUTime"],
 	"conditions": [
 		{
