@@ -1511,7 +1511,7 @@ Using the API:
 }
 ```
 
-### analytics
+### `analytics`
 
 `analytics_aggregatePeriod` - _Type_: number; _Default_: 60 (seconds)
 
