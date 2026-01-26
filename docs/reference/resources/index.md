@@ -8,14 +8,9 @@ title: Resource Class
 
 The Resource class is designed to provide a unified API for modeling different data resources within Harper. Database/table data can be accessed through the Resource API. The Resource class can be extended to create new data sources. Resources can be exported to define endpoints. Tables themselves extend the Resource class, and can be extended by users.
 
-Conceptually, a Resource class provides an interface for accessing, querying, modifying, and monitoring a set of entities or records. Instances of a Resource class can represent a single record or entity, or a collection of records, at a given point in time, that you can interact with through various methods or queries. Resource instances can represent an atomic transactional view of a resource and facilitate transactional interaction. A Resource instance holds the primary key/identifier, context information, and any pending updates to the record, so any instance methods can act on the record and have full access to this information during execution. Therefore, there are distinct resource instances created for every record or query that is accessed, and the instance methods are used for interaction with the data.
+Conceptually, a Resource class provides an interface for accessing, querying, modifying, and monitoring a set of entities or records. A Resource class represents a collection of entities/records with methods for querying and accessing records and inserting/updating records. Instances of a Resource class represent a single record that can be modified through various methods or queries. A Resource instance holds the primary key/identifier and any pending updates to the record, so any instance methods can act on the record and have full access to this information during execution. You may also `get` single records directly from a Resource class, returning an immutable object representing the record.
 
-Resource classes also have static methods, which are generally the preferred way to externally interact with tables and resources. The static methods handle parsing paths and query strings, starting a transaction as necessary, performing access authorization checks (if required), creating a resource instance, and calling the instance methods. This general rule for how to interact with resources:
-
-- If you want to _act upon_ a table or resource, querying or writing to it, then use the static methods to initially access or write data. For example, you could use `MyTable.get(34)` to access the record with a primary key of `34`.
-- If you want to _define custom behavior_ for a table or resource (to control how a resource responds to queries/writes), then extend the class and override/define instance methods.
-
-The Resource API is heavily influenced by the REST/HTTP API, and the methods and properties of the Resource class are designed to map to and be used in a similar way to how you would interact with a RESTful API.
+Resource classes have static methods for interaction with records, with general create, read, update, and delete capabilities. The methods can also overriden for customized functionality. The Resource API is heavily influenced by the REST/HTTP API, and the methods and properties of the Resource class are designed to map to and be used in a similar way to how you would interact with a RESTful API.
 
 The REST-based API is a little different from traditional Create-Read-Update-Delete (CRUD) APIs that were designed with single-server interactions in mind. Semantics that attempt to guarantee no existing record or overwrite-only behavior require locks that don't scale well in distributed database. Centralizing writes around `put` calls provides much more scalable, simple, and consistent behavior in a distributed eventually consistent database. You can generally think of CRUD operations mapping to REST operations like this:
 
@@ -26,27 +21,26 @@ The REST-based API is a little different from traditional Create-Read-Update-Del
 - Update (Partial) - `patch`
 - Delete - `delete`
 
-The RESTful HTTP server and other server interfaces will directly call resource methods of the same name to fulfill incoming requests so resources can be defined as endpoints for external interaction. When resources are used by the server interfaces, the static method will be executed (which starts a transaction and does access checks), which will then create the resource instance and call the corresponding instance method. Paths (URL, MQTT topics) are mapped to different resource instances. Using a path that specifies an ID like `/MyResource/3492` will be mapped an instance of MyResource, and will call the instance methods like `get(target)`, `put(target, data)`, and `post(target, data)`, where target is based on the `/3492` part of the path.
+The RESTful HTTP server and other server interfaces will directly call resource methods of the same name to fulfill incoming requests so resources can be defined as endpoints for external interaction. When resources are used by the server interfaces, the static method will be executed (which does access checks), which will then create the resource instance and call the corresponding instance method. Paths (URL, MQTT topics) are mapped to different records by path. Using a path that specifies an ID like `/MyResource/3492` is intended to be mapped a record from MyResource with an id of "3492", and will call the static methods like `get(target)`, `put(target, data)`, and `post(target, data)`, where target is based on the `/3492` part of the path.
 
-It is recommended that you use the latest version (V2) of the Resource API with the legacy instance binding behavior disabled. This is done by setting the static `loadAsInstance` property to `false` on the Resource class. This will become the default behavior in Harper version 5.0. This page is written assuming `loadAsInstance` is set to `false`. If you want to use the legacy instance binding behavior, you can set `loadAsInstance` to `true` on the Resource class. If you have existing code that you want to migrate, please see the [migration guide](resources/migration) for more information.
+It is recommended that you primarily call or override static methods for `get`/`put`/`post`/`delete` actions. However, in the past, documentation/examples used instance methods. There is different instance behavior that can be controlled with the `loadAsInstance` property, which is covered here: [migration guide](resources/migration).
 
 You can create classes that extend `Resource` to define your own data sources, typically to interface with external data sources (the `Resource` base class is available as a global variable in the Harper JS environment). In doing this, you will generally be extending and providing implementations for the instance methods below. For example:
 
 ```javascript
 export class MyExternalData extends Resource {
-	static loadAsInstance = false; // enable the updated API
-	async get(target) {
+	static async get(target) {
 		// fetch data from an external source, using our id
 		let response = await this.fetch(target.id);
 		// do something with the response
 	}
-	put(target, data) {
+	static put(target, data) {
 		// send the data into the external source
 	}
-	delete(target) {
+	static delete(target) {
 		// delete an entity in the external data source
 	}
-	subscribe(subscription) {
+	static subscribe(subscription) {
 		// if the external data source is capable of real-time notification of changes, can subscribe
 	}
 }
@@ -59,19 +53,18 @@ You can also extend table classes in the same way, overriding the instance metho
 
 ```javascript
 export class MyTable extends tables.MyTable {
-	static loadAsInstance = false; // enable the updated API
-	get(target) {
+	static get(target) {
 		// we can add properties or change properties before returning data:
 		return { ...super.get(target), newProperty: 'newValue', existingProperty: 42 }; // returns the record, with additional properties
 	}
-	put(target, data) {
+	static put(target, data) {
 		// can change data any way we want
 		super.put(target, data);
 	}
-	delete(target) {
+	static delete(target) {
 		super.delete(target);
 	}
-	post(target, data) {
+	static post(target, data) {
 		// providing a post handler (for HTTP POST requests) is a common way to create additional
 		// actions that aren't well described with just PUT or DELETE
 	}
@@ -183,16 +176,15 @@ import { databases, tables, Resource } from 'harperdb';
 
 Properties that have been defined in your table's schema can be accessed and modified as direct properties on the Resource instances.
 
-### `get(target: RequestTarget | Id): Promise<Resource>|AsyncIterable`
+### `static get(target: RequestTarget | Id): Promise<Resource>|AsyncIterable`
 
 This retrieves a record, or queries for records, and is called by HTTP GET requests. This can be called with a `RequestTarget` which can specify a path/id and query parameters as well as search parameters. For tables, this can also be called directly with an id (string or number) to retrieve a record by id. When defining Resource classes, you can define or override this method to define exactly what should be returned when retrieving a record. HTTP requests will always call `get` with a full `RequestTarget`. The default `get` method (`super.get(target)`) returns the current record as a plain object.
 
 The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL. For example, with a request to `/my-resource/some-id?param1=value`, we can access URL/request information:
 
 ```javascript
-class extends Resource {
-	static loadAsInstance = false;
-	get(target) {
+class MyResource extends Resource {
+	static get(target) {
 		let param1 = target.get('param1'); // returns 'value'
 		let id = target.id; // returns 'some-id'
 		let path = target.pathname; // returns /some-id
@@ -203,37 +195,48 @@ class extends Resource {
 
 If `get` is called for a single record (for a request like `/Table/some-id`), the default action is to return the record identified by the path. If `get` is called on a collection (`/Table/?name=value`), the target will have the `isCollection` property set to `true` and default action is to `search` and return an AsyncIterable of results.
 
-### `search(query: RequestTarget)`: AsyncIterable
+You can also override `get` to collect data from other tables:
+
+```javascript
+const { MyTable, Comment } = tables;
+...
+// in class:
+	static async get() {
+		for (let commentId of this.commentIds) {
+			let comment = await Comment.get(commentId, this);
+			// now you can do something with the comment record
+		}
+	}
+```
+
+### `static search(query: RequestTarget)`: AsyncIterable
 
 This performs a query on this resource or table. By default, this is called by `get(query)` from a collection resource. When this is called for the root resource (like `/Table/`) it searches through all records in the table. You can define or override this method to define how records should be queried. The default `search` method on tables (`super.search(query)`) will perform a query and return an `AsyncIterable` of results. The `query` object can be used to specify the desired query.
 
-### `put(target: RequestTarget | Id, data: object): void|Response`
+### `static put(target: RequestTarget | Id, data: object): void|Response`
 
 This will assign the provided record or data to this resource, and is called for HTTP PUT requests. You can define or override this method to define how records should be updated. The default `put` method on tables (`super.put(target, data)`) writes the record to the table (updating or inserting depending on if the record previously existed) as part of the current transaction for the resource instance.
 
 The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `patch(target: RequestTarget | Id, data: object): void|Response`
+### `static patch(target: RequestTarget | Id, data: object): void|Response`
 
 This will update the existing record with the provided data's properties, and is called for HTTP PATCH requests. You can define or override this method to define how records should be updated. The default `patch` method on tables (`super.patch(target, data)`) updates the record. The properties will be applied to the existing record, overwriting the existing records properties, and preserving any properties in the record that are not specified in the `data` object. This is performed as part of the current transaction for the resource instance. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `update(target: RequestTarget, updates?: object): Updatable`
+### `static update(target: RequestTarget, updates?: object): Resource`
 
-This can be called to get an Updatable class for updating a record. An `Updatable` instance provides direct access to record properties as properties on `Updatable` instance. The properties can also be modified and any changes are tracked and written to the record when the transaction commits. For example, if we wanted to update the quantify of a product in the Product table, in response to a post, we could write:
+This can be called to get an instance for updating a record. An instance provides direct access to record properties as properties. The properties can also be modified and any changes are tracked and written to the record when the transaction commits. For example, if we wanted to update the quantify of a product in the Product table, in response to a post, we could write:
 
 ```javascript
 class ... {
-	post(target, data) {
-		static loadAsInstance = false;
+	static post(target, data) {
 		let updatable = this.update(target);
 		updatable.quantity = updatable.quantity - 1;
 	}
 }
 ```
 
-In addition, the `Updatable` class has the following methods.
-
-### `Updatable` class
+The `update` is a static method on the Resource class, and returns an instance of the Resource class, that has methods for modifying the record properties:
 
 #### `addTo(property, value)`
 
@@ -241,8 +244,7 @@ This adds the provided value to the specified property using conflict-free data 
 
 ```javascript
 class ... {
-	static loadAsInstance = false;
-	post(target, data) {
+	static post(target, data) {
 		let updatable = this.update(target);
 		updatable.addTo('quantity', -1);
 	}
@@ -253,25 +255,31 @@ class ... {
 
 This functions exactly the same as `addTo`, except it subtracts the value.
 
-The `Updatable` also inherits the `getUpdatedTime` and `getExpiresAt` methods from the `RecordObject` class.
+### `getUpdatedTime`
 
-### `delete(target: RequestTarget): void|Response`
+Return last updated time of the record.
+
+### `getExpiresAt`
+
+Return the expiration time of the record.
+
+### `static delete(target: RequestTarget): void|Response`
 
 This will delete this record or resource identified by the target, and is called for HTTP DELETE requests. You can define or override this method to define how records should be deleted. The default `delete` method on tables (`super.delete(target)`) deletes the record identified by target from the table as part of the current transaction. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `publish(target: RequestTarget, message): void|Response`
+### `static publish(target: RequestTarget, message): void|Response`
 
 This will publish a message to this resource, and is called for MQTT publish commands. You can define or override this method to define how messages should be published. The default `publish` method on tables (`super.publish(target, message)`) records the published message as part of the current transaction; this will not change the data in the record but will notify any subscribers to the record/topic. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `post(target: RequestTarget, data: object): void|Response`
+### `static post(target: RequestTarget, data: object): void|Response`
 
 This is called for HTTP POST requests. You can define this method to provide your own implementation of how POST requests should be handled. Generally `POST` provides a generic mechanism for various types of data updates, and is a good place to define custom functionality for updating records. The default behavior is to create a new record/resource. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `invalidate(target: RequestTarget)`
+### `static invalidate(target: RequestTarget)`
 
 This method is available on tables. This will invalidate the specified record in the table. This can be used with a caching table and is used to indicate that the source data has changed, and the record needs to be reloaded when next accessed.
 
-### `subscribe(subscriptionRequest: SubscriptionRequest): Promise<Subscription>`
+### `static subscribe(subscriptionRequest: SubscriptionRequest): Promise<Subscription>`
 
 This will subscribe to the current resource, and is called for MQTT subscribe commands. You can define or override this method to define how subscriptions should be handled. The default `subscribe` method on tables (`super.publish(message)`) will set up a listener that will be called for any changes or published messages to this resource.
 
@@ -284,7 +292,7 @@ The `SubscriptionRequest` object supports the following properties (all optional
 - `previousCount` - This specifies the number of previous updates/messages to deliver. For example, `previousCount: 10` would return the last ten messages. Note that `previousCount` can not be used in conjunction with `startTime`.
 - `omitCurrent` - Indicates that the current (or retained) record should _not_ be immediately sent as the first update in the subscription (if no `startTime` or `previousCount` was used). By default, the current record is sent as the first update.
 
-### `connect(target: RequestTarget, incomingMessages?: AsyncIterable<any>): AsyncIterable<any>`
+### `static connect(target: RequestTarget, incomingMessages?: AsyncIterable<any>): AsyncIterable<any>`
 
 This is called when a connection is received through WebSockets or Server Sent Events (SSE) to this resource path. This is called with `incomingMessages` as an iterable stream of incoming messages when the connection is from WebSockets, and is called with no arguments when the connection is from a SSE connection. This can return an asynchronous iterable representing the stream of messages to be sent to the client.
 
@@ -324,7 +332,7 @@ When a resource is accessed as a data source:
 
 - `requestContext` - For resources that are acting as a data source for another resource, this provides access to the context of the resource that is making a request for data from the data source resource. Note that it is generally not recommended to rely on this context. The resolved data may be used fulfilled many different requests, and relying on this first request context may not be representative of future requests. Also, source resolution may be triggered by various actions, not just specified endpoints (for example queries, operations, studio, etc.), so make sure you are not relying on specific request context information.
 
-### `operation(operationObject: Object, authorize?: boolean): Promise<any>`
+### `static operation(operationObject: Object, authorize?: boolean): Promise<any>`
 
 This method is available on tables and will execute a Harper operation, using the current table as the target of the operation (the `table` and `database` do not need to be specified). See the [operations API](../developers/operations-api/) for available operations that can be performed. You can set the second argument to `true` if you want the current user to be checked for authorization for the operation (if `true`, will throw an error if they are not authorized).
 
@@ -337,74 +345,6 @@ For caching tables, this can be defined to allow stale entries to be returned wh
 The Resource class also has static methods that mirror the instance methods with an initial argument that is the id of the record to act on. The static methods are generally the preferred and most convenient method for interacting with tables outside of methods that are directly extending a table. Whereas instances methods are bound to a specific record, the static methods allow you to specify any record in the table to act on.
 
 The `get`, `put`, `delete`, `publish`, `subscribe`, and `connect` methods all have static equivalents. There is also a `static search()` method for specifically handling searching a table with query parameters. By default, the Resource static methods default to creating an instance bound to the record specified by the arguments, and calling the instance methods. Again, generally static methods are the preferred way to interact with resources and call them from application code. These methods are available on all user Resource classes and tables.
-
-### `get(target: RequestTarget|Id, context?: Resource|Context)`
-
-This will retrieve a resource instance by id. For example, if you want to retrieve comments by id in the retrieval of a blog post you could do:
-
-```javascript
-const { MyTable, Comment } = tables;
-...
-// in class:
-	async get() {
-		for (let commentId of this.commentIds) {
-			let comment = await Comment.get(commentId, this);
-			// now you can do something with the comment record
-		}
-	}
-```
-
-Type definition for `Id`:
-
-```typescript
-Id = string | number | array<string | number>;
-```
-
-### `get(query: Query, context?: Resource|Context)`
-
-This can be used to retrieve a resource instance by a query. The query can be used to specify a single/unique record by an `id` property, and can be combined with a `select`:
-
-```javascript
-MyTable.get({ id: 34, select: ['name', 'age'] });
-```
-
-This method may also be used to retrieve a collection of records by a query. If the query is not for a specific record id, this will call the `search` method, described above.
-
-### `put(target: RequestTarget|Id, record: object, context?: Resource|Context): Promise<void>`
-
-This will save the provided record or data to this resource. This will create a new record or fully replace an existing record if one exists with the same `id` (primary key).
-
-### `put(record: object, context?: Resource|Context): Promise<void>`
-
-This will save the provided record or data to this resource. This will create a new record or fully replace an existing record if one exists with the same primary key provided in the record. If your table doesn't have a primary key attribute, you will need to use the method with the `id` argument. Make sure to `await` this function to ensure it finishes execution within the surrounding transaction.
-
-### `create(record: object, context?: Resource|Context): Promise<Resource>`
-
-This will create a new record using the provided record for all fields (except primary key), generating a new primary key for the record. This does _not_ check for an existing record; the record argument should not have a primary key and should use the generated primary key. This will (asynchronously) return the new resource instance. Make sure to `await` this function to ensure it finishes execution within the surrounding transaction.
-
-### `post(target: RequestTarget|Id, data: object, context?: Resource|Context): Promise<any>|any`
-
-This will save the provided data to this resource. By default, this will create a new record (by calling `create`). However, the `post` method is specifically intended to be available for custom behaviors, so extending a class to support custom `post` method behavior is encouraged.
-
-### `patch(target: RequestTarget|Id, recordUpdate: object, context?: Resource|Context): Promise<void>|void`
-
-This will save the provided updates to the record. The `recordUpdate` object's properties will be applied to the existing record, overwriting the existing records properties, and preserving any properties in the record that are not specified in the `recordUpdate` object. Make sure to `await` this function to ensure it finishes execution within the surrounding transaction.
-
-### `delete(target: RequestTarget|Id, context?: Resource|Context): Promise<void>|void`
-
-Deletes this resource's record or data. Make sure to `await` this function to ensure it finishes execution within the surrounding transaction.
-
-### `publish(target: RequestTarget|Id, message: object, context?: Resource|Context): Promise<void>|void`
-
-Publishes the given message to the record entry specified by the id in the context. Make sure to `await` this function to ensure it finishes execution within the surrounding transaction.
-
-### `subscribe(subscriptionRequest?, context?: Resource|Context): Promise<Subscription>`
-
-Subscribes to a record/resource. See the description of the `subscriptionRequest` object above for more information on how to use this.
-
-### `search(query: RequestTarget, context?: Resource|Context): AsyncIterable`
-
-This will perform a query on this table or collection. The query parameter can be used to specify the desired query.
 
 ### `setComputedAttribute(name: string, computeFunction: (record: object) => any)`
 
@@ -500,7 +440,7 @@ For example, if we had a method to post a comment on a blog, and when this happe
 const { Comment } = tables;
 
 export class BlogPost extends tables.BlogPost {
-	post(comment) {
+	static post(comment) {
 		// add a comment record to the comment table, using this resource as the source for the context
 		Comment.put(comment, this);
 		this.comments.push(comment.id); // add the id for the record to our array of comment ids
@@ -690,7 +630,7 @@ If we have extended this table class with our own `get()` we can interact with t
 
 ```javascript
 export class CustomProduct extends Product {
-	async get(target) {
+	static async get(target) {
 		let record = await super.get(target);
 		let name = record.name; // this is the name of the current product
 		let rating = record.rating; // this is the rating of the current product
@@ -715,7 +655,7 @@ When running inside a transaction, we can use the `update` method and updates ar
 
 ```javascript
 export class CustomProduct extends Product {
-	post(target, data) {
+	static post(target, data) {
 		let record = this.update(target);
 		record.name = data.name;
 		record.description = data.description;
