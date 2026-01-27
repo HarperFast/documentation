@@ -34,7 +34,7 @@ export class MyExternalData extends Resource {
 		let response = await this.fetch(target.id);
 		// do something with the response
 	}
-	static put(target, data) {
+	static put(target, promisedData) {
 		// send the data into the external source
 	}
 	static delete(target) {
@@ -53,20 +53,22 @@ You can also extend table classes in the same way, overriding the instance metho
 
 ```javascript
 export class MyTable extends tables.MyTable {
-	static get(target) {
+	static async get(target) {
 		// we can add properties or change properties before returning data:
-		return { ...super.get(target), newProperty: 'newValue', existingProperty: 42 }; // returns the record, with additional properties
+		return { ...(await super.get(target)), newProperty: 'newValue', existingProperty: 42 }; // returns the record, with additional properties
 	}
-	static put(target, data) {
+	static async put(target, promisedData) {
+		let data = await promisedData;
 		// can change data any way we want
 		super.put(target, data);
 	}
-	static delete(target) {
-		super.delete(target);
+	static async delete(target) {
+		return super.delete(target);
 	}
-	static post(target, data) {
+	static async post(target, promisedData) {
 		// providing a post handler (for HTTP POST requests) is a common way to create additional
 		// actions that aren't well described with just PUT or DELETE
+		let data = await promisedData;
 	}
 }
 ```
@@ -201,8 +203,9 @@ You can also override `get` to collect data from other tables:
 const { MyTable, Comment } = tables;
 ...
 // in class:
-	static async get() {
-		for (let commentId of this.commentIds) {
+	static async get(target) {
+		let record = await super.get(target);
+		for (let commentId of record.commentIds) {
 			let comment = await Comment.get(commentId, this);
 			// now you can do something with the comment record
 		}
@@ -213,13 +216,13 @@ const { MyTable, Comment } = tables;
 
 This performs a query on this resource or table. By default, this is called by `get(query)` from a collection resource. When this is called for the root resource (like `/Table/`) it searches through all records in the table. You can define or override this method to define how records should be queried. The default `search` method on tables (`super.search(query)`) will perform a query and return an `AsyncIterable` of results. The `query` object can be used to specify the desired query.
 
-### `static put(target: RequestTarget | Id, data: object): void|Response`
+### `static put(target: RequestTarget | Id, data: Promise<object> | object): void|Response`
 
 This will assign the provided record or data to this resource, and is called for HTTP PUT requests. You can define or override this method to define how records should be updated. The default `put` method on tables (`super.put(target, data)`) writes the record to the table (updating or inserting depending on if the record previously existed) as part of the current transaction for the resource instance.
 
 The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `static patch(target: RequestTarget | Id, data: object): void|Response`
+### `static patch(target: RequestTarget | Id, data: Promise<object> | object): void|Response`
 
 This will update the existing record with the provided data's properties, and is called for HTTP PATCH requests. You can define or override this method to define how records should be updated. The default `patch` method on tables (`super.patch(target, data)`) updates the record. The properties will be applied to the existing record, overwriting the existing records properties, and preserving any properties in the record that are not specified in the `data` object. This is performed as part of the current transaction for the resource instance. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
@@ -267,11 +270,11 @@ Return the expiration time of the record.
 
 This will delete this record or resource identified by the target, and is called for HTTP DELETE requests. You can define or override this method to define how records should be deleted. The default `delete` method on tables (`super.delete(target)`) deletes the record identified by target from the table as part of the current transaction. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `static publish(target: RequestTarget, message): void|Response`
+### `static publish(target: RequestTarget, message: Promise<object> | object): void|Response`
 
 This will publish a message to this resource, and is called for MQTT publish commands. You can define or override this method to define how messages should be published. The default `publish` method on tables (`super.publish(target, message)`) records the published message as part of the current transaction; this will not change the data in the record but will notify any subscribers to the record/topic. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
-### `static post(target: RequestTarget, data: object): void|Response`
+### `static post(target: RequestTarget, data: Promise<object> | object): void|Response`
 
 This is called for HTTP POST requests. You can define this method to provide your own implementation of how POST requests should be handled. Generally `POST` provides a generic mechanism for various types of data updates, and is a good place to define custom functionality for updating records. The default behavior is to create a new record/resource. The `target` object represents the target of a request and can be used to access the path, coerced id, and any query parameters that were included in the URL.
 
