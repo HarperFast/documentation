@@ -56,7 +56,9 @@ Plugins have replaced an old Harper component system called **extensions**. Plug
 
 Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process. Harper instances are meant to be treated as "serverful" systems (contrary to ephemeral "serverless" services). As such, Harper's main thread is meant to always stay running. The concept of a "restart" is specific to restarting the worker threads, and persisting the main thread. Harper uses a rolling restart in order to ensure the Harper system remains functional throughout a restart. Furthermore, the entire Harper process can be safely stopped and started, but generally that should be unnecessary for application development.
 
-> Harper provides an environment variable, `HARPER_EXIT_ON_RESTART`, that will exit the process when it is instructed to restart. This is meant to be used along side a container environment restart policy such as docker's `--restart=unless-stopped` so that the entire Harper process can be restarted. Its important to keep in mind that full process restarts will disrupt functionality.
+:::note
+Harper provides an environment variable, `HARPER_EXIT_ON_RESTART`, that will exit the process when it is instructed to restart. This is meant to be used along side a container environment restart policy such as docker's `--restart=unless-stopped` so that the entire Harper process can be restarted. Its important to keep in mind that full process restarts will disrupt functionality.
+:::
 
 Plugins run exclusively on worker threads, but the older version, extensions, can run on both the main and worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins and extensions. One critical advantage that plugins have over extensions is their ability to respond to configuration changes without restarting.
 
@@ -108,15 +110,20 @@ Use the mermaid diagram from docs/developers/applications/index.md as visual aid
 
 In the first guide, we introduced you to the `/health` endpoint. This is provided by Harper's built-in Operations API.
 
-The **Operations API** provides a full set of capabilities for configuring, deploying, administering, and controlling Harper. It is configured on port `9925` by default, and primarily functions through JSON-based, POST requests to the root path `/`. It has some additional functionalities too such as the `/health` endpoint and an OpenAPI endpoint (`/api/openapi/rest`).
+The **Operations API** provides a full set of capabilities for configuring, deploying, administering, and controlling Harper. It is configured on port `9925` by default, and primarily functions through JSON-based, POST requests to the root path `/`. It has some additional functionalities too such as the `/health` endpoint and an OpenAPI endpoint `/api/openapi/rest`.
 
-The root path POST requests must be authenticated using the `Authorization` request header. If Harper is configured with the `authentication.authorizeLocal: true` option, then the main admin user (the one created during Harper installation) is automatically added to all requests. Meaning the `Authorization` header can be omitted. Fabric users will always need to provide an `Authorization` header. Harper automatically enables `authentication.authorizeLocal` when installed using the `dev` default config (as was instructed in the previous installation guide).
+The operations API root path POST requests must be authenticated. Harper provides an `authentication.authorizeLocal` configuration option for automatically authorizing any requests from the loopback IP address as the superuser (the one created during Harper installation). This option is enabled automatically when Harper is installed using the `dev` default config (as was instructed in the getting started guide). Thus, local installation users may make unauthenticated requests. Container based installation users must use `--network host` when running the container in order to make use of this option. And Fabric or any other remote host installations generally must authenticate all requests.
 
-> Operations API examples throughout this guide will always include an Authorization header value as a reminder for Fabric users as well as for security best practices. The next sections actually demonstrate disabling the `authentication.authorizeLocal` configuration setting for exactly this purpose. Local installation developers can optionally leave this option enabled and omit the Authorization header from their requests for an easier experience.
+:::note
+The `authentication.authorizeLocal` option should be disabled for any Harper servers that may be accessed by untrusted users from the same instance. For example, it should be disabled if you are using a local proxy, or for general server hardening.
+:::
 
-### Getting Started with Basic Authentication
+This and future learn guides will omit `Authorization` headers from any request examples. The assumption is that all local installation readers have `authorizeLocal` enabled, local container installation users are running the container with a shared network host, and Fabric users are using the UI or an authenticated HTTP client to make requests. Nonetheless, we've included the following section on how to setup Basic Authentication in case it is necessary. Most readers may skip ahead to the [First Operation API Request](#first-operation-api-request) section.
 
-The simplest authorization scheme is [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme such as JSON Web Tokens (JWT) or certificates; both of which Harper supports and will be covered in later Learn guides.
+<details>
+	<summary>Basic Authentication</summary>
+
+The simplest authorization scheme is [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme or certificates. Harper supports many different authentication mechanisms, and they will all be covered in later Learn guides.
 
 Use the username and password values from the previous [Install and Connect](/learn/getting-started/install-and-connect-harper) guide to generate an authorization value. The important part is to combine the `username` and `password` using a colon `:` character, encode that using base64, and then append the result to `"Basic "`. Here are some efficient methodologies:
 
@@ -144,11 +151,31 @@ const authorizationValue = `Basic ${credentials}`;
 
 > Both of these options are preferred over [`btoa()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa) do to its limitation to Latin-1 character set.
 
+And finally, you would use the `authorizationValue` as the value for the `Authorization` header such as:
+
+```typescript
+fetch('/', {
+	// ...
+	headers: {
+		'Authorization': authorizationValue,
+	},
+	// ...
+});
+```
+
+</details>
+
 ### First Operations API Request
 
-Lets test out the `authorizationValue` by creating a proper Operations API request. First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Using your HTTP client of choice, create a POST request to your running Harper instance with `Authorization` and `Content-Type: application/json` headers, and a JSON body containing `{ "operation": "get_configuration" }`.
+There are many great operations to chose from, but to get started, lets try the `system_information` operation.
 
-> Fabric users, remember to replace `http://localhost` with your Fabric instance URL.
+:::note
+All `operation` values will be in snake_case; all lowercase and underscores `_` in-place of spaces.
+:::
+
+First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Then, using your HTTP client of choice, create a POST request to your running Harper instance with `Content-Type: application/json` header, and a JSON body containing `{ "operation": "system_information" }`.
+
+> Fabric users, remember to replace `http://localhost` with your Fabric instance URL, and include an authorization header.
 
 <Tabs>
   <TabItem value="curl">
@@ -218,7 +245,7 @@ curl 'http://localhost:9925/' \
 	-X POST \
 	-H "Content-Type: application/json" \
 	-H "Authorization: <authorizationValue>" \
-	-d '{ "operation": "get_configuration" }'
+	-d '{ "operation": "set_configuration", "authentication_authorizelocal": false }'
 ```
 
 You may also include `| jq` here to render the output as JSON.
@@ -234,7 +261,8 @@ const response = await fetch('http://localhost:9925/', {
 		'Authorization': authorizationValue,
 	},
 	body: JSON.stringify({
-		"operation": "get_configuration"
+		"operation": "set_configuration",
+		"authentication_authorizelocal": false
 	}),
 });
 const data = await response.json();
@@ -245,121 +273,125 @@ console.log(data);
 
 </Tabs>
 
-### Common Operations API Endpoints
+{/* I'm not sure we really need this section; a callout to the reference docs for _all_ Operations would be better IMO */}
 
-{/* [NOTE: Showcase a few key endpoints beyond /health:
+{/* ### Common Operations API Endpoints */}
+
+{/* AI Generated Outline: Showcase a few key endpoints beyond /health:
 - restart_service (mentioned in docs/developers/applications/index.md)
 - read_log (mentioned in docs/developers/applications/debugging.md)
 - Other essential operations for application development
-Include code examples for 1-2 operations.] */}
+Include code examples for 1-2 operations. */}
 
 ### Operations API vs Application REST APIs
 
-{/* [NOTE: Clarify the distinction - Operations API (port 9925) for system management vs REST API (port 9926) for application data. This reinforces concepts from Getting Started.] */}
+{/* AI Generated Outline: Clarify the distinction - Operations API (port 9925) for system management vs REST API (port 9926) for application data. This reinforces concepts from Getting Started. */}
+
+{/* AI is stupid. Lets use this section to show off more operations APIs like getting resources. compare to using REST interface from getting started. */}
 
 ## Working with the Harper CLI
 
-{/* [NOTE: Expand on CLI usage beyond the basic `harper` and `harper dev` commands already introduced in Getting Started.] */}
+{/* AI Generated Outline: Expand on CLI usage beyond the basic `harper` and `harper dev` commands already introduced in Getting Started. */}
 
 ### Essential CLI Commands for Application Development
 
-{/* [NOTE: Cover key commands developers use regularly:
+{/* AI Generated Outline: Cover key commands developers use regularly:
 - `harper` (already used in Getting Started - installation)
 - `harper dev` (already used in Getting Started - development)
 - `harper deploy` (briefly mentioned in Getting Started bonus section)
 - Commands for component management
-Include practical examples and when to use each.] */}
+Include practical examples and when to use each. */}
 
 ### CLI vs Operations API: Choosing Your Tools
 
-{/* [NOTE: Explain when to use CLI (local development, deployments) vs Operations API (programmatic control, automation). They often accomplish the same things via different interfaces.] */}
+{/* AI Generated Outline: Explain when to use CLI (local development, deployments) vs Operations API (programmatic control, automation). They often accomplish the same things via different interfaces. */}
 
 ## Debugging Harper Applications
 
-{/* [NOTE: Essential debugging content from docs/developers/applications/debugging.md] */}
+{/* AI Generated Outline: Essential debugging content from docs/developers/applications/debugging.md */}
 
 ### Development Mode and Debugging
 
-{/* [NOTE: Explain `harper dev` in more depth:
+{/* AI Generated Outline: Explain `harper dev` in more depth:
 - Single-threaded mode for easier debugging
 - File watching and auto-restart (already experienced in Getting Started)
 - How to connect a debugger (Chrome DevTools, VSCode, WebStorm)
-Include step-by-step instructions with code/configuration examples.] */}
+Include step-by-step instructions with code/configuration examples. */}
 
 ### Logging: Console vs Harper Logger
 
-{/* [NOTE: Explain the distinction:
+{/* AI Generated Outline: Explain the distinction:
 - console.log() for local development (fine for what was done in Getting Started)
 - `logger` global for production use
 - Different log levels (trace, debug, info, warn, error, fatal, notify)
-Include examples of using the logger in resources.js or other application code.] */}
+Include examples of using the logger in resources.js or other application code. */}
 
 ### Viewing and Querying Logs
 
-{/* [NOTE: Explain how to access logs:
+{/* AI Generated Outline: Explain how to access logs:
 - Local file system (~/hdb/log/hdb.log)
 - Studio Status page (for Fabric users)
 - `read_log` operation from Operations API
-Include practical examples.] */}
+Include practical examples. */}
 
 ### Debugging Strategies and Common Issues
 
-{/* [NOTE: Practical tips for debugging:
+{/* AI Generated Outline: Practical tips for debugging:
 - Setting breakpoints in resources.js
 - Debugging schema loading issues
 - Troubleshooting plugin configuration
-- Common errors and how to resolve them] */}
+- Common errors and how to resolve them */}
 
 ## Application Structure Best Practices
 
-{/* [NOTE: Guidance on organizing Harper applications for maintainability] */}
+{/* AI Generated Outline: Guidance on organizing Harper applications for maintainability */}
 
 ### Core Application Files
 
-{/* [NOTE: Explain the purpose and best practices for:
+{/* AI Generated Outline: Explain the purpose and best practices for:
 - config.yaml (introduced in Getting Started)
 - schema.graphql (introduced in Getting Started)
 - resources.js (will be covered in depth in next guide)
 - package.json (for dependencies)
-- Directory structure recommendations] */}
+- Directory structure recommendations */}
 
 ### Configuration Management
 
-{/* [NOTE: Deeper dive into config.yaml:
+{/* AI Generated Outline: Deeper dive into config.yaml:
 - How plugins are configured
 - Environment-specific configurations
 - Configuration validation and troubleshooting
-Build on the simple config.yaml example from Getting Started.] */}
+Build on the simple config.yaml example from Getting Started. */}
 
 ### File Organization and Conventions
 
-{/* [NOTE: Recommended patterns for growing applications:
+{/* AI Generated Outline: Recommended patterns for growing applications:
 - When to split schemas into multiple files
 - Organizing resources by domain
-- Directory structures for larger applications] */}
+- Directory structures for larger applications */}
 
 ## Building on the Foundation
 
-{/* [NOTE: Transitional section that ties everything together and previews what comes next] */}
+{/* AI Generated Outline: Transitional section that ties everything together and previews what comes next */}
 
 ### What You've Accomplished
 
-{/* [NOTE: Recap of the conceptual foundation laid:
+{/* AI Generated Outline: Recap of the conceptual foundation laid:
 - Deep understanding of Harper's architecture
 - Knowledge of component types and when to use each
 - Familiarity with essential tooling (CLI, Operations API)
 - Debugging capabilities
-- Best practices for application structure] */}
+- Best practices for application structure */}
 
 ### Next Steps in Your Harper Journey
 
-{/* [NOTE: Preview upcoming Learn guides:
+{/* AI Generated Outline: Preview upcoming Learn guides:
 - Deep dive into Custom Resources and JavaScript (resources.js in detail)
 - Schema definition and data modeling
 - Caching and performance
 - Authentication and security
 - Web applications and frontends
-Each preview should reference concepts introduced in this guide.] */}
+Each preview should reference concepts introduced in this guide. */}
 
 ## Additional Resources
 
