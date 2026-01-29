@@ -167,13 +167,13 @@ fetch('/', {
 
 ### First Operations API Request
 
-There are many great operations to chose from, but to get started, lets try the `system_information` operation.
+There are many great operations to chose from, but to get started, lets try the `get_status` operation.
 
 :::note
 All `operation` values will be in snake_case; all lowercase and underscores `_` in-place of spaces.
 :::
 
-First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Then, using your HTTP client of choice, create a POST request to your running Harper instance with `Content-Type: application/json` header, and a JSON body containing `{ "operation": "system_information" }`.
+First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Then, using your HTTP client of choice, create a POST request to your running Harper instance with `Content-Type: application/json` header, and a JSON body containing `{ "operation": "get_status" }`.
 
 > Fabric users, remember to replace `http://localhost` with your Fabric instance URL, and include an authorization header.
 
@@ -184,8 +184,7 @@ First, ensure Harper is running (refer to the previous guide if you need a quick
 curl 'http://localhost:9925/' \
 	-X POST \
 	-H "Content-Type: application/json" \
-	-H "Authorization: <authorizationValue>" \
-	-d '{ "operation": "get_configuration" }'
+	-d '{ "operation": "get_status" }'
 ```
 
 You may also include `| jq` here to render the output as JSON.
@@ -198,10 +197,9 @@ const response = await fetch('http://localhost:9925/', {
 	method: 'POST',
 	headers: {
 		'Content-Type': 'application/json',
-		'Authorization': authorizationValue,
 	},
 	body: JSON.stringify({
-		"operation": "get_configuration"
+		"operation": "get_status"
 	}),
 });
 const data = await response.json();
@@ -212,9 +210,147 @@ console.log(data);
 
 </Tabs>
 
-You should see a JSON representation of the Harper instance's configuration with top-level properties such as `http`, `threads`, `authentication`, and `logging`.
+This operation returns a JSON object with three top-level properties: `restartRequired`, `systemStatus`, and `componentStatus`.
+
+The `restartRequired` property is a mechanism for Harper plugins to indicate they require a restart for some changes to take effect (more on this later).
+
+The other two properties are lists containing status objects corresponding to different parts of Harper. These should all read `"status": "healthy"` right now, and you may recognize some of the `"name"` and `"componentName"` fields as they correspond to Harper's built-in subsystems (such as `"http"`, `"threads"`, and `"authentication"`).
+
+### More with Operations API
+
+The Operations API is mainly intended to be used for system management purposes. It does have the ability to do data management (create/modify/query databases, tables, and records), Harper has released significantly more ergonomic and performant methods instead.
+
+Harper keeps a reference of all operations in the Operations API reference documentation, but here a few more you can try immediately: `user_info`, `read_log`, and `describe_all`.
+
+For `describe_all` to work, ensure that you are still running the Harper application you created in the previous guide. If you need to, checkout the [`02-rest-api`](https://github.com/HarperFast/create-your-first-application/tree/02-rest-api) branch of the `HarperFast/create-your-first-application` repository to ensure you have the necessary application files for this example.
+
+You should see a JSON object with a top-level property `"data"`. This operation returns a map of all databases and tables. The `"data"` is the default database in Harper. Within that object, there should be a `"Dog"` key. This is the table you defined with `graphqlSchema` in the previous guide.
+
+The entire JSON response should look something like this:
+
+```json
+{
+  "data": {
+    "Dog": {
+      "schema": "data",
+      "name": "Dog",
+      "hash_attribute": "id",
+      "audit": true,
+      "schema_defined": true,
+      "attributes": [
+        {
+          "attribute": "id",
+          "type": "ID",
+          "is_primary_key": true
+        },
+        {
+          "attribute": "name",
+          "type": "String"
+        },
+        {
+          "attribute": "breed",
+          "type": "String"
+        },
+        {
+          "attribute": "age",
+          "type": "Int"
+        }
+      ],
+      "db_size": 212992,
+      "sources": [],
+      "record_count": 1,
+      "table_size": 16384,
+      "db_audit_size": 16384
+    }
+  }
+}
+```
+
+Now lets keep drilling down in specificity by using the `describe_database` and then the `describe_table` operations. The difference this time is that these operations require additional properties.
+
+For `describe_database`, you can specify `"database": "data"`. The entire request body would look something like this:
+
+```json
+{
+	"operation": "describe_database",
+	"database": "data"
+}
+```
+
+The response this time should omit the top-level `"data"` key, and instead be just an object containing `"Dog"` (the singular table defined in the `data` database so far).
+
+And for `describe_table`, you would specify both `"database": "data"` and `"table": "Dog"`,
+
+```json
+{
+	"operation": "describe_database",
+	"database": "data",
+	"table": "Dog"
+}
+```
+
+Now there is yet another way to get information about the `Dog` table; with the REST interface!
+
+Create a `GET` request to `http://localhost:9926/Dog` and its important that you omit any trailing forward slash `/`, this request should return a slightly different JSON object describing the `Dog` table.
+
+<Tabs>
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/Dog' | jq
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch('http://localhost:9926/Dog');
+const data = await response.json();
+console.log(data);
+```
+
+  </TabItem>
+
+</Tabs>
+
+Expected result:
+
+```json
+{
+  "records": "./",
+  "name": "Dog",
+  "database": "data",
+  "auditSize": 3,
+  "attributes": [
+    {
+      "type": "ID",
+      "name": "id",
+      "isPrimaryKey": true,
+      "attribute": "id"
+    },
+    {
+      "type": "String",
+      "name": "name",
+      "attribute": "name"
+    },
+    {
+      "type": "String",
+      "name": "breed",
+      "attribute": "breed"
+    },
+    {
+      "type": "Int",
+      "name": "age",
+      "attribute": "age"
+    }
+  ]
+}
+```
+
+All in all, the Operations API is fundamental tool for managing and introspecting your Harper instance. We'll cover more operations throughout the Learn guides.
 
 {/* 
+(This comment was from before when this example used get_configuration)
 I had an idea for a section here that dives into the configuration object. This would be an opportunity to like highlight different default features as well as
 default configuration values. It would also highlight like relevant things the user may want to tweak, such as logging level, threads debugging, etc. But I've 
 decided that that content is better suited for specific sections. Like later in this guide it will introduce using the debugger, and will refer to modifying the
@@ -228,6 +364,10 @@ Harper configuration.
 ```
 
 */}
+
+{/* 
+
+I had this section here because I originally wanted to guide local users through enforcing authorization, but per other conversations we switched to the other way. this is no longer necessary; users will get experience setting config options later. 
 
 ### Modifying the Harper Configuration using the Operations API
 
@@ -271,7 +411,7 @@ console.log(data);
 
   </TabItem>
 
-</Tabs>
+</Tabs> */}
 
 {/* I'm not sure we really need this section; a callout to the reference docs for _all_ Operations would be better IMO */}
 
@@ -283,15 +423,127 @@ console.log(data);
 - Other essential operations for application development
 Include code examples for 1-2 operations. */}
 
-### Operations API vs Application REST APIs
+## Expanding your Harper Application with custom Resources
 
-{/* AI Generated Outline: Clarify the distinction - Operations API (port 9925) for system management vs REST API (port 9926) for application data. This reinforces concepts from Getting Started. */}
+If you're following along from getting started, you should have a basic Harper application running containing a `schema.graphql` and `config.yaml` files defining a simple `Dog` table and REST endpoint. Lets expand on this example while also exploring more of Harper's lifecycle and application development capabilities.
 
-{/* AI is stupid. Lets use this section to show off more operations APIs like getting resources. compare to using REST interface from getting started. */}
+:::note
+If you want to ensure you're application code is at the right starting point, checkout the [`02-rest-api`](https://github.com/HarperFast/create-your-first-application/tree/02-rest-api) branch of the `HarperFast/create-your-first-application` repository.
+:::
 
-## Working with the Harper CLI
+Create a new file `resources.js` within your Harper application; here we are going to define custom Resources.
 
-{/* AI Generated Outline: Expand on CLI usage beyond the basic `harper` and `harper dev` commands already introduced in Getting Started. */}
+**Resources** are the mechanism for defining custom functionality in your Harper application. This gives you tremendous flexibility and control over how data is accessed and modified in Harper. The corresponding Resource API is a unified API for modeling different data sources within Harper as JavaScript classes. Generally, this is where the core business logic of your application lives. Database tables (the ones defined by `graphqlSchema` entries) are `Resource` classes, and so extending the function of a table is as simple as extending their class.
+
+Resource classes have methods that correspond to standard HTTP/REST methods, like `get`, `post`, `patch`, and `put` to implement specific handling for any of these methods (for tables they all have default implementations). Furthermore, by simply `export` 'ing a resource class, Harper will generate REST API endpoints for it just like the `@export` directive did in `graphqlSchema`. The Resource API is quite powerful, and we'll dive into different aspects throughout future Learn guides, but for now lets start with a trivial example extending the existing `Dog` table that already exists in your application.
+
+Inside of `resources.js` add the following code for defining a `DogWithHumanAge` custom resource:
+
+```javascript
+// Fun fact, the 7:1 ratio is a misconception
+// https://www.akc.org/expert-advice/health/how-to-calculate-dog-years-to-human-years/
+function calculateHumanAge(dogAge) {
+	if (dogAge === 1) {
+		return 15;
+	} else if (dogAge === 2) {
+		return 24;
+	} else {
+		return 24 + 5 * dogAge - 2;
+	}
+}
+
+export class DogWithHumanAge extends tables.Dog {
+	static loadAsInstance = false;
+	async get(target) {
+		const dogRecord = await super.get(target);
+
+		return {
+			...dogRecord,
+			humanAge: calculateHumanAge(dogRecord.age),
+		}
+	}
+}
+```
+
+Then open `config.yaml` and add the `jsResource` plugin:
+
+```yaml
+# Harper application configuration
+graphqlSchema:
+  files: 'schema.graphql'
+jsResource:
+  files: 'resources.js'
+rest: true
+```
+
+Ensure Harper has restarted (automatically in `dev` mode or by manually starting/stopping it), and then prepare to query the new resource. In the getting started guide we created a singular dog record with an id of `001`. Create a `GET` request to `/DogWithHumanAge/001` and display the resulting JSON:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/DogWithHumanAge/001' | jq
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch('http://localhost:9926/DogWithHumanAge/001');
+const dog = await response.json();
+console.log(dog);
+```
+
+  </TabItem>
+</Tabs>
+
+The resulting JSON object should look similar to the original `Dog/001` entry, except this time there is a new property `humanAge`.
+
+Notably, did you see how we were able to use the `001` id with the new resource immediately? And it was able to derive the underlying `Dog` record? Lets take a closer look at the custom resource implementation:
+
+```javascript
+export class DogWithHumanAge extends tables.Dog {
+	// ...
+}
+```
+
+The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is a global added by Harper that is a map of all tables within the instance, such as the ones defined by `graphqlSchema`. The `export` keyword is used here to instruct Harper to automatically generated a REST API endpoint for the custom resource.
+
+```javascript
+export class DogWithHumanAge extends tables.Dog {
+	static loadAsInstance = false;
+	async get (target) {
+		// ...
+	}
+}
+```
+
+The `static loadAsInstance = false;` line established that the Resource instances will not be bound to a specific record. Instead instances represent the whole table, capturing the context and current transactional state.
+
+```javascript
+export class DogWithHumanAge extends tables.Dog {
+	static loadAsInstance = false;
+	async get(target) {
+		const dogRecord = await super.get(target);
+
+		return {
+			...dogRecord,
+			humanAge: calculateHumanAge(dogRecord.age),
+		}
+	}
+}
+```
+
+Thus, the `super` part of `const dogRecord = await super.get(target);` refers to the original `tables.Dog`. By passing through the `target` object to `super.get(target)`, we are querying the original `Dog` table defined by `graphqlSchema`. The `dogRecord` instance returned here corresponds to whatever the request `/<id>` portion specified.
+
+The rest of the `get()` method returns a new object with a copy of `dogRecord` and a newly computed `humanAge` field.
+
+The `dogRecord` isn't just a plain JSON object; it has its own set of methods including comprehensive getters and setters. However, Harper does make all the defined properties available as enumerable properties so by using the `...` spread operator, you can easily copy all of the relevant properties of the `dogRecord` instance.
+
+Now if you perhaps tried to use a query string selector, like `GET /DogWithHumanAge/?age=5`, this `get()` method implementation can't quite handle it yet; but this will be covered soon!
+
+For now, celebrate that you've successfully implemented your first custom resource!
+
 
 ### Essential CLI Commands for Application Development
 
