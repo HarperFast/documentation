@@ -1,5 +1,5 @@
 ---
-title: Harper Application and Plugin Development
+title: Harper Applications in Depth
 ---
 
 import Tabs from '@theme/Tabs';
@@ -7,15 +7,13 @@ import TabItem from '@theme/TabItem';
 
 import HarperArchitectureDiagram from '../../src/components/learn/harper-architecture-diagram.mdx';
 
-{/* AI Generated Outline: Introduction paragraph - to be written in prose style explaining that this guide deepens the understanding of Harper Applications beyond the Getting Started section, focusing on the architecture, development patterns, and tooling that developers use day-to-day when building with Harper. */}
-
 In the Getting Started guides you successfully installed Harper and created your first application. You experienced Harper's schema and database system, and the automatic REST API feature too. This guide dives deeper into Harper's Component Architecture differentiating applications from plugins, and introduces multiple new ways to interact with Harper. By the end of this guide you will be a confident Harper application developer capable of creating just about anything with Harper!
 
 ## What You Will Learn
 
 - The fundamental concepts and architecture of Harper Applications
-- How applications, plugins, and extensions work together in the Harper ecosystem
-- The distinction between applications and extensions/plugins, and when to use each
+- How applications and plugins work together in the Harper ecosystem
+- The distinction between applications and plugins, and when to use each
 - How to interact with Harper using the Operations API and CLI
 - Essential debugging techniques for Harper application development
 - Best practices for structuring and developing Harper applications
@@ -29,11 +27,9 @@ In the Getting Started guides you successfully installed Harper and created your
 
 ## Revisiting Harper's Architecture
 
-{/* AI Generated Outline: Expand on the architecture introduced in Getting Started, providing deeper explanation of the component system. Use the architecture diagram/ASCII art from Getting Started as reference point but explain in more detail how the layers interact. */}
-
 In the previous guide we introduced a high-level Harper architecture diagram:
 
-<HarperArchitectureDiagram/>
+<HarperArchitectureDiagram />
 
 And defined some key Harper concepts:
 
@@ -49,11 +45,6 @@ Plugins have replaced an old Harper component system called **extensions**. Plug
 
 ### The Harper Stack in Detail
 
-{/* AI Generated Outline: Detailed prose explanation of each layer:
-- Core Services (database, networking, component management) - what they provide, why they matter
-- Plugins (built-in vs custom) - their role in extending core functionality
-- Applications - the user-facing implementations that tie everything together */}
-
 Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process. Harper instances are meant to be treated as "serverful" systems (contrary to ephemeral "serverless" services). As such, Harper's main thread is meant to always stay running. The concept of a "restart" is specific to restarting the worker threads, and persisting the main thread. Harper uses a rolling restart in order to ensure the Harper system remains functional throughout a restart. Furthermore, the entire Harper process can be safely stopped and started, but generally that should be unnecessary for application development.
 
 :::note
@@ -68,45 +59,13 @@ Since core services and plugins are the building blocks of applications, they to
 
 ### Component Classification: Built-in vs Custom
 
-{/* AI Generated Outline: Explain the distinction between built-in and custom components, why this matters for development, and how to reference each type. Include practical examples. */}
-
 Harper further classifies components (plugins and applications) as either built-in or custom. **Built-in** components are internal to Harper, require no additional installation steps, and are immediately accessible for use. The `graphqlSchema` and `rest` plugins are great examples of built-in plugins. **Custom** components are external to Harper, generally available as an npm package or git repository, and do require additional installation steps in order to be used. Custom components can be authored by anyone, including Harper. Any of Harper's official custom components are published using the `@harperdb` and `@harper` package scopes, such as the [`@harperdb/nextjs`](https://github.com/HarperDB/nextjs) plugin for developing Next.js applications or the [`@harperdb/status-check`](https://github.com/HarperDB/status-check) application.
 
 Harper's reference documentation contains detailed documentation for all built-in components. Custom components will be documented within their respective repositories.
 
 Harper does not currently include any built-in applications, making "custom applications" a bit redundant. Generally, we just refer to them as "applications". However, there is a multitude of both built-in and custom plugins, and so the documentation tends to specify whenever relevant.
 
-{/* The AI outline included a sub-section here for component lifecycle. I think we have enough text so far and need to move into some actual development. I think lifecycle will fit in better later too when the user has learned more about managing components, particularly applications using the Operations API and CLI. */}
-
-{/* I'm not sold on these next four sub-sections. I think they are good titles for the reference page on components. I think the content written above walks the line of informative but not-overly technical well-enough. For more in depth docs, that is where the components/applications/plugins reference page will come into play. Leaving the sections here for now as the rest of the guide is drafted, but will likely move them and rewrite the reference page quite a bit. */}
-
-{/* ### What Makes Something an Application? */}
-
-{/* AI Generated Outline: Elaborate on applications as user-facing implementations. Provide concrete examples:
-- A Next.js web application serving a UI
-- An Apollo GraphQL server providing an API
-- A custom REST API using resources.js
-Use the mermaid diagram from docs/developers/applications/index.md as visual aid. */}
-
-{/* ### What Makes Something a Plugin? */}
-
-{/* AI Generated Outline: Explain extensions as the building blocks that enable functionality. Examples:
-- `graphqlSchema` enables table definition (already used in Getting Started)
-- `rest` enables automatic REST API generation (already used in Getting Started)
-- `@harperdb/nextjs` enables building Next.js apps
-- Custom extensions can depend on other extensions */}
-
-{/* ### When to Build an Application vs an Plugin */}
-
-{/* AI Generated Outline: Practical guidance on decision-making. Key principle: extensions enable, applications implement. Provide decision tree or clear guidelines. */}
-
-{/* ### The Plugin API */}
-
-{/* AI Generated Outline: Briefly mention the v4.6+ plugin system as covered in docs/developers/applications/index.md, note it's experimental, and reference the plugin API docs for readers who want to explore. Don't go too deep since this is fundamentals. */}
-
 ## Working with the Operations API
-
-{/* AI Generated Outline: Introduce the Operations API as the primary interface for managing Harper programmatically. Build on the /health endpoint from Getting Started. */}
 
 In the first guide, we introduced you to the `/health` endpoint. This is provided by Harper's built-in Operations API.
 
@@ -132,7 +91,7 @@ Use the username and password values from the previous [Install and Connect](/le
 In Node.js v24 or earlier use the [`Buffer`](https://nodejs.org/docs/latest/api/buffer.html) API:
 
 ```typescript
-// Ensure you replace these with your installation's values 
+// Ensure you replace these with your installation's values
 const username = 'HDB_ADMIN';
 const password = 'abc123!';
 const credentials = Buffer.from(`${username}:${password}`).toString('base64');
@@ -142,7 +101,7 @@ const authorizationValue = `Basic ${credentials}`;
 For Node.js v25 or later, most web browser consoles, and any WinterTC Minimum Common API compatible runtime use the [`Uint8Array.prototype.toBase64()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/toBase64) API:
 
 ```typescript
-// Ensure you replace these with your installation's values 
+// Ensure you replace these with your installation's values
 const username = 'HDB_ADMIN';
 const password = 'abc123!';
 const credentials = new TextEncoder().encode(`${username}:${password}`).toBase64();
@@ -157,7 +116,7 @@ And finally, you would use the `authorizationValue` as the value for the `Author
 fetch('/', {
 	// ...
 	headers: {
-		'Authorization': authorizationValue,
+		Authorization: authorizationValue,
 	},
 	// ...
 });
@@ -170,7 +129,7 @@ fetch('/', {
 There are many great operations to chose from, but to get started, lets try the `get_status` operation.
 
 :::note
-All `operation` values will be in snake_case; all lowercase and underscores `_` in-place of spaces.
+All `operation` values will be in snake*case; all lowercase and underscores `*` in-place of spaces.
 :::
 
 First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Then, using your HTTP client of choice, create a POST request to your running Harper instance with `Content-Type: application/json` header, and a JSON body containing `{ "operation": "get_status" }`.
@@ -181,7 +140,7 @@ First, ensure Harper is running (refer to the previous guide if you need a quick
   <TabItem value="curl">
 
 ```bash
-curl 'http://localhost:9925/' \
+curl -s 'http://localhost:9925/' \
 	-X POST \
 	-H "Content-Type: application/json" \
 	-d '{ "operation": "get_status" }'
@@ -199,7 +158,7 @@ const response = await fetch('http://localhost:9925/', {
 		'Content-Type': 'application/json',
 	},
 	body: JSON.stringify({
-		"operation": "get_status"
+		operation: 'get_status',
 	}),
 });
 const data = await response.json();
@@ -230,39 +189,39 @@ The entire JSON response should look something like this:
 
 ```json
 {
-  "data": {
-    "Dog": {
-      "schema": "data",
-      "name": "Dog",
-      "hash_attribute": "id",
-      "audit": true,
-      "schema_defined": true,
-      "attributes": [
-        {
-          "attribute": "id",
-          "type": "ID",
-          "is_primary_key": true
-        },
-        {
-          "attribute": "name",
-          "type": "String"
-        },
-        {
-          "attribute": "breed",
-          "type": "String"
-        },
-        {
-          "attribute": "age",
-          "type": "Int"
-        }
-      ],
-      "db_size": 212992,
-      "sources": [],
-      "record_count": 1,
-      "table_size": 16384,
-      "db_audit_size": 16384
-    }
-  }
+	"data": {
+		"Dog": {
+			"schema": "data",
+			"name": "Dog",
+			"hash_attribute": "id",
+			"audit": true,
+			"schema_defined": true,
+			"attributes": [
+				{
+					"attribute": "id",
+					"type": "ID",
+					"is_primary_key": true
+				},
+				{
+					"attribute": "name",
+					"type": "String"
+				},
+				{
+					"attribute": "breed",
+					"type": "String"
+				},
+				{
+					"attribute": "age",
+					"type": "Int"
+				}
+			],
+			"db_size": 212992,
+			"sources": [],
+			"record_count": 1,
+			"table_size": 16384,
+			"db_audit_size": 16384
+		}
+	}
 }
 ```
 
@@ -317,111 +276,62 @@ Expected result:
 
 ```json
 {
-  "records": "./",
-  "name": "Dog",
-  "database": "data",
-  "auditSize": 3,
-  "attributes": [
-    {
-      "type": "ID",
-      "name": "id",
-      "isPrimaryKey": true,
-      "attribute": "id"
-    },
-    {
-      "type": "String",
-      "name": "name",
-      "attribute": "name"
-    },
-    {
-      "type": "String",
-      "name": "breed",
-      "attribute": "breed"
-    },
-    {
-      "type": "Int",
-      "name": "age",
-      "attribute": "age"
-    }
-  ]
+	"records": "./",
+	"name": "Dog",
+	"database": "data",
+	"auditSize": 3,
+	"attributes": [
+		{
+			"type": "ID",
+			"name": "id",
+			"isPrimaryKey": true,
+			"attribute": "id"
+		},
+		{
+			"type": "String",
+			"name": "name",
+			"attribute": "name"
+		},
+		{
+			"type": "String",
+			"name": "breed",
+			"attribute": "breed"
+		},
+		{
+			"type": "Int",
+			"name": "age",
+			"attribute": "age"
+		}
+	]
 }
 ```
 
 All in all, the Operations API is fundamental tool for managing and introspecting your Harper instance. We'll cover more operations throughout the Learn guides.
 
-{/* 
-(This comment was from before when this example used get_configuration)
-I had an idea for a section here that dives into the configuration object. This would be an opportunity to like highlight different default features as well as
-default configuration values. It would also highlight like relevant things the user may want to tweak, such as logging level, threads debugging, etc. But I've 
-decided that that content is better suited for specific sections. Like later in this guide it will introduce using the debugger, and will refer to modifying the
-`threads.debug` setting in order to do so. I think if anything, "exploring the configuration object" should just be a properly detailed reference page on the 
-Harper configuration.
+## The Harper CLI
 
-### Exploring the Harper Configuration Object
+So far you've only used the Harper CLI to run Harper itself, but it can do so much more than that!
 
-```json
-{ ... }
-```
+In previous guides we demonstrated how to use the `harper` and `harper dev` commands to run Harper; with the later automatically restarting threads on application changes. There are a few more ways to manage a Harper instance using the CLI.
 
-*/}
+- `harper run <path>` is an alias for the default `harper` command. These commands run Harper in the current process
+- `harper start` will start Harper in a background process
+- `harper stop` command will gracefully shutdown Harper
+- `harper restart` will restart the main process and all threads (different than the thread-only restart from the `dev` command)
+- `harper status` displays the status of the process including the PID
 
-{/* 
+There are a few more commands not listed here (check out the [CLI reference]() if you're interested), and there is one more fun trick with the CLI.
 
-I had this section here because I originally wanted to guide local users through enforcing authorization, but per other conversations we switched to the other way. this is no longer necessary; users will get experience setting config options later. 
+Certain operations from the Operations API are available as CLI commands! They follow the convention: `harper <operation> <param>=<value>`, and by return YAML by default. You can always pass `json=true` to see the result in JSON instead.
 
-### Modifying the Harper Configuration using the Operations API
-
-Particularly relevant for local installation users, lets learn how to disable the `authentication.authorizeLocal` property so that you have the same experience as Fabric users do providing `Authorization` headers for all Operations API requests. Keep in mind, Learn guides will always specify an `Authorization` header for requests, but it is possible for local installation users to ignore it if they leave this option enabled.
-
-:::important
-You should never enable this option on Fabric or other hosted instances. It is generally secure even if enabled, but there are possible hosting configurations that can result in insecure access to your Harper instance.
-:::
-
-<Tabs>
-  <TabItem value="curl">
+We'll dive deeper in the CLI operations later for the purpose of deploying and managing your application, but for now, try out some of the operations you've already learned. Don't forget that you can append `json=true` and `| jq` to get nicely formatted JSON output.
 
 ```bash
-curl 'http://localhost:9925/' \
-	-X POST \
-	-H "Content-Type: application/json" \
-	-H "Authorization: <authorizationValue>" \
-	-d '{ "operation": "set_configuration", "authentication_authorizelocal": false }'
+harper get_status
+harper describe_all
+harper describe_database database=data
+harper describe_table database=data table=Dog
 ```
-
-You may also include `| jq` here to render the output as JSON.
-
-  </TabItem>
-  <TabItem value="fetch">
-
-```typescript
-const response = await fetch('http://localhost:9925/', {
-	method: 'POST',
-	headers: {
-		'Content-Type': 'application/json',
-		'Authorization': authorizationValue,
-	},
-	body: JSON.stringify({
-		"operation": "set_configuration",
-		"authentication_authorizelocal": false
-	}),
-});
-const data = await response.json();
-console.log(data);
-```
-
-  </TabItem>
-
-</Tabs> */}
-
-{/* I'm not sure we really need this section; a callout to the reference docs for _all_ Operations would be better IMO */}
-
-{/* ### Common Operations API Endpoints */}
-
-{/* AI Generated Outline: Showcase a few key endpoints beyond /health:
-- restart_service (mentioned in docs/developers/applications/index.md)
-- read_log (mentioned in docs/developers/applications/debugging.md)
-- Other essential operations for application development
-Include code examples for 1-2 operations. */}
 
 ## Expanding your Harper Application with custom Resources
 
@@ -448,7 +358,7 @@ function calculateHumanAge(dogAge) {
 	} else if (dogAge === 2) {
 		return 24;
 	} else {
-		return 24 + 5 * dogAge - 2;
+		return 24 + 5 * (dogAge - 2);
 	}
 }
 
@@ -460,7 +370,7 @@ export class DogWithHumanAge extends tables.Dog {
 		return {
 			...dogRecord,
 			humanAge: calculateHumanAge(dogRecord.age),
-		}
+		};
 	}
 }
 ```
@@ -499,6 +409,16 @@ console.log(dog);
 
 The resulting JSON object should look similar to the original `Dog/001` entry, except this time there is a new property `humanAge`.
 
+```json
+{
+	"name": "Harper",
+	"breed": "Black Labrador / Chow Mix",
+	"age": 5,
+	"id": "001",
+	"humanAge": 39
+}
+```
+
 Notably, did you see how we were able to use the `001` id with the new resource immediately? And it was able to derive the underlying `Dog` record? Lets take a closer look at the custom resource implementation:
 
 ```javascript
@@ -512,7 +432,7 @@ The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
 	static loadAsInstance = false;
-	async get (target) {
+	async get(target) {
 		// ...
 	}
 }
@@ -529,7 +449,7 @@ export class DogWithHumanAge extends tables.Dog {
 		return {
 			...dogRecord,
 			humanAge: calculateHumanAge(dogRecord.age),
-		}
+		};
 	}
 }
 ```
@@ -544,106 +464,147 @@ Now if you perhaps tried to use a query string selector, like `GET /DogWithHuman
 
 For now, celebrate that you've successfully implemented your first custom resource!
 
-
-### Essential CLI Commands for Application Development
-
-{/* AI Generated Outline: Cover key commands developers use regularly:
-- `harper` (already used in Getting Started - installation)
-- `harper dev` (already used in Getting Started - development)
-- `harper deploy` (briefly mentioned in Getting Started bonus section)
-- Commands for component management
-Include practical examples and when to use each. */}
-
-### CLI vs Operations API: Choosing Your Tools
-
-{/* AI Generated Outline: Explain when to use CLI (local development, deployments) vs Operations API (programmatic control, automation). They often accomplish the same things via different interfaces. */}
-
 ## Debugging Harper Applications
 
-{/* AI Generated Outline: Essential debugging content from docs/developers/applications/debugging.md */}
+Now that your Harper application is actually executing some custom logic; lets learn how to efficiently debug your code.
 
-### Development Mode and Debugging
+Thinking back to the Harper architecture earlier in this guide, we detailed that Harper runs as a singular main process and uses worker threads for parallelization. Furthermore, we mentioned that where exactly Harper runs your application code is a bit dynamic. Applications are executed by plugins and extensions. Plugins will only ever run on worker threads, but some old extensions still execute on the main thread. Harper is hard at work converting all of the built-in extensions to the new plugin API, but it is still a work in progress. For example, the `graphqlSchema` and `rest` plugins you used are actually still extensions. However, `jsResource` has been converted to the new plugin API.
 
-{/* AI Generated Outline: Explain `harper dev` in more depth:
-- Single-threaded mode for easier debugging
-- File watching and auto-restart (already experienced in Getting Started)
-- How to connect a debugger (Chrome DevTools, VSCode, WebStorm)
-Include step-by-step instructions with code/configuration examples. */}
+Harper provides the ability to launch a proper debugger as part of the Harper process; which you can connect to from any debugger tool such as your browser or IDE. This will let you properly debug your application code, particularly the custom code you implemented in `resources.js` with `jsResource` plugin.
 
-### Logging: Console vs Harper Logger
+Harper v4 (the current version everyone uses) ships as a built and minified package, so debugging the Harper source may be confusing; you generally will only want to debug your custom code. However, in the near future, as Harper v5 is released using our new open source core, you will be able to debug Harper's core too!
 
-{/* AI Generated Outline: Explain the distinction:
-- console.log() for local development (fine for what was done in Getting Started)
-- `logger` global for production use
-- Different log levels (trace, debug, info, warn, error, fatal, notify)
-Include examples of using the logger in resources.js or other application code. */}
+Before getting started, lets use the Operations API to inspect how Harper is currently configured. Lets use the `get_configuration` operation. We are looking for the `"threads"` part of the configuration object in particular.
 
-### Viewing and Querying Logs
+<Tabs>
+  <TabItem value="CLI">
 
-{/* AI Generated Outline: Explain how to access logs:
-- Local file system (~/hdb/log/hdb.log)
-- Studio Status page (for Fabric users)
-- `read_log` operation from Operations API
-Include practical examples. */}
+```bash
+harper get_configuration json=true | jq .'threads'
+```
 
-### Debugging Strategies and Common Issues
+  </TabItem>
+  <TabItem value="curl">
 
-{/* AI Generated Outline: Practical tips for debugging:
-- Setting breakpoints in resources.js
-- Debugging schema loading issues
-- Troubleshooting plugin configuration
-- Common errors and how to resolve them */}
+```bash
+curl -s 'http://localhost:9925/' \
+	-X POST \
+	-H "Content-Type: application/json" \
+	-d '{ "operation": "get_configuration" }' | jq .'threads'
+```
 
-## Application Structure Best Practices
+  </TabItem>
+  <TabItem value="fetch">
 
-{/* AI Generated Outline: Guidance on organizing Harper applications for maintainability */}
+```typescript
+const response = await fetch('http://localhost:9925/', {
+	method: 'POST',
+	headers: {
+		'Content-Type': 'application/json',
+	},
+	body: JSON.stringify({
+		operation: 'get_configuration',
+	}),
+});
+const data = await response.json();
+console.log(data.threads);
+```
 
-### Core Application Files
+  </TabItem>
+</Tabs>
 
-{/* AI Generated Outline: Explain the purpose and best practices for:
-- config.yaml (introduced in Getting Started)
-- schema.graphql (introduced in Getting Started)
-- resources.js (will be covered in depth in next guide)
-- package.json (for dependencies)
-- Directory structure recommendations */}
+The result should contain two properties, `count` and `debug`. With the development default config these configuration properties should have the values:
 
-### Configuration Management
+```json
+{
+	"count": 1,
+	"debug": true
+}
+```
 
-{/* AI Generated Outline: Deeper dive into config.yaml:
-- How plugins are configured
-- Environment-specific configurations
-- Configuration validation and troubleshooting
-Build on the simple config.yaml example from Getting Started. */}
+If you values aren't the same, then use this as an opportunity to try using the `set_configuration` operation! You'll need to specify the nested property as snake_case, so to set `debug: true`, you would specify: `harper set_configuration threads_debug=true`. Don't forget to restart the entire Harper process after making configuration changes.
 
-### File Organization and Conventions
+If you look closely at your Harper output, you should see a line `Debugger listening on` followed by a WebSocket URL (starts with `ws://`).
 
-{/* AI Generated Outline: Recommended patterns for growing applications:
-- When to split schemas into multiple files
-- Organizing resources by domain
-- Directory structures for larger applications */}
+Using a debugger of your choice, attach to this debug process.
 
-## Building on the Foundation
+Now set a breakpoint somewhere in `resources.js` such as the last return statement of `calculateHumanAge()`.
 
-{/* AI Generated Outline: Transitional section that ties everything together and previews what comes next */}
+Then run the `GET /DogWithHumanAge/001` query from earlier and watch as your debugger breaks in your custom code!
 
-### What You've Accomplished
+Don't forget to _continue_ the process using the debugger to let the request complete.
 
-{/* AI Generated Outline: Recap of the conceptual foundation laid:
-- Deep understanding of Harper's architecture
-- Knowledge of component types and when to use each
-- Familiarity with essential tooling (CLI, Operations API)
-- Debugging capabilities
-- Best practices for application structure */}
+:::note
+When using the debugger, and breaking on application code for too long, particularly in a custom resource, you may see log lines such as:
 
-### Next Steps in Your Harper Journey
+```
+[http/1] [warn]: JavaScript execution has taken too long and is not allowing proper event queue cycling, consider using 'await new Promise(setImmediate)' in code that will execute for a long duration
+```
 
-{/* AI Generated Outline: Preview upcoming Learn guides:
-- Deep dive into Custom Resources and JavaScript (resources.js in detail)
-- Schema definition and data modeling
-- Caching and performance
-- Authentication and security
-- Web applications and frontends
-Each preview should reference concepts introduced in this guide. */}
+:::
+
+You can disconnect the debugger and resume using Harper as usual.
+
+## Logging with Harper Logger
+
+Harper comes with a built-in logger. It is what powers the `harper` CLI output and throughout building your first application and trying some operations, you've likely seen many additional lines in your terminal output. You may have even tried the `read_log` operation too.
+
+The logger is a very fundamental piece to application development. Not only does it a serve a crucial purpose at runtime for understanding how your application is running, but it can be a very useful development tool too.
+
+Harper's logger is available as a global `logger` API. It has methods for each log level, and some additional utilities too.
+
+The available log levels (in hierarchical order) are:
+
+```
+trace
+debug
+info
+warn
+error
+fatal
+notify
+```
+
+The main logger is configured at the top-level of the configuration object. Try using the operations API to view your instance's current logging configuration.
+
+The `logger` configuration object has a lot to it, but the most important fields for application _development_ (don't worry, we'll discuss running applications in production in another guide) are `level`, `console`, and `stdStreams`.
+
+For example, `level` is defaulted to `info` in `dev` mode. This means that all logs from `info` to `notify` levels will be created by default. If you want to see additional levels, use `set_configuration` to change the log level (remember to use snake_case to specify the configuration property, ex `logging_level=debug`).
+
+The best way to conceptualize Harper's logger is that its primary function is to output structure logs to a specified log file(s). By default this is `<root_path>/logs/hdb.log`. Now the `stdStreams` configuration option is what instructs the logger to _also_ log Harper logs to the standard output and error streams (aka `stdout` and `stderr`). Furthermore, the `console` option instructs Harper to forward `Console` API logs (aka `console.log()`) to the log file.
+
+In general, Harper recommends you always use the Harper logger API, even for debugging and developing applications. But support for the `Console` API will always exist since we cannot dictate how downstream modules may operate.
+
+Lets quickly practice creating a log in the custom resources code.
+
+Add a `logger.info()` line anywhere in `resources.js`, such within the `get()` method:
+
+```javascript
+// ...
+export class DogWithHumanAge extends tables.Dog {
+	// ...
+	async get(target) {
+		logger.debug('Hello from inside DogWithHumanAge!');
+		// ...
+	}
+}
+```
+
+Ensure Harper restarts and then execute the `GET /DogWithHumanAge/001` query again.
+
+You should see:
+
+```
+[http/1] [info]: Hello from inside DogWithHumanAge!
+```
+
+We'll cover logs more in depth in a later guide about running your Harper app in production.
+
+## What You've Accomplished
+
+This guide started off with a deep dive into Harper's component architecture and differentiating applications from plugins. You learned how to use Harper's Operations API for system management, and learned some new CLI commands too. You got your first taste of Harper's Resource API and implemented your first custom endpoint. We'll be using this API a lot more throughout later guides. Finally, you learned how to use a debugger with your Harper application and how to use Harper's built-in logger too.
+
+At this point, you should confident to start tinkering with your own ideas for a Harper application. In the next guide we'll be exploring more of Harper's Resource API, exploring more schema directives, and diving deeper into what Harper applications are really capable of.
 
 ## Additional Resources
 
