@@ -25,7 +25,7 @@ In the Getting Started guides you successfully installed Harper and created your
 - Basic familiarity with Node.js and JavaScript
 - Working Harper installation (local or Fabric)
 
-## Revisiting Harper's Architecture
+## The Harper Stack in more Detail
 
 In the previous guide we introduced a high-level Harper architecture diagram:
 
@@ -41,21 +41,9 @@ And defined some key Harper concepts:
 
 The most important thing to remember is that plugins enable the functionality and applications implement it. Similar to that of a front-end framework. React is like a plugin; on its own it doesn't actually do anything. You actually need to build an application with React for it do anything meaningful.
 
-Plugins have replaced an old Harper component system called **extensions**. Plugins and extensions have essentially the same definition, but different APIs. In time, extensions will be deprecated, and we encourage all developers to use the plugins immediately. However, both systems are fully supported in Harper v4 and v5.
+Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process.
 
-### The Harper Stack in Detail
-
-Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process. Harper instances are meant to be treated as "serverful" systems (contrary to ephemeral "serverless" services). As such, Harper's main thread is meant to always stay running. The concept of a "restart" is specific to restarting the worker threads, and persisting the main thread. Harper uses a rolling restart in order to ensure the Harper system remains functional throughout a restart. Furthermore, the entire Harper process can be safely stopped and started, but generally that should be unnecessary for application development.
-
-:::note
-Harper provides an environment variable, `HARPER_EXIT_ON_RESTART`, that will exit the process when it is instructed to restart. This is meant to be used along side a container environment restart policy such as docker's `--restart=unless-stopped` so that the entire Harper process can be restarted. Its important to keep in mind that full process restarts will disrupt functionality.
-:::
-
-Plugins run exclusively on worker threads, but the older version, extensions, can run on both the main and worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins and extensions. One critical advantage that plugins have over extensions is their ability to respond to configuration changes without restarting.
-
-Both the `graphqlSchema` database schema system and the `rest` automatic REST API features from the previous guide are technically implemented as built-in extensions still. If you were running Harper locally, the `harper dev` command automatically restarted Harper for you. And if you were using Fabric, this is why you had to click on the "Restart Cluster" button. We are actively migrating all built-in extensions to the plugin API, and once complete, a lot of Harper will run entirely in worker threads and require less restarts in order to respond to configuration and file changes. Aside from the subtle differences in execution context, extensions and plugins very much serve the same purpose. Aside from this section where we are deliberately specifying the technical differences between the two, we have switched to using the plugin terminology entirely. This is to simplify and align our documentation to Harpers ideal future.
-
-Since core services and plugins are the building blocks of applications, they too can run across all threads. As an application developer, you don't necessarily need to worry to much about what plugins are doing behind the scenes; however, its important to keep in mind that for now, restarting Harper is an important step throughout application development, deployment, and management. Later in this guide you will learn other methods for restarting Harper beyond just the `dev` command.
+Plugins run exclusively on worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins. Some application changes require restarting the Harper instance in order to take affect. In time, we hope that restarts will become completely unnecessary, but for now its best to always assume you need to restart Harper for any application changes. Plugins are capable to dynamically responding to application changes (without a restart), but not all of Harper's built-in or custom plugins take full advantage of that API capability yet. Thus, for now, **restart Harper when updating applications**. Later in this guide you will learn other methods for restarting Harper beyond just the `dev` command.
 
 ### Component Classification: Built-in vs Custom
 
