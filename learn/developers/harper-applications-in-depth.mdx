@@ -6,6 +6,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 import HarperArchitectureDiagram from '../../src/components/learn/harper-architecture-diagram.mdx';
+import BasicAuthentication from '../../src/components/learn/basic-authentication.mdx';
 
 In the Getting Started guides you successfully installed Harper and created your first application. You experienced Harper's schema and database system, and the automatic REST API feature too. This guide dives deeper into Harper's Component Architecture differentiating applications from plugins, and introduces multiple new ways to interact with Harper. By the end of this guide you will be a confident Harper application developer capable of creating just about anything with Harper!
 
@@ -13,16 +14,16 @@ In the Getting Started guides you successfully installed Harper and created your
 
 - The fundamental concepts and architecture of Harper Applications
 - How applications and plugins work together in the Harper ecosystem
-- The distinction between applications and plugins, and when to use each
+- The distinction between applications and plugins
+- The structure of the Harper installation
 - How to interact with Harper using the Operations API and CLI
+- Introduction to the Harper Resource API for custom endpoint development
 - Essential debugging techniques for Harper application development
-- Best practices for structuring and developing Harper applications
 
 ## Prerequisites
 
 - Completed [Install and Connect Harper](../getting-started/install-and-connect-harper)
 - Completed [Create Your First Application](../getting-started/create-your-first-application)
-- Basic familiarity with Node.js and JavaScript
 - Working Harper installation (local or Fabric)
 
 ## The Harper Stack in more Detail
@@ -53,6 +54,43 @@ Harper's reference documentation contains detailed documentation for all built-i
 
 Harper does not currently include any built-in applications, making "custom applications" a bit redundant. Generally, we just refer to them as "applications". However, there is a multitude of both built-in and custom plugins, and so the documentation tends to specify whenever relevant.
 
+### Harper Installation File Structure
+
+One of the founding principles of Harper is its simplicity. When you install Harper locally or are using a Fabric instance, we wanted it to be effortless to introspect your installation and understand how it works. Refer back to the previous installation guide and determine what path you installed Harper to. For many users, this path is likely within your home directory. Local, container installs likely mounted to a similar path. And Fabric users should follow along using the browser.
+
+Within every Harper installation are these core files and directories:
+
+```
+~/hdb
+  ┠─ backup/
+  ┠─ components/
+  ┠─ database/
+  ┠─ keys/
+  ┠─ log/
+  ┠─ harper-application-lock.json
+  ┠─ harperdb-config.yaml
+  ┠─ hdb.pid
+  ┠─ operations-server
+  ┗━ README.md
+```
+
+Some of these files are runtime-only such as `hdb.pid` and `operations-server`.
+
+The `README.md` contains some relevant information about the installation files and directories, as well as additional links to the documentation site.
+
+The directories themselves are fairly self-explanatory:
+- `backup/` is for system backups
+- `components/` is where your application code goes (when you deploy it)
+- `database/` is the database files
+- `keys/` is any security keys for the purpose of authentication; more on this in a future guide
+- `log/` is where log files are stored
+
+The `harper-application-lock.json` file is similar to any sort of lockfile. Its purpose is to ensure Harper is installing the correct versions of applications and plugins. This is an internal file and you shouldn't ever have to modify it yourself.
+
+Finally, and most importantly is the `harperdb-config.yaml`. This is the main configuration file for your Harper installation. Lets open this file and inspect its contents. Local users should open it in their editor of choice, Fabric users should navigate to the "Config" tab from their main organization view.
+
+You should see a number of top-level properties such as `http`, `threads`, `authentication`, and more. Each of these corresponds to one of Harper's built-in core features. This file is the source of truth for Harper configuration values. You can make changes directly to the file and then restart Harper for them to take affect.
+
 ## Working with the Operations API
 
 In the first guide, we introduced you to the `/health` endpoint. This is provided by Harper's built-in Operations API.
@@ -65,76 +103,32 @@ The operations API root path POST requests must be authenticated. Harper provide
 The `authentication.authorizeLocal` option should be disabled for any Harper servers that may be accessed by untrusted users from the same instance. For example, it should be disabled if you are using a local proxy, or for general server hardening.
 :::
 
-This and future learn guides will omit `Authorization` headers from any request examples. The assumption is that all local installation readers have `authorizeLocal` enabled, local container installation users are running the container with a shared network host, and Fabric users are using the UI or an authenticated HTTP client to make requests. Nonetheless, we've included the following section on how to setup Basic Authentication in case it is necessary. Most readers may skip ahead to the [First Operation API Request](#first-operation-api-request) section.
+This and future learn guides omit `Authorization` headers from any request examples. The assumption is that all local installation readers have `authorizeLocal` enabled, local container installation users are running the container with a shared network host, and Fabric users are using the UI or an authenticated HTTP client to make requests. Nonetheless, we've included the following section on how to setup Basic Authentication in case it is necessary. Most readers may skip ahead to the [First Operation API Request](#first-operations-api-request) section.
 
-<details>
-	<summary>Basic Authentication</summary>
-
-The simplest authorization scheme is [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme or certificates. Harper supports many different authentication mechanisms, and they will all be covered in later Learn guides.
-
-Use the username and password values from the previous [Install and Connect](/learn/getting-started/install-and-connect-harper) guide to generate an authorization value. The important part is to combine the `username` and `password` using a colon `:` character, encode that using base64, and then append the result to `"Basic "`. Here are some efficient methodologies:
-
-{/* Maybe consider using Tabs here with labels like "Node.js <=v24" and ("Web" or "Winter" or "W/MCA" if defined that abbreviation earlier somehow?) */}
-
-In Node.js v24 or earlier use the [`Buffer`](https://nodejs.org/docs/latest/api/buffer.html) API:
-
-```typescript
-// Ensure you replace these with your installation's values
-const username = 'HDB_ADMIN';
-const password = 'abc123!';
-const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-const authorizationValue = `Basic ${credentials}`;
-```
-
-For Node.js v25 or later, most web browser consoles, and any WinterTC Minimum Common API compatible runtime use the [`Uint8Array.prototype.toBase64()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/toBase64) API:
-
-```typescript
-// Ensure you replace these with your installation's values
-const username = 'HDB_ADMIN';
-const password = 'abc123!';
-const credentials = new TextEncoder().encode(`${username}:${password}`).toBase64();
-const authorizationValue = `Basic ${credentials}`;
-```
-
-> Both of these options are preferred over [`btoa()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa) do to its limitation to Latin-1 character set.
-
-And finally, you would use the `authorizationValue` as the value for the `Authorization` header such as:
-
-```typescript
-fetch('/', {
-	// ...
-	headers: {
-		Authorization: authorizationValue,
-	},
-	// ...
-});
-```
-
-</details>
+<BasicAuthentication />
 
 ### First Operations API Request
 
 There are many great operations to chose from, but to get started, lets try the `get_status` operation.
 
 :::note
-All `operation` values will be in snake*case; all lowercase and underscores `*` in-place of spaces.
+All `operation` values will be in `snake_case`; all lowercase and underscores in-place of spaces.
 :::
 
 First, ensure Harper is running (refer to the previous guide if you need a quick refresher). Then, using your HTTP client of choice, create a POST request to your running Harper instance with `Content-Type: application/json` header, and a JSON body containing `{ "operation": "get_status" }`.
 
 > Fabric users, remember to replace `http://localhost` with your Fabric instance URL, and include an authorization header.
 
-<Tabs>
+<Tabs groupId="http-client">
   <TabItem value="curl">
 
 ```bash
 curl -s 'http://localhost:9925/' \
 	-X POST \
 	-H "Content-Type: application/json" \
-	-d '{ "operation": "get_status" }'
+	-d '{ "operation": "get_status" }' \
+	| jq
 ```
-
-You may also include `| jq` here to render the output as JSON.
 
   </TabItem>
   <TabItem value="fetch">
@@ -159,13 +153,13 @@ console.log(data);
 
 This operation returns a JSON object with three top-level properties: `restartRequired`, `systemStatus`, and `componentStatus`.
 
-The `restartRequired` property is a mechanism for Harper plugins to indicate they require a restart for some changes to take effect (more on this later).
+The `restartRequired` property is a mechanism for Harper plugins to indicate they require a restart for some changes to take effect.
 
 The other two properties are lists containing status objects corresponding to different parts of Harper. These should all read `"status": "healthy"` right now, and you may recognize some of the `"name"` and `"componentName"` fields as they correspond to Harper's built-in subsystems (such as `"http"`, `"threads"`, and `"authentication"`).
 
 ### More with Operations API
 
-The Operations API is mainly intended to be used for system management purposes. It does have the ability to do data management (create/modify/query databases, tables, and records), Harper has released significantly more ergonomic and performant methods instead.
+The Operations API is mainly intended to be used for system management purposes. It does have the ability to do data management (create/modify/query databases, tables, and records), but Harper has released significantly more ergonomic and performant methods instead.
 
 Harper keeps a reference of all operations in the Operations API reference documentation, but here a few more you can try immediately: `user_info`, `read_log`, and `describe_all`.
 
@@ -240,7 +234,7 @@ Now there is yet another way to get information about the `Dog` table; with the 
 
 Create a `GET` request to `http://localhost:9926/Dog` and its important that you omit any trailing forward slash `/`, this request should return a slightly different JSON object describing the `Dog` table.
 
-<Tabs>
+<Tabs groupId="http-client">
   <TabItem value="curl">
 
 ```bash
@@ -294,7 +288,7 @@ Expected result:
 }
 ```
 
-All in all, the Operations API is fundamental tool for managing and introspecting your Harper instance. We'll cover more operations throughout the Learn guides.
+All in all, the Operations API is a fundamental tool for managing and introspecting your Harper instance. We'll cover more operations throughout the Learn guides.
 
 ## The Harper CLI
 
@@ -333,7 +327,7 @@ Create a new file `resources.js` within your Harper application; here we are goi
 
 **Resources** are the mechanism for defining custom functionality in your Harper application. This gives you tremendous flexibility and control over how data is accessed and modified in Harper. The corresponding Resource API is a unified API for modeling different data sources within Harper as JavaScript classes. Generally, this is where the core business logic of your application lives. Database tables (the ones defined by `graphqlSchema` entries) are `Resource` classes, and so extending the function of a table is as simple as extending their class.
 
-Resource classes have methods that correspond to standard HTTP/REST methods, like `get`, `post`, `patch`, and `put` to implement specific handling for any of these methods (for tables they all have default implementations). Furthermore, by simply `export` 'ing a resource class, Harper will generate REST API endpoints for it just like the `@export` directive did in `graphqlSchema`. The Resource API is quite powerful, and we'll dive into different aspects throughout future Learn guides, but for now lets start with a trivial example extending the existing `Dog` table that already exists in your application.
+Resource classes have methods that correspond to standard HTTP/REST methods, like `get`, `post`, `patch`, and `put` to implement specific handling for any of these methods (for tables they all have default implementations). Furthermore, by simply `export` 'ing a resource class, Harper will generate REST API endpoints for it just like the `@export` directive did in `graphqlSchema`. The Resource API is quite powerful, and we'll dive into different aspects throughout future Learn guides, but for now lets start with a simple example extending the existing `Dog` table that already exists in the application.
 
 Inside of `resources.js` add the following code for defining a `DogWithHumanAge` custom resource:
 
@@ -352,7 +346,7 @@ function calculateHumanAge(dogAge) {
 
 export class DogWithHumanAge extends tables.Dog {
 	static loadAsInstance = false;
-	async get(target) {
+	async async get(target) {
 		const dogRecord = await super.get(target);
 
 		return {
@@ -374,7 +368,7 @@ jsResource:
 rest: true
 ```
 
-Ensure Harper has restarted (automatically in `dev` mode or by manually starting/stopping it), and then prepare to query the new resource. In the getting started guide we created a singular dog record with an id of `001`. Create a `GET` request to `/DogWithHumanAge/001` and display the resulting JSON:
+Ensure Harper has restarted (automatically in `dev` mode or by manually starting/stopping it), and then prepare to query the new resource endpoint. Just like with the `Dog` table, the automatically generated endpoint matches the name of the exported class, in this case `DogWithHumanAge/`. In the getting started guide we created a singular dog record with an id of `001`. Create a `GET` request to `/DogWithHumanAge/001` and display the resulting JSON:
 
 <Tabs groupId="http-client">
   <TabItem value="curl">
@@ -407,15 +401,7 @@ The resulting JSON object should look similar to the original `Dog/001` entry, e
 }
 ```
 
-Notably, did you see how we were able to use the `001` id with the new resource immediately? And it was able to derive the underlying `Dog` record? Lets take a closer look at the custom resource implementation:
-
-```javascript
-export class DogWithHumanAge extends tables.Dog {
-	// ...
-}
-```
-
-The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is a global added by Harper that is a map of all tables within the instance, such as the ones defined by `graphqlSchema`. The `export` keyword is used here to instruct Harper to automatically generated a REST API endpoint for the custom resource.
+Notably, did you see how we were able to use the `001` id with the new resource immediately? And it was able to derive the underlying `Dog` record? Lets take a closer look at the custom resource implementation to understand how this works:
 
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
@@ -426,7 +412,7 @@ export class DogWithHumanAge extends tables.Dog {
 }
 ```
 
-The `static loadAsInstance = false;` line established that the Resource instances will not be bound to a specific record. Instead instances represent the whole table, capturing the context and current transactional state.
+The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is a global added by Harper that is a map of all tables, such as the ones defined by `graphqlSchema`. A table class represents the collection of all the records in the table. Its an interface for querying and accessing records from the table and even creating/updating records too. The purpose of the `static loadAsInstance = false;` line is to ensure that this resource does not load as a singular record instance. This enables `DogWithHumanAge` to extend the functionality of `tables.Dog`. The `export` keyword instructs Harper to automatically generate a REST API endpoint for the custom resource using the same name (`DogWithHumanAge/`).
 
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
@@ -442,7 +428,7 @@ export class DogWithHumanAge extends tables.Dog {
 }
 ```
 
-Thus, the `super` part of `const dogRecord = await super.get(target);` refers to the original `tables.Dog`. By passing through the `target` object to `super.get(target)`, we are querying the original `Dog` table defined by `graphqlSchema`. The `dogRecord` instance returned here corresponds to whatever the request `/<id>` portion specified.
+As we mentioned before, the `tables.Dog` class represents the entire collection of records in that table. Thus, the `get()` method uses the `super` keyword to reference the `tables.Dog` class its extended from in order to retrieve the `target` record. By passing through the `target` object to `super.get(target)`, we are querying the original `Dog` table defined in `graphqlSchema`. The `dogRecord` instance corresponds to whatever the request `/<id>` portion specified.
 
 The rest of the `get()` method returns a new object with a copy of `dogRecord` and a newly computed `humanAge` field.
 
@@ -452,17 +438,21 @@ Now if you perhaps tried to use a query string selector, like `GET /DogWithHuman
 
 For now, celebrate that you've successfully implemented your first custom resource!
 
+:::note
+If you need to check your work, checkout the [`03-custom-resource`](https://github.com/HarperFast/create-your-first-application/tree/03-custom-resource) branch.
+:::
+
 ## Debugging Harper Applications
 
 Now that your Harper application is actually executing some custom logic; lets learn how to efficiently debug your code.
 
-Thinking back to the Harper architecture earlier in this guide, we detailed that Harper runs as a singular main process and uses worker threads for parallelization. Furthermore, we mentioned that where exactly Harper runs your application code is a bit dynamic. Applications are executed by plugins and extensions. Plugins will only ever run on worker threads, but some old extensions still execute on the main thread. Harper is hard at work converting all of the built-in extensions to the new plugin API, but it is still a work in progress. For example, the `graphqlSchema` and `rest` plugins you used are actually still extensions. However, `jsResource` has been converted to the new plugin API.
-
 Harper provides the ability to launch a proper debugger as part of the Harper process; which you can connect to from any debugger tool such as your browser or IDE. This will let you properly debug your application code, particularly the custom code you implemented in `resources.js` with `jsResource` plugin.
 
-Harper v4 (the current version everyone uses) ships as a built and minified package, so debugging the Harper source may be confusing; you generally will only want to debug your custom code. However, in the near future, as Harper v5 is released using our new open source core, you will be able to debug Harper's core too!
+:::note
+Harper v4 ships as a built and minified package, so debugging the Harper source may be confusing; you generally will only want to debug your custom code. However, in the near future, as Harper v5 is released using our new open source core, you will be able to debug Harper's core too!
+:::
 
-Before getting started, lets use the Operations API to inspect how Harper is currently configured. Lets use the `get_configuration` operation. We are looking for the `"threads"` part of the configuration object in particular.
+Before getting started, either open the `harperdb-config.yaml` file or use the Operations API to inspect how Harper is currently configured (using the `get_configuration` operation). We are looking for the `"threads"` part of the configuration object in particular.
 
 <Tabs>
   <TabItem value="CLI">
@@ -510,7 +500,7 @@ The result should contain two properties, `count` and `debug`. With the developm
 }
 ```
 
-If you values aren't the same, then use this as an opportunity to try using the `set_configuration` operation! You'll need to specify the nested property as snake_case, so to set `debug: true`, you would specify: `harper set_configuration threads_debug=true`. Don't forget to restart the entire Harper process after making configuration changes.
+If you values aren't the same, modify them so that `debug: true` is set. This as another great opportunity to try out another operation, `set_configuration`. You'll need to specify the nested property as snake_case, so to set `debug: true`, you would specify: `harper set_configuration threads_debug=true`, or in JSON `{ "operation": "set_configuration", "threads_debug": true }`. Don't forget to restart Harper after making configuration changes.
 
 If you look closely at your Harper output, you should see a line `Debugger listening on` followed by a WebSocket URL (starts with `ws://`).
 
@@ -537,7 +527,7 @@ You can disconnect the debugger and resume using Harper as usual.
 
 Harper comes with a built-in logger. It is what powers the `harper` CLI output and throughout building your first application and trying some operations, you've likely seen many additional lines in your terminal output. You may have even tried the `read_log` operation too.
 
-The logger is a very fundamental piece to application development. Not only does it a serve a crucial purpose at runtime for understanding how your application is running, but it can be a very useful development tool too.
+The logger is a very fundamental piece to Harper applications. However, since this is _just JavaScript_ you can use the `Console` API (`console.log()`) too!
 
 Harper's logger is available as a global `logger` API. It has methods for each log level, and some additional utilities too.
 
@@ -557,22 +547,23 @@ The main logger is configured at the top-level of the configuration object. Try 
 
 The `logger` configuration object has a lot to it, but the most important fields for application _development_ (don't worry, we'll discuss running applications in production in another guide) are `level`, `console`, and `stdStreams`.
 
-For example, `level` is defaulted to `info` in `dev` mode. This means that all logs from `info` to `notify` levels will be created by default. If you want to see additional levels, use `set_configuration` to change the log level (remember to use snake_case to specify the configuration property, ex `logging_level=debug`).
+For example, `level` is defaulted to `info` in `dev` mode. This means that all logs from `info` to `notify` levels will be created by default. If you want to see additional levels, change the log level in the configuration.
 
-The best way to conceptualize Harper's logger is that its primary function is to output structure logs to a specified log file(s). By default this is `<root_path>/logs/hdb.log`. Now the `stdStreams` configuration option is what instructs the logger to _also_ log Harper logs to the standard output and error streams (aka `stdout` and `stderr`). Furthermore, the `console` option instructs Harper to forward `Console` API logs (aka `console.log()`) to the log file.
+The best way to conceptualize Harper's logger is that its primary function is to output structure logs to specified log files. By default this is `<root_path>/logs/hdb.log`. Now the `stdStreams` configuration option is what instructs the logger to _also_ log Harper logs to the standard output and error streams (aka `stdout` and `stderr`). Furthermore, the `console` option instructs Harper to forward `Console` API logs (aka `console.log()`) to the log file. Ensure that both of these settings are enabled.
 
-In general, Harper recommends you always use the Harper logger API, even for debugging and developing applications. But support for the `Console` API will always exist since we cannot dictate how downstream modules may operate.
+Lets quickly practice creating some logs in the custom resources code.
 
-Lets quickly practice creating a log in the custom resources code.
-
-Add a `logger.info()` line anywhere in `resources.js`, such within the `get()` method:
+Add a `logger.info()` and a `console.log()` anywhere in `resources.js`, such as within the `get()` method:
 
 ```javascript
 // ...
 export class DogWithHumanAge extends tables.Dog {
-	// ...
-	async get(target) {
-		logger.debug('Hello from inside DogWithHumanAge!');
+	static async get(target) {
+		logger.info('Hello from inside DogWithHumanAge!');
+
+		const dogRecord = await super.get(target);
+
+		console.log('dogRecord', dogRecord);
 		// ...
 	}
 }
@@ -584,16 +575,31 @@ You should see:
 
 ```
 [http/1] [info]: Hello from inside DogWithHumanAge!
+dogRecord RecordObject {
+  name: 'Harper',
+  breed: 'Black Labrador / Chow Mix',
+  age: 5,
+  id: '001'
+}
 ```
+
+As you can see, the `logger.info()` message has the structured `[http/1] [info]:` piece, and the `console.log()` does not.
 
 We'll cover logs more in depth in a later guide about running your Harper app in production.
 
+:::note
+If you need to check your work, checkout the [`04-logger`](https://github.com/HarperFast/create-your-first-application/tree/04-logger) branch.
+:::
+
 ## What You've Accomplished
 
-This guide started off with a deep dive into Harper's component architecture and differentiating applications from plugins. You learned how to use Harper's Operations API for system management, and learned some new CLI commands too. You got your first taste of Harper's Resource API and implemented your first custom endpoint. We'll be using this API a lot more throughout later guides. Finally, you learned how to use a debugger with your Harper application and how to use Harper's built-in logger too.
+This guide started off with a deep dive into Harper's component architecture and differentiating applications from plugins. You learned about Harper's file structure, how to use Harper's Operations API for system management, and learned some new CLI commands too. You got your first taste of Harper's Resource API and implemented your first custom endpoint. We'll be using the Resource API a lot more throughout later guides. Finally, you learned how to use a debugger with your Harper application and how to use Harper's built-in logger too.
 
 At this point, you should confident to start tinkering with your own ideas for a Harper application. In the next guide we'll be exploring more of Harper's Resource API, exploring more schema directives, and diving deeper into what Harper applications are really capable of.
 
 ## Additional Resources
 
-TODO
+- [Operations API](/docs/reference/operations-api/)
+- [`logger` global reference](/docs/reference/globals#logger)
+- [Resources](/docs/reference/resources/)
+- [Components](/docs/reference/components/)
