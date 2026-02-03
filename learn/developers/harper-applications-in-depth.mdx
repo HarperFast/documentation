@@ -517,7 +517,7 @@ console.log(data.threads);
   </TabItem>
 </Tabs>
 
-The result should contain two properties, `count` and `debug`. With the development default config these configuration properties should have the values:
+The result should contain two properties, `count` and `debug`. With the default development config, these configuration properties should have the values:
 
 ```json
 {
@@ -526,7 +526,7 @@ The result should contain two properties, `count` and `debug`. With the developm
 }
 ```
 
-If you values aren't the same, modify them so that `debug: true` is set. This as another great opportunity to try out another operation, `set_configuration`. You'll need to specify the nested property as snake_case, so to set `debug: true`, you would specify: `harper set_configuration threads_debug=true`, or in JSON `{ "operation": "set_configuration", "threads_debug": true }`. Don't forget to restart Harper after making configuration changes.
+If your values aren't the same, modify them so that `debug: true` is set. This as another great opportunity to try out another operation, `set_configuration`. You'll need to specify the nested property as snake_case, so to set `debug: true`, you would specify: `harper set_configuration threads_debug=true`, or in JSON `{ "operation": "set_configuration", "threads_debug": true }`. Don't forget to restart Harper after making configuration changes.
 
 If you look closely at your Harper output, you should see a line `Debugger listening on` followed by a WebSocket URL (starts with `ws://`).
 
