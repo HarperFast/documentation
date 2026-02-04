@@ -74,7 +74,7 @@ const config: Config = {
 			'@docusaurus/plugin-content-docs',
 			{
 				id: 'default',
-				path: 'docs',
+				path: 'reference',
 				routeBasePath: 'reference',
 				sidebarPath: './sidebarsReference.ts',
 				editUrl: ({ versionDocsDirPath, docPath }) => {
@@ -317,7 +317,7 @@ const config: Config = {
 				},
 				{
 					type: 'docSidebar',
-					sidebarId: 'docsSidebar',
+					sidebarId: 'referenceSidebar',
 					position: 'left',
 					label: 'Reference',
 				},
