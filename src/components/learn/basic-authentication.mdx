@@ -11,36 +11,6 @@ const password = 'abc123!';
 const authorizationValue = `Basic ${btoa(`${username}:${password}`)}`;
 ```
 
-{/\*
-Replace above with this commented content when we switch from using `atob()` here https://github.com/HarperFast/harper/blob/main/security/auth.ts#L181 potentially in v5
-
-Here are some efficient methodologies:
-
-\{\/\* Maybe consider using Tabs here with labels like "Node.js <=v24" and ("Web" or "Winter" or "W/MCA" if defined that abbreviation earlier somehow?) \*\/\}
-
-In Node.js v24 or earlier use the [`Buffer`](https://nodejs.org/docs/latest/api/buffer.html) API:
-
-```typescript
-// Ensure you replace these with your installation's values
-const username = 'HDB_ADMIN';
-const password = 'abc123!';
-const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-const authorizationValue = `Basic ${credentials}`;
-```
-
-For Node.js v25 or later, most web browser consoles, and any WinterTC Minimum Common API compatible runtime use the [`Uint8Array.prototype.toBase64()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/toBase64) API:
-
-```typescript
-// Ensure you replace these with your installation's values
-const username = 'HDB_ADMIN';
-const password = 'abc123!';
-const credentials = new TextEncoder().encode(`${username}:${password}`).toBase64();
-const authorizationValue = `Basic ${credentials}`;
-```
-
-> Both of these options are preferred over [`btoa()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa) do to its limitation to Latin-1 character set.
-> \*/}
-
 You would use the `authorizationValue` as the value for the `Authorization` header such as:
 
 ```typescript
