@@ -185,7 +185,7 @@ The other two properties are lists containing status objects corresponding to di
 
 ### More with Operations API
 
-The Operations API is mainly intended to be used for system management purposes. It does have the ability to do data management (create/modify/query databases, tables, and records), but Harper has released significantly more ergonomic and performant methods instead.
+The Operations API is mainly intended to be used for system administration purposes. This API runs on a separate port than the main application port serving user traffic, providing a distinct interface for clear differentiation between secure system administration and the application interface designed for high-load, performance and application defined actions. (It does have the ability to do data management, which may overlap with application capabilities, but this is part of a full system administration API).
 
 Harper keeps a [reference of all operations](/docs/developers/operations-api) in the Operations API reference documentation, but here a few more you can try immediately: `user_info`, `read_log`, and `describe_all`.
 
