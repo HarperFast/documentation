@@ -44,11 +44,13 @@ The most important thing to remember is that plugins enable the functionality an
 
 Harper itself is a Node.js application. It runs in a single process, and uses worker threads for parallelization. Harper is meant to be a long-running process.
 
-Plugins run exclusively on worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins. Some application changes require restarting the Harper instance in order to take affect. In time, we hope that restarts will become completely unnecessary, but for now its best to always assume you need to restart Harper for any application changes. Plugins are capable to dynamically responding to application changes (without a restart), but not all of Harper's built-in or custom plugins take full advantage of that API capability yet. Thus, for now, **restart Harper when updating applications**. Later in this guide you will learn other methods for restarting Harper beyond just the `dev` command.
+Plugins run exclusively on worker threads. Some of Harper's core services, such as the database and the networking socket router, are implemented directly within the main process. However, a majority of Harper's core functionality is implemented as built-in plugins. Some application changes require restarting the Harper in order to take affect. As you've experienced already, the `harper dev` command automatically restarts threads on detected file changes. Plugins are sometimes capable to dynamically responding to application changes (without a restart), but not all of Harper's built-in or custom plugins take full advantage of that API capability yet. Thus, for now, **restart Harper when updating applications**. Later in this guide you will learn other methods for restarting Harper beyond just the `dev` command.
+
+Beyond the component system, Harper also includes some other important subsystems. Harper includes the Operations API and CLI for system administration purposes. Furthermore, Harper exposes a number of code-based APIs such as the Resource API and other useful globals such as `logger` as the core building blocks for implementing custom application functionality. You'll learn about all of these throughout this guide.
 
 ### Component Classification: Built-in vs Custom
 
-Harper further classifies components (plugins and applications) as either built-in or custom. **Built-in** components are internal to Harper, require no additional installation steps, and are immediately accessible for use. The `graphqlSchema` and `rest` plugins are great examples of built-in plugins. **Custom** components are external to Harper, generally available as an npm package or git repository, and do require additional installation steps in order to be used. Custom components can be authored by anyone, including Harper. Any of Harper's official custom components are published using the `@harperdb` and `@harper` package scopes, such as the [`@harperdb/nextjs`](https://github.com/HarperDB/nextjs) plugin for developing Next.js applications or the [`@harperdb/status-check`](https://github.com/HarperDB/status-check) application.
+Harper further classifies components (plugins and applications) as either built-in or custom. **Built-in** components are internal to Harper, require no additional installation steps, and are immediately accessible for use. The `graphqlSchema` and `rest` plugins are great examples of built-in plugins. **Custom** components are external to Harper, generally available as an npm package or git repository, and do require additional installation steps in order to be used. Custom components can be authored by anyone, including Harper. Any of Harper's official custom components are published using the `@harperdb` and `@harperfast` package scopes, such as the [`@harperdb/nextjs`](https://github.com/HarperDB/nextjs) plugin for developing Next.js applications or the [`@harperdb/status-check`](https://github.com/HarperDB/status-check) application.
 
 Harper's reference documentation contains detailed documentation for all [built-in components](/docs/reference/components/built-in-extensions). Custom components are documented within their respective repositories.
 
@@ -80,7 +82,7 @@ The `README.md` contains some relevant information about the installation files 
 
 The directories themselves are fairly self-explanatory:
 
-- `backup/` is for system backups
+- `backup/` is for backups of the configuration file
 - `components/` is where your application code goes (when you deploy it)
 - `database/` is the database files
 - `keys/` is any security keys for the purpose of authentication; more on this in a future guide
@@ -438,7 +440,7 @@ export class DogWithHumanAge extends tables.Dog {
 }
 ```
 
-The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is a global added by Harper that is a map of all tables, such as the ones defined by `graphqlSchema`. A table class represents the collection of all the records in the table. Its an interface for querying and accessing records from the table and even creating/updating records too. The purpose of the `static loadAsInstance = false;` line is to ensure that this resource does not load as a singular record instance. This enables `DogWithHumanAge` to extend the functionality of `tables.Dog`. The `export` keyword instructs Harper to automatically generate a REST API endpoint for the custom resource using the same name (`DogWithHumanAge/`).
+The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is a global added by Harper that is a map of all tables, such as the ones defined by `graphqlSchema`. A table class represents the collection of all the records in the table. Its an interface for querying and accessing records from the table and even creating/updating records too. The purpose of the `static loadAsInstance = false;` line is to ensure that we can `get` a direct enumerable record of the dog (rather than an class instance referencing the record). The `DogWithHumanAge` class extends the functionality of `tables.Dog`. The `export` keyword instructs Harper to automatically generate a REST API endpoint for the custom resource using the same name (`DogWithHumanAge/`).
 
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
@@ -559,15 +561,13 @@ Harper's logger is available as a global `logger` API. It has methods for each l
 
 The available log levels (in hierarchical order) are:
 
-```
-trace
-debug
-info
-warn
-error
-fatal
-notify
-```
+1. trace
+2. debug
+3. info
+4. warn
+5. error
+6. fatal
+7. notify
 
 The main logger is configured at the top-level of the configuration object. Try using the operations API to view your instance's current logging configuration.
 
