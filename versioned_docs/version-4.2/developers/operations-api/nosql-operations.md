@@ -264,7 +264,7 @@ Returns data from a table for one or more matching conditions.
 - `conditions` _(required)_ - the array of conditions objects, specified below, to filter by. Must include one or more object in the array
   - `search_attribute` _(required)_ - the attribute you wish to search, can be any attribute
   - `search_type` _(required)_ - the type of search to perform - `equals`, `contains`, `starts_with`, `ends_with`, `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal`, `between`
-  - `search_value` _(required)_ - case-sensitive value you wish to search. If the `search_type` is `between` then use an array of two values to search between
+  - `search_value` _(required)_ - case-sensitive value you wish to search. If the `search_type` is `between` then use an array of two values to search between (both inclusive)
 
 ### Body
 
