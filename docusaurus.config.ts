@@ -58,6 +58,13 @@ const config: Config = {
 	onBrokenLinks: 'throw',
 
 	plugins: [
+		[
+			'@docusaurus/plugin-content-pages',
+			{
+				id: 'default',
+				path: 'src/pages'
+			}
+		],
 		// Learn documentation
 		[
 			'@docusaurus/plugin-content-docs',
@@ -69,11 +76,11 @@ const config: Config = {
 				editUrl: 'https://github.com/HarperFast/documentation/blob/main/',
 			},
 		],
-		// Main documentation
+		// Reference documentation
 		[
 			'@docusaurus/plugin-content-docs',
 			{
-				id: 'default',
+				id: 'reference',
 				path: 'reference',
 				routeBasePath: 'reference',
 				sidebarPath: './sidebarsReference.ts',
@@ -275,6 +282,7 @@ const config: Config = {
 							highlightSearchTermsOnTargetPage: true,
 							searchResultLimits: 8,
 							searchBarPosition: 'right',
+							docsPluginIdForPreferredVersion: 'reference'
 						},
 					],
 				]),
@@ -305,7 +313,7 @@ const config: Config = {
 				alt: 'Harper Logo',
 				src: 'img/HarperPrimaryBlk.svg',
 				srcDark: 'img/HarperPrimaryWht.svg',
-				href: 'https://www.harper.fast/',
+				// href: 'https://www.harper.fast/',
 			},
 			items: [
 				{
@@ -318,6 +326,7 @@ const config: Config = {
 				{
 					type: 'docSidebar',
 					sidebarId: 'referenceSidebar',
+					docsPluginId: 'reference',
 					position: 'left',
 					label: 'Reference',
 				},
@@ -340,6 +349,7 @@ const config: Config = {
 					type: 'docsVersionDropdown',
 					position: 'right',
 					dropdownActiveClassDisabled: true,
+					docsPluginId: 'reference',
 				},
 				{
 					href: 'https://github.com/HarperFast/documentation',
