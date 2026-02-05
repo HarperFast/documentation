@@ -1,0 +1,53 @@
+---
+title: Harper Docs
+---
+
+import CustomDocCardList from '@site/src/components/CustomDocCardList';
+
+# Harper Docs
+
+:::info
+
+### Get the Most Out of Harper
+
+Join our Discord to access expert support, collaborate with Harper’s core team, and stay up to date on the latest platform updates. [Join Our Discord →](https://harper.fast/discord)
+:::
+
+Welcome to the Harper Documentation! Here, you'll find all things Harper, and everything you need to get started, troubleshoot issues, and make the most of our platform.
+
+## Getting Started
+
+The best way to get started using Harper is to head over to the [Learn](/learn/) section and work through the Getting Started and Developer guides.
+
+## Building with Harper
+
+<CustomDocCardList
+	columns={2}
+	items={[
+		{
+			type: 'link',
+			href: 'developers/applications/',
+			label: 'Harper Applications',
+			description: 'Build your a fully featured Harper Component with custom functionality',
+		},
+		{
+			type: 'link',
+			href: 'developers/rest',
+			label: 'REST Queries',
+			description: 'The recommended HTTP interface for data access, querying, and manipulation',
+		},
+		{
+			type: 'link',
+			href: 'developers/operations-api/',
+			label: 'Operations API',
+			description: 'Configure, deploy, administer, and control your Harper instance',
+		},
+		{
+			type: 'link',
+			href: 'developers/replication/',
+			label: 'Clustering & Replication',
+			description:
+				'The process of connecting multiple Harper databases together to create a database mesh network that enables users to define data replication patterns.',
+		},
+	]}
+/>

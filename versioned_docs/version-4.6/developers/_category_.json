@@ -1,0 +1,10 @@
+{
+	"label": "Developers",
+	"position": 1,
+	"link": {
+		"type": "generated-index",
+		"title": "Developers Documentation",
+		"description": "Comprehensive guides and references for building applications with HarperDB",
+		"keywords": ["developers"]
+	}
+}
