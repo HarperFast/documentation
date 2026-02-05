@@ -5,6 +5,9 @@ title: Create Your First Application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+import HarperArchitectureDiagram from '../../src/components/learn/harper-architecture-diagram.mdx';
+import BasicAuthentication from '../../src/components/learn/basic-authentication.mdx';
+
 With Harper successfully installed and setup, let's dive into building your first Harper Application, a simple REST API. Harper lets you build powerful APIs with minimal effort.
 
 ## What You Will Learn
@@ -24,22 +27,7 @@ With Harper successfully installed and setup, let's dive into building your firs
 
 Before diving into building your first Harper application, it is important to understand a bit about Harper's architecture. The simplest way to think about Harper is as a stack.
 
-```
-┏━━━━━━━━━━━━━━━━━━┓
-┃ Applications     ┃
-┠──────────────────┨
-┃ Plugins          ┃
-┃  - rest          ┃
-┃  - graphqlSchema ┃
-┃  - ...           ┃
-┠──────────────────┨
-┃ Core Services:   ┃
-┃  - database      ┃
-┃  - networking    ┃
-┃  - component     ┃
-┃    management    ┃
-┗━━━━━━━━━━━━━━━━━━┛
-```
+<HarperArchitectureDiagram />
 
 At the bottom are the **core services** that make up the foundation of the Harper platform. This includes the high-performance **database**, extensible **networking** middleware, and **component** management system. Components are extensions of the core Harper system, and are further classified as **plugins** and **applications**.
 
@@ -220,13 +208,28 @@ If you need to check your work, checkout the [`02-rest-api`](https://github.com/
 
 With everything in place, now its time to create your first record for the `Dog` table.
 
-With the automatic REST API generation you have a plethora of options for interacting with the `Dog` table. We'll keep it simple for now, but will explore everything this has to offer in later guides.
+The goal is to create a new `Dog` record with an ID of `001` and the properties:
+
+```json
+{
+	"name": "Harper",
+	"breed": "Black Labrador / Chow Mix",
+	"age": 5
+}
+```
+
+With the automatic REST API generation you enabled in the previous step, you now have a plethora of options for interacting with the `Dog` table.
+
+Fabric users should use the UI directly, but can optionally follow along with the following request snippets if they want. Importantly, Fabric users must do things differently:
+
+1. Replace `http://localhost` with their Fabric instance's URL
+2. Include an Authorization header in the requests.
+
+Here is some additional information on how to create a Basic Authentication token:
+
+<BasicAuthentication />
 
 Create a `PUT` request using the REST API port and the path `/Dog/001`. Include a JSON body with the specified attributes except for `id`. The `001` in the URL will be used as the ID for this entry.
-
-:::note
-If you're using Fabric remember to replace the `localhost` with your cluster's URL
-:::
 
 <Tabs groupId="http-client">
   <TabItem value="curl">
@@ -264,7 +267,7 @@ console.log(response.status);
   </TabItem>
 </Tabs>
 
-If you see `204` status code, then the record was successfully created!
+If you see a `204` status code, then the record was successfully created!
 
 ## Read a Record
 
