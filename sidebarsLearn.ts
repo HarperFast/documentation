@@ -23,6 +23,11 @@ const sidebarsLearn: SidebarsConfig = {
 					id: 'getting-started/create-your-first-application',
 					label: 'Create your First Application',
 				},
+				{
+					type: 'doc',
+					id: 'getting-started/using-agents',
+					label: 'Using AI Agents',
+				},
 			],
 		},
 		{
