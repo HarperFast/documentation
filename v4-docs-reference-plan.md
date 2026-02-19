@@ -339,14 +339,15 @@ reference/
 ├── studio/
 │   └── overview.md                  # Studio documentation (still ships with v4 but moving to legacy)
 │
+├── fastify-routes/
+│   └── overview.md                  # Fastify routes documentation (discouraged in favor of components)
+│
 └── legacy/
     ├── cloud/                       # Legacy cloud documentation (replaced by Fabric)
     │
     ├── custom-functions/            # Custom functions (deprecated in favor of components)
     │
-    ├── sql/                         # SQL guide (discouraged)
-    │
-    └── fastify-routes/              # Fastify routes (discouraged) 
+    └── sql/                         # SQL guide (discouraged) 
 ```
 
 ## Redirects
