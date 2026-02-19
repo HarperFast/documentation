@@ -1,0 +1,55 @@
+---
+title: Welcome to Harper Documentation Site
+---
+
+import CustomDocCardList from '@site/src/components/CustomDocCardList';
+
+# Harper Docs
+
+:::info
+
+### Get the Most Out of Harper
+
+Join our Discord to access expert support, collaborate with Harper's core team, and stay up to date on the latest platform updates. [Join Our Discord →](https://harper.fast/discord)
+:::
+
+Harper is an all-in-one backend technology that fuses database technologies, caching, application hosting, and messaging functions into a single system. Unlike traditional architectures where each piece runs independently and incurs extra costs and latency from serialization and network operations between processes, Harper systems can handle workloads seamlessly and efficiently.
+
+Here, you'll find all things Harper, and everything you need to get started, troubleshoot issues, and make the most of our platform.
+
+## Getting Started
+
+The best way to get started using Harper is to head over to the [Learn](/learn/) section and work through the Getting Started and Developer guides.
+
+## Building with Harper
+
+<CustomDocCardList
+	columns={3}
+	items={[
+		{
+			type: 'link',
+			href: '/docs/developers/applications/',
+			label: 'Harper Applications',
+			description: 'Build your a fully featured Harper Component with custom functionality',
+		},
+		{
+			type: 'link',
+			href: '/docs/developers/rest',
+			label: 'REST Queries',
+			description: 'The recommended HTTP interface for data access, querying, and manipulation',
+		},
+		{
+			type: 'link',
+			href: '/docs/developers/operations-api/',
+			label: 'Operations API',
+			description: 'Configure, deploy, administer, and control your Harper instance',
+		},
+		{
+			type: 'link',
+			href: '/docs/developers/replication/',
+			label: 'Clustering & Replication',
+			description:
+				'The process of connecting multiple Harper databases together to create a database mesh network that enables users to define data replication patterns.',
+		},
+	]}
+/>
