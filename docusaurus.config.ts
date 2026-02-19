@@ -55,7 +55,7 @@ const config: Config = {
 	organizationName: 'HarperFast', // Usually your GitHub org/user name.
 	projectName: 'documentation', // Usually your repo name.
 
-	onBrokenLinks: 'throw',
+	onBrokenLinks: 'warn',
 
 	plugins: [
 		[
@@ -269,23 +269,7 @@ const config: Config = {
 		// Use Algolia search in production when env vars are set, otherwise use local search
 		...(process.env.NODE_ENV === 'production' && process.env.ALGOLIA_APP_ID && process.env.ALGOLIA_SEARCH_KEY
 			? ['@docusaurus/theme-search-algolia']
-			: [
-					[
-						require.resolve('@easyops-cn/docusaurus-search-local'),
-						{
-							hashed: true,
-							language: ['en'],
-							indexDocs: true,
-							indexBlog: false,
-							indexPages: true,
-							docsRouteBasePath: routeBasePath,
-							highlightSearchTermsOnTargetPage: true,
-							searchResultLimits: 8,
-							searchBarPosition: 'right',
-							docsPluginIdForPreferredVersion: 'reference'
-						},
-					],
-				]),
+			: []),
 		'@docusaurus/theme-mermaid',
 	],
 

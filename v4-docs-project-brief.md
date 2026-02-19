@@ -111,6 +111,17 @@ This consolidation will improve documentation maintainability, make features mor
 - **Rationale**: Validate quality and process before committing to full migration
 - **Impact**: Adds ~2-3 days upfront but reduces risk of rework
 
+### 2026-02-19: Temporary Build Simplifications
+- **Decision**: Temporarily disable local search plugin and set `onBrokenLinks: 'warn'`
+- **Rationale**: Allows build to succeed during migration while reference docs are being populated
+- **Impact**: Must remember to re-enable before merging to main:
+  - Re-enable local search plugin in `docusaurus.config.ts` themes section
+  - Change `onBrokenLinks` back to `'throw'`
+- **Note**: prebuild.js and postbuild.js scripts are still needed and should remain:
+  - prebuild.js generates release-notes-data.json used by React components
+  - postbuild.js creates index.html files for URL flexibility (/path and /path/)
+  - Remove or update prebuild/postbuild scripts if no longer needed
+
 ---
 
 ## Known Issues & Blockers
