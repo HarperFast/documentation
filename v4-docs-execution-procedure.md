@@ -105,12 +105,14 @@ gh auth status
    4. Generate new files in reference_versioned_docs/version-v4/cli/ with:
       - Inline source comments
       - Version annotations with confidence levels
-      - Link placeholders for cross-references
-   5. Create migration-context/link-placeholders/cli-link-placeholders.md
-   6. Create branch: migration/cli
-   7. Commit changes
-   8. Open PR using the template from implementation plan
-   9. Update v4-docs-migration-map.md status to "In Progress"
+      - Link placeholders for cross-references (TODO: for external, relative paths for internal)
+   5. After generating all files, replace TODO placeholders with relative paths for internal section links
+   6. Update reference_versioned_sidebars/version-v4-sidebars.json to add the CLI section
+   7. Create migration-context/link-placeholders/cli-link-placeholders.md
+   8. Create branch: migration/cli
+   9. Commit changes (use git commit --fixup for subsequent changes)
+   10. Open PR using the template from implementation plan
+   11. Update v4-docs-migration-map.md status to "In Progress"
 
    Follow all agent instructions from Part 1 of the implementation plan.
    ```
@@ -125,8 +127,16 @@ gh auth status
    - Check PR description follows template
    - Verify all required sections are filled out
    - Note quality of content, version annotations, placeholders
+   - Verify internal links use relative paths (not TODO placeholders)
+   - Verify sidebar was updated with the new section
 
-5. **Document findings:**
+5. **Merge the PR:**
+   - Use GitHub's "Squash and merge" option
+   - This combines all fixup commits into a single clean commit
+   - Development history (with fixup commits) is preserved in the PR for review
+   - Main branch maintains clean, atomic commits per section
+
+6. **Document findings:**
    - What worked well?
    - What needs improvement?
    - Any prompt refinements needed?

@@ -37,6 +37,11 @@ For each section in the migration map, the agent should:
    [JWT Authentication](TODO:reference_versioned_docs/version-v4/security/jwt-authentication.md "Will be created in security section")
    ```
 
+   **IMPORTANT**: After generating all files in the section, replace TODO placeholders with relative paths for internal section links:
+   - For links within the same section: Use relative paths like `./filename.md`
+   - For links to other sections not yet migrated: Keep TODO placeholders
+   - Example: `[CLI Commands](./commands.md)` NOT `[CLI Commands](TODO:reference_versioned_docs/version-v4/cli/commands.md)`
+
 7. **Create section-specific link placeholder tracker**:
    - Store in `migration-context/link-placeholders/`
    - Named by section: `cli-link-placeholders.md`, `security-link-placeholders.md`, etc.
@@ -78,9 +83,47 @@ For each section in the migration map, the agent should:
     ![Architecture Diagram](TODO:IMAGE)
     ```
 
-11. **Create PR** with comprehensive description (template below)
+11. **Update the versioned sidebar** at `reference_versioned_sidebars/version-v4-sidebars.json`:
+    - Add a non-collapsible category for the section
+    - List all pages in the appropriate order
+    - Match the pattern from `sidebarsLearn.ts` (non-collapsible with `className: "learn-category-header"`)
+    - Example:
+    ```json
+    {
+        "type": "category",
+        "label": "CLI",
+        "collapsible": false,
+        "className": "learn-category-header",
+        "items": [
+            {
+                "type": "doc",
+                "id": "cli/overview",
+                "label": "Overview"
+            }
+        ]
+    }
+    ```
 
 12. **Update migration-map.md** status to "In Progress" for that section
+
+13. **Git workflow with fixup commits**:
+    - Create feature branch: `git checkout -b migration/[section-name]`
+    - Make initial commit with all content files
+    - Use `git commit --fixup <commit-hash>` for subsequent changes
+    - This allows easy squashing later while keeping development history clear
+    - Example:
+      ```bash
+      # Initial commit
+      git add reference_versioned_docs/version-v4/cli/*.md
+      git commit -m "docs: migrate CLI section to v4 consolidated reference"
+
+      # Subsequent fixes use --fixup
+      git add reference_versioned_sidebars/version-v4-sidebars.json
+      git commit --fixup HEAD
+      ```
+    - PRs will be squash-merged to maintain clean history on main branch
+
+14. **Create PR** with comprehensive description (template below)
 
 ### PR Description Template
 

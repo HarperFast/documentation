@@ -24,7 +24,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - Current `reference/harper-cli.md` (if exists)
 - **Merge Required**: Yes - CLI commands added across versions
 - **Version Annotations**: Track command additions from v4.1 → v4.7
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion with operations API commands
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Dev mode (`harperdb dev`, `harperdb run`)
@@ -33,7 +33,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: Compare all versions for command evolution
 - **Version Annotations**: Each command should note its introduction version
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Foreground mode changes
@@ -42,13 +42,13 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: `versioned_docs/version-4.3+` (CLI ops api support added in v4.3)
 - **Version Annotations**: Note v4.3.0 introduction
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion with operations API
 
 ### `reference/cli/authentication.md`
 - **Primary Source**: New content or extract from CLI docs
-- **Status**: Not Started
+- **Status**: In Progress
 
 ---
 
