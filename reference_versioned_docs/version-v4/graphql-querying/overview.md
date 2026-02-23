@@ -56,7 +56,7 @@ Accept: application/graphql-response+json
 
 > Tip: For the best user experience, include the `Accept: application/graphql-response+json` header in your request. This provides better status codes for errors.
 
-The Harper GraphQL querying system is strictly limited to exported Harper Resources. For many users, this will typically be a table that uses the `@exported` directive in its schema. Queries can only specify Harper Resources and their attributes in the selection set. Queries can filter using [arguments](https://graphql.org/learn/queries/#arguments) on the top-level Resource field. Harper provides a short form pattern for simple queries, and a long form pattern based off of the [Resource Query API](./resources/overview.md#query) for more complex queries.
+The Harper GraphQL querying system is strictly limited to exported Harper Resources. This will typically be a table that uses the `@exported` directive in its schema or `export`'ed custom resources. Queries can only specify Harper Resources and their attributes in the selection set. Queries can filter using [arguments](https://graphql.org/learn/queries/#arguments) on the top-level Resource field. Harper provides a short form pattern for simple queries, and a long form pattern based off of the [Resource Query API](./resources/overview.md#query) for more complex queries.
 
 Unlike REST queries, GraphQL queries can specify multiple resources simultaneously:
 
