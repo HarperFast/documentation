@@ -601,13 +601,16 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Studio Section
 
 ### `reference/studio/overview.md`
-- **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/index.md`
-- **Additional Sources**: All harper-studio/*.md files
-- **Merge Required**: Maybe - consolidate or keep nested?
+- **Primary Source**: `versioned_docs/version-4.7/deployments/configuration.md` (localStudio configuration)
 - **Status**: In Progress
-- **Notes**: May want to keep as nested folder or consolidate into single page
+- **Notes**: Simple overview page focusing on:
+  - How to configure/enable local Studio (localStudio.enabled in config)
+  - How to access local Studio (http://localhost:9926)
+  - General description of Studio's purpose (UI for Harper instance)
+  - Link to hosted Studio at studio.harperdb.io
 - **Release Notes**:
-  - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Local studio upgrade to match online version
+  - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Local studio upgraded to match online version
+  - [4.7.0](release-notes/v4-tucker/4.7.0.md) - Studio client updated
 
 ---
 
@@ -623,10 +626,15 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 ## Legacy Section
 
-### `reference/legacy/cloud/`
+### `reference/legacy/harper-cloud-studio/`
+- **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
+- **Status**: In Progress
+- **Notes**: These docs are for Harper Cloud Studio (the hosted studio for cloud instances), not the local Studio UI. Move to legacy with note that this is for Harper Cloud Studio which is deprecated/replaced by Fabric. Content includes account management, organizations, instance management, etc.
+
+### `reference/legacy/harper-cloud/` (deployments/harper-cloud)
 - **Primary Source**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
-- **Status**: N/A
-- **Notes**: Move entire folder as-is, add deprecation notice
+- **Status**: Not Needed - Content can be ignored and eventually removed
+- **Notes**: Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info, etc.) are not relevant for v4 reference. Harper Cloud has been replaced by Fabric. Do not migrate this content.
 
 ### `reference/legacy/custom-functions/`
 - **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
@@ -673,9 +681,10 @@ These files require careful merging from multiple sources:
    - Migration path complex
    - Significant API changes in v4.4
 
-### Files Being Removed
+### Files Being Removed/Ignored
 These exist in current docs but won't exist in new structure:
 
+**To be moved to Learn guides:**
 - `versioned_docs/version-4.7/administration/administration.md` - Generic admin intro
 - `versioned_docs/version-4.7/administration/cloning.md` - Move to Learn guide
 - `versioned_docs/version-4.7/developers/applications/debugging.md` - Move to Learn guide
@@ -685,6 +694,9 @@ These exist in current docs but won't exist in new structure:
 - `versioned_docs/version-4.7/developers/operations-api/advanced-json-sql-examples.md` - Move to Learn guide
 - `versioned_docs/version-4.7/deployments/install-harper/*` - Move to Learn guides
 - `versioned_docs/version-4.7/deployments/upgrade-hdb-instance.md` - Move to Learn guide
+
+**To be ignored (obsolete content):**
+- `versioned_docs/version-4.7/deployments/harper-cloud/*` - Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info) - replaced by Fabric, do not migrate
 - `versioned_docs/version-4.7/reference/index.md` - Generic intro page
 - `versioned_docs/version-4.7/reference/limits.md` - Fold into database/overview or schema
 

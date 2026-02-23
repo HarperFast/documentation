@@ -209,7 +209,7 @@ Based on migration map and reference plan, recommend this order. Each section is
    - `overview.md`
 
 3. **Studio** (`reference_versioned_docs/version-v4/studio/`)
-   - `overview.md`
+   - `overview.md` - Simple page covering local Studio UI configuration and access
 
 4. **Fastify Routes** (`reference_versioned_docs/version-v4/fastify-routes/`)
    - `overview.md`
@@ -305,9 +305,10 @@ Based on migration map and reference plan, recommend this order. Each section is
 **Phase 1E - Legacy Content**
 
 1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`)
-    - `cloud/` (entire folder as-is)
+    - `harper-cloud-studio/` - Harper Cloud Studio docs from `administration/harper-studio/` (for hosted cloud studio, deprecated with Fabric)
     - `custom-functions/` (entire folder as-is)
     - `sql/` (entire folder as-is)
+    - **Note**: `deployments/harper-cloud/` should NOT be migrated - content is obsolete (cloud deployment specifics replaced by Fabric)
 
 (But ensure we reflect version changes from v4.1 to v4.7 using version annotations)
 
