@@ -604,7 +604,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/index.md`
 - **Additional Sources**: All harper-studio/*.md files
 - **Merge Required**: Maybe - consolidate or keep nested?
-- **Status**: Not Started
+- **Status**: In Progress
 - **Notes**: May want to keep as nested folder or consolidate into single page
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Local studio upgrade to match online version
