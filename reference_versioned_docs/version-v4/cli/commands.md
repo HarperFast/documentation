@@ -27,7 +27,6 @@ When you run `harper`:
 
 - If Harper is not installed, it will guide you through the installation process
 - Once installed, it runs Harper in the foreground as a standard process, compatible with systemd, Docker, and other process management tools
-- Logs output directly to the console for easy monitoring
 
 **First-Time Installation**:
 
@@ -40,21 +39,23 @@ If Harper is not installed, you can provide configuration parameters via environ
 export TC_AGREEMENT=yes
 export HDB_ADMIN_USERNAME=HDB_ADMIN
 export HDB_ADMIN_PASSWORD=password
-export ROOTPATH=/tmp/hdb/
-export OPERATIONSAPI_NETWORK_PORT=9925
+export ROOTPATH=/hdb/
 harper
 ```
+
+:::note
+If you specify `DEFAULT_MODE=dev` you will also need to specify the `REPLICATION_HOSTNAME=localhost`
+:::
 
 **Using Command Line Arguments**:
 
 ```bash
 # Minimum required parameters for no additional CLI prompts
 harper \
-  --TC_AGREEMENT yes \
-  --HDB_ADMIN_USERNAME HDB_ADMIN \
-  --HDB_ADMIN_PASSWORD password \
-  --ROOTPATH /tmp/hdb/ \
-  --OPERATIONSAPI_NETWORK_PORT 9925
+  --TC_AGREEMENT=yes \
+  --HDB_ADMIN_USERNAME=HDB_ADMIN \
+  --HDB_ADMIN_PASSWORD=password \
+  --ROOTPATH='/hdb'
 ```
 
 **Note**: When used in conjunction, command line arguments override environment variables. See [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md "Configuration overview") for a full list of configuration parameters.
@@ -167,9 +168,10 @@ harper status
 
 Shows:
 - Harper process status
-- Clustering hub and leaf processes
 - Clustering network status
 - Replication statuses
+
+In Harper versions where NATS is supported, this command also shows the clustering hub and leaf processes too.
 
 ### `harper help`
 
@@ -225,9 +227,7 @@ This copies the default `data` database to a new location with compaction applie
 
 See also: [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md "Database compaction reference") for more information.
 
-## Backups
-
-Available since: v4.1.0
+#### How Backups Work
 
 Harper uses a transactional commit process that ensures data on disk is always transactionally consistent with storage. This means Harper maintains database integrity in the event of a crash and allows you to use standard volume snapshot tools to make backups.
 
