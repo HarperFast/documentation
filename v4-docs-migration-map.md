@@ -698,13 +698,6 @@ Files that heavily reference paths that will change:
 
 ---
 
-## Migration Workflow Recommendations
-
-1. **Start with stable, simple sections** (CLI, Content Types, Headers)
-2. **Then tackle medium complexity** (Security, Logging, MQTT)
-3. **Save complex merges for later** (Configuration, Schema, Components, Clustering)
-4. **Move legacy content last** (SQL, Cloud, Custom Functions)
-
 ## Version Annotation Checklist
 
 For each file migrated, ensure:
@@ -717,9 +710,9 @@ For each file migrated, ensure:
 
 ## Release Notes Reference Guide
 
-The `release-notes/v4-tucker/` directory contains 169 release note files covering the entire v4.0 - v4.7 series. Key major releases with significant feature additions:
+The `release-notes/v4-tucker/` directory contains 169 release note files covering the entire v4.0 - v4.7 series. Key minor releases with significant feature additions:
 
-### Major Releases
+### Minor Releases
 
 - **[4.1.0](release-notes/v4-tucker/4.1.0.md)** (Worker threads, iterator-based queries, logging revamp)
 - **[4.2.0](release-notes/v4-tucker/4.2.0.md)** (Resource API, Component Architecture, REST interface, MQTT/WebSockets/SSE, configurable schemas)

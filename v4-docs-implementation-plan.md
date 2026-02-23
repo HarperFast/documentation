@@ -15,7 +15,7 @@ This document outlines the concrete steps for migrating Harper v4 documentation 
 ## Part 1: Initial Content Generation (AI-Driven)
 
 ### Overview
-AI agents work through the migration map, creating PRs for each top-level section. All PRs are opened simultaneously from the same base commit. Each PR adds new files without removing anything from `versioned_docs/`.
+AI agents work through the migration map, creating PRs for each top-level section. Each PR adds new files without removing anything from `versioned_docs/`.
 
 ### Agent Instructions
 
@@ -99,7 +99,8 @@ For each section in the migration map, the agent should:
                 "type": "doc",
                 "id": "cli/overview",
                 "label": "Overview"
-            }
+            },
+            // ...
         ]
     }
     ```
@@ -194,98 +195,121 @@ Updated status for this section to "In Progress"
 
 ### Sections to Migrate (In Order of Priority)
 
-Based on migration map, recommend this order:
+Based on migration map and reference plan, recommend this order. Each section is generated as a complete unit with all its pages at once:
 
-**Phase 1A - Simple, Stable Sections (Parallel PRs)**
-1. CLI (`reference_versioned_docs/version-v4/cli/`)
-2. Content Types (`reference_versioned_docs/version-v4/rest/content-types.md`)
-3. Headers (`reference_versioned_docs/version-v4/rest/headers.md`)
-4. GraphQL Querying (`reference_versioned_docs/version-v4/graphql-querying/`)
-5. Studio (`reference_versioned_docs/version-v4/studio/`)
+**Phase 1A - Simple, Stable Sections**
 
-**Phase 1B - Medium Complexity (Parallel PRs)**
-6. Security (`reference_versioned_docs/version-v4/security/`)
-7. Environment Variables (`reference_versioned_docs/version-v4/environment-variables/`)
-8. Static Files (`reference_versioned_docs/version-v4/static-files/`)
-9. HTTP (`reference_versioned_docs/version-v4/http/`)
-10. MQTT (`reference_versioned_docs/version-v4/mqtt/`)
-11. Logging (`reference_versioned_docs/version-v4/logging/`)
-12. Analytics (`reference_versioned_docs/version-v4/analytics/`)
+1. **CLI** (`reference_versioned_docs/version-v4/cli/`)
+   - `overview.md`
+   - `commands.md`
+   - `operations-api-commands.md`
+   - `authentication.md`
 
-**Phase 1C - Complex Sections (Parallel PRs, expect longer review)**
-13. REST (`reference_versioned_docs/version-v4/rest/`)
-14. Replication (`reference_versioned_docs/version-v4/replication/`)
-15. Database (`reference_versioned_docs/version-v4/database/`)
-16. Resources (`reference_versioned_docs/version-v4/resources/`)
-17. Components (`reference_versioned_docs/version-v4/components/`)
+2. **GraphQL Querying** (`reference_versioned_docs/version-v4/graphql-querying/`)
+   - `overview.md`
 
-**Phase 1D - Cross-Cutting Sections (After others to minimize placeholders)**
-18. Operations API (`reference_versioned_docs/version-v4/operations-api/`)
-19. Configuration (`reference_versioned_docs/version-v4/configuration/`)
+3. **Studio** (`reference_versioned_docs/version-v4/studio/`)
+   - `overview.md`
 
-**Phase 1E - Legacy Content (Simple moves)**
-20. Legacy (`reference_versioned_docs/version-v4/legacy/`)
+4. **Fastify Routes** (`reference_versioned_docs/version-v4/fastify-routes/`)
+   - `overview.md`
 
-### Progress Tracking
+**Phase 1B - Medium Complexity**
 
-Create GitHub issue to track progress:
+1. **Environment Variables** (`reference_versioned_docs/version-v4/environment-variables/`)
+   - `overview.md`
+   - `configuration.md`
 
-**Title**: "v4 Documentation Migration Progress Tracker"
+2. **Static Files** (`reference_versioned_docs/version-v4/static-files/`)
+   - `overview.md`
+   - `configuration.md`
 
-**Body**:
-```markdown
-Tracking migration of v4 documentation to consolidated structure.
+3. **HTTP** (`reference_versioned_docs/version-v4/http/`)
+   - `overview.md`
+   - `configuration.md`
+   - `api.md`
 
-## Phase 1A - Simple Sections
-- [ ] #[PR] CLI
-- [ ] #[PR] Content Types
-- [ ] #[PR] Headers
-- [ ] #[PR] GraphQL Querying
-- [ ] #[PR] Studio
+4. **MQTT** (`reference_versioned_docs/version-v4/mqtt/`)
+   - `overview.md`
+   - `configuration.md`
 
-## Phase 1B - Medium Complexity
-- [ ] #[PR] Security
-- [ ] #[PR] Environment Variables
-- [ ] #[PR] Static Files
-- [ ] #[PR] HTTP
-- [ ] #[PR] MQTT
-- [ ] #[PR] Logging
-- [ ] #[PR] Analytics
+5. **Logging** (`reference_versioned_docs/version-v4/logging/`)
+   - `overview.md`
+   - `configuration.md`
+   - `api.md`
+   - `operations.md`
 
-## Phase 1C - Complex Sections
-- [ ] #[PR] REST
-- [ ] #[PR] Replication
-- [ ] #[PR] Database
-- [ ] #[PR] Resources
-- [ ] #[PR] Components
+6.  **Analytics** (`reference_versioned_docs/version-v4/analytics/`)
+    - `overview.md`
+    - `operations.md`
 
-## Phase 1D - Cross-Cutting
-- [ ] #[PR] Operations API
-- [ ] #[PR] Configuration
+**Phase 1C - Complex Sections**
 
-## Phase 1E - Legacy
-- [ ] #[PR] Legacy Content
+1.  **Security** (`reference_versioned_docs/version-v4/security/`)
+    - `overview.md`
+    - `basic-authentication.md`
+    - `jwt-authentication.md`
+    - `mtls-authentication.md`
+    - `certificate-management.md`
+    - `certificate-verification.md`
+    - `cors.md`
+    - `ssl.md`
+    - `users-and-roles.md`
 
-## Part 2 - Link Resolution
-- [ ] Links resolved
+2.  **REST** (`reference_versioned_docs/version-v4/rest/`)
+    - `overview.md`
+    - `querying.md`
+    - `headers.md`
+    - `content-types.md`
+    - `websockets.md`
+    - `server-sent-events.md`
 
-## Part 3 - Cross-References
-- [ ] Release notes updated
-- [ ] Learn guides updated
+3.  **Database** (`reference_versioned_docs/version-v4/database/`)
+    - `overview.md`
+    - `schema.md`
+    - `data-loader.md`
+    - `storage-algorithm.md`
+    - `jobs.md`
+    - `system-tables.md`
+    - `compaction.md`
+    - `transaction.md`
 
-## Part 4 - Finalization
-- [ ] Sidebars created
-- [ ] Old content removed
-- [ ] Redirects configured
-```
+4.  **Resources** (`reference_versioned_docs/version-v4/resources/`)
+    - `overview.md`
+    - `resource-api.md`
+    - `global-apis.md`
+    - `query-optimization.md`
 
-After each PR is created, agent adds comment to this issue:
-```markdown
-Created PR #123 for [Section Name] migration
-- Files: X created
-- Placeholders: Y links need resolution
-- Status: Awaiting human review
-```
+5.  **Components** (`reference_versioned_docs/version-v4/components/`)
+    - `overview.md`
+    - `applications.md`
+    - `extension-api.md`
+    - `plugin-api.md`
+
+6.  **Replication** (`reference_versioned_docs/version-v4/replication/`)
+    - `overview.md`
+    - `clustering.md`
+    - `sharding.md`
+
+**Phase 1D - Cross-Cutting Sections**
+
+1.  **Operations API** (`reference_versioned_docs/version-v4/operations-api/`)
+    - `overview.md`
+    - `operations.md`
+
+2.  **Configuration** (`reference_versioned_docs/version-v4/configuration/`)
+    - `overview.md`
+    - `options.md`
+    - `operations.md`
+
+**Phase 1E - Legacy Content**
+
+1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`)
+    - `cloud/` (entire folder as-is)
+    - `custom-functions/` (entire folder as-is)
+    - `sql/` (entire folder as-is)
+
+(But ensure we reflect version changes from v4.1 to v4.7 using version annotations)
 
 ---
 
@@ -301,7 +325,6 @@ Created PR #123 for [Section Name] migration
    - Handle image decisions
 3. **Human approves and merges PR**
 4. **Human updates migration-map.md** status to "Complete"
-5. **Human checks off tracking issue**
 
 ---
 
@@ -369,7 +392,7 @@ Update other parts of documentation that reference the old structure.
 **Task**: Update links in learn guides to point to new reference structure.
 
 **Agent Instructions**:
-1. Scan all files in `learn/` (or wherever learn content lives)
+1. Scan all files in `learn/`
 2. Find links to old reference paths
 3. Map to new paths
 4. Create PR with updates
@@ -385,34 +408,7 @@ Update other parts of documentation that reference the old structure.
 
 ---
 
-## Part 5: Sidebar Configuration (AI-Assisted)
-
-Create Docusaurus sidebar configuration for new structure.
-
-### Agent Instructions
-
-1. **Read the reference plan outline** to understand hierarchy
-2. **Scan `reference_versioned_docs/version-v4/`** to see what actually exists
-3. **Generate sidebar JSON/JS** following Docusaurus conventions:
-   ```javascript
-   {
-     type: 'category',
-     label: 'CLI',
-     items: [
-       'cli/overview',
-       'cli/commands',
-       'cli/operations-api-commands',
-       'cli/authentication'
-     ]
-   }
-   ```
-4. **Follow existing sidebar patterns** from current docs
-5. **Ensure non-collapsible sections** (as noted in reference plan)
-6. **Create PR** with sidebar configuration
-
----
-
-## Part 6: Redirects Configuration (AI-Assisted)
+## Part 5: Redirects Configuration (AI-Assisted)
 
 Configure redirects from old paths to new paths.
 
@@ -468,9 +464,10 @@ Focus on:
 
 Once everything on `major-version-reorg` branch is complete:
 1. Final review of entire branch
-2. Squash/organize commits if needed
-3. Merge to `main`
-4. Deploy
+3. Squash/organize commits if needed
+4. Format
+5. Merge to `main`
+6. Deploy
 
 ---
 
@@ -483,10 +480,7 @@ Once everything on `major-version-reorg` branch is complete:
 - `v4-docs-reference-plan.md` - Understanding structure and philosophy
 - `versioned_docs/version-4.X/**/*.md` - Source content
 - `release_notes/*.md` - Version annotation validation
-
-**Secondary**:
 - `v4-docs-research.md` - Manual research notes
-- `v4-feature-history-ai-gen.md` - AI-generated feature history (use with caution)
 
 ### Agent Constraints
 
