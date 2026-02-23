@@ -43,6 +43,71 @@
 					"type": "doc",
 					"id": "studio/overview",
 					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "studio/create-account",
+					"label": "Create Account"
+				},
+				{
+					"type": "doc",
+					"id": "studio/login-password-reset",
+					"label": "Login & Password Reset"
+				},
+				{
+					"type": "doc",
+					"id": "studio/organizations",
+					"label": "Organizations"
+				},
+				{
+					"type": "doc",
+					"id": "studio/instances",
+					"label": "Instances"
+				},
+				{
+					"type": "doc",
+					"id": "studio/instance-configuration",
+					"label": "Instance Configuration"
+				},
+				{
+					"type": "doc",
+					"id": "studio/instance-metrics",
+					"label": "Instance Metrics"
+				},
+				{
+					"type": "doc",
+					"id": "studio/manage-instance-users",
+					"label": "Manage Instance Users"
+				},
+				{
+					"type": "doc",
+					"id": "studio/manage-instance-roles",
+					"label": "Manage Instance Roles"
+				},
+				{
+					"type": "doc",
+					"id": "studio/manage-databases-browse-data",
+					"label": "Manage Databases & Browse Data"
+				},
+				{
+					"type": "doc",
+					"id": "studio/query-instance-data",
+					"label": "Query Instance Data"
+				},
+				{
+					"type": "doc",
+					"id": "studio/manage-applications",
+					"label": "Manage Applications"
+				},
+				{
+					"type": "doc",
+					"id": "studio/manage-replication",
+					"label": "Manage Replication"
+				},
+				{
+					"type": "doc",
+					"id": "studio/enable-mixed-content",
+					"label": "Enable Mixed Content"
 				}
 			]
 		}
