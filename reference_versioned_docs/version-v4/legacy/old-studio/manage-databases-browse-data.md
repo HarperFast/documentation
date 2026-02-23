@@ -6,6 +6,10 @@ title: Manage Databases / Browse Data
 
 # Manage Databases / Browse Data
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 Manage instance databases/tables and browse data in tabular format with the following instructions:
 
 1. Navigate to the Harper Studio Organizations page.

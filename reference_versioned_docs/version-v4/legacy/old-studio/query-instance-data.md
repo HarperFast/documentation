@@ -6,6 +6,10 @@ title: Query Instance Data
 
 # Query Instance Data
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 SQL queries can be executed directly through the Harper Studio with the following instructions:
 
 1. Navigate to the [Harper Studio Organizations](https://studio.harperdb.io/organizations) page.

@@ -6,6 +6,10 @@ title: Manage Replication
 
 # Manage Replication
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 Harper instance clustering and replication can be configured directly through the Harper Studio. It is recommended to read through the [clustering documentation](../../reference/clustering) first to gain a strong understanding of Harper clustering behavior.
 
 All clustering configuration is handled through the **replication** page of the Harper Studio, accessed with the following instructions:

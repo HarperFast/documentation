@@ -6,6 +6,10 @@ title: Login and Password Reset
 
 # Login and Password Reset
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 ## Log In to Your Harper Studio Account
 
 To log into your existing Harper Studio account:

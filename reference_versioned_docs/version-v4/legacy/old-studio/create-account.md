@@ -1,10 +1,14 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/create-account.md (primary) -->
-
 ---
 title: Create a Studio Account
 ---
 
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/create-account.md (primary) -->
+
 # Create a Studio Account
+
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
 
 Start at the [Harper Studio sign up page](https://fabric.harper.fast/#/sign-up).
 

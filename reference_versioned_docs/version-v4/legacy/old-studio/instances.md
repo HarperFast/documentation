@@ -6,6 +6,10 @@ title: Instances
 
 # Instances
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 The Harper Studio allows you to administer all of your HarperDinstances in one place. Harper currently offers the following instance types:
 
 - **Harper Cloud Instance** Managed installations of Harper, what we call [Harper Cloud](../../deployments/harper-cloud/).

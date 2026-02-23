@@ -6,6 +6,10 @@ title: Instance Metrics
 
 # Instance Metrics
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 The Harper Studio display instance status and metrics on the instance status page, which can be accessed with the following instructions:
 
 1. Navigate to the [Harper Studio Organizations](https://studio.harperdb.io/organizations) page.

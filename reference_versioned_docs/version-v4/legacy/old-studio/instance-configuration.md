@@ -6,6 +6,10 @@ title: Instance Configuration
 
 # Instance Configuration
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 Harper instance configuration can be viewed and managed directly through the Harper Studio. Harper Cloud instances can be resized in two different ways via this page, either by modifying machine RAM or by increasing drive storage. Enterprise instances can have their licenses modified by modifying licensed RAM.
 
 All instance configuration is handled through the **config** page of the Harper Studio, accessed with the following instructions:

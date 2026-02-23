@@ -7,6 +7,10 @@ title: Harper Studio
 
 # Harper Studio
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 Changed in: v4.3.0 (local studio upgraded to match online version)
 
 Harper Studio is the web-based GUI for Harper. Studio enables you to administer, navigate, and monitor all of your Harper instances in a simple, user-friendly interface without any knowledge of the underlying Harper API. It's free to sign up, get started today!

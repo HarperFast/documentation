@@ -6,6 +6,10 @@ title: Manage Instance Users
 
 # Manage Instance Users
 
+:::important
+This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+:::
+
 Harper users and roles can be managed directly through the Harper Studio. It is recommended to read through the [users & roles documentation](../../developers/security/users-and-roles) to gain a strong understanding of how they operate.
 
 Instance user configuration is handled through the **users** page of the Harper Studio, accessed with the following instructions:
