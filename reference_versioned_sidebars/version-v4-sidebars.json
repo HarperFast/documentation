@@ -32,6 +32,19 @@
 					"label": "Authentication"
 				}
 			]
+		},
+		{
+			"type": "category",
+			"label": "Studio",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "studio/overview",
+					"label": "Overview"
+				}
+			]
 		}
 	]
 }
