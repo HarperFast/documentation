@@ -2,41 +2,48 @@
 title: Harper Studio
 ---
 
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/index.md (primary) -->
-<!-- Source: release-notes/v4-tucker/4.3.0.md (local studio upgrade) -->
+<!-- Source: versioned_docs/version-4.7/deployments/configuration.md (localStudio configuration) -->
+<!-- Source: release-notes/v4-tucker/4.3.0.md (local studio upgrade in v4.3) -->
 
 # Harper Studio
 
 Changed in: v4.3.0 (local studio upgraded to match online version)
 
-Harper Studio is the web-based GUI for Harper. Studio enables you to administer, navigate, and monitor all of your Harper instances in a simple, user-friendly interface without any knowledge of the underlying Harper API. It's free to sign up, get started today!
+Changed in: v4.7.0 (studio client updated)
 
-[Sign up for free!](https://studio.harperdb.io/sign-up)
+Harper Studio is a web-based GUI for Harper that enables you to administer, navigate, and monitor your Harper instances through a simple, user-friendly interface without requiring knowledge of the underlying Harper API.
 
-Harper now includes a simplified local Studio that is packaged with all Harper installations and served directly from the instance. It can be enabled in the [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md "Configuration file documentation"). This section is dedicated to the hosted Studio accessed at [studio.harperdb.io](https://studio.harperdb.io).
+## Local Studio
 
-## How does Studio Work?
+Harper v4 includes a local Studio that is packaged with all Harper installations and served directly from your instance.
 
-While Harper Studio is web based and hosted by us, all database interactions are performed on the Harper instance the studio is connected to. The Harper Studio loads in your browser, at which point you login to your Harper instances. Credentials are stored in your browser cache and are not transmitted back to Harper. All database interactions are made via the Harper Operations API directly from your browser to your instance.
+### Configuration
 
-## What type of instances can I manage?
+To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md#localstudio "Configuration options"):
 
-Harper Studio enables users to manage both Harper Cloud instances and privately hosted instances all from a single UI. All Harper instances feature identical behavior whether they are hosted by us or by you.
+```yaml
+localStudio:
+  enabled: true
+```
 
-## Studio Features
+By default, local Studio is disabled (`enabled: false`).
 
-For detailed documentation on specific Studio features, see:
+### Accessing Local Studio
 
-- [Create Account](./create-account.md) - Instructions for creating a new Studio account
-- [Login & Password Reset](./login-password-reset.md) - Login procedures and password recovery
-- [Organizations](./organizations.md) - Managing organizations and their settings
-- [Instances](./instances.md) - Managing and connecting to Harper instances
-- [Instance Configuration](./instance-configuration.md) - Configuring instance settings
-- [Instance Metrics](./instance-metrics.md) - Viewing instance status and performance metrics
-- [Manage Instance Users](./manage-instance-users.md) - Creating and managing users
-- [Manage Instance Roles](./manage-instance-roles.md) - Setting up and managing roles
-- [Manage Databases & Browse Data](./manage-databases-browse-data.md) - Database and data management
-- [Query Instance Data](./query-instance-data.md) - Executing SQL queries
-- [Manage Applications](./manage-applications.md) - Managing applications and components
-- [Manage Replication](./manage-replication.md) - Configuring clustering and replication
-- [Enable Mixed Content](./enable-mixed-content.md) - Enabling mixed content in browsers
+Once enabled, the local Studio can be accessed through your browser at:
+
+```
+http://localhost:9926
+```
+
+Or replace `localhost` with your instance's hostname/IP address if accessing remotely.
+
+All database interactions from the local Studio are made directly from your browser to your Harper instance. Credentials are stored in your browser cache and are not transmitted to external servers.
+
+## Hosted Studio
+
+A hosted version of Harper Studio with additional features for licensing and provisioning is available at [studio.harperdb.io](https://studio.harperdb.io). The hosted Studio allows you to manage both Harper Cloud instances and privately hosted instances from a single interface.
+
+## Legacy Documentation
+
+For users on Harper v4.6 or earlier, detailed Studio feature documentation is available in the [Old Studio Documentation](../legacy/old-studio/overview.md) section.
