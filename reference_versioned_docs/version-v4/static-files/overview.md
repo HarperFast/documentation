@@ -11,7 +11,10 @@ title: Static Files
 
 # Static Files
 
-The `static` built-in plugin serves static files from your Harper component over HTTP. Use it to host websites, SPAs, downloadable assets, or any static content alongside your Harper data and API endpoints.
+- Added in: v4.5.0
+- Changed in: v4.7.0 - (Migrated to Plugin API and new options added)
+
+The `static` built-in plugin serves static files from your Harper application over HTTP. Use it to host websites, SPAs, downloadable assets, or any static content alongside your Harper data and API endpoints.
 
 `static` does **not** need to be installed — it is built into Harper and only needs to be declared in your `config.yaml`.
 
@@ -39,7 +42,9 @@ my-app/
 
 Files are accessed relative to the matched directory root, so `GET /index.html` returns `site/index.html` and `GET /blog/post-1.html` returns `site/blog/post-1.html`.
 
-## `files` and `urlPath`
+## `files` and `urlPath` Options
+
+Added in: v4.5
 
 `static` is a [Plugin](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Plugins overview') and supports the standard `files` and `urlPath` configuration options for controlling which files to serve and at what URL path.
 
@@ -55,9 +60,9 @@ Now `GET /app/index.html` returns `site/index.html` and `GET /app/blog/post-1.ht
 
 See [Components Overview](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Plugins overview — files and urlPath options') for full `files` glob pattern and `urlPath` documentation.
 
-## Options
+## Additional Options
 
-Added in: v4.7.0 (inferred from version-4.7 docs; not present in version-4.6 docs)
+Added in: v4.7
 
 In addition to the standard `files`, `urlPath`, and `timeout` options, `static` supports these configuration options:
 
@@ -71,7 +76,7 @@ In addition to the standard `files`, `urlPath`, and `timeout` options, `static` 
 
 ## Auto-Updates
 
-Added in: v4.7.0 (inferred from version-4.7 docs; not present in version-4.6 docs)
+Added in: v4.7.0
 
 Because `static` uses the Plugin API, it automatically responds to changes without requiring a Harper restart. Adding, removing, or modifying files — or updating `config.yaml` — takes effect immediately.
 
@@ -142,6 +147,7 @@ Return a specific file when a requested path is not found:
 static:
   files: 'static/**'
   notFound: 'static/404.html'
+  fallthrough: false
 ```
 
 A request to `/non-existent` returns the contents of `static/404.html` with a `404` status code.
