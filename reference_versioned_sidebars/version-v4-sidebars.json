@@ -61,6 +61,19 @@
 		},
 		{
 			"type": "category",
+			"label": "Fastify Routes",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "fastify-routes/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",

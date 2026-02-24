@@ -619,7 +619,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ### `reference/fastify-routes/overview.md`
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/define-routes.md`
 - **Additional Sources**: Current `reference/define-routes.md`
-- **Status**: Not Started
+- **Status**: In Progress
 - **Notes**: Discouraged in favor of modern routing with components, but still a supported feature.
 
 ---
