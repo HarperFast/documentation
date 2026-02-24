@@ -3,21 +3,22 @@ name: Deploy PR Preview
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, closed]
-    paths:
-      - 'docs/**'
-      - 'fabric/**'
-      - 'learn/**'
-      - 'release-notes/**'
-      - 'src/**'
-      - 'static/**'
-      - 'versioned_docs/**'
-      - 'versioned_sidebars/**'
-      - 'docusaurus.config.ts'
-      - 'package-lock.json'
-      - 'package.json'
-      - 'redirects.ts'
-      - 'sidebars*.ts'
-      - 'versions.json'
+    # Temporarily disable the file filter so we get preview deploys for reference docs migration PRs
+    # paths:
+    #   - 'docs/**'
+    #   - 'fabric/**'
+    #   - 'learn/**'
+    #   - 'release-notes/**'
+    #   - 'src/**'
+    #   - 'static/**'
+    #   - 'versioned_docs/**'
+    #   - 'versioned_sidebars/**'
+    #   - 'docusaurus.config.ts'
+    #   - 'package-lock.json'
+    #   - 'package.json'
+    #   - 'redirects.ts'
+    #   - 'sidebars*.ts'
+    #   - 'versions.json'
 
 # Cancel previous runs when new commits are pushed to the PR
 concurrency:
