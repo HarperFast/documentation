@@ -35,6 +35,19 @@
 		},
 		{
 			"type": "category",
+			"label": "GraphQL Querying",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "graphql-querying/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Fastify Routes",
 			"collapsible": false,
 			"className": "learn-category-header",

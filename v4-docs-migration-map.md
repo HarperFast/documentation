@@ -589,7 +589,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Added: v4.4.0 (experimental)
   - Disabled by default: v4.5.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Notes**: Mark as experimental/incomplete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - OpenAPI specification endpoint
