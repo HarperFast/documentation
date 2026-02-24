@@ -97,7 +97,7 @@ There are three request parameters for GraphQL queries: `query`, `operationName`
 
 ## Type Checking
 
-The Harper GraphQL Querying system takes many liberties from the GraphQL specification. This extends to how it handle type checking. In general, the querying system does **not** type check. Harper uses the `graphql` parser directly, and then performs a transformation on the resulting AST. We do not control any type checking/casting behavior of the parser, and since the execution step diverges from the spec greatly, the type checking behavior is only loosely defined.
+The Harper GraphQL Querying system is designed to handle GraphQL queries and map them directly to Harper's tables, schemas, fields, and relationships to easily query with GraphQL syntax with minimal configuration, code, and overhead. However, the "GraphQL", as a technology has come to encompass an entire model of resolvers and a type checking system, which is outside of the scope of using GraphQL as a _query_ language for data retrieval from Harper. Therefore, the querying system generally does **not** type check, and type checking behavior is outside the scope of resolving queries and is only loosely defined in Harper.
 
 In variable definitions, the querying system will ensure non-null values exist (and error appropriately), but it will not do any type checking of the value itself.
 
