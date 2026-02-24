@@ -32,6 +32,19 @@
 					"label": "Authentication"
 				}
 			]
+		},
+		{
+			"type": "category",
+			"label": "GraphQL Querying",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "graphql-querying/overview",
+					"label": "Overview"
+				}
+			]
 		}
 	]
 }
