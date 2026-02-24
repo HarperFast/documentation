@@ -126,6 +126,26 @@
 							"type": "doc",
 							"id": "legacy/cloud-studio/enable-mixed-content",
 							"label": "Enable Mixed Content"
+						},
+						{
+							"type": "doc",
+							"id": "legacy/cloud-studio/alarms",
+							"label": "Alarms"
+						},
+						{
+							"type": "doc",
+							"id": "legacy/cloud-studio/instance-size-hardware-specs",
+							"label": "Instance Size Hardware Specs"
+						},
+						{
+							"type": "doc",
+							"id": "legacy/cloud-studio/iops-impact",
+							"label": "IOPS Impact on Performance"
+						},
+						{
+							"type": "doc",
+							"id": "legacy/cloud-studio/verizon-5g-wavelength-instances",
+							"label": "Verizon 5G Wavelength"
 						}
 					]
 				}

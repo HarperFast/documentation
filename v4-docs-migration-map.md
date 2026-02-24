@@ -626,15 +626,11 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 ## Legacy Section
 
-### `reference/legacy/harper-cloud-studio/`
+### `reference/legacy/cloud-studio/`
 - **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
+- - **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
 - **Status**: In Progress
-- **Notes**: These docs are for Harper Cloud Studio (the hosted studio for cloud instances), not the local Studio UI. Move to legacy with note that this is for Harper Cloud Studio which is deprecated/replaced by Fabric. Content includes account management, organizations, instance management, etc.
-
-### `reference/legacy/harper-cloud/` (deployments/harper-cloud)
-- **Primary Source**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
-- **Status**: Not Needed - Content can be ignored and eventually removed
-- **Notes**: Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info, etc.) are not relevant for v4 reference. Harper Cloud has been replaced by Fabric. Do not migrate this content.
+- **Notes**: These docs are for Harper Cloud Studio (the hosted studio for cloud instances), not the local Studio UI. Move to legacy with note that this is for Harper Cloud Studio which is deprecated/replaced by Fabric. Content includes account management, organizations, instance management, etc. Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info, etc.) are not relevant for v4 reference. Harper Cloud has been replaced by Fabric. There is a chance we delete this content entirely prior to merging into main. Waiting on information from customer teams.
 
 ### `reference/legacy/custom-functions/`
 - **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
@@ -696,7 +692,6 @@ These exist in current docs but won't exist in new structure:
 - `versioned_docs/version-4.7/deployments/upgrade-hdb-instance.md` - Move to Learn guide
 
 **To be ignored (obsolete content):**
-- `versioned_docs/version-4.7/deployments/harper-cloud/*` - Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info) - replaced by Fabric, do not migrate
 - `versioned_docs/version-4.7/reference/index.md` - Generic intro page
 - `versioned_docs/version-4.7/reference/limits.md` - Fold into database/overview or schema
 

@@ -10,7 +10,7 @@ This documentation is for the deprecated Harper Cloud Studio. All users should m
 
 # Create a Studio Account
 
-Start at the [Harper Studio sign up page](https://fabric.harper.fast/#/sign-up).
+Start at the [Harper Studio sign up page](https://studio.harperdb.io/sign-up).
 
 1. Provide the following information:
    - First Name
