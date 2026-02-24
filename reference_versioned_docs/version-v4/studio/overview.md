@@ -35,7 +35,3 @@ http://localhost:9925
 ```
 
 All database interactions from the local Studio are made directly from your browser to your Harper instance. Authentication is maintained via session cookies.
-
-## Legacy Cloud Studio Documentation
-
-For users on Harper Cloud, the old usage documentation is still available at [Legacy / Cloud Studio](../legacy/cloud-studio/overview.md); however, we strongly recommend you upgrade to Harper Fabric.
