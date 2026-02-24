@@ -246,19 +246,3 @@ query GetDog($dogName: String!, $ownerName: String!) {
 	}
 }
 ```
-
-## Long Form Querying
-
-> Coming soon!
-
-## Mutations
-
-> Coming soon!
-
-## Subscriptions
-
-> Coming soon!
-
-## Directives
-
-> Coming soon!
