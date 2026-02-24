@@ -1,14 +1,15 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/query-instance-data.md (primary) -->
-
 ---
 title: Query Instance Data
 ---
 
-# Query Instance Data
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/query-instance-data.md (primary) -->
 
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+
+# Query Instance Data
 
 SQL queries can be executed directly through the Harper Studio with the following instructions:
 

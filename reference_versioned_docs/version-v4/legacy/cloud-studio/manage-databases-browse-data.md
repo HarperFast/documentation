@@ -1,14 +1,14 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/manage-databases-browse-data.md (primary) -->
-
 ---
 title: Manage Databases / Browse Data
 ---
 
-# Manage Databases / Browse Data
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/manage-databases-browse-data.md (primary) -->
 
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Manage Databases / Browse Data
 
 Manage instance databases/tables and browse data in tabular format with the following instructions:
 

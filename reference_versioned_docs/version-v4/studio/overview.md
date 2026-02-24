@@ -1,23 +1,21 @@
 ---
-title: Harper Studio
+title: Local Studio
 ---
 
 <!-- Source: versioned_docs/version-4.7/deployments/configuration.md (localStudio configuration) -->
 <!-- Source: release-notes/v4-tucker/4.3.0.md (local studio upgrade in v4.3) -->
 
-# Harper Studio
+- Added in: v4.1.0
+- Changed in: v4.3.0 (Upgrade to match Cloud client)
+- Changed in: v4.7.0 (Upgraded to match Fabric client)
 
-Changed in: v4.3.0 (local studio upgraded to match online version)
+Harper Local Studio is a web-based GUI that enables you to administer, navigate, and monitor your Harper instance through a simple, user-friendly interface without requiring knowledge of the underlying Harper APIs.
 
-Changed in: v4.7.0 (studio client updated)
+It is automatically bundled with all Harper instances and is enabled by default on the Operations API port.
 
-Harper Studio is a web-based GUI for Harper that enables you to administer, navigate, and monitor your Harper instances through a simple, user-friendly interface without requiring knowledge of the underlying Harper API.
+If you're looking for the platform as a service interface, go to [Harper Fabric](https://fabric.harper.fast) instead. 
 
-## Local Studio
-
-Harper v4 includes a local Studio that is packaged with all Harper installations and served directly from your instance.
-
-### Configuration
+## Configuration
 
 To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md#localstudio "Configuration options"):
 
@@ -26,24 +24,18 @@ localStudio:
   enabled: true
 ```
 
-By default, local Studio is disabled (`enabled: false`).
+The local studio is provided by the [Operations API](TODO:reference_versioned_docs/version-v4/operations/configuration.md) and is available on the configured `operationsApi.port` or `operationsApi.securePort` values. This is `9925` by default.
 
-### Accessing Local Studio
+## Accessing Local Studio
 
-Once enabled, the local Studio can be accessed through your browser at:
+The local Studio can be accessed through your browser at:
 
 ```
-http://localhost:9926
+http://localhost:9925
 ```
-
-Or replace `localhost` with your instance's hostname/IP address if accessing remotely.
 
 All database interactions from the local Studio are made directly from your browser to your Harper instance. Credentials are stored in your browser cache and are not transmitted to external servers.
 
-## Hosted Studio
+## Legacy Cloud Studio Documentation
 
-A hosted version of Harper Studio with additional features for licensing and provisioning is available at [studio.harperdb.io](https://studio.harperdb.io). The hosted Studio allows you to manage both Harper Cloud instances and privately hosted instances from a single interface.
-
-## Legacy Documentation
-
-For users on Harper v4.6 or earlier, detailed Studio feature documentation is available in the [Old Studio Documentation](../legacy/old-studio/overview.md) section.
+For users on Harper Cloud, the old usage documentation is still available at [Legacy / Cloud Studio](../legacy/cloud-studio/overview.md); however, we strongly recommend you upgrade to Harper Fabric.

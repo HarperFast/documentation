@@ -4,11 +4,11 @@ title: Create a Studio Account
 
 <!-- Source: versioned_docs/version-4.7/administration/harper-studio/create-account.md (primary) -->
 
-# Create a Studio Account
-
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Create a Studio Account
 
 Start at the [Harper Studio sign up page](https://fabric.harper.fast/#/sign-up).
 
@@ -22,11 +22,11 @@ Start at the [Harper Studio sign up page](https://fabric.harper.fast/#/sign-up).
 
    - Coupon Code (optional)
 
-1. Review the Privacy Policy and Terms of Service.
-1. Click the sign up for free button.
-1. You will be taken to a new screen to add an account password. Enter your password.
+2. Review the Privacy Policy and Terms of Service.
+3. Click the sign up for free button.
+4. You will be taken to a new screen to add an account password. Enter your password.
    _Passwords must be a minimum of 8 characters with at least 1 lower case character, 1 upper case character, 1 number, and 1 special character._
-1. Click the add account password button.
+5. Click the add account password button.
 
 You will receive a Studio welcome email confirming your registration.
 

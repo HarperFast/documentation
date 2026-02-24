@@ -1,14 +1,14 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/instance-metrics.md (primary) -->
-
 ---
 title: Instance Metrics
 ---
 
-# Instance Metrics
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/instance-metrics.md (primary) -->
 
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Instance Metrics
 
 The Harper Studio display instance status and metrics on the instance status page, which can be accessed with the following instructions:
 
@@ -17,6 +17,6 @@ The Harper Studio display instance status and metrics on the instance status pag
 1. Select your desired instance.
 1. Click **status** in the instance control bar.
 
-Once on the instance browse page you can view host system information, [Harper logs](../logging/standard-logging), and Harper Cloud alarms (if it is a cloud instance).
+Once on the instance browse page you can view host system information, [Harper logs](../../logging/standard-logging), and Harper Cloud alarms (if it is a cloud instance).
 
 _Note, the **status** page will only be available to super users._

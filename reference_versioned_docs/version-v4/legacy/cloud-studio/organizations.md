@@ -1,8 +1,12 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/organizations.md (primary) -->
-
 ---
 title: Organizations
 ---
+
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/organizations.md (primary) -->
+
+:::important
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
+:::
 
 # Organizations
 

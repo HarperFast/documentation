@@ -5,19 +5,17 @@ title: Harper Studio
 <!-- Source: versioned_docs/version-4.7/administration/harper-studio/index.md (primary) -->
 <!-- Source: release-notes/v4-tucker/4.3.0.md (local studio upgrade) -->
 
-# Harper Studio
-
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Harper Cloud Studio
 
 Changed in: v4.3.0 (local studio upgraded to match online version)
 
-Harper Studio is the web-based GUI for Harper. Studio enables you to administer, navigate, and monitor all of your Harper instances in a simple, user-friendly interface without any knowledge of the underlying Harper API. It's free to sign up, get started today!
+Harper Studio is a web-based GUI for Harper. Studio enables you to administer, navigate, and monitor all of your Harper instances in a simple, user-friendly interface without any knowledge of the underlying Harper API. This documentation section specifically refers to the deprecated, hosted form of Harper Studio. All users should migrate or get started with [Harper Fabric](https://fabric.harper.fast) instead.
 
-[Sign up for free!](https://studio.harperdb.io/sign-up)
-
-Harper now includes a simplified local Studio that is packaged with all Harper installations and served directly from the instance. It can be enabled in the [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md "Configuration file documentation"). This section is dedicated to the hosted Studio accessed at [studio.harperdb.io](https://studio.harperdb.io).
+For the Local Studio documentation, go to [Studio / Overview](../../studio/overview.md) instead.
 
 ## How does Studio Work?
 

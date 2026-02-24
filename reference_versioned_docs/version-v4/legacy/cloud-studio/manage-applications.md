@@ -1,14 +1,14 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/manage-applications.md (primary) -->
-
 ---
 title: Manage Applications
 ---
 
-# Manage Applications
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/manage-applications.md (primary) -->
 
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Manage Applications
 
 [Harper Applications](../../developers/applications/) are enabled by default and can be configured further through the Harper Studio. It is recommended to read through the [Applications](../../developers/applications/) documentation first to gain a strong understanding of Harper Applications behavior.
 

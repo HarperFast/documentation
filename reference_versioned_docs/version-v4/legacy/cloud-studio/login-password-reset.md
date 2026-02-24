@@ -1,14 +1,14 @@
-<!-- Source: versioned_docs/version-4.7/administration/harper-studio/login-password-reset.md (primary) -->
-
 ---
 title: Login and Password Reset
 ---
 
-# Login and Password Reset
+<!-- Source: versioned_docs/version-4.7/administration/harper-studio/login-password-reset.md (primary) -->
 
 :::important
-This documentation is for Harper Studio in versions 4.6 and earlier. For Harper v4.7+, see the current [Studio documentation](../../studio/overview.md).
+This documentation is for the deprecated Harper Cloud Studio. All users should migrate or start using [Harper Fabric](https://fabric.harper.fast) instead.
 :::
+
+# Login and Password Reset
 
 ## Log In to Your Harper Studio Account
 
