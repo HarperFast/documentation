@@ -35,6 +35,19 @@
 		},
 		{
 			"type": "category",
+			"label": "Static Files",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "static-files/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "GraphQL Querying",
 			"collapsible": false,
 			"className": "learn-category-header",

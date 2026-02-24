@@ -417,14 +417,15 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 ### `reference/static-files/overview.md`
 
-- **Primary Source**: Extract from built-in plugins/extensions documentation
-- **Additional Sources**: Current `reference/components/built-in-extensions.md`
-- **Status**: Not Started
-
-### `reference/static-files/configuration.md`
-
-- **Primary Source**: Extract from configuration docs
-- **Status**: Not Started
+- **Primary Source**: `versioned_docs/version-4.7/reference/components/built-in-extensions.md` (static section)
+- **Additional Sources**:
+  - `versioned_docs/version-4.6/reference/components/built-in-extensions.md` (pre-v4.7 behavior)
+  - `versioned_docs/version-4.5/developers/components/built-in.md` (early v4 behavior)
+- **Status**: In Progress
+- **Notes**: No separate `configuration.md` needed — all static plugin options are documented inline in the overview. The `configuration.md` entry has been removed; static file serving has no Harper-level configuration. The v4.7 Plugin API (`extensions`, `fallthrough`, `index`, `notFound` options and auto-update behavior) is annotated as added in v4.7.0 (inferred from version comparison; not present in v4.6 docs). The `static` plugin itself predates v4.7 (present in v4.4 and earlier).
+- **Release Notes**:
+  - [4.7.2](release-notes/v4-tucker/4.7.2.md) - `static` handler defaults to `index.html`
+  - [4.7.3](release-notes/v4-tucker/4.7.3.md) - Fix trailing slash issue with static component
 
 ---
 
