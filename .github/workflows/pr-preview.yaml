@@ -4,6 +4,10 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, closed]
     paths:
+      - 'reference/**'
+      - 'reference_versioned_docs/**'
+      - 'reference_versioned_sidebars/**'
+      - 'reference_versions.json'
       - 'docs/**'
       - 'fabric/**'
       - 'learn/**'
