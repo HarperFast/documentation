@@ -48,6 +48,19 @@
 		},
 		{
 			"type": "category",
+			"label": "Studio",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "studio/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Fastify Routes",
 			"collapsible": false,
 			"className": "learn-category-header",
@@ -56,6 +69,19 @@
 					"type": "doc",
 					"id": "fastify-routes/overview",
 					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Legacy",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "legacy/cloud",
+					"label": "Harper Cloud"
 				}
 			]
 		}

@@ -209,7 +209,7 @@ Based on migration map and reference plan, recommend this order. Each section is
    - `overview.md`
 
 3. **Studio** (`reference_versioned_docs/version-v4/studio/`)
-   - `overview.md`
+   - `overview.md` - Simple page covering local Studio UI configuration and access
 
 4. **Fastify Routes** (`reference_versioned_docs/version-v4/fastify-routes/`)
    - `overview.md`
@@ -305,7 +305,7 @@ Based on migration map and reference plan, recommend this order. Each section is
 **Phase 1E - Legacy Content**
 
 1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`)
-    - `cloud/` (entire folder as-is)
+    - `cloud/` - Harper Cloud landing page to direct users to Fabric instead
     - `custom-functions/` (entire folder as-is)
     - `sql/` (entire folder as-is)
 
