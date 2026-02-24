@@ -74,7 +74,7 @@ loadEnv:
 or
 
 ```yaml
-loadEnd:
+loadEnv:
   files: 'env-vars/*'
 ```
 
