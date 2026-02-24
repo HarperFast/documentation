@@ -34,7 +34,7 @@ The local Studio can be accessed through your browser at:
 http://localhost:9925
 ```
 
-All database interactions from the local Studio are made directly from your browser to your Harper instance. Credentials are stored in your browser cache and are not transmitted to external servers.
+All database interactions from the local Studio are made directly from your browser to your Harper instance. Authentication is maintained via session cookies.
 
 ## Legacy Cloud Studio Documentation
 
