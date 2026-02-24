@@ -6,21 +6,24 @@ title: Define Fastify Routes
 
 # Define Fastify Routes
 
-> **Note**: Fastify routes are discouraged in favor of modern routing with [Components](TODO:reference_versioned_docs/version-v4/components/overview.md "Component documentation"), but remain a supported feature for backwards compatibility and specific use cases.
+:::note
+Fastify routes are discouraged in favor of modern routing with [Custom Resources](TODO:reference_versioned_docs/version-v4/resources/overview.md "Resources documentation"), but remain a supported feature for backwards compatibility and specific use cases.
+:::
 
-Harper's applications provide an extension for loading [Fastify](https://www.fastify.io/) routes as a way to handle endpoints. While we generally recommend building your endpoints/APIs with Harper's [REST interface](TODO:reference_versioned_docs/version-v4/rest/overview.md "REST interface documentation") for better performance and standards compliance, Fastify's route can provide an extensive API for highly customized path handling. Below is a very simple example of a route declaration.
+Harper provides a build-in plugin for loading [Fastify](https://www.fastify.io/) routes as a way to define custom endpoints for your Harper application. While we generally recommend building your endpoints/APIs with Harper's [REST interface](TODO:reference_versioned_docs/version-v4/rest/overview.md "REST interface documentation") for better performance and standards compliance, Fastify routes can provide an extensive API for highly customized path handling. Below is a very simple example of a route declaration.
 
 The fastify route handler can be configured in your application's config.yaml (this is the default config if you used the [application template](https://github.com/HarperDB/application-template)):
 
 ```yaml
-fastifyRoutes: # This loads files that define fastify routes using fastify's auto-loader
+fastifyRoutes:
   files: routes/*.js # specify the location of route definition modules
-  path: . # relative to the app-name, like  https://server/app-name/route-name
 ```
 
 By default, route URLs are configured to be:
 
-- \[**Instance URL**]:\[**HTTP Port**]/\[**Project Name**]/\[**Route URL**]
+```
+<Instance URL>:<HTTP Port>/<Project name>/<Route URL>
+```
 
 However, you can specify the path to be `/` if you wish to have your routes handling the root path of incoming URLs.
 
