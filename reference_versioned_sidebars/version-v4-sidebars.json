@@ -33,19 +33,19 @@
 				}
 			]
 		},
-    {
+		{
 			"type": "category",
-      "label": "GraphQL Querying",
-      "collapsible": false,
+			"label": "GraphQL Querying",
+			"collapsible": false,
 			"className": "learn-category-header",
-      "items": [
+			"items": [
 				{
-          "type": "doc",
+					"type": "doc",
 					"id": "graphql-querying/overview",
 					"label": "Overview"
 				}
 			]
-    },
+		},
 		{
 			"type": "category",
 			"label": "Studio",
@@ -66,101 +66,9 @@
 			"className": "learn-category-header",
 			"items": [
 				{
-					"type": "category",
-					"label": "Cloud Studio",
-					"collapsible": true,
-					"items": [
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/overview",
-							"label": "Overview"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/create-account",
-							"label": "Create Account"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/login-password-reset",
-							"label": "Login & Password Reset"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/organizations",
-							"label": "Organizations"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/instances",
-							"label": "Instances"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/instance-configuration",
-							"label": "Instance Configuration"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/instance-metrics",
-							"label": "Instance Metrics"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/manage-instance-users",
-							"label": "Manage Instance Users"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/manage-instance-roles",
-							"label": "Manage Instance Roles"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/manage-databases-browse-data",
-							"label": "Manage Databases & Browse Data"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/query-instance-data",
-							"label": "Query Instance Data"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/manage-applications",
-							"label": "Manage Applications"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/manage-replication",
-							"label": "Manage Replication"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/enable-mixed-content",
-							"label": "Enable Mixed Content"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/alarms",
-							"label": "Alarms"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/instance-size-hardware-specs",
-							"label": "Instance Size Hardware Specs"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/iops-impact",
-							"label": "IOPS Impact on Performance"
-						},
-						{
-							"type": "doc",
-							"id": "legacy/cloud-studio/verizon-5g-wavelength-instances",
-							"label": "Verizon 5G Wavelength"
-						}
-					]
+					"type": "doc",
+					"id": "legacy/cloud",
+					"label": "Harper Cloud"
 				}
 			]
 		}

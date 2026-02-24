@@ -626,11 +626,11 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 ## Legacy Section
 
-### `reference/legacy/cloud-studio/`
+### `reference/legacy/cloud/`
 - **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
-- - **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
+- **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
 - **Status**: In Progress
-- **Notes**: These docs are for Harper Cloud Studio (the hosted studio for cloud instances), not the local Studio UI. Move to legacy with note that this is for Harper Cloud Studio which is deprecated/replaced by Fabric. Content includes account management, organizations, instance management, etc. Harper Cloud deployment docs (alarms, instance sizes, hardware specs, IOPS, Verizon info, etc.) are not relevant for v4 reference. Harper Cloud has been replaced by Fabric. There is a chance we delete this content entirely prior to merging into main. Waiting on information from customer teams.
+- **Notes**: The primary and additional sources are to be completely removed and this section is to act as a basic landing page to direct users to Fabric instead.
 
 ### `reference/legacy/custom-functions/`
 - **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
@@ -694,6 +694,8 @@ These exist in current docs but won't exist in new structure:
 **To be ignored (obsolete content):**
 - `versioned_docs/version-4.7/reference/index.md` - Generic intro page
 - `versioned_docs/version-4.7/reference/limits.md` - Fold into database/overview or schema
+- `versioned_docs/version-4.7/administration/harper-studio/` - direct users to fabric
+- `versioned_docs/version-4.7/deployments/harper-cloud/` - direct users to fabric
 
 ### Cross-References to Update
 Files that heavily reference paths that will change:

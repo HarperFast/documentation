@@ -305,7 +305,7 @@ Based on migration map and reference plan, recommend this order. Each section is
 **Phase 1E - Legacy Content**
 
 1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`)
-    - `cloud-studio/` - Harper Cloud Studio docs from `administration/harper-studio/` and `deployments/harper-cloud/` (for hosted cloud studio, deprecated with Fabric)
+    - `cloud/` - Harper Cloud landing page to direct users to Fabric instead
     - `custom-functions/` (entire folder as-is)
     - `sql/` (entire folder as-is)
 
