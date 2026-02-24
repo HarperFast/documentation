@@ -31,6 +31,7 @@ This consolidation will improve documentation maintainability, make features mor
 ## Current Status
 
 ### Phase Status
+
 - ✅ Planning & Documentation Complete
 - ⏸️ Team Review Pending
 - ⏳ Pilot Execution Not Started
@@ -40,6 +41,7 @@ This consolidation will improve documentation maintainability, make features mor
 ### Sections Status (0/20 Complete)
 
 **Phase 1A - Simple** (0/5)
+
 - [ ] CLI
 - [ ] Content Types
 - [ ] Headers
@@ -47,6 +49,7 @@ This consolidation will improve documentation maintainability, make features mor
 - [ ] Studio
 
 **Phase 1B - Medium** (0/7)
+
 - [ ] Security
 - [ ] Environment Variables
 - [ ] Static Files
@@ -56,6 +59,7 @@ This consolidation will improve documentation maintainability, make features mor
 - [ ] Analytics
 
 **Phase 1C - Complex** (0/5)
+
 - [ ] REST
 - [ ] Replication
 - [ ] Database
@@ -63,13 +67,16 @@ This consolidation will improve documentation maintainability, make features mor
 - [ ] Components
 
 **Phase 1D - Cross-Cutting** (0/2)
+
 - [ ] Operations API
 - [ ] Configuration
 
 **Phase 1E - Legacy** (0/1)
+
 - [ ] Legacy Content
 
 ### Metrics
+
 - **PRs Opened**: 0/20
 - **PRs Merged**: 0/20
 - **Link Placeholders Created**: 0
@@ -82,36 +89,43 @@ This consolidation will improve documentation maintainability, make features mor
 ## Key Decisions Log
 
 ### 2026-02-18: Initial Planning
+
 - **Decision**: Use VSCode + Claude Code approach (vs fully automated Agent SDK)
 - **Rationale**: Provides visibility and control; can pivot to automation if needed
 - **Impact**: Requires manual orchestration but allows quality validation throughout
 
 ### 2026-02-18: Target Directory
+
 - **Decision**: Output to `reference_versioned_docs/version-v4/` not `reference/`
 - **Rationale**: Clean separation; `reference/` will be used for v5 kickstart later
 - **Impact**: Additional step required later to copy to `reference/` for v5
 
 ### 2026-02-18: Transaction Logging Reorganization
+
 - **Decision**: Move transaction/audit logging from `logging/` to `database/`
 - **Rationale**: Transaction logging is a database-level concern, not application logging
 - **Impact**: Better conceptual organization; `logging/` focuses on app/system logs
 
 ### 2026-02-18: Link Placeholder Strategy
+
 - **Decision**: Use `TODO:path` format in actual markdown links with per-section tracker files
 - **Rationale**: Easy to find/replace, works with markdown parsers, no merge conflicts
 - **Impact**: Separate cleanup phase needed to resolve placeholders
 
 ### 2026-02-18: Complete Sections in Single PRs
+
 - **Decision**: Don't split large sections (like Configuration) into multiple PRs
 - **Rationale**: Easier to review section holistically; context is preserved
 - **Impact**: Some PRs will be large but provide complete picture
 
 ### 2026-02-18: Pilot-First Approach
+
 - **Decision**: Run CLI and Security as pilots before scaling
 - **Rationale**: Validate quality and process before committing to full migration
 - **Impact**: Adds ~2-3 days upfront but reduces risk of rework
 
 ### 2026-02-19: Temporary Build Simplifications
+
 - **Decision**: Temporarily disable local search plugin and set `onBrokenLinks: 'warn'`
 - **Rationale**: Allows build to succeed during migration while reference docs are being populated
 - **Impact**: Must remember to re-enable before merging to main:
@@ -127,22 +141,25 @@ This consolidation will improve documentation maintainability, make features mor
 ## Known Issues & Blockers
 
 ### Current Blockers
-*None - ready to begin execution*
+
+_None - ready to begin execution_
 
 ### Potential Risks
+
 1. **Version annotation accuracy** - AI might infer wrong introduction versions
-   - *Mitigation*: Confidence levels + human verification + release notes validation
+   - _Mitigation_: Confidence levels + human verification + release notes validation
 
 2. **Content quality variability** - Some sections might need significant editing
-   - *Mitigation*: Pilot sections first; refine prompts based on learnings
+   - _Mitigation_: Pilot sections first; refine prompts based on learnings
 
 3. **Review capacity** - Team might be overwhelmed by 20 large PRs
-   - *Mitigation*: Flexible timeline; can slow down review velocity as needed
+   - _Mitigation_: Flexible timeline; can slow down review velocity as needed
 
 4. **Link placeholder confusion** - Placeholders might be unclear or incorrect
-   - *Mitigation*: Clear format specification; dedicated cleanup phase
+   - _Mitigation_: Clear format specification; dedicated cleanup phase
 
 ### Watch Items
+
 - [ ] Current `reference/` and `reference_versioned_docs/version-v4/` directories are empty (confirmed reset)
 - [ ] All planning documents are up to date
 - [ ] Team has capacity for 2-3 PR reviews per day
@@ -153,6 +170,7 @@ This consolidation will improve documentation maintainability, make features mor
 ## Upcoming Milestones
 
 ### Next Steps (Immediate)
+
 1. **Present to team** - Review all planning docs, get feedback and buy-in
 2. **Environment setup** - Verify VSCode, Claude Code, gh CLI ready
 3. **Create tracking issue** - Set up GitHub issue for progress tracking
@@ -160,18 +178,21 @@ This consolidation will improve documentation maintainability, make features mor
 5. **Team sync** - Review pilot results, refine approach
 
 ### Near-Term Milestones (Next 2 Weeks)
+
 - [ ] Pilot sections complete (CLI + Security)
 - [ ] Decision on scaling approach (continue VSCode or build automation)
 - [ ] Phase 1A complete (5 simple sections)
 - [ ] Phase 1B started (medium complexity sections)
 
 ### Medium-Term Milestones (Next 4 Weeks)
+
 - [ ] All 20 sections have PRs merged
 - [ ] Link resolution complete
 - [ ] Cross-references updated
 - [ ] Sidebars configured
 
 ### Long-Term Milestones (Next 6 Weeks)
+
 - [ ] Redirects configured
 - [ ] Old versioned_docs removed
 - [ ] Final validation complete
@@ -184,6 +205,7 @@ This consolidation will improve documentation maintainability, make features mor
 **Project Goal**: Migrate v4 docs from `versioned_docs/version-4.X/` → `reference_versioned_docs/version-v4/` with restructuring.
 
 **Your Role**: Generate initial content drafts by:
+
 1. Reading migration map entry for assigned section
 2. Reading all source files listed (primary + additional)
 3. Reading release notes for version info
@@ -192,6 +214,7 @@ This consolidation will improve documentation maintainability, make features mor
 6. Creating branch, committing, opening PR
 
 **Key Constraints**:
+
 - ✅ DO add files to `reference_versioned_docs/version-v4/`
 - ✅ DO include inline source comments
 - ✅ DO use `TODO:path` format for link placeholders
@@ -201,6 +224,7 @@ This consolidation will improve documentation maintainability, make features mor
 - ❌ DON'T guess at version dates without noting uncertainty
 
 **Key Files to Reference**:
+
 - `v4-docs-migration-map.md` - Your primary instruction source (which files to read, where to write)
 - `v4-docs-implementation-plan.md` - Detailed agent instructions (Part 1)
 - `v4-docs-reference-plan.md` - Target structure and philosophy
@@ -209,6 +233,7 @@ This consolidation will improve documentation maintainability, make features mor
 **PR Template**: See `v4-docs-implementation-plan.md` Part 1 for complete template.
 
 **Success Criteria**:
+
 - All files in correct location with proper structure
 - Inline source comments on all content
 - Version annotations with confidence levels
@@ -221,20 +246,24 @@ This consolidation will improve documentation maintainability, make features mor
 ## Team Assignments
 
 ### Project Lead
+
 - **Name**: Ethan
 - **Responsibilities**: Overall coordination, decision making, pilot execution
 
 ### Reviewers
-*TBD after team discussion*
+
+_TBD after team discussion_
 
 ### Execution Assignments
-*To be determined after pilot phase*
+
+_To be determined after pilot phase_
 
 ---
 
 ## Notes & Learnings
 
 ### Planning Phase Insights
+
 - Horizontal consolidation (v4.1→v4.7) + vertical reorganization (role-based→feature-based) are parallel transformations
 - Starting with v4.7 as base and annotating backwards is more efficient than building forward from v4.1
 - Migration map revealed several complex merges (Configuration 59KB, Schema from 5+ files, Clustering 10+ files)
@@ -242,19 +271,23 @@ This consolidation will improve documentation maintainability, make features mor
 - Current `reference/` folder was already partially reorganized (work in progress)
 
 ### Process Improvements
-*To be filled in as we learn from pilots and execution*
+
+_To be filled in as we learn from pilots and execution_
 
 ### Template Refinements
-*To be filled in as we refine prompts based on pilot results*
+
+_To be filled in as we refine prompts based on pilot results_
 
 ### Common Issues
-*To be filled in as patterns emerge during execution*
+
+_To be filled in as patterns emerge during execution_
 
 ---
 
 ## Change Log
 
 ### 2026-02-18 - Project Initialization
+
 - Created all planning documents
 - Completed migration map (20 sections, ~100+ files mapped)
 - Defined reference structure and philosophy
@@ -266,18 +299,21 @@ This consolidation will improve documentation maintainability, make features mor
 ## Future Considerations
 
 ### Post-Migration Tasks (Out of Scope for Now)
+
 - Copy content from `reference_versioned_docs/version-v4/` to `reference/` to kickstart v5
 - Begin v5 documentation structure planning
 - Consider automation for future minor version consolidations
 - Evaluate if this approach works for v3 historical docs
 
 ### Process Improvements for Next Time
+
 - Could build Agent SDK automation upfront if this approach proves successful
 - Template-based content generation for consistent structure
 - Automated version annotation extraction from git history
 - Automated redirect generation from sitemap analysis
 
 ### Documentation Enhancements
+
 - Consider adding diagrams/flowcharts to planning docs
 - Video walkthrough of the process for future team members
 - Automated progress dashboard from migration map status fields
@@ -287,6 +323,7 @@ This consolidation will improve documentation maintainability, make features mor
 ## Quick Reference
 
 ### Directory Structure
+
 ```
 documentation/
 ├── versioned_docs/
@@ -306,6 +343,7 @@ documentation/
 ```
 
 ### Common Commands
+
 ```bash
 # Switch to migration branch
 git checkout major-version-reorg
@@ -327,6 +365,7 @@ grep "Status:" v4-docs-migration-map.md
 ```
 
 ### Key Metrics to Track
+
 - Sections complete: `X/20`
 - PRs open: `X`
 - PRs merged: `X`
@@ -339,12 +378,14 @@ grep "Status:" v4-docs-migration-map.md
 ## Questions & Decisions Needed
 
 ### Before Pilot
+
 - [ ] Team reviewed all planning docs?
 - [ ] Reviewers assigned for pilot sections?
 - [ ] GitHub tracking issue created?
 - [ ] Environment setup verified?
 
 ### After Pilot
+
 - [ ] Is content quality acceptable?
 - [ ] Are version annotations accurate?
 - [ ] Is link placeholder format working?
@@ -352,18 +393,21 @@ grep "Status:" v4-docs-migration-map.md
 - [ ] Any prompt refinements needed?
 
 ### Before Scaling
+
 - [ ] Pilot learnings documented?
 - [ ] Prompts refined based on pilot?
 - [ ] Review assignments made?
 - [ ] Ready to open 15-18 more PRs?
 
 ### Before Cleanup
+
 - [ ] All sections merged?
 - [ ] Ready to start link resolution?
 - [ ] Any orphaned content to address?
 - [ ] Ready to configure sidebars/redirects?
 
 ### Before Merge to Main
+
 - [ ] All cleanup phases complete?
 - [ ] Documentation builds successfully?
 - [ ] Redirects tested?

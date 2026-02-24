@@ -1,10 +1,10 @@
 # v4 Docs Map
 
-The point of this is to figure out the documented evolution of Harper features and subsystems from v4.1 to v4.7 in order to create a holistic solution for reorganized singular major v4 versioned docs. 
+The point of this is to figure out the documented evolution of Harper features and subsystems from v4.1 to v4.7 in order to create a holistic solution for reorganized singular major v4 versioned docs.
 
 This is aligned with renaming `docs/` to `reference/` and furthering the ideal separation of prose content into `learn/`.
 
-The structure I'm hoping to work towards is a single `reference/` folder layout that ideally has any _active_ features top-level. Then if there are legacy, deprecated, or even removed features (from a latest version), they will be documented in some sub-path such as `reference/legacy/` or something like that. 
+The structure I'm hoping to work towards is a single `reference/` folder layout that ideally has any _active_ features top-level. Then if there are legacy, deprecated, or even removed features (from a latest version), they will be documented in some sub-path such as `reference/legacy/` or something like that.
 
 When a feature has changed over time and some part of it is still active, but some other aspect has been deprecated; that feature should still live at top-level, but then that specific detail will be indicated as legacy/deprecated/removed.
 
@@ -17,19 +17,20 @@ My plan is to go through versioned docs folders one by one and try to logically 
 ## v4.1
 
 Top Level sections include:
+
 - Installation
   - Replaced by both newer installation instructions and learn guides
 - Getting Started
   - Replaced entirely by learn guides
-- External API docs (api.harperdb.io) which has since been redirected to operations api 
+- External API docs (api.harperdb.io) which has since been redirected to operations api
 - Studio
   - We'll keep this around for now since it is still shipped with v4
 - Cloud
   - No longer need to support these pages; cloud has been fully replaced by fabric
 - Security
-  - Lots of these pages still exist today but have been updated. 
-  - In general I don't think there is anything in here that would be version specific; other than the larger concepts. 
-  - This section has "JWT" and Certificate Management. in later harper versions we've likely added to those and so we'll detail that version specificity in the respective pages. 
+  - Lots of these pages still exist today but have been updated.
+  - In general I don't think there is anything in here that would be version specific; other than the larger concepts.
+  - This section has "JWT" and Certificate Management. in later harper versions we've likely added to those and so we'll detail that version specificity in the respective pages.
     - Like there should be something that dictates that JWT support has existed as early as v4.1
     - But say some other scheme (Cookies?) didn't work until whatever minor version
 - Clustering
@@ -77,7 +78,7 @@ Top Level sections include:
   - Data Types
     - This becomes schema docs in the future
   - Dynamic Schema
-    - This becomes schema docs in the future 
+    - This becomes schema docs in the future
   - Headers
     - `server-timing`, `hdb-response-time`, `content-type`
   - Limits
@@ -99,7 +100,7 @@ First time pages have been nested into top-level sections Getting Started, Devel
     - Guide like that has been / will be replaced by Learn content
     - Subsections:
     - Caching
-      - This is a key feature 
+      - This is a key feature
     - Debugging
       - This isn't necessarily a reference page; replaceable by Learn guide and cross links from configuration page (thread.debug) to Learn guide focussing on debugging
     - Fastify Routes
@@ -116,19 +117,19 @@ First time pages have been nested into top-level sections Getting Started, Devel
     - This obviously will continue to have its own top-level section which will properly encapsulate applications, plugins, etc. (in-fact we already have the start of this in docs/reference/components now so we'll build off of that)
   - Operations API
     - First time having its own standalone section containing sub pages for all operations api types
-    - Likely want to retain something like this and ensure this is the single source of reference for all operations apis. feature pages should link to this directly  
+    - Likely want to retain something like this and ensure this is the single source of reference for all operations apis. feature pages should link to this directly
   - Real-Time
     - This page still exists today in a similar fashion
-    - Need to consider making this nested i think and having dedicated pages for MQTT, WS, etc. 
-    - Similar to ongoing idea below, likely want to have detailed ops/config info for any of these core features in their own reference section that parallels and links to/from other pages like a general overview pages. Akin to the general config or ops api page ideas, we could have another one for Real-Time that succinctly details the subsystems available, but then links out to reference and learn content depending what user wants. 
+    - Need to consider making this nested i think and having dedicated pages for MQTT, WS, etc.
+    - Similar to ongoing idea below, likely want to have detailed ops/config info for any of these core features in their own reference section that parallels and links to/from other pages like a general overview pages. Akin to the general config or ops api page ideas, we could have another one for Real-Time that succinctly details the subsystems available, but then links out to reference and learn content depending what user wants.
     - nonetheless things like mqtt is a standalone plugin; document it as such
-    - but something like ws isn't exactly; its a feature of REST so ensure its appropriately organized by the plugin and well referenced for other sensible locations. 
+    - but something like ws isn't exactly; its a feature of REST so ensure its appropriately organized by the plugin and well referenced for other sensible locations.
     - In this regard we may not need a top-level "Real Time" page. These specific features MQTT, WS, do deserve detailed reference pages and sections, but we don't have to arbitrarily group them like this.
   - REST
     - should remain top level but is truly a built-in plugin. can be structured like other plugin docs
     - may need to think through how to incorporate all the configuration and subfeatures of this. like ws and interconnectedness with Resource API and things like content types. this goes back to the organization of information problem that this could live under an umbrella like "HTTP" or "Networking", but is there value in having higherlevel pages or can we just list this top-level along with everything else
   - Security
-    - This might exist in v4.1 but aligned with some of the current thinking, this section has a "Configuration" page ... is this more like what we want out of dedicated sections for features and then having detailed subsections for similar parts? 
+    - This might exist in v4.1 but aligned with some of the current thinking, this section has a "Configuration" page ... is this more like what we want out of dedicated sections for features and then having detailed subsections for similar parts?
     - Instead of having a whole `security/configuration` page, I believe this could live in a root, or the relative configurations should go into a more specific topic. like `security/cors` and that can contain general reference as well as specific configuration info
     - Otherwise, seeing some trend of existing feature scope here like Basic auth, Cert mgmt, JWT, and Users & Roles
     - So just like other places; we likely don't need to lump these all into a "Security" subsection and they could just have their own top-level reference topic.
@@ -144,7 +145,7 @@ First time pages have been nested into top-level sections Getting Started, Devel
     - same as v4.1 page; should just exist top level or be completely folded into operations api
   - Logging
     - nested all three "Audit", "Standard", and "Transaction"
-    - again, why nest? and furthermore, most of these pages are just operations reference. 
+    - again, why nest? and furthermore, most of these pages are just operations reference.
 - Deployments
   - Configuration File
     - Good start to an important reference page. as i've written else where, I likely want to have a configuration page be more general and then list out all options but link out to specific pages for detailed description and usage patterns.
@@ -156,12 +157,12 @@ First time pages have been nested into top-level sections Getting Started, Devel
     - this is a learn guide now; any other info should be included else where like configuration page (in a subsection about say necessary installation variables or the like)
     - The "On Linux" subpage should be a learn guide if its even still relevant.
   - Upgrade
-    - likely can be removed or more simply retained. not as much upgrade info today. 
+    - likely can be removed or more simply retained. not as much upgrade info today.
     - if there is actually some sort of api feature then it can documented in reference. but its just behavior of installation or something then absolutely simplify
 - Reference
-  - Many of the following subsections can exist as is; this is the basis for what we want this whole `/docs` section to become. 
+  - Many of the following subsections can exist as is; this is the basis for what we want this whole `/docs` section to become.
   - Analytics
-    - this is just a table; theres a few of these "system" tables that we could detail somewhere more technically 
+    - this is just a table; theres a few of these "system" tables that we could detail somewhere more technically
   - Architecture
     - high level info that would fit better in an earlier page or in something like applications
     - new learn content already has this info in it.
@@ -177,8 +178,8 @@ First time pages have been nested into top-level sections Getting Started, Devel
   - Data Types
     - same as before; should be folded into a schema reference
   - Dynamic Schema
-    - as early as v4.2 we have this information disorganization where the user needs to read multiple different pages to even understand what the schema system is made of. if they missed the "defining schema" guide early on then this page and the previous make little sense. 
-    - schemas system needs a detailed reference page! 
+    - as early as v4.2 we have this information disorganization where the user needs to read multiple different pages to even understand what the schema system is made of. if they missed the "defining schema" guide early on then this page and the previous make little sense.
+    - schemas system needs a detailed reference page!
   - Globals
     - beginning of some js api reference docs that are important for extensions (at this time), but now applications and plugins
   - Headers
@@ -192,7 +193,7 @@ First time pages have been nested into top-level sections Getting Started, Devel
   - Storage Algorithm
     - useful technical info; where is this today? Could likely be apart of a larger "DB" section or something or just "Additional Technical Details" as it doesn't have too much relevant info for app or even plugin devs.
   - Transactions
-    - is this another global api? 
+    - is this another global api?
     - need to see what the state of this is today and ensure its represented in appropriate places like globals page
     - now maybe global page needs to be high level and we need separate pages for each api within it too? like logger could exist in logger of course. all the server stuff could exist in a Networking or simply "Server" part.
 
@@ -272,12 +273,12 @@ There is really only one new file in v4.5, `reference/blob.md`, but the list of 
 - Default replication port was changed from 9925 to 9933
 - Expanded property access even if they aren't defined in a schema
 - Storage reclamation (more of a platform feature than any kind of api)
-- Expanded sharding functionality 
+- Expanded sharding functionality
 - Certificate revocation in clustering
 - Built-in `loadEnv` plugin for environment variable loading
 - `cluster_status` operation updates
 - Improved URL path parsing for resources
-- `server.authenticateUser` API 
+- `server.authenticateUser` API
 - HTTP/2 support fo api endpoints (`http2` option)
 - transactions can now be reused after calling `transaction.commit()`
 - GraphQL query endpoint can be configured to listen on different ports; its also now disabled by default to avoid conflicts
@@ -306,7 +307,8 @@ In addition to that new features include:
 Only one new file; `'developers/security/certificate-verification.md'`
 
 Feature list much smaller:
-- individual component status monitoring 
+
+- individual component status monitoring
 - OCSP support
 - new analytics and licensing functionality (for Fabric)
 - Plugin API changes
@@ -315,12 +317,12 @@ Feature list much smaller:
 
 From early on (v4.1) many features were fully controlled by ops apis. And at first they were presented based on the feature at hand. Like "Clustering", "Custom Functions", etc. and within the docs for that feature it included whatever relevant ops apis were needed. This makes me think that while we should have a technical reference for _all_ operations apis, it may be valuable to also associated specific ops apis with their relative feature. Like how is a user supposed to know if they want to do _clustering_ that they need to first look "ops apis"? Having a top level "Clustering" is valuable. That said; this is in part what the Learn section is meant to solve. Users should learn about how to Clustering via Learn guides. And then they can click through to reference pages for any other information. We also have Search in order to discover whatever specific ops apis. I think organizing the ops apis under an "Operations APIs" section is still correct but we should ensure discoverability. Maybe we don't nest it and just have them all viewable by default as soon as someone is looking at the left sidebar in Reference.
 
-Just from reviewing v4.1 docs it is starting to show ideal core systems to document such as CLI, Operations API, Configuration, Schemas, Logging. Like the previous paragraph stated, some thought needs to be given to how information is organized. Logger is a great example of having configuration details, usage details, and API reference details. So should all of that exist under "Logging" or should it be spread out between sections? I think the reality is we'll need a bit of "both". Where there should be top-level sections "Configuration" and "Logging". Under configuration, it should have the general info about the config file and snake_case mapping to CLI options or operations API values, and it should list out all available configuration properties in a structure way (think JSON schema). Include short descriptions, but for any actual detail around say the `logger` section, it should link out to the Logging section for further information. Like expanded descriptions for example. Additionally, any "guide" or usage like info should be delegated to learn guides. But with this thinking; how should operations apis be documented? 
+Just from reviewing v4.1 docs it is starting to show ideal core systems to document such as CLI, Operations API, Configuration, Schemas, Logging. Like the previous paragraph stated, some thought needs to be given to how information is organized. Logger is a great example of having configuration details, usage details, and API reference details. So should all of that exist under "Logging" or should it be spread out between sections? I think the reality is we'll need a bit of "both". Where there should be top-level sections "Configuration" and "Logging". Under configuration, it should have the general info about the config file and snake_case mapping to CLI options or operations API values, and it should list out all available configuration properties in a structure way (think JSON schema). Include short descriptions, but for any actual detail around say the `logger` section, it should link out to the Logging section for further information. Like expanded descriptions for example. Additionally, any "guide" or usage like info should be delegated to learn guides. But with this thinking; how should operations apis be documented?
 
-Should we simplify Ops Api section to include general ops api info (requests, endpoints, w/e), and then have a table/list of available (and deprecated) ops apis with short descriptions and then links out to other docs (related to the respective feature) that details the op? 
+Should we simplify Ops Api section to include general ops api info (requests, endpoints, w/e), and then have a table/list of available (and deprecated) ops apis with short descriptions and then links out to other docs (related to the respective feature) that details the op?
 
 Could we introduce some form of a "tag" system for pages? This could help with information organization as we could get rid of top-level pages like "Real-Time" or "Security" and just tag relevant sections based on some of those top-level topics. We could incorporate these tags into search or even some of navigation mechanism. This may be more satisfactory of a compromise for self-navigation. Its simpler than trying to come up with overly organized top-level sections, and is better than search (though AI search would definitely trump this). I think a fundamental issue is that users still are hesitant to use search since its traditionally such a poor experience. Now with AI baked in its improved tremendously but still users aren't gravitating towards it. Many are simply used to self-navigating and so we need to find some compromise. Going back to concept of "tags", idk if that necessarily solves that problem unless we introduce a more interactive search page. I think i'd rather just ensure that searching `"networking"` will actually return pages like HTTP, REST, MQTT, w/e.
 
 As I make my way through later v4 minors (4.3, 4.4, 4.5) its starting to show how the docs structure from as early as 4.2 doesn't change all too much. If I can sufficiently map out the top-level features to document, then come up with a reasonable format/structure for pages (like how to actually detail changes over versions), we should be in a really good place. Overall we'll significantly simplify the reference docs and make it much easier to maintain going into v5. We'll meet our obligation to provide "support" for existing v4 minors since we'll have changes documented. We've done an excellent job not breaking any apis over the development of v4 so in theory there shouldn't be much concern if say a v4.5 user was reading v4 docs which are more representative of latest v4.7 information but also contain notes about how things had changed for any particular part from v4.5 to v4.6 and beyond.
 
-The real challenge in all of this is to figure out the high-level organization of information. I've flip-flopped a bit between high-level general pages and how everything should be organized, but I think through a lot of this it seems apparent we should document individual plugins and features thus the docs will logically map to the implementation. There will obviously be some cross-cuts, but i think organizing by feature makes the most sense. 
+The real challenge in all of this is to figure out the high-level organization of information. I've flip-flopped a bit between high-level general pages and how everything should be organized, but I think through a lot of this it seems apparent we should document individual plugins and features thus the docs will logically map to the implementation. There will obviously be some cross-cuts, but i think organizing by feature makes the most sense.

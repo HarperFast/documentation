@@ -33,6 +33,7 @@ Changed in: v4.7.0
 The CLI command is `harper`. From v4.1.0 to v4.6.x, the command was only available as `harperdb`. Starting in v4.7.0, the preferred command is `harper`, though `harperdb` continues to work as an alias for backward compatibility.
 
 **Examples**:
+
 ```bash
 # Modern usage (v4.7.0+)
 harper
@@ -83,6 +84,7 @@ When Harper is running, the process identifier (PID) is stored in a file named `
 **Location**: `<ROOTPATH>/hdb.pid`
 
 **Example**:
+
 ```bash
 # Read the PID
 cat /path/to/hdb/hdb.pid
@@ -93,19 +95,19 @@ kill -0 $(cat /path/to/hdb/hdb.pid)  # Check if process is running
 
 ## System Management Commands
 
-| Command | Description | Available Since |
-|---------|-------------|-----------------|
-| `harper` | Run Harper in foreground mode (default behavior) | v4.1.0 |
-| `harper run <path/to/app>` | Run Harper application from any directory | v4.2.0 |
-| `harper dev <path/to/app>` | Run Harper in dev mode with auto-restart and console logging | v4.2.0 |
-| `harper restart` | Restart Harper | v4.1.0 |
-| `harper start` | Start Harper in background (daemon mode) | v4.1.0 |
-| `harper stop` | Stop a running Harper instance | v4.1.0 |
-| `harper status` | Display Harper and clustering status | v4.1.0 |
-| `harper version` | Show installed Harper version | v4.1.0 |
-| `harper renew-certs` | Renew Harper-generated self-signed certificates | v4.1.0 |
-| `harper copy-db <source> <target>` | Copy a database with compaction | v4.1.0 |
-| `harper help` | Display all available CLI commands | v4.1.0 |
+| Command                            | Description                                                  | Available Since |
+| ---------------------------------- | ------------------------------------------------------------ | --------------- |
+| `harper`                           | Run Harper in foreground mode (default behavior)             | v4.1.0          |
+| `harper run <path/to/app>`         | Run Harper application from any directory                    | v4.2.0          |
+| `harper dev <path/to/app>`         | Run Harper in dev mode with auto-restart and console logging | v4.2.0          |
+| `harper restart`                   | Restart Harper                                               | v4.1.0          |
+| `harper start`                     | Start Harper in background (daemon mode)                     | v4.1.0          |
+| `harper stop`                      | Stop a running Harper instance                               | v4.1.0          |
+| `harper status`                    | Display Harper and clustering status                         | v4.1.0          |
+| `harper version`                   | Show installed Harper version                                | v4.1.0          |
+| `harper renew-certs`               | Renew Harper-generated self-signed certificates              | v4.1.0          |
+| `harper copy-db <source> <target>` | Copy a database with compaction                              | v4.1.0          |
+| `harper help`                      | Display all available CLI commands                           | v4.1.0          |
 
 See [CLI Commands](./commands.md) for detailed documentation on each command.
 
@@ -113,7 +115,7 @@ See [CLI Commands](./commands.md) for detailed documentation on each command.
 
 Added in: v4.3.0 (confirmed via release notes)
 
-The Harper CLI supports executing most operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API overview") directly from the command line. This includes operations that do not require complex nested parameters.
+The Harper CLI supports executing most operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') directly from the command line. This includes operations that do not require complex nested parameters.
 
 **Syntax**: `harper <operation> <parameter>=<value>`
 
@@ -150,6 +152,7 @@ Changed in: v4.3.0 (expanded remote operations support)
 The CLI can execute operations on remote Harper instances by passing the `target` parameter with the HTTP address of the remote instance.
 
 **Authentication**: Provide credentials via:
+
 - Parameters: `username=<user> password=<pass>`
 - Environment variables: `CLI_TARGET_USERNAME` and `CLI_TARGET_PASSWORD`
 
@@ -180,6 +183,7 @@ harper dev /path/to/app
 ```
 
 **Features**:
+
 - Console logging for immediate feedback
 - Debugging enabled
 - Auto-restart on file changes
@@ -192,5 +196,5 @@ See [CLI Commands](./commands.md) for detailed information on `harper dev` and o
 - [CLI Commands](./commands.md) - Detailed reference for each CLI command
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
 - [CLI Authentication](./authentication.md) - Authentication mechanisms
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md "Configuration overview") - Harper configuration options
-- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API") - Full operations API reference
+- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview') - Harper configuration options
+- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API') - Full operations API reference

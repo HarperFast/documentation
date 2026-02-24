@@ -90,6 +90,7 @@ Since we're consolidating v4.1 through v4.7 into a unified v4 reference, we need
 ### Annotation Patterns
 
 **For new features:**
+
 ```markdown
 ## Relationships
 
@@ -99,6 +100,7 @@ The `@relation` directive allows you to define relationships between tables...
 ```
 
 **For changed features:**
+
 ```markdown
 ### Auto-increment Primary Keys
 
@@ -109,6 +111,7 @@ In previous versions, only GUIDs were supported for `ID` and `String` types.
 ```
 
 **For deprecated features:**
+
 ```markdown
 ## SQL Querying
 
@@ -120,15 +123,18 @@ for modern alternatives.
 ```
 
 **For configuration options:**
+
 ```markdown
 ## Logging Configuration
 
 ### `logger.level`
+
 - Type: `string`
 - Default: `"info"`
 - Added in: v4.1.0
 
 ### `logger.per_component`
+
 - Type: `object`
 - Default: `{}`
 - Added in: v4.6.0
@@ -149,6 +155,7 @@ Allows granular logging configuration per component or plugin.
 ### Building Version History
 
 When migrating content:
+
 1. Start with v4.7 documentation as the base (most current)
 2. Compare with earlier versions (v4.6 → v4.5 → ... → v4.1) to identify when features appeared
 3. Use release notes to validate feature introduction versions
@@ -271,7 +278,7 @@ reference/
 │   │                                # are very similar but with the `loadAsInstance` thing have different signatures.
 │   │                                # Easiest to stick to that model until we can simplify in future majors.
 │   │
-│   ├── global-apis.md               # `tables`, `databases`, `transactions` etc. 
+│   ├── global-apis.md               # `tables`, `databases`, `transactions` etc.
 │   │                                # `server` has its own section so mention and link.
 │   │
 │   └── query-optimization.md        # Query optimization details and best practices
@@ -347,7 +354,7 @@ reference/
     │
     ├── custom-functions/            # Custom functions (deprecated in favor of components)
     │
-    └── sql/                         # SQL guide (discouraged) 
+    └── sql/                         # SQL guide (discouraged)
 ```
 
 ## Redirects

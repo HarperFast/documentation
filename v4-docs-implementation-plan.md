@@ -15,6 +15,7 @@ This document outlines the concrete steps for migrating Harper v4 documentation 
 ## Part 1: Initial Content Generation (AI-Driven)
 
 ### Overview
+
 AI agents work through the migration map, creating PRs for each top-level section. Each PR adds new files without removing anything from `versioned_docs/`.
 
 ### Agent Instructions
@@ -26,6 +27,7 @@ For each section in the migration map, the agent should:
 3. **Read relevant release notes** from `release_notes/` for version annotations
 4. **Generate new reference files** following the structure in the reference plan
 5. **Add inline source comments** documenting what was used:
+
    ```markdown
    <!-- Source: versioned_docs/version-4.7/path/to/file.md (primary) -->
    <!-- Source: versioned_docs/version-4.3/path/to/file.md (for v4.3 feature annotation) -->
@@ -33,8 +35,9 @@ For each section in the migration map, the agent should:
    ```
 
 6. **Use link placeholders** for cross-references that don't exist yet:
+
    ```markdown
-   [JWT Authentication](TODO:reference_versioned_docs/version-v4/security/jwt-authentication.md "Will be created in security section")
+   [JWT Authentication](TODO:reference_versioned_docs/version-v4/security/jwt-authentication.md 'Will be created in security section')
    ```
 
    **IMPORTANT**: After generating all files in the section, replace TODO placeholders with relative paths for internal section links:
@@ -46,6 +49,7 @@ For each section in the migration map, the agent should:
    - Store in `migration-context/link-placeholders/`
    - Named by section: `cli-link-placeholders.md`, `security-link-placeholders.md`, etc.
    - Format:
+
      ```markdown
      # Link Placeholders for [Section Name]
 
@@ -61,6 +65,7 @@ For each section in the migration map, the agent should:
      ```
 
 8. **Add version annotations** using the strategy defined in reference plan:
+
    ```markdown
    ## Relationships
 
@@ -77,9 +82,11 @@ For each section in the migration map, the agent should:
 9. **Note conflicts and uncertainties** in PR description
 
 10. **Handle images/assets** with placeholders:
+
     ```markdown
     <!-- TODO-IMAGE: Original image at versioned_docs/version-4.7/assets/diagram.png -->
     <!-- Human reviewer: Determine if this image should be migrated, updated, or removed -->
+
     ![Architecture Diagram](TODO:IMAGE)
     ```
 
@@ -88,20 +95,21 @@ For each section in the migration map, the agent should:
     - List all pages in the appropriate order
     - Match the pattern from `sidebarsLearn.ts` (non-collapsible with `className: "learn-category-header"`)
     - Example:
+
     ```json
     {
-        "type": "category",
-        "label": "CLI",
-        "collapsible": false,
-        "className": "learn-category-header",
-        "items": [
-            {
-                "type": "doc",
-                "id": "cli/overview",
-                "label": "Overview"
-            },
-            // ...
-        ]
+    	"type": "category",
+    	"label": "CLI",
+    	"collapsible": false,
+    	"className": "learn-category-header",
+    	"items": [
+    		{
+    			"type": "doc",
+    			"id": "cli/overview",
+    			"label": "Overview"
+    		}
+    		// ...
+    	]
     }
     ```
 
@@ -113,6 +121,7 @@ For each section in the migration map, the agent should:
     - Use `git commit --fixup <commit-hash>` for subsequent changes
     - This allows easy squashing later while keeping development history clear
     - Example:
+
       ```bash
       # Initial commit
       git add reference_versioned_docs/version-v4/cli/*.md
@@ -122,6 +131,7 @@ For each section in the migration map, the agent should:
       git add reference_versioned_sidebars/version-v4-sidebars.json
       git commit --fixup HEAD
       ```
+
     - PRs will be squash-merged to maintain clean history on main branch
 
 14. **Create PR** with comprehensive description (template below)
@@ -132,9 +142,11 @@ For each section in the migration map, the agent should:
 # [Section Name] Migration
 
 ## Summary
+
 Migration of [section name] documentation from versioned_docs into new reference structure.
 
 ## Files Created
+
 - reference_versioned_docs/version-v4/[section]/overview.md
 - reference_versioned_docs/version-v4/[section]/page1.md
 - reference_versioned_docs/version-v4/[section]/page2.md
@@ -142,49 +154,60 @@ Migration of [section name] documentation from versioned_docs into new reference
 ## Source Files Used
 
 ### reference_versioned_docs/version-v4/[section]/overview.md
+
 - `versioned_docs/version-4.7/path/to/file.md` (primary source)
 - `versioned_docs/version-4.2/path/to/file.md` (for baseline features)
 - `release_notes/4.3.0.md` (feature introduction dates)
 
 ### reference_versioned_docs/version-v4/[section]/page1.md
+
 - `versioned_docs/version-4.7/path/to/another.md` (primary)
 - ...
 
 ## Version Annotations Added
 
 ### High Confidence (Confirmed via release notes)
+
 - Feature X: Added in v4.3.0
 - Feature Y: Changed in v4.4.0
 
 ### Needs Verification
+
 - Feature Z: Likely added in v4.3.0 (inferred from version comparison)
 - Config option ABC: Possibly changed in v4.5.0 (mentioned in docs but not in release notes)
 
 ## Link Placeholders Created
+
 See `migration-context/link-placeholders/[section]-link-placeholders.md` for complete list.
 
 Summary:
+
 - 12 placeholders to operations-api section
 - 5 placeholders to security section
 - 3 placeholders to configuration section
 
 ## Images/Assets Noted
+
 - Line 45 of overview.md: TODO-IMAGE for architecture diagram
 - Line 123 of page1.md: TODO-IMAGE for flow chart
 
 ## Conflicts & Questions for Human Review
 
 ### Content Conflicts
+
 None (reference/ directory was reset)
 
 ### Uncertainties
+
 - Unclear if Feature Z was introduced in v4.3.0 or v4.4.0 - marked for verification
 - Configuration option `foo.bar` mentioned in v4.5 docs but not in earlier versions or release notes
 
 ## Migration Map Status
+
 Updated status for this section to "In Progress"
 
 ## Checklist for Human Reviewer
+
 - [ ] Verify version annotations marked as "needs verification"
 - [ ] Review content accuracy and completeness
 - [ ] Check inline source comments are accurate
@@ -239,9 +262,9 @@ Based on migration map and reference plan, recommend this order. Each section is
    - `api.md`
    - `operations.md`
 
-6.  **Analytics** (`reference_versioned_docs/version-v4/analytics/`)
-    - `overview.md`
-    - `operations.md`
+6. **Analytics** (`reference_versioned_docs/version-v4/analytics/`)
+   - `overview.md`
+   - `operations.md`
 
 **Phase 1C - Complex Sections**
 
@@ -354,18 +377,22 @@ Once all Part 1 PRs are merged, resolve link placeholders.
 # Link Resolution: [Section Name]
 
 ## Summary
+
 Resolved link placeholders in [section name] now that target pages exist.
 
 ## Links Resolved
+
 - `reference_versioned_docs/version-v4/[section]/file1.md` line 45: JWT Auth → `../security/jwt-authentication.md`
 - `reference_versioned_docs/version-v4/[section]/file1.md` line 67: Operations → `../operations-api/operations.md`
 - ... (X total links resolved)
 
 ## Links Unable to Resolve
+
 - `reference_versioned_docs/version-v4/[section]/file2.md` line 123: Target `TODO:reference_versioned_docs/version-v4/foo/bar.md` doesn't exist
   - Recommendation: This might be a typo, should probably link to `../foo/baz.md` instead
 
 ## Checklist
+
 - [ ] Human verify resolved links are correct
 - [ ] Human resolve any unresolvable links
 - [ ] Delete corresponding `migration-context/link-placeholders/[section]-link-placeholders.md` after merge
@@ -382,6 +409,7 @@ Update other parts of documentation that reference the old structure.
 **Task**: Update internal links in release notes to point to new structure.
 
 **Agent Instructions**:
+
 1. Scan all files in `release_notes/`
 2. Find links to old paths (e.g., `/docs/4.7/...`, `/docs/developers/...`)
 3. Map to new paths based on migration map
@@ -392,6 +420,7 @@ Update other parts of documentation that reference the old structure.
 **Task**: Update links in learn guides to point to new reference structure.
 
 **Agent Instructions**:
+
 1. Scan all files in `learn/`
 2. Find links to old reference paths
 3. Map to new paths
@@ -402,6 +431,7 @@ Update other parts of documentation that reference the old structure.
 **Task**: Find and update any other references to old paths.
 
 **Agent Instructions**:
+
 1. Search entire repo for common old path patterns
 2. Update as appropriate
 3. Create PR with updates
@@ -425,6 +455,7 @@ Configure redirects from old paths to new paths.
 ### Redirect Priority
 
 Focus on:
+
 1. Most visited pages (if analytics data available)
 2. All `/docs/4.7/` paths (current latest)
 3. Common paths across v4.2-v4.6 (many are duplicates)
@@ -437,6 +468,7 @@ Focus on:
 ### 7.1: Orphaned Content Review
 
 **Human Task**:
+
 1. Review "Files Being Removed" section in migration map
 2. Confirm these files are intentionally not migrated
 3. Document decision (move to legacy, move to learn, delete entirely)
@@ -444,6 +476,7 @@ Focus on:
 ### 7.2: Remove Old Content
 
 **After all above steps complete**:
+
 1. Create PR that removes old `versioned_docs/version-4.X/` folders
 2. Only do this after confirming:
    - All content is migrated or intentionally deprecated
@@ -454,6 +487,7 @@ Focus on:
 ### 7.3: Final Validation
 
 **Human Task**:
+
 1. Build documentation locally
 2. Spot check various pages
 3. Test redirects
@@ -463,11 +497,12 @@ Focus on:
 ### 7.4: Merge to Main
 
 Once everything on `major-version-reorg` branch is complete:
+
 1. Final review of entire branch
-3. Squash/organize commits if needed
-4. Format
-5. Merge to `main`
-6. Deploy
+2. Squash/organize commits if needed
+3. Format
+4. Merge to `main`
+5. Deploy
 
 ---
 
@@ -476,6 +511,7 @@ Once everything on `major-version-reorg` branch is complete:
 ### Files Agents Should Reference
 
 **Primary**:
+
 - `v4-docs-migration-map.md` - The authoritative source for what goes where
 - `v4-docs-reference-plan.md` - Understanding structure and philosophy
 - `versioned_docs/version-4.X/**/*.md` - Source content
@@ -485,6 +521,7 @@ Once everything on `major-version-reorg` branch is complete:
 ### Agent Constraints
 
 **DO**:
+
 - Add new files to `reference_versioned_docs/version-v4/`
 - Include inline source comments
 - Use link placeholders with TODO: prefix
@@ -494,6 +531,7 @@ Once everything on `major-version-reorg` branch is complete:
 - Update migration-map.md status
 
 **DO NOT**:
+
 - Remove anything from `versioned_docs/` (wait until Part 7)
 - Add files to `reference/` (that's for v5 later)
 - Guess at version annotations without noting confidence
@@ -503,30 +541,36 @@ Once everything on `major-version-reorg` branch is complete:
 ### Link Placeholder Format
 
 **Standard format**:
+
 ```markdown
-[Link Text](TODO:reference_versioned_docs/version-v4/section/page.md "Optional description of expected target")
+[Link Text](TODO:reference_versioned_docs/version-v4/section/page.md 'Optional description of expected target')
 ```
 
 **For images**:
+
 ```markdown
 <!-- TODO-IMAGE: Original at versioned_docs/version-4.7/path/to/image.png -->
 <!-- Human: Decide if this should be migrated, updated, or removed -->
+
 ![Alt text](TODO:IMAGE)
 ```
 
 ### Version Annotation Format
 
 **High confidence**:
+
 ```markdown
 Added in: v4.3.0
 ```
 
 **Needs verification**:
+
 ```markdown
 Added in: v4.3.0 (inferred from version comparison, needs verification)
 ```
 
 **Changed features**:
+
 ```markdown
 Changed in: v4.4.0
 
@@ -535,6 +579,7 @@ In previous versions: [Describe old behavior]
 ```
 
 **Deprecated features**:
+
 ```markdown
 Deprecated in: v4.X.0 (moved to legacy in v4.7+)
 

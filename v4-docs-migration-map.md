@@ -18,6 +18,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## CLI Section
 
 ### `reference/cli/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.1/cli.md` (for baseline features)
@@ -30,6 +31,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Dev mode (`harperdb dev`, `harperdb run`)
 
 ### `reference/cli/commands.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: Compare all versions for command evolution
 - **Version Annotations**: Each command should note its introduction version
@@ -39,6 +41,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Foreground mode changes
 
 ### `reference/cli/operations-api-commands.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: `versioned_docs/version-4.3+` (CLI ops api support added in v4.3)
 - **Version Annotations**: Note v4.3.0 introduction
@@ -47,6 +50,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion with operations API
 
 ### `reference/cli/authentication.md`
+
 - **Primary Source**: New content or extract from CLI docs
 - **Status**: In Progress
 
@@ -55,6 +59,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Configuration Section
 
 ### `reference/configuration/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/deployments/configuration.md`
 - **Additional Sources**:
   - Current `reference/configuration.md`
@@ -66,6 +71,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Developer/production mode
 
 ### `reference/configuration/options.md`
+
 - **Primary Source**: Current `reference/configuration.md` (very comprehensive)
 - **Additional Sources**: Compare all version-X/deployments/configuration.md files
 - **Merge Required**: Yes - configuration options added across versions
@@ -75,6 +81,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Release Notes**: Major config changes across many versions - see all major releases
 
 ### `reference/configuration/operations.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/configuration.md`
 - **Additional Sources**: Earlier versions for feature evolution
 - **Version Annotations**: Track when ops were added
@@ -85,12 +92,14 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Operations API Section
 
 ### `reference/operations-api/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.2/developers/operations-api/index.md` (first structured ops api section)
 - **Status**: Not Started
 
 ### `reference/operations-api/operations.md`
+
 - **Primary Source**: Synthesize from all `versioned_docs/version-4.7/developers/operations-api/*.md` files
 - **Merge Required**: Yes - comprehensive list linking to primary references
 - **Version Annotations**: Each operation needs version introduced
@@ -102,24 +111,28 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Security Section
 
 ### `reference/security/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/security/configuration.md`
 - **Status**: Not Started
 
 ### `reference/security/basic-authentication.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/basic-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/basic-authentication.md`
 - **Version Annotations**: Available since v4.1.0
 - **Status**: Not Started
 
 ### `reference/security/jwt-authentication.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/jwt-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/jwt.md`
 - **Version Annotations**: Available since v4.1.0
 - **Status**: Not Started
 
 ### `reference/security/mtls-authentication.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/mtls-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.3/developers/security/mtls-auth.md`
 - **Version Annotations**: Added in v4.3.0
@@ -128,6 +141,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - mTLS support added
 
 ### `reference/security/certificate-management.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/certificate-management.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.1/security/certificate-management.md`
@@ -140,6 +154,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Certificate revocation
 
 ### `reference/security/certificate-verification.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/certificate-verification.md`
 - **Version Annotations**: Added in v4.7.0 (OCSP support)
 - **Status**: Not Started
@@ -147,14 +162,17 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - OCSP support
 
 ### `reference/security/cors.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/developers/security/configuration.md`
 - **Status**: Not Started
 
 ### `reference/security/ssl.md`
+
 - **Primary Source**: Extract from security/configuration or certificate management docs
 - **Status**: Not Started
 
 ### `reference/security/users-and-roles.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/users-and-roles.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/operations-api/users-and-roles.md`
@@ -171,6 +189,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Components Section
 
 ### `reference/components/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.1/custom-functions/*` (for evolution context)
@@ -190,6 +209,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - New extension API with dynamic reloading
 
 ### `reference/components/applications.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/applications.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/applications/*.md`
@@ -200,6 +220,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Component architecture, NPM/GitHub deployment
 
 ### `reference/components/extension-api.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/extensions.md`
 - **Additional Sources**: Current `reference/components/extensions.md`
 - **Version Annotations**: Extension API formalized around v4.4-4.5
@@ -208,6 +229,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - New extension API
 
 ### `reference/components/plugin-api.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/plugins.md`
 - **Additional Sources**: Current `reference/components/plugins.md`
 - **Version Annotations**: Added in v4.6.0
@@ -221,6 +243,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Database Section
 
 ### `reference/database/overview.md`
+
 - **Primary Source**: New content synthesizing how database system works
 - **Additional Sources**:
   - `versioned_docs/version-4.7/reference/architecture.md`
@@ -231,6 +254,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Database structure changes (single file per database)
 
 ### `reference/database/schema.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/defining-schemas.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/reference/data-types.md`
@@ -258,6 +282,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Vector indexing (HNSW)
 
 ### `reference/database/data-loader.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/data-loader.md`
 - **Additional Sources**: Current `reference/data-loader.md`
 - **Version Annotations**: Added in v4.5.0
@@ -266,6 +291,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Data loader introduced
 
 ### `reference/database/storage-algorithm.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/storage-algorithm.md`
 - **Additional Sources**: Current `reference/storage-algorithm.md`
 - **Status**: Not Started
@@ -273,6 +299,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Storage performance improvements, compression by default
 
 ### `reference/database/jobs.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/administration/jobs.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/operations-api/jobs.md`
@@ -281,12 +308,14 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Status**: Not Started
 
 ### `reference/database/system-tables.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/analytics.md`
 - **Additional Sources**: Current `reference/analytics.md`
 - **Status**: Not Started
 - **Notes**: System tables for analytics and other features
 
 ### `reference/database/compaction.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/administration/compact.md`
 - **Additional Sources**: Current `reference/compact.md`
 - **Version Annotations**: Added in v4.3.0
@@ -295,6 +324,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Compact database functionality
 
 ### `reference/database/transaction.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/administration/logging/transaction-logging.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/administration/logging/audit-logging.md`
@@ -313,6 +343,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Resources Section
 
 ### `reference/resources/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/resources/index.md`
 - **Additional Sources**: Current `reference/resources/` folder
 - **Status**: Not Started
@@ -320,6 +351,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Resource API introduced
 
 ### `reference/resources/resource-api.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/resources/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/reference/resources/instance-binding.md`
@@ -340,6 +372,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Resource API upgrades
 
 ### `reference/resources/global-apis.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/globals.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/reference/transactions.md`
@@ -353,6 +386,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Table.getRecordCount()
 
 ### `reference/resources/query-optimization.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/resources/query-optimization.md`
 - **Additional Sources**: Current `reference/resources/query-optimization.md`
 - **Status**: Not Started
@@ -364,6 +398,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Environment Variables Section
 
 ### `reference/environment-variables/overview.md`
+
 - **Primary Source**: New content about `loadEnv` plugin
 - **Additional Sources**: Built-in extensions docs, configuration docs
 - **Version Annotations**: loadEnv added in v4.5.0
@@ -372,6 +407,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Built-in loadEnv component
 
 ### `reference/environment-variables/configuration.md`
+
 - **Primary Source**: Extract from configuration docs or components docs
 - **Status**: Not Started
 
@@ -380,11 +416,13 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Static Files Section
 
 ### `reference/static-files/overview.md`
+
 - **Primary Source**: Extract from built-in plugins/extensions documentation
 - **Additional Sources**: Current `reference/components/built-in-extensions.md`
 - **Status**: Not Started
 
 ### `reference/static-files/configuration.md`
+
 - **Primary Source**: Extract from configuration docs
 - **Status**: Not Started
 
@@ -393,6 +431,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## HTTP Section
 
 ### `reference/http/overview.md`
+
 - **Primary Source**: New content about HTTP server
 - **Additional Sources**: Configuration docs, architecture docs
 - **Status**: Not Started
@@ -401,6 +440,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Socket management (SO_REUSEPORT), flexible port configs
 
 ### `reference/http/configuration.md`
+
 - **Primary Source**: Extract from `reference/configuration.md` (http section)
 - **Version Annotations**:
   - HTTP/2 support: v4.5.0
@@ -409,6 +449,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - HTTP/2 support
 
 ### `reference/http/api.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/reference/globals.md` (server global)
 - **Additional Sources**: Current `reference/globals.md`
 - **Version Annotations**:
@@ -422,6 +463,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## REST Section
 
 ### `reference/rest/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/rest.md`
 - **Additional Sources**: Current `reference/rest.md`
 - **Status**: Not Started
@@ -429,6 +471,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - REST interface introduced
 
 ### `reference/rest/querying.md`
+
 - **Primary Source**: Extract from REST docs and NoSQL operations
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/operations-api/nosql-operations.md`
@@ -442,17 +485,20 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Improved URL path parsing, directURLMapping
 
 ### `reference/rest/headers.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/headers.md`
 - **Additional Sources**: Current `reference/headers.md`
 - **Version Annotations**: Track which headers were added/removed over versions
 - **Status**: Not Started
 
 ### `reference/rest/content-types.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/content-types.md`
 - **Additional Sources**: Current `reference/content-types.md`
 - **Status**: Not Started
 
 ### `reference/rest/websockets.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/developers/real-time.md`
 - **Additional Sources**: Current `reference/real-time.md`
 - **Status**: Not Started
@@ -460,6 +506,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - WebSocket support
 
 ### `reference/rest/server-sent-events.md`
+
 - **Primary Source**: Extract from real-time or REST docs
 - **Status**: Not Started
 - **Release Notes**:
@@ -470,6 +517,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## MQTT Section
 
 ### `reference/mqtt/overview.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/developers/real-time.md`
 - **Additional Sources**: Built-in plugins/extensions docs
 - **Version Annotations**:
@@ -484,6 +532,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Improved message delivery, blob support for MQTT
 
 ### `reference/mqtt/configuration.md`
+
 - **Primary Source**: Extract from configuration docs and real-time docs
 - **Version Annotations**: Port change v4.5.0 (9925 → 9933)
 - **Status**: Not Started
@@ -495,6 +544,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Logging Section
 
 ### `reference/logging/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/administration/logging/index.md`
 - **Additional Sources**: Current `reference/logging.md` (if exists)
 - **Status**: Not Started
@@ -503,6 +553,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Major logging improvements
 
 ### `reference/logging/configuration.md`
+
 - **Primary Source**: Extract from configuration docs
 - **Version Annotations**:
   - Per-component logging: v4.6.0
@@ -512,12 +563,14 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Per-component logging, dynamic reloading, HTTP logging
 
 ### `reference/logging/api.md`
+
 - **Primary Source**: Extract from `versioned_docs/version-4.7/reference/globals.md` (logger global)
 - **Status**: Not Started
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Logger based on Node.js Console API
 
 ### `reference/logging/operations.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/logs.md`
 - **Status**: Not Started
 - **Notes**: Operations for managing standard logs (not transaction/audit logs, which moved to database section)
@@ -527,6 +580,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Analytics Section
 
 ### `reference/analytics/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/analytics.md`
 - **Additional Sources**: Current `reference/analytics.md`
 - **Version Annotations**:
@@ -538,6 +592,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - New analytics and licensing functionality
 
 ### `reference/analytics/operations.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/analytics.md`
 - **Status**: Not Started
 
@@ -546,6 +601,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Replication Section
 
 ### `reference/replication/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/replication/index.md`
 - **Additional Sources**: Current `reference/replication/` (if exists)
 - **Version Annotations**:
@@ -556,6 +612,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Cluster status information, improved replication timestamps
 
 ### `reference/replication/clustering.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/clustering/index.md`
 - **Additional Sources**:
   - All `versioned_docs/version-4.7/reference/clustering/*.md` files
@@ -570,6 +627,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Cluster status information
 
 ### `reference/replication/sharding.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/replication/sharding.md`
 - **Version Annotations**:
   - Sharding: v4.4.0
@@ -584,6 +642,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## GraphQL Querying Section
 
 ### `reference/graphql-querying/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/graphql.md`
 - **Additional Sources**: Current `reference/graphql.md`
 - **Version Annotations**:
@@ -601,6 +660,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Studio Section
 
 ### `reference/studio/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/deployments/configuration.md` (localStudio configuration)
 - **Status**: In Progress
 - **Notes**: Simple overview page focusing on:
@@ -617,6 +677,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Fastify Routes Section
 
 ### `reference/fastify-routes/overview.md`
+
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/define-routes.md`
 - **Additional Sources**: Current `reference/define-routes.md`
 - **Status**: In Progress
@@ -627,18 +688,21 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Legacy Section
 
 ### `reference/legacy/cloud/`
+
 - **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
 - **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
 - **Status**: In Progress
 - **Notes**: The primary and additional sources are to be completely removed and this section is to act as a basic landing page to direct users to Fabric instead.
 
 ### `reference/legacy/custom-functions/`
+
 - **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
 - **Additional Sources**: `versioned_docs/version-4.7/developers/operations-api/custom-functions.md`
 - **Status**: N/A
 - **Notes**: Move as-is with deprecation notice pointing to Components
 
 ### `reference/legacy/sql/`
+
 - **Primary Source**: `versioned_docs/version-4.7/reference/sql-guide/*`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/operations-api/sql-operations.md`
@@ -651,6 +715,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Files Requiring Special Attention
 
 ### High Priority Merges
+
 These files require careful merging from multiple sources:
 
 1. **Configuration Options** (`reference/configuration/options.md`)
@@ -678,9 +743,11 @@ These files require careful merging from multiple sources:
    - Significant API changes in v4.4
 
 ### Files Being Removed/Ignored
+
 These exist in current docs but won't exist in new structure:
 
 **To be moved to Learn guides:**
+
 - `versioned_docs/version-4.7/administration/administration.md` - Generic admin intro
 - `versioned_docs/version-4.7/administration/cloning.md` - Move to Learn guide
 - `versioned_docs/version-4.7/developers/applications/debugging.md` - Move to Learn guide
@@ -692,15 +759,17 @@ These exist in current docs but won't exist in new structure:
 - `versioned_docs/version-4.7/deployments/upgrade-hdb-instance.md` - Move to Learn guide
 
 **To be ignored (obsolete content):**
+
 - `versioned_docs/version-4.7/reference/index.md` - Generic intro page
 - `versioned_docs/version-4.7/reference/limits.md` - Fold into database/overview or schema
 - `versioned_docs/version-4.7/administration/harper-studio/` - direct users to fabric
 - `versioned_docs/version-4.7/deployments/harper-cloud/` - direct users to fabric
 
 ### Cross-References to Update
+
 Files that heavily reference paths that will change:
 
-- All operations-api/*.md files reference other sections
+- All operations-api/\*.md files reference other sections
 - Security files cross-reference operations and configuration
 - Components files reference configuration and operations
 - Clustering files extensively cross-reference
@@ -710,6 +779,7 @@ Files that heavily reference paths that will change:
 ## Version Annotation Checklist
 
 For each file migrated, ensure:
+
 - [ ] Features note their introduction version
 - [ ] Changed behaviors note the version they changed
 - [ ] Deprecated features note deprecation version
@@ -736,11 +806,13 @@ The `release-notes/v4-tucker/` directory contains 169 release note files coverin
 When adding version annotations, refer to these key features and their introduction versions:
 
 **CLI & Configuration**
+
 - CLI expansion with operations API: 4.3.0
 - Dev mode (`harperdb dev`): 4.2.0
 - Configuration improvements: 4.3.0, 4.4.0
 
 **Security**
+
 - mTLS support: 4.3.0
 - Dynamic certificate management: 4.4.0
 - OCSP support: 4.7.0
@@ -748,6 +820,7 @@ When adding version annotations, refer to these key features and their introduct
 - Certificate revocation: 4.5.0
 
 **Components & Extensions**
+
 - Component architecture: 4.2.0
 - Custom functions with worker threads: 4.1.0
 - New extension API: 4.6.0
@@ -755,6 +828,7 @@ When adding version annotations, refer to these key features and their introduct
 - Built-in loadEnv component: 4.5.0
 
 **Database & Schema**
+
 - Configurable schemas (GraphQL syntax): 4.2.0
 - Relationships and joins: 4.3.0
 - Computed properties: 4.4.0
@@ -766,6 +840,7 @@ When adding version annotations, refer to these key features and their introduct
 - Auto-incrementing primary keys: 4.4.0
 
 **Data Access**
+
 - Resource API: 4.2.0
 - CRDT support: 4.3.0
 - Response object support: 4.4.0
@@ -774,6 +849,7 @@ When adding version annotations, refer to these key features and their introduct
 - Iterator-based queries: 4.1.0
 
 **REST & HTTP**
+
 - REST interface: 4.2.0
 - HTTP/2 support: 4.5.0
 - Improved URL path parsing: 4.5.0
@@ -781,6 +857,7 @@ When adding version annotations, refer to these key features and their introduct
 - Worker threads for HTTP: 4.1.0
 
 **Real-Time & MQTT**
+
 - MQTT support: 4.2.0
 - WebSocket support: 4.2.0
 - Server-Sent Events: 4.2.0
@@ -790,6 +867,7 @@ When adding version annotations, refer to these key features and their introduct
 - Improved message delivery: 4.5.0
 
 **Replication & Clustering**
+
 - Native replication (Plexus): 4.4.0
 - Sharding: 4.4.0
 - Expanded sharding functionality: 4.5.0
@@ -797,17 +875,20 @@ When adding version annotations, refer to these key features and their introduct
 - Replicated operations: 4.4.0
 
 **Logging**
+
 - Logging consolidated to hdb.log: 4.1.0
 - Per-component logging: 4.6.0
 - Dynamic logging reload: 4.6.0
 - HTTP logging: 4.6.0
 
 **GraphQL**
+
 - OpenAPI specification: 4.3.0
 - Native GraphQL support (provisional): 4.4.0
 - GraphQL disabled by default: 4.5.0
 
 **Storage & Performance**
+
 - Database structure (single file): 4.2.0
 - Storage performance improvements: 4.3.0
 - Compression by default: 4.3.0
@@ -815,10 +896,12 @@ When adding version annotations, refer to these key features and their introduct
 - Storage reclamation: 4.5.0
 
 **Analytics**
+
 - Resource and storage analytics: 4.5.0
 - New analytics/licensing: 4.7.0
 
 **Studio**
+
 - Local studio upgrade: 4.3.0
 
 ## Notes

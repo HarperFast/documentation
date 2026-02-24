@@ -14,7 +14,7 @@ Added in: v4.4.0 (provisional)
 
 Changed in: v4.5.0 (disabled by default, configuration options)
 
-Harper supports GraphQL in a variety of ways. It can be used for [defining schemas](TODO:reference_versioned_docs/version-v4/components/applications.md "Schema definition documentation"), and for querying [Resources](./resources/overview.md).
+Harper supports GraphQL in a variety of ways. It can be used for [defining schemas](TODO:reference_versioned_docs/version-v4/components/applications.md 'Schema definition documentation'), and for querying [Resources](./resources/overview.md).
 
 Get started by setting `graphql: true` in `config.yaml`. This configuration option was added in v4.5.0 to allow more granular control over the GraphQL endpoint.
 

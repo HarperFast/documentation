@@ -62,8 +62,8 @@ const config: Config = {
 			'@docusaurus/plugin-content-pages',
 			{
 				id: 'default',
-				path: 'src/pages'
-			}
+				path: 'src/pages',
+			},
 		],
 		// Learn documentation
 		[
@@ -98,8 +98,8 @@ const config: Config = {
 				lastVersion: 'current',
 				includeCurrentVersion: false,
 				versions: {
-					'current': { label: 'v5', path: 'v5' },
-					'v4': { label: 'v4', path: 'v4', banner: 'none' }
+					current: { label: 'v5', path: 'v5' },
+					v4: { label: 'v4', path: 'v4', banner: 'none' },
 				},
 				// Converts npm commands in markdown code blocks to show npm/yarn/pnpm tabs
 				remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
@@ -358,12 +358,12 @@ const config: Config = {
 						},
 						{
 							label: 'Release Notes',
-							to: '/release-notes/v4-tucker'
+							to: '/release-notes/v4-tucker',
 						},
 						{
 							label: 'Fabric',
-							to: '/fabric'
-						}
+							to: '/fabric',
+						},
 					],
 				},
 				{

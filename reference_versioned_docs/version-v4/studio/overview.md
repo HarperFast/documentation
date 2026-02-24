@@ -13,11 +13,11 @@ Harper Local Studio is a web-based GUI that enables you to administer, navigate,
 
 It is automatically bundled with all Harper instances and is enabled by default on the Operations API port.
 
-If you're looking for the platform as a service interface, go to [Harper Fabric](https://fabric.harper.fast) instead. 
+If you're looking for the platform as a service interface, go to [Harper Fabric](https://fabric.harper.fast) instead.
 
 ## Configuration
 
-To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md#localstudio "Configuration options"):
+To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md#localstudio 'Configuration options'):
 
 ```yaml
 localStudio:

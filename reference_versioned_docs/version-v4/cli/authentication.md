@@ -51,6 +51,7 @@ harper get_components target=https://remote-instance.example.com:9925
 ```
 
 **Benefits**:
+
 - Credentials not visible in command history
 - More secure for scripting
 - Can be set once per session
@@ -83,10 +84,12 @@ harper describe_database \
 ```
 
 **Parameters**:
+
 - `username=<username>` - Harper admin username
 - `password=<password>` - Harper admin password
 
 **Cautions**:
+
 - Credentials visible in command history
 - Less secure for production environments
 - Exposed in process listings
@@ -164,7 +167,7 @@ harper deploy target=https://prod.example.com:9925
 
 ### 4. Use Least Privilege
 
-Create dedicated users with minimal required permissions for CLI operations instead of using the main admin account. See [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md "Users and roles documentation") for more information.
+Create dedicated users with minimal required permissions for CLI operations instead of using the main admin account. See [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md 'Users and roles documentation') for more information.
 
 ### 5. Rotate Credentials
 
@@ -172,7 +175,7 @@ Regularly rotate credentials, especially for automated systems and CI/CD pipelin
 
 ### 6. Audit Access
 
-Monitor and audit CLI operations, especially for production environments. See [Logging](TODO:reference_versioned_docs/version-v4/logging/overview.md "Logging documentation") for more information on logging.
+Monitor and audit CLI operations, especially for production environments. See [Logging](TODO:reference_versioned_docs/version-v4/logging/overview.md 'Logging documentation') for more information on logging.
 
 ## Troubleshooting
 
@@ -190,6 +193,7 @@ If you receive authentication errors:
    - Verify HTTPS/HTTP protocol
 
 3. **Check network connectivity**:
+
    ```bash
    curl https://server.com:9925
    ```
@@ -203,6 +207,7 @@ If you receive authentication errors:
 If environment variables aren't working:
 
 1. **Verify variables are set**:
+
    ```bash
    echo $CLI_TARGET_USERNAME
    echo $CLI_TARGET_PASSWORD
@@ -210,6 +215,7 @@ If environment variables aren't working:
 
 2. **Export variables**:
    Ensure you used `export`, not just assignment:
+
    ```bash
    # Wrong - variable only available in current shell
    CLI_TARGET_USERNAME=admin
@@ -227,5 +233,5 @@ If environment variables aren't working:
 - [CLI Overview](./overview.md) - General CLI information
 - [CLI Commands](./commands.md) - Core CLI commands
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md "Security overview") - Harper security features
-- [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md "Users and roles") - User management
+- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security overview') - Harper security features
+- [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md 'Users and roles') - User management

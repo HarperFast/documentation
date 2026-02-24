@@ -58,7 +58,7 @@ harper \
   --ROOTPATH='/hdb'
 ```
 
-**Note**: When used in conjunction, command line arguments override environment variables. See [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md "Configuration overview") for a full list of configuration parameters.
+**Note**: When used in conjunction, command line arguments override environment variables. See [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview') for a full list of configuration parameters.
 
 :::info
 For more information on installation, see [Getting Started / Install and Connect Harper](/learn/getting-started/install-and-connect-harper).
@@ -87,6 +87,7 @@ harper dev /path/to/app
 ```
 
 **Features**:
+
 - Pushes logs to standard streams automatically
 - Uses a single thread for simpler debugging
 - Auto-restart on file changes
@@ -152,6 +153,7 @@ harper version
 ```
 
 **Example Output**:
+
 ```
 4.7.0
 ```
@@ -167,6 +169,7 @@ harper status
 ```
 
 Shows:
+
 - Harper process status
 - Clustering network status
 - Replication statuses
@@ -208,6 +211,7 @@ harper copy-db <source-database> <target-database-path>
 ```
 
 **Parameters**:
+
 - `<source-database>` - Name of the source database
 - `<target-database-path>` - Full path to the target database file
 
@@ -220,12 +224,13 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 This copies the default `data` database to a new location with compaction applied.
 
 **Use Cases**:
+
 - Database optimization
 - Eliminating fragmentation
 - Creating compacted backups
 - Reclaiming free space
 
-See also: [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md "Database compaction reference") for more information.
+See also: [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md 'Database compaction reference') for more information.
 
 #### How Backups Work
 
@@ -244,6 +249,7 @@ Database files are stored in the `hdb/database` directory. As long as the snapsh
 - **Safe Copying**: Standard file copying is only reliable for database files that are **not in use**
 
 **Recommended Backup Tools**:
+
 - LVM snapshots
 - ZFS snapshots
 - BTRFS snapshots
@@ -259,5 +265,5 @@ The CLI supports executing commands on remote Harper instances. For details, see
 - [CLI Overview](./overview.md) - General CLI information
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
 - [CLI Authentication](./authentication.md) - Authentication mechanisms
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md "Configuration") - Configuration parameters for installation
-- [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md "Compaction") - More on database compaction
+- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration') - Configuration parameters for installation
+- [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md 'Compaction') - More on database compaction

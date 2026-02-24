@@ -9,7 +9,7 @@ title: Operations API Commands
 
 Added in: v4.3.0 (confirmed via release notes)
 
-The Harper CLI supports executing operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API overview") directly from the command line. This enables powerful automation and scripting capabilities.
+The Harper CLI supports executing operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') directly from the command line. This enables powerful automation and scripting capabilities.
 
 ## General Syntax
 
@@ -18,6 +18,7 @@ harper <operation> <parameter>=<value>
 ```
 
 **Output Format**:
+
 - Default: YAML
 - JSON: Pass `json=true` as a parameter
 
@@ -33,80 +34,80 @@ The following operations are available through the CLI. Operations that require 
 This is just a brief overview of all operations available as CLI commands. Review the respective operation documentation for more information on available arguments and expected behavior. Keep in mind that all operations options are converted to CLI arguments in the same way (using `snake_case`).
 :::
 
-| Operation | Description | Category | Available Since |
-|-----------|-------------|----------|-----------------|
-| `describe_table` | Describe table structure and metadata | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `describe_all` | Describe all databases and tables | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `describe_database` | Describe database structure | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `create_database` | Create a new database | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `drop_database` | Delete a database | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `create_table` | Create a new table | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `drop_table` | Delete a table | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `create_attribute` | Create a table attribute | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `drop_attribute` | Delete a table attribute | [Database](TODO:../operations-api/database.md) | v4.3.0 |
-| `search_by_id` | Search records by ID | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `search_by_value` | Search records by attribute value | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `insert` | Insert new records | [Data](TODO:../operations-api/data.md) | v4.4.9 |
-| `update` | Update existing records | [Data](TODO:../operations-api/data.md) | v4.4.9 |
-| `upsert` | Insert or update records | [Data](TODO:../operations-api/data.md) | v4.4.9 |
-| `delete` | Delete records | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `sql` | Execute SQL queries | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `csv_file_load` | Load data from CSV file | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `csv_url_load` | Load data from CSV URL | [Data](TODO:../operations-api/data.md) | v4.3.0 |
-| `list_users` | List all users | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `add_user` | Create a new user | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `alter_user` | Modify user properties | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `drop_user` | Delete a user | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `list_roles` | List all roles | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `drop_role` | Delete a role | [Security](TODO:../operations-api/security.md) | v4.3.0 |
-| `create_csr` | Create certificate signing request | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `sign_certificate` | Sign a certificate | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `list_certificates` | List SSL/TLS certificates | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `add_certificate` | Add SSL/TLS certificate | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `remove_certificate` | Remove SSL/TLS certificate | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `add_ssh_key` | Add SSH key | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `get_ssh_key` | Get SSH key | [Security](TODO:../operations-api/security.md) | v4.7.2 |
-| `update_ssh_key` | Update SSH key | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `delete_ssh_key` | Delete SSH key | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `list_ssh_keys` | List all SSH keys | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `set_ssh_known_hosts` | Set SSH known hosts | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `get_ssh_known_hosts` | Get SSH known hosts | [Security](TODO:../operations-api/security.md) | v4.4.0 |
-| `cluster_get_routes` | Get cluster routing information | [Clustering](TODO:../operations-api/clustering.md) | v4.3.0 |
-| `cluster_network` | Get cluster network status | [Clustering](TODO:../operations-api/clustering.md) | v4.3.0 |
-| `cluster_status` | Get cluster status | [Clustering](TODO:../operations-api/clustering.md) | v4.3.0 |
-| `remove_node` | Remove node from cluster | [Clustering](TODO:../operations-api/clustering.md) | v4.3.0 |
-| `add_component` | Add a component | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `deploy_component` | Deploy a component | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `deploy` (alias) | Alias for `deploy_component` | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `package_component` | Package a component | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `package` (alias) | Alias for `package_component` | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `drop_component` | Remove a component | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `get_components` | List all components | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `get_component_file` | Get component file contents | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `set_component_file` | Set component file contents | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `install_node_modules` | Install Node.js dependencies | [Components](TODO:../operations-api/components.md) | v4.3.0 |
-| `set_configuration` | Update configuration settings | [Configuration](TODO:../operations-api/configuration.md) | v4.3.0 |
-| `get_configuration` | Get current configuration | [Configuration](TODO:../operations-api/configuration.md) | v4.3.0 |
-| `create_authentication_tokens` | Create authentication tokens | [Authentication](TODO:../operations-api/authentication.md) | v4.3.0 |
-| `refresh_operation_token` | Refresh operation token | [Authentication](TODO:../operations-api/authentication.md) | v4.3.0 |
-| `restart_service` | Restart Harper service | [System](TODO:../operations-api/system.md) | v4.3.0 |
-| `restart` | Restart Harper instance | [System](TODO:../operations-api/system.md) | v4.3.0 |
-| `system_information` | Get system information | [System](TODO:../operations-api/system.md) | v4.3.0 |
-| `registration_info` | Get registration information | [Licensing](TODO:../operations-api/licensing.md) | v4.3.0 |
-| `get_fingerprint` | Get instance fingerprint | [Licensing](TODO:../operations-api/licensing.md) | v4.3.0 |
-| `set_license` | Set license key | [Licensing](TODO:../operations-api/licensing.md) | v4.3.0 |
-| `get_usage_licenses` | Get usage and license info | [Licensing](TODO:../operations-api/licensing.md) | v4.7.3 |
-| `get_job` | Get job status | [Jobs](TODO:../operations-api/jobs.md) | v4.3.0 |
-| `search_jobs_by_start_date` | Search jobs by start date | [Jobs](TODO:../operations-api/jobs.md) | v4.3.0 |
-| `read_log` | Read application logs | [Logging](TODO:../operations-api/logging.md) | v4.3.0 |
-| `read_transaction_log` | Read transaction logs | [Logging](TODO:../operations-api/logging.md) | v4.3.0 |
-| `read_audit_log` | Read audit logs | [Logging](TODO:../operations-api/logging.md) | v4.3.0 |
-| `delete_transaction_logs_before` | Delete old transaction logs | [Logging](TODO:../operations-api/logging.md) | v4.3.0 |
-| `purge_stream` | Purge streaming data | [Maintenance](TODO:../operations-api/maintenance.md) | v4.3.0 |
-| `delete_records_before` | Delete old records | [Maintenance](TODO:../operations-api/maintenance.md) | v4.3.0 |
-| `get_status` | Get custom status information | [Status](TODO:../operations-api/status.md) | v4.6.0 |
-| `set_status` | Set custom status information | [Status](TODO:../operations-api/status.md) | v4.6.0 |
-| `clear_status` | Clear custom status information | [Status](TODO:../operations-api/status.md) | v4.6.0 |
+| Operation                        | Description                           | Category                                                   | Available Since |
+| -------------------------------- | ------------------------------------- | ---------------------------------------------------------- | --------------- |
+| `describe_table`                 | Describe table structure and metadata | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `describe_all`                   | Describe all databases and tables     | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `describe_database`              | Describe database structure           | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `create_database`                | Create a new database                 | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `drop_database`                  | Delete a database                     | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `create_table`                   | Create a new table                    | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `drop_table`                     | Delete a table                        | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `create_attribute`               | Create a table attribute              | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `drop_attribute`                 | Delete a table attribute              | [Database](TODO:../operations-api/database.md)             | v4.3.0          |
+| `search_by_id`                   | Search records by ID                  | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `search_by_value`                | Search records by attribute value     | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `insert`                         | Insert new records                    | [Data](TODO:../operations-api/data.md)                     | v4.4.9          |
+| `update`                         | Update existing records               | [Data](TODO:../operations-api/data.md)                     | v4.4.9          |
+| `upsert`                         | Insert or update records              | [Data](TODO:../operations-api/data.md)                     | v4.4.9          |
+| `delete`                         | Delete records                        | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `sql`                            | Execute SQL queries                   | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `csv_file_load`                  | Load data from CSV file               | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `csv_url_load`                   | Load data from CSV URL                | [Data](TODO:../operations-api/data.md)                     | v4.3.0          |
+| `list_users`                     | List all users                        | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `add_user`                       | Create a new user                     | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `alter_user`                     | Modify user properties                | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `drop_user`                      | Delete a user                         | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `list_roles`                     | List all roles                        | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `drop_role`                      | Delete a role                         | [Security](TODO:../operations-api/security.md)             | v4.3.0          |
+| `create_csr`                     | Create certificate signing request    | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `sign_certificate`               | Sign a certificate                    | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `list_certificates`              | List SSL/TLS certificates             | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `add_certificate`                | Add SSL/TLS certificate               | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `remove_certificate`             | Remove SSL/TLS certificate            | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `add_ssh_key`                    | Add SSH key                           | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `get_ssh_key`                    | Get SSH key                           | [Security](TODO:../operations-api/security.md)             | v4.7.2          |
+| `update_ssh_key`                 | Update SSH key                        | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `delete_ssh_key`                 | Delete SSH key                        | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `list_ssh_keys`                  | List all SSH keys                     | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `set_ssh_known_hosts`            | Set SSH known hosts                   | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `get_ssh_known_hosts`            | Get SSH known hosts                   | [Security](TODO:../operations-api/security.md)             | v4.4.0          |
+| `cluster_get_routes`             | Get cluster routing information       | [Clustering](TODO:../operations-api/clustering.md)         | v4.3.0          |
+| `cluster_network`                | Get cluster network status            | [Clustering](TODO:../operations-api/clustering.md)         | v4.3.0          |
+| `cluster_status`                 | Get cluster status                    | [Clustering](TODO:../operations-api/clustering.md)         | v4.3.0          |
+| `remove_node`                    | Remove node from cluster              | [Clustering](TODO:../operations-api/clustering.md)         | v4.3.0          |
+| `add_component`                  | Add a component                       | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `deploy_component`               | Deploy a component                    | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `deploy` (alias)                 | Alias for `deploy_component`          | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `package_component`              | Package a component                   | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `package` (alias)                | Alias for `package_component`         | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `drop_component`                 | Remove a component                    | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `get_components`                 | List all components                   | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `get_component_file`             | Get component file contents           | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `set_component_file`             | Set component file contents           | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `install_node_modules`           | Install Node.js dependencies          | [Components](TODO:../operations-api/components.md)         | v4.3.0          |
+| `set_configuration`              | Update configuration settings         | [Configuration](TODO:../operations-api/configuration.md)   | v4.3.0          |
+| `get_configuration`              | Get current configuration             | [Configuration](TODO:../operations-api/configuration.md)   | v4.3.0          |
+| `create_authentication_tokens`   | Create authentication tokens          | [Authentication](TODO:../operations-api/authentication.md) | v4.3.0          |
+| `refresh_operation_token`        | Refresh operation token               | [Authentication](TODO:../operations-api/authentication.md) | v4.3.0          |
+| `restart_service`                | Restart Harper service                | [System](TODO:../operations-api/system.md)                 | v4.3.0          |
+| `restart`                        | Restart Harper instance               | [System](TODO:../operations-api/system.md)                 | v4.3.0          |
+| `system_information`             | Get system information                | [System](TODO:../operations-api/system.md)                 | v4.3.0          |
+| `registration_info`              | Get registration information          | [Licensing](TODO:../operations-api/licensing.md)           | v4.3.0          |
+| `get_fingerprint`                | Get instance fingerprint              | [Licensing](TODO:../operations-api/licensing.md)           | v4.3.0          |
+| `set_license`                    | Set license key                       | [Licensing](TODO:../operations-api/licensing.md)           | v4.3.0          |
+| `get_usage_licenses`             | Get usage and license info            | [Licensing](TODO:../operations-api/licensing.md)           | v4.7.3          |
+| `get_job`                        | Get job status                        | [Jobs](TODO:../operations-api/jobs.md)                     | v4.3.0          |
+| `search_jobs_by_start_date`      | Search jobs by start date             | [Jobs](TODO:../operations-api/jobs.md)                     | v4.3.0          |
+| `read_log`                       | Read application logs                 | [Logging](TODO:../operations-api/logging.md)               | v4.3.0          |
+| `read_transaction_log`           | Read transaction logs                 | [Logging](TODO:../operations-api/logging.md)               | v4.3.0          |
+| `read_audit_log`                 | Read audit logs                       | [Logging](TODO:../operations-api/logging.md)               | v4.3.0          |
+| `delete_transaction_logs_before` | Delete old transaction logs           | [Logging](TODO:../operations-api/logging.md)               | v4.3.0          |
+| `purge_stream`                   | Purge streaming data                  | [Maintenance](TODO:../operations-api/maintenance.md)       | v4.3.0          |
+| `delete_records_before`          | Delete old records                    | [Maintenance](TODO:../operations-api/maintenance.md)       | v4.3.0          |
+| `get_status`                     | Get custom status information         | [Status](TODO:../operations-api/status.md)                 | v4.6.0          |
+| `set_status`                     | Set custom status information         | [Status](TODO:../operations-api/status.md)                 | v4.6.0          |
+| `clear_status`                   | Clear custom status information       | [Status](TODO:../operations-api/status.md)                 | v4.6.0          |
 
 ### Command Aliases
 
@@ -115,7 +116,7 @@ The following aliases are available for convenience:
 - `deploy` → `deploy_component`
 - `package` → `package_component`
 
-For detailed parameter information for each operation, see the [Operations API documentation](TODO:reference_versioned_docs/version-v4/operations-api/operations.md "Complete operations list").
+For detailed parameter information for each operation, see the [Operations API documentation](TODO:reference_versioned_docs/version-v4/operations-api/operations.md 'Complete operations list').
 
 ## Command Examples
 
@@ -134,6 +135,7 @@ harper describe_table database=dev table=dog
 ```
 
 **Example Output**:
+
 ```yaml
 schema: dev
 name: dog
@@ -151,7 +153,7 @@ last_updated_record: 1724483231970.9949
 ```
 
 :::tip
-For detailed information on database and table structures, see the [Database Reference](TODO:reference_versioned_docs/version-v4/database/overview.md "Database reference documentation").
+For detailed information on database and table structures, see the [Database Reference](TODO:reference_versioned_docs/version-v4/database/overview.md 'Database reference documentation').
 :::
 
 ### Data Operations
@@ -169,7 +171,7 @@ harper search_by_value table=dog search_attribute=name search_value=harper get_a
 ```
 
 :::tip
-For more information on querying data, see the [REST Reference](TODO:reference_versioned_docs/version-v4/rest/overview.md "REST API reference") and [GraphQL Querying](TODO:reference_versioned_docs/version-v4/graphql-querying/overview.md "GraphQL querying reference").
+For more information on querying data, see the [REST Reference](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST API reference') and [GraphQL Querying](TODO:reference_versioned_docs/version-v4/graphql-querying/overview.md 'GraphQL querying reference').
 :::
 
 ### Configuration Operations
@@ -187,7 +189,7 @@ harper get_configuration
 ```
 
 :::tip
-For comprehensive configuration options, see the [Configuration Reference](TODO:reference_versioned_docs/version-v4/configuration/overview.md "Configuration reference").
+For comprehensive configuration options, see the [Configuration Reference](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration reference').
 :::
 
 ### Component Operations
@@ -211,7 +213,7 @@ harper deploy project=my-app package=https://github.com/user/repo
 ```
 
 :::tip
-For more information on components and applications, see the [Components Reference](TODO:reference_versioned_docs/version-v4/components/overview.md "Components reference").
+For more information on components and applications, see the [Components Reference](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components reference').
 :::
 
 ### User and Role Operations
@@ -229,7 +231,7 @@ harper list_roles
 ```
 
 :::tip
-For detailed information on users, roles, and authentication, see the [Security Reference](TODO:reference_versioned_docs/version-v4/security/overview.md "Security reference").
+For detailed information on users, roles, and authentication, see the [Security Reference](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security reference').
 :::
 
 ## Remote Operations
@@ -267,8 +269,9 @@ harper restart target=https://server.com:9925 replicated=true
 ```
 
 For more information on Harper applications and components, see:
-- [Applications](TODO:reference_versioned_docs/version-v4/applications/overview.md "Applications reference") - Application architecture and structure
-- [Deploying Harper Applications](TODO:learn_link "Deploying applications guide") - Step-by-step deployment guide
+
+- [Applications](TODO:reference_versioned_docs/version-v4/applications/overview.md 'Applications reference') - Application architecture and structure
+- [Deploying Harper Applications](TODO:learn_link 'Deploying applications guide') - Step-by-step deployment guide
 
 ## Parameter Formatting
 
@@ -291,7 +294,8 @@ harper search_by_id database=dev table=dog ids='["1","2","3"]'
 ### Object Parameters
 
 Object parameters are not supported via CLI. For operations requiring complex nested objects, use:
-- The [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API") via HTTP
+
+- The [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API') via HTTP
 - A custom script or tool
 
 ### Boolean Parameters
@@ -365,12 +369,12 @@ The following operation types are **not supported** via CLI:
 - File upload operations
 - Streaming operations
 
-For these operations, use the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API") directly via HTTP.
+For these operations, use the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API') directly via HTTP.
 
 ## See Also
 
 - [CLI Overview](./overview.md) - General CLI information
 - [CLI Commands](./commands.md) - Core CLI commands
-- [Operations API Overview](TODO:reference_versioned_docs/version-v4/operations-api/overview.md "Operations API overview") - Operations API documentation
-- [Operations API Reference](TODO:reference_versioned_docs/version-v4/operations-api/operations.md "Operations reference") - Complete operations list
+- [Operations API Overview](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') - Operations API documentation
+- [Operations API Reference](TODO:reference_versioned_docs/version-v4/operations-api/operations.md 'Operations reference') - Complete operations list
 - [CLI Authentication](./authentication.md) - Authentication details

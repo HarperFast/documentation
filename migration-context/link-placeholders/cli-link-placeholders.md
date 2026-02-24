@@ -226,13 +226,16 @@ This document tracks all link placeholders in the CLI section that need to be re
 ## Summary
 
 ### Resolved Links (Within CLI Section)
+
 - 12 links to pages within the CLI section (all resolved in this migration)
 - All internal CLI section links now use relative paths (e.g., `./overview.md`)
 
 ### Pending Links (Cross-Section References)
+
 These will be resolved in future section migrations:
 
 **Operations API Section** (~82 links):
+
 - `reference_versioned_docs/version-v4/operations-api/overview.md` (5 occurrences)
 - `reference_versioned_docs/version-v4/operations-api/operations.md` (2 occurrences)
 - Operations table category pages (72 links):
@@ -251,32 +254,41 @@ These will be resolved in future section migrations:
   - `../operations-api/status.md`
 
 **Configuration Section** (5 links):
+
 - `reference_versioned_docs/version-v4/configuration/overview.md`
 
 **Database Section** (3 links):
+
 - `reference_versioned_docs/version-v4/database/compaction.md` (2 occurrences)
 - `reference_versioned_docs/version-v4/database/overview.md` (1 occurrence)
 
 **Security Section** (4 links):
+
 - `reference_versioned_docs/version-v4/security/overview.md` (2 occurrences)
 - `reference_versioned_docs/version-v4/security/users-and-roles.md` (2 occurrences)
 
 **Logging Section** (1 link):
+
 - `reference_versioned_docs/version-v4/logging/overview.md`
 
 **Components Section** (1 link):
+
 - `reference_versioned_docs/version-v4/components/overview.md`
 
 **REST Section** (1 link):
+
 - `reference_versioned_docs/version-v4/rest/overview.md`
 
 **GraphQL Querying Section** (1 link):
+
 - `reference_versioned_docs/version-v4/graphql-querying/overview.md`
 
 **Applications Section** (1 link):
+
 - `reference_versioned_docs/version-v4/applications/overview.md`
 
 **Learn Guides** (1 link):
+
 - Deploying Harper Applications guide (external learn link)
 
 **Total Pending Links**: ~96
