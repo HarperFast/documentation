@@ -601,13 +601,16 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Studio Section
 
 ### `reference/studio/overview.md`
-- **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/index.md`
-- **Additional Sources**: All harper-studio/*.md files
-- **Merge Required**: Maybe - consolidate or keep nested?
-- **Status**: Not Started
-- **Notes**: May want to keep as nested folder or consolidate into single page
+- **Primary Source**: `versioned_docs/version-4.7/deployments/configuration.md` (localStudio configuration)
+- **Status**: In Progress
+- **Notes**: Simple overview page focusing on:
+  - How to configure/enable local Studio (localStudio.enabled in config)
+  - How to access local Studio (http://localhost:9926)
+  - General description of Studio's purpose (UI for Harper instance)
+  - Link to hosted Studio at studio.harperdb.io
 - **Release Notes**:
-  - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Local studio upgrade to match online version
+  - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Local studio upgraded to match online version
+  - [4.7.0](release-notes/v4-tucker/4.7.0.md) - Studio client updated
 
 ---
 
@@ -624,9 +627,10 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ## Legacy Section
 
 ### `reference/legacy/cloud/`
-- **Primary Source**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
-- **Status**: N/A
-- **Notes**: Move entire folder as-is, add deprecation notice
+- **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
+- **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
+- **Status**: In Progress
+- **Notes**: The primary and additional sources are to be completely removed and this section is to act as a basic landing page to direct users to Fabric instead.
 
 ### `reference/legacy/custom-functions/`
 - **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
@@ -673,9 +677,10 @@ These files require careful merging from multiple sources:
    - Migration path complex
    - Significant API changes in v4.4
 
-### Files Being Removed
+### Files Being Removed/Ignored
 These exist in current docs but won't exist in new structure:
 
+**To be moved to Learn guides:**
 - `versioned_docs/version-4.7/administration/administration.md` - Generic admin intro
 - `versioned_docs/version-4.7/administration/cloning.md` - Move to Learn guide
 - `versioned_docs/version-4.7/developers/applications/debugging.md` - Move to Learn guide
@@ -685,8 +690,12 @@ These exist in current docs but won't exist in new structure:
 - `versioned_docs/version-4.7/developers/operations-api/advanced-json-sql-examples.md` - Move to Learn guide
 - `versioned_docs/version-4.7/deployments/install-harper/*` - Move to Learn guides
 - `versioned_docs/version-4.7/deployments/upgrade-hdb-instance.md` - Move to Learn guide
+
+**To be ignored (obsolete content):**
 - `versioned_docs/version-4.7/reference/index.md` - Generic intro page
 - `versioned_docs/version-4.7/reference/limits.md` - Fold into database/overview or schema
+- `versioned_docs/version-4.7/administration/harper-studio/` - direct users to fabric
+- `versioned_docs/version-4.7/deployments/harper-cloud/` - direct users to fabric
 
 ### Cross-References to Update
 Files that heavily reference paths that will change:
