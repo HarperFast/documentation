@@ -25,7 +25,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - Current `reference/harper-cli.md` (if exists)
 - **Merge Required**: Yes - CLI commands added across versions
 - **Version Annotations**: Track command additions from v4.1 → v4.7
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion with operations API commands
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Dev mode (`harperdb dev`, `harperdb run`)
@@ -35,7 +35,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: Compare all versions for command evolution
 - **Version Annotations**: Each command should note its introduction version
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Foreground mode changes
@@ -45,14 +45,14 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `versioned_docs/version-4.7/deployments/harper-cli.md`
 - **Additional Sources**: `versioned_docs/version-4.3+` (CLI ops api support added in v4.3)
 - **Version Annotations**: Note v4.3.0 introduction
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CLI expansion with operations API
 
 ### `reference/cli/authentication.md`
 
 - **Primary Source**: New content or extract from CLI docs
-- **Status**: In Progress
+- **Status**: Complete
 
 ---
 
@@ -648,7 +648,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Added: v4.4.0 (experimental)
   - Disabled by default: v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Mark as experimental/incomplete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - OpenAPI specification endpoint
@@ -662,7 +662,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ### `reference/studio/overview.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/deployments/configuration.md` (localStudio configuration)
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Simple overview page focusing on:
   - How to configure/enable local Studio (localStudio.enabled in config)
   - How to access local Studio (http://localhost:9926)
@@ -680,7 +680,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/define-routes.md`
 - **Additional Sources**: Current `reference/define-routes.md`
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Discouraged in favor of modern routing with components, but still a supported feature.
 
 ---
@@ -691,7 +691,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/administration/harper-studio/*`
 - **Additional Sources**: `versioned_docs/version-4.7/deployments/harper-cloud/*`
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: The primary and additional sources are to be completely removed and this section is to act as a basic landing page to direct users to Fabric instead.
 
 ### `reference/legacy/custom-functions/`
