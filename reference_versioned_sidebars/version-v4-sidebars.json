@@ -35,6 +35,19 @@
 		},
 		{
 			"type": "category",
+			"label": "Environment Variables",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "environment-variables/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "GraphQL Querying",
 			"collapsible": false,
 			"className": "learn-category-header",
