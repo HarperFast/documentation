@@ -65,10 +65,19 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - Current `reference/configuration.md`
   - `versioned_docs/version-4.1/configuration.md` (baseline)
 - **Status**: Not Started
+- **Notes**: Must include a dedicated section on environment variable configuration. Content researched and ready from the environment-variables migration:
+  - **Naming convention**: YAML keys map to `SCREAMING_SNAKE_CASE` env vars (e.g. `http.port` → `HTTP_PORT`, `operationsApi.network.port` → `OPERATIONSAPI_NETWORK_PORT`). Case-insensitive. Component configuration cannot be set this way.
+  - **`HDB_CONFIG`**: CLI/ENV variable to specify a custom config file path at install time. Source: `versioned_docs/version-4.7/deployments/configuration.md` lines 51-55.
+  - **`HARPER_DEFAULT_CONFIG`**: Added in v4.7.2. Sets default config values as JSON, respects user edits, restores original on key removal. Source: `versioned_docs/version-4.7/deployments/configuration.md` lines 80-116 + `release_notes/4.7.2.md`.
+  - **`HARPER_SET_CONFIG`**: Added in v4.7.2. Forces config values that always win, even over user edits. Deleted (not restored) on key removal. Source: `versioned_docs/version-4.7/deployments/configuration.md` lines 118-145 + `release_notes/4.7.2.md`.
+  - **Configuration precedence**: `HARPER_SET_CONFIG` > user manual edits > `HARPER_DEFAULT_CONFIG` > file defaults.
+  - **State tracking**: Harper maintains `{rootPath}/backup/.harper-config-state.json` for drift detection and restoration.
+  - Full content is in `reference_versioned_docs/version-v4/environment-variables/configuration.md` — this file should be deleted after porting its content here.
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Major config changes (http section, componentRoot)
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Configuration improvements
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Developer/production mode
+  - [4.7.2](release-notes/v4-tucker/4.7.2.md) - HARPER_SET_CONFIG and HARPER_DEFAULT_CONFIG added
 
 ### `reference/configuration/options.md`
 
@@ -402,14 +411,10 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: New content about `loadEnv` plugin
 - **Additional Sources**: Built-in extensions docs, configuration docs
 - **Version Annotations**: loadEnv added in v4.5.0
-- **Status**: Not Started
+- **Status**: In Progress
+- **Notes**: Covers `loadEnv` extension only. Harper-level environment variable configuration (naming conventions, `HDB_CONFIG`, `HARPER_DEFAULT_CONFIG`, `HARPER_SET_CONFIG`) belongs in the Configuration section — see notes there.
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Built-in loadEnv component
-
-### `reference/environment-variables/configuration.md`
-
-- **Primary Source**: Extract from configuration docs or components docs
-- **Status**: Not Started
 
 ---
 
