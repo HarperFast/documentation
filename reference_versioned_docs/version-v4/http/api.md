@@ -10,8 +10,6 @@ The `server` global object is available in all Harper component code. It provide
 
 ## `server.http(listener, options)`
 
-Alias: `server.request`
-
 Add a handler to the HTTP request middleware chain.
 
 ```ts

@@ -77,7 +77,7 @@ When `http.securePort` is set, Harper accepts plaintext connections on `http.por
 
 ## Multi-Domain Certificates (SNI)
 
-To serve different certificates for different domains using Server Name Indication (SNI), define `tls` as an array of configuration objects. Each entry can optionally include a `host` property specifying which domain it applies to. If `host` is omitted, the certificate's common name is used.
+To serve different certificates for different domains using Server Name Indication (SNI), define `tls` as an array of configuration objects. Each entry can optionally include a `host` property specifying which domain it applies to. If `host` is omitted, the certificate's common name and subject alternate names (SANs) are used.
 
 ```yaml
 tls:
