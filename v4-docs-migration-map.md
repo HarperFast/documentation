@@ -440,7 +440,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: New content about HTTP server
 - **Additional Sources**: Configuration docs, architecture docs
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Worker threads for HTTP requests
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Socket management (SO_REUSEPORT), flexible port configs
@@ -450,7 +450,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `reference/configuration.md` (http section)
 - **Version Annotations**:
   - HTTP/2 support: v4.5.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - HTTP/2 support
 
@@ -460,7 +460,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**: Current `reference/globals.md`
 - **Version Annotations**:
   - server.authenticateUser: v4.5.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - server.authenticateUser API
 

@@ -61,6 +61,34 @@
 		},
 		{
 			"type": "category",
+			"label": "HTTP",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "http/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "http/configuration",
+					"label": "Configuration"
+				},
+				{
+					"type": "doc",
+					"id": "http/api",
+					"label": "API"
+				},
+				{
+					"type": "doc",
+					"id": "http/tls",
+					"label": "TLS"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "GraphQL Querying",
 			"collapsible": false,
 			"className": "learn-category-header",
