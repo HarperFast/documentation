@@ -1,0 +1,130 @@
+{
+	"referenceSidebar": [
+		{
+			"type": "doc",
+			"id": "index",
+			"label": "Welcome"
+		},
+		{
+			"type": "category",
+			"label": "CLI",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "cli/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "cli/commands",
+					"label": "Commands"
+				},
+				{
+					"type": "doc",
+					"id": "cli/operations-api-commands",
+					"label": "Operations API Commands"
+				},
+				{
+					"type": "doc",
+					"id": "cli/authentication",
+					"label": "Authentication"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Environment Variables",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "environment-variables/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "HTTP",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "http/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "http/configuration",
+					"label": "Configuration"
+				},
+				{
+					"type": "doc",
+					"id": "http/api",
+					"label": "API"
+				},
+				{
+					"type": "doc",
+					"id": "http/tls",
+					"label": "TLS"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "GraphQL Querying",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "graphql-querying/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Studio",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "studio/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Fastify Routes",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "fastify-routes/overview",
+					"label": "Overview"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Legacy",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "legacy/cloud",
+					"label": "Harper Cloud"
+				}
+			]
+		}
+	]
+}

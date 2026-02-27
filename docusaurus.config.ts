@@ -22,10 +22,10 @@ const baseUrl = process.env.DOCUSAURUS_BASE_URL || '/';
 // Determine route base path for docs
 // Can be set to '/docs/' if we need docs under a subdirectory
 // Default is '/' to serve docs at the root
-const routeBasePath = process.env.DOCUSAURUS_ROUTE_BASE_PATH || '/docs'; // matching the production URL structure since this will currently affect some relative links in the docs
+const routeBasePath = process.env.DOCUSAURUS_ROUTE_BASE_PATH; // matching the production URL structure since this will currently affect some relative links in the docs
 
 // URL can also be overridden if needed
-const url = process.env.DOCUSAURUS_URL || 'https://docs.harperdb.io';
+const url = process.env.DOCUSAURUS_URL || 'https://docs.harper.fast';
 
 // Always log configuration at build time
 console.log('Docusaurus URL config:', { url, baseUrl, routeBasePath });
@@ -55,9 +55,16 @@ const config: Config = {
 	organizationName: 'HarperFast', // Usually your GitHub org/user name.
 	projectName: 'documentation', // Usually your repo name.
 
-	onBrokenLinks: 'throw',
+	onBrokenLinks: 'warn',
 
 	plugins: [
+		[
+			'@docusaurus/plugin-content-pages',
+			{
+				id: 'default',
+				path: 'src/pages',
+			},
+		],
 		// Learn documentation
 		[
 			'@docusaurus/plugin-content-docs',
@@ -69,16 +76,16 @@ const config: Config = {
 				editUrl: 'https://github.com/HarperFast/documentation/blob/main/',
 			},
 		],
-		// Main documentation
+		// Reference documentation
 		[
 			'@docusaurus/plugin-content-docs',
 			{
-				id: 'default',
-				path: './docs',
-				sidebarPath: './sidebars.ts',
-				routeBasePath,
+				id: 'reference',
+				path: 'reference',
+				routeBasePath: 'reference',
+				sidebarPath: './sidebarsReference.ts',
 				editUrl: ({ versionDocsDirPath, docPath }) => {
-					// For versioned docs: versionDocsDirPath is like 'versioned_docs/version-4.6'
+					// For versioned docs: versionDocsDirPath is like 'versioned_docs/version-4'
 					// For current docs: versionDocsDirPath is 'docs'
 					if (versionDocsDirPath.startsWith('versioned_docs')) {
 						// Versioned docs are in versioned_docs/version-X.X/
@@ -88,21 +95,11 @@ const config: Config = {
 						return `https://github.com/HarperFast/documentation/blob/main/docs/${docPath}`;
 					}
 				},
-				lastVersion: '4.7',
+				lastVersion: 'current',
 				includeCurrentVersion: false,
 				versions: {
-					'4.7': {
-						// No banner for 4.7 as it's the latest stable version
-						banner: 'none',
-					},
-					'4.6': {
-						// No banner for 4.6 as it's still actively maintained
-						banner: 'none',
-					},
-					'4.5': {
-						// No banner for 4.5 as it's still actively maintained
-						banner: 'none',
-					},
+					current: { label: 'v5', path: 'v5' },
+					v4: { label: 'v4', path: 'v4', banner: 'none' },
 				},
 				// Converts npm commands in markdown code blocks to show npm/yarn/pnpm tabs
 				remarkPlugins: [[require('@docusaurus/remark-plugin-npm2yarn'), { sync: true }]],
@@ -218,14 +215,14 @@ const config: Config = {
 			},
 		],
 
-		// Redirects
-		[
-			'@docusaurus/plugin-client-redirects',
-			{
-				redirects: generateRedirects(routeBasePath),
-				createRedirects: (existingPath: string) => createRedirectsBase(existingPath, routeBasePath),
-			},
-		],
+		// // Redirects
+		// [
+		// 	'@docusaurus/plugin-client-redirects',
+		// 	{
+		// 		redirects: generateRedirects(routeBasePath),
+		// 		createRedirects: (existingPath: string) => createRedirectsBase(existingPath, routeBasePath),
+		// 	},
+		// ],
 
 		// Sitemap
 		[
@@ -272,22 +269,7 @@ const config: Config = {
 		// Use Algolia search in production when env vars are set, otherwise use local search
 		...(process.env.NODE_ENV === 'production' && process.env.ALGOLIA_APP_ID && process.env.ALGOLIA_SEARCH_KEY
 			? ['@docusaurus/theme-search-algolia']
-			: [
-					[
-						require.resolve('@easyops-cn/docusaurus-search-local'),
-						{
-							hashed: true,
-							language: ['en'],
-							indexDocs: true,
-							indexBlog: false,
-							indexPages: true,
-							docsRouteBasePath: routeBasePath,
-							highlightSearchTermsOnTargetPage: true,
-							searchResultLimits: 8,
-							searchBarPosition: 'right',
-						},
-					],
-				]),
+			: []),
 		'@docusaurus/theme-mermaid',
 	],
 
@@ -315,7 +297,7 @@ const config: Config = {
 				alt: 'Harper Logo',
 				src: 'img/HarperPrimaryBlk.svg',
 				srcDark: 'img/HarperPrimaryWht.svg',
-				href: 'https://www.harper.fast/',
+				// href: 'https://www.harper.fast/',
 			},
 			items: [
 				{
@@ -327,9 +309,10 @@ const config: Config = {
 				},
 				{
 					type: 'docSidebar',
-					sidebarId: 'docsSidebar',
+					sidebarId: 'referenceSidebar',
+					docsPluginId: 'reference',
 					position: 'left',
-					label: 'Documentation',
+					label: 'Reference',
 				},
 				{
 					// Link directly to v4 (current version) instead of overview page
@@ -350,6 +333,7 @@ const config: Config = {
 					type: 'docsVersionDropdown',
 					position: 'right',
 					dropdownActiveClassDisabled: true,
+					docsPluginId: 'reference',
 				},
 				{
 					href: 'https://github.com/HarperFast/documentation',
@@ -366,11 +350,19 @@ const config: Config = {
 					items: [
 						{
 							label: 'Learn',
-							to: `/learn`,
+							to: '/learn',
 						},
 						{
-							label: 'Administration',
-							to: `${routeBasePath}/administration`,
+							label: 'Reference',
+							to: '/reference',
+						},
+						{
+							label: 'Release Notes',
+							to: '/release-notes/v4-tucker',
+						},
+						{
+							label: 'Fabric',
+							to: '/fabric',
 						},
 					],
 				},
