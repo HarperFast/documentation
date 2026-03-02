@@ -45,7 +45,7 @@ When creating a new, user-defined role in a Harper instance, you must provide a 
 
 - `permissions` used to explicitly define CRUD access to existing table data.
 
-Example JSON for `add_role` request
+### Example JSON for `add_role` request {#add-role-example}
 
 ```json
 {
@@ -191,25 +191,25 @@ Each table that a role should be given some level of CRUD permissions to must be
 **Important Notes About Table Permissions**
 
 1. If a database and/or any of its tables are not included in the permissions JSON, the role will not have any CRUD access to the database and/or tables.
-1. If a table-level CRUD permission is set to false, any attribute-level with that same CRUD permission set to true will return an error.
+2. If a table-level CRUD permission is set to false, any attribute-level with that same CRUD permission set to true will return an error.
 
 **Important Notes About Attribute Permissions**
 
 1. If there are attribute-specific CRUD permissions that need to be enforced on a table, those need to be explicitly described in the `attribute_permissions` array.
-1. If a non-hash attribute is given some level of CRUD access, that same access will be assigned to the table's `hash_attribute` (also referred to as the `primary_key`), even if it is not explicitly defined in the permissions JSON.
+2. If a non-hash attribute is given some level of CRUD access, that same access will be assigned to the table's `hash_attribute` (also referred to as the `primary_key`), even if it is not explicitly defined in the permissions JSON.
 
-   _See table_name1's permission set for an example of this – even though the table's hash attribute is not specifically defined in the attribute_permissions array, because the role has CRUD access to 'attribute1', the role will have the same access to the table's hash attribute._
+   _See [`table_name1`'s permission set](#add-role-example) for an example of this – even though the table's hash attribute is not specifically defined in the attribute_permissions array, because the role has CRUD access to 'attribute1', the role will have the same access to the table's hash attribute._
 
-1. If attribute-level permissions are set – _i.e. attribute_permissions.length > 0_ – any table attribute not explicitly included will be assumed to have not CRUD access (with the exception of the `hash_attribute` described in #2).
+3. If attribute-level permissions are set – _i.e. attribute_permissions.length > 0_ – any table attribute not explicitly included will be assumed to have not CRUD access (with the exception of the `hash_attribute` described in #2).
 
-   _See table_name1's permission set for an example of this – in this scenario, the role will have the ability to create, insert and update 'attribute1' and the table's hash attribute but no other attributes on that table._
+   _See [`table_name1`'s permission set](#add-role-example) for an example of this – in this scenario, the role will have the ability to create, insert and update 'attribute1' and the table's hash attribute but no other attributes on that table._
 
-1. If an `attribute_permissions` array is empty, the role's access to a table's attributes will be based on the table-level CRUD permissions.
+4. If an `attribute_permissions` array is empty, the role's access to a table's attributes will be based on the table-level CRUD permissions.
 
-   _See table_name2's permission set for an example of this._
+   _See [`table_name2`'s permission set](#add-role-example) for an example of this._
 
-1. The `__createdtime__` and `__updatedtime__` attributes that Harper manages internally can have read perms set but, if set, all other attribute-level permissions will be ignored.
-1. Please note that DELETE permissions are not included as a part of an individual attribute-level permission set. That is because it is not possible to delete individual attributes from a row, rows must be deleted in full.
+5. The `__createdtime__` and `__updatedtime__` attributes that Harper manages internally can have read perms set but, if set, all other attribute-level permissions will be ignored.
+6. Please note that DELETE permissions are not included as a part of an individual attribute-level permission set. That is because it is not possible to delete individual attributes from a row, rows must be deleted in full.
    - If a role needs the ability to delete rows from a table, that permission should be set on the table-level.
    - The practical approach to deleting an individual attribute of a row would be to set that attribute to null via an update statement.
 
