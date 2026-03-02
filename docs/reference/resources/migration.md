@@ -87,8 +87,8 @@ export class MyData extends tables.MyData {
 		// While you can still use allowRead, it is not called before get is called, and it is generally encouraged
 		// to perform/call authorization explicitly in direct get, put, post methods rather than using allow* methods.
 		if (!this.getContext().user) throw new Error('Unauthorized');
-		target.checkPermissions = false; // authorization complete, no need to further check permissions below
-		// target.checkPermissions is set to true or left in place, this default get method will perform the default permissions checks
+		target.checkPermission = false; // authorization complete, no need to further check permissions below
+		// target.checkPermission is set to true or left in place, this default get method will perform the default permissions checks
 		return super.get(target); // we can just directly use the query as well
 	}
 }
