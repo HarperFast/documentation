@@ -83,15 +83,14 @@ This guide is going to walk you through building a basic Harper application usin
 
 [The getting started guide](/learn/) covers how to build an application entirely through schema configuration. However, if your application requires more custom functionality, you will probably want to employ your own JavaScript modules to implement more specific features and interactions. This gives you tremendous flexibility and control over how data is accessed and modified in Harper. Let's take a look at how we can use JavaScript to extend and define "resources" for custom functionality. In Harper, data is accessed through our [Resource API](../../reference/resources/), a standard interface to access data sources, tables, and make them available to endpoints. Database tables are `Resource` classes, and so extending the function of a table is as simple as extending their class.
 
-To define custom (JavaScript) resources as endpoints, we need to create a `resources.js` module (this goes in the root of your application folder). And then endpoints can be defined with Resource classes that `export`ed. This can be done in addition to, or in lieu of the `@export`ed types in the schema.graphql. If you are exporting and extending a table you defined in the schema make sure you remove the `@export` from the schema so that don't export the original table or resource to the same endpoint/path you are exporting with a class. Resource classes have methods that correspond to standard HTTP/REST methods, like `get`, `post`, `patch`, and `put` to implement specific handling for any of these methods (for tables they all have default implementations). Let's add a property to the dog records when they are returned, that includes their age in human years. To do this, we get the `Dog` class from the defined tables, extend it (with our custom logic), and export it:
+To define custom (JavaScript) resources as endpoints, we need to create a `resources.js` module (this goes in the root of your application folder). And then endpoints can be defined with Resource classes that `export`ed. This can be done in addition to, or in lieu of the `@export`ed types in the schema.graphql. If you are exporting and extending a table you defined in the schema make sure you remove the `@export` from the schema so that don't export the original table or resource to the same endpoint/path you are exporting with a class. Resource classes have `static` methods that correspond to standard HTTP/REST methods, like `get`, `post`, `patch`, and `put` to implement specific handling for any of these methods (for tables they all have default implementations). Let's add a property to the dog records when they are returned, that includes their age in human years. To do this, we get the `Dog` class from the defined tables, extend it (with our custom logic), and export it:
 
 ```javascript
 // resources.js:
 const { Dog } = tables; // get the Dog table from the Harper provided set of tables (in the default database)
 
 export class DogWithHumanAge extends Dog {
-	static loadAsInstance = false;
-	async get(target) {
+	async static get(target) {
 		const record = await super.get(target);
 		return {
 			...record, // include all properties from the record
@@ -126,8 +125,7 @@ The resource methods are automatically wrapped with a transaction and will autom
 //resource.js:
 const { Dog, Breed } = tables; // get the Breed table too
 export class DogWithBreed extends Dog {
-	static loadAsInstance = false;
-	async get(target) {
+	static async get(target) {
 		// get the Dog record
 		const record = await super.get(target);
 		// get the Breed record
@@ -145,7 +143,7 @@ The call to `Breed.get` will return a record from the `Breed` table as specified
 We may also want to customize access to this data. By default, the `target` has a `checkPermission` property that indicates that the table's `get` method will check if there is a valid user with access to a table before returning a record (and throw an `AccessViolation` if they do not). However, we can explicitly allow permission to the table's data/records by setting `checkPermission` to `false`:
 
 ```javascript
-	async get(target) {
+	static async get(target) {
 		target.checkPermission = false;
 		const record = await super.get(target);
 		...
@@ -155,8 +153,7 @@ Here we have focused on customizing how we retrieve data, but we may also want t
 
 ```javascript
 export class CustomDog extends Dog {
-	static loadAsInstance = false;
-	async post(target, data) {
+	static async post(target, data) {
 		if (data.action === 'add-trick') {
 			const record = this.update(target);
 			record.tricks.push(data.trick); // will be persisted when the transaction commits
@@ -171,8 +168,7 @@ We can also define custom authorization capabilities here. For example, we might
 
 ```javascript
 export class CustomDog extends Dog {
-	static loadAsInstance = false;
-	async post(target, data) {
+	static async post(target, data) {
 		if (data.action === 'add-trick') {
 			const context = this.getContext();
 			// if we want to skip the default permission checks, we can turn off checkPermissions:
@@ -208,7 +204,7 @@ We can also directly implement the `Resource` class and use it to create new dat
 const { Breed } = tables; // our Breed table
 class BreedSource extends Resource {
 	// define a data source
-	async get(target) {
+	static async get(target) {
 		return (await fetch(`https://best-dog-site.com/${target}`)).json();
 	}
 }
