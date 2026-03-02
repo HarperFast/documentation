@@ -4,7 +4,7 @@ title: Users & Roles
 
 # Users & Roles
 
-Harper utilizes a Role-Based Access Control (RBAC) framework to manage access to Harper instances. A user is assigned a role that determines the user’s permissions to access database resources and run core operations.
+Harper utilizes a Role-Based Access Control (RBAC) framework to manage access to Harper instances. A user is assigned a role that determines the user's permissions to access database resources and run core operations.
 
 ## Roles in Harper
 
@@ -13,9 +13,9 @@ Role permissions in Harper are broken into two categories – permissions around
 **Database Manipulation**: A role defines CRUD (create, read, update, delete) permissions against database resources (i.e. data) in a Harper instance.
 
 1. At the table-level access, permissions must be explicitly defined when adding or altering a role – _i.e. Harper will assume CRUD access to be FALSE if not explicitly provided in the permissions JSON passed to the `add_role` and/or `alter_role` API operations._
-1. At the attribute-level, permissions for attributes in all tables included in the permissions set will be assigned based on either the specific attribute-level permissions defined in the table’s permission set or, if there are no attribute-level permissions defined, permissions will be based on the table’s CRUD set.
+1. At the attribute-level, permissions for attributes in all tables included in the permissions set will be assigned based on either the specific attribute-level permissions defined in the table's permission set or, if there are no attribute-level permissions defined, permissions will be based on the table's CRUD set.
 
-**Database Definition**: Permissions related to managing databases, tables, roles, users, and other system settings and operations are restricted to the built-in `super_user` role.
+**Database Definition**: Permissions related to managing databases, tables, roles, users, and other system settings and operations are restricted to the built-in `super_user` role by default. Specific operations can be selectively granted to non-super_user roles using [`operations`](#roles-in-harper).
 
 **Built-In Roles**
 
@@ -84,15 +84,86 @@ Example JSON for `add_role` request
 
 **Setting Role Permissions**
 
-There are two parts to a permissions set:
+There are three parts to a permissions set:
 
 - `super_user` – boolean value indicating if role should be provided super_user access.
 
   _If `super_user` is set to true, there should be no additional database-specific permissions values included since the role will have access to the entire database schema. If permissions are included in the body of the operation, they will be stored within Harper, but ignored, as super_users have full access to the database._
 
-- `permissions`: Database tables that a role should have specific CRUD access to should be included in the final, database-specific `permissions` JSON.
+- `operations` – array of operation names and/or permission group names that this role is allowed to call. When set, it acts as a two-gate check: (1) only listed operations are reachable — any unlisted operation is denied regardless of table CRUD permissions; (2) for data operations that pass gate one, table-level CRUD permissions still apply as normal. Operations that are normally restricted to `super_user` can be selectively granted by including them in the list.
 
-  _For user-defined roles (i.e. non-super_user roles, blank permissions will result in the user being restricted from accessing any of the database schema._
+  _If `operations` is not set, existing behavior is unchanged — the role can call any non-super_user operation, subject to table CRUD permissions._
+
+  **Permission Groups**
+
+  Groups expand to a predefined set of operations and can be mixed with individual operation names:
+
+  - `read_only` – search, SQL SELECT, describe, and monitoring operations. No data modification. Operations: `search`, `search_by_conditions`, `search_by_hash`, `search_by_id`, `search_by_value`, `sql`, `describe_all`, `describe_schema`, `describe_database`, `describe_table`, `user_info`, `get_job`, `get_analytics`, `list_metrics`, `describe_metric`
+
+  - `standard_user` – everything in `read_only` plus full data manipulation and bulk load. Does not include any `super_user`-restricted operations, schema DDL (`create_attribute`), or token management. Additional operations beyond `read_only`: `insert`, `update`, `upsert`, `delete`, `csv_data_load`, `csv_file_load`, `csv_url_load`, `import_from_s3`
+
+  **Example: read-only role**
+
+  A role that can only search and describe — cannot insert, update, delete, or call any admin operations:
+
+  ```json
+  {
+  	"operation": "add_role",
+  	"role": "read_only_analyst",
+  	"permission": {
+  		"operations": ["read_only"],
+  		"orders_db": {
+  			"tables": {
+  				"orders": {
+  					"read": true,
+  					"insert": false,
+  					"update": false,
+  					"delete": false,
+  					"attribute_permissions": []
+  				}
+  			}
+  		}
+  	}
+  }
+  ```
+
+  **Example: full data access + targeted admin operations**
+
+  A role with all normally available data operations, plus the ability to call `get_configuration` and `system_information` without being a super_user. The `standard_user` group opens the operation gate for all non-SU data ops; table CRUD permissions then govern what the role can actually do in each table:
+
+  ```json
+  {
+  	"operation": "add_role",
+  	"role": "ops_engineer",
+  	"permission": {
+  		"operations": ["standard_user", "get_configuration", "system_information"],
+  		"orders_db": {
+  			"tables": {
+  				"orders": {
+  					"read": true,
+  					"insert": true,
+  					"update": true,
+  					"delete": true,
+  					"attribute_permissions": []
+  				},
+  				"audit_log": {
+  					"read": true,
+  					"insert": false,
+  					"update": false,
+  					"delete": false,
+  					"attribute_permissions": []
+  				}
+  			}
+  		}
+  	}
+  }
+  ```
+
+  _This role can insert/update/delete `orders` (both gates pass), only read `audit_log` (operation gate passes, CRUD gate blocks writes), call `get_configuration` and `system_information` (super_user bypass), and cannot call `restart`, `drop_database`, or any other unlisted operation._
+
+- `permission`: Database tables that a role should have specific CRUD access to should be included in the final, database-specific `permission` JSON.
+
+  _For user-defined roles (i.e. non-super_user roles), blank permissions will result in the user being restricted from accessing any of the database schema._
 
 **Table Permissions JSON**
 
@@ -125,17 +196,17 @@ Each table that a role should be given some level of CRUD permissions to must be
 **Important Notes About Attribute Permissions**
 
 1. If there are attribute-specific CRUD permissions that need to be enforced on a table, those need to be explicitly described in the `attribute_permissions` array.
-1. If a non-hash attribute is given some level of CRUD access, that same access will be assigned to the table’s `hash_attribute` (also referred to as the `primary_key`), even if it is not explicitly defined in the permissions JSON.
+1. If a non-hash attribute is given some level of CRUD access, that same access will be assigned to the table's `hash_attribute` (also referred to as the `primary_key`), even if it is not explicitly defined in the permissions JSON.
 
-   _See table_name1’s permission set for an example of this – even though the table’s hash attribute is not specifically defined in the attribute_permissions array, because the role has CRUD access to ‘attribute1’, the role will have the same access to the table’s hash attribute._
+   _See table_name1's permission set for an example of this – even though the table's hash attribute is not specifically defined in the attribute_permissions array, because the role has CRUD access to 'attribute1', the role will have the same access to the table's hash attribute._
 
 1. If attribute-level permissions are set – _i.e. attribute_permissions.length > 0_ – any table attribute not explicitly included will be assumed to have not CRUD access (with the exception of the `hash_attribute` described in #2).
 
-   _See table_name1’s permission set for an example of this – in this scenario, the role will have the ability to create, insert and update ‘attribute1’ and the table’s hash attribute but no other attributes on that table._
+   _See table_name1's permission set for an example of this – in this scenario, the role will have the ability to create, insert and update 'attribute1' and the table's hash attribute but no other attributes on that table._
 
-1. If an `attribute_permissions` array is empty, the role’s access to a table’s attributes will be based on the table-level CRUD permissions.
+1. If an `attribute_permissions` array is empty, the role's access to a table's attributes will be based on the table-level CRUD permissions.
 
-   _See table_name2’s permission set for an example of this._
+   _See table_name2's permission set for an example of this._
 
 1. The `__createdtime__` and `__updatedtime__` attributes that Harper manages internally can have read perms set but, if set, all other attribute-level permissions will be ignored.
 1. Please note that DELETE permissions are not included as a part of an individual attribute-level permission set. That is because it is not possible to delete individual attributes from a row, rows must be deleted in full.
@@ -146,7 +217,7 @@ Each table that a role should be given some level of CRUD permissions to must be
 
 The table below includes all API operations available in Harper and indicates whether or not the operation is restricted to super_user roles.
 
-_Keep in mind that non-super_user roles will also be restricted within the operations they do have access to by the database-level CRUD permissions set for the roles._
+_Keep in mind that non-super_user roles will also be restricted within the operations they do have access to by the database-level CRUD permissions set for the roles. Operations marked with X can be selectively granted to non-super_user roles using `operations`._
 
 | Databases and Tables | Restricted to Super_Users |
 | -------------------- | :-----------------------: |
