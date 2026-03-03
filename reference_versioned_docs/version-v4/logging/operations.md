@@ -20,16 +20,16 @@ _Restricted to super_user roles only._
 
 ### Parameters
 
-| Parameter | Required | Type   | Description                                                                                                       |
-| --------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
-| `operation` | Yes    | string | Must be `"read_log"`                                                                                              |
-| `start`   | No       | number | Result offset to start from. Default: `0` (first entry in `hdb.log`).                                            |
-| `limit`   | No       | number | Maximum number of entries to return. Default: `1000`.                                                             |
-| `level`   | No       | string | Filter by log level. One of: `notify`, `error`, `warn`, `info`, `debug`, `trace`. Default: all levels.           |
-| `from`    | No       | string | Start of time window. Format: `YYYY-MM-DD` or `YYYY-MM-DD hh:mm:ss`. Default: first entry in log.               |
-| `until`   | No       | string | End of time window. Format: `YYYY-MM-DD` or `YYYY-MM-DD hh:mm:ss`. Default: last entry in log.                  |
-| `order`   | No       | string | Sort order: `asc` or `desc` by timestamp. Default: maintains `hdb.log` order.                                    |
-| `filter`  | No       | string | A substring that must appear in each returned log line.                                                           |
+| Parameter   | Required | Type   | Description                                                                                            |
+| ----------- | -------- | ------ | ------------------------------------------------------------------------------------------------------ |
+| `operation` | Yes      | string | Must be `"read_log"`                                                                                   |
+| `start`     | No       | number | Result offset to start from. Default: `0` (first entry in `hdb.log`).                                  |
+| `limit`     | No       | number | Maximum number of entries to return. Default: `1000`.                                                  |
+| `level`     | No       | string | Filter by log level. One of: `notify`, `error`, `warn`, `info`, `debug`, `trace`. Default: all levels. |
+| `from`      | No       | string | Start of time window. Format: `YYYY-MM-DD` or `YYYY-MM-DD hh:mm:ss`. Default: first entry in log.      |
+| `until`     | No       | string | End of time window. Format: `YYYY-MM-DD` or `YYYY-MM-DD hh:mm:ss`. Default: last entry in log.         |
+| `order`     | No       | string | Sort order: `asc` or `desc` by timestamp. Default: maintains `hdb.log` order.                          |
+| `filter`    | No       | string | A substring that must appear in each returned log line.                                                |
 
 ### Request
 
@@ -80,7 +80,7 @@ _Restricted to super_user roles only._
 | `level`     | string | Log level of the entry.                                                                                 |
 | `message`   | string | Log message.                                                                                            |
 | `timestamp` | string | ISO 8601 timestamp when the event occurred.                                                             |
-| `thread`    | string | Thread name and ID (e.g., `main/0`, `http/3`).                                                         |
+| `thread`    | string | Thread name and ID (e.g., `main/0`, `http/3`).                                                          |
 | `tags`      | array  | Additional context tags. Entries from components may include `custom-function` or other component tags. |
 
 ## Related

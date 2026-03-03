@@ -18,12 +18,14 @@ Type: `string`
 
 Default: `warn`
 
-Controls the verbosity of text event logs. Levels from least to most severe: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `notify`. Setting a level includes that level and all more-severe levels.
+Controls the verbosity of logs. Levels from least to most severe: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `notify`. Setting a level includes that level and all more-severe levels.
 
 ```yaml
 logging:
   level: warn
 ```
+
+For example, `level: warn` results in `warn`, `error`, `fatal`, and `notify` logs.
 
 ### `logging.path`
 
@@ -70,11 +72,9 @@ Type: `boolean`
 
 Default: `false`
 
-Log to `stdout`/`stderr` in addition to (or instead of) the log file. Primarily for container logging drivers.
+Log to `stdout`/`stderr` in addition to (or instead of) the log file.
 
-When enabled, run Harper in the foreground (`harperdb`, not `harperdb start`). Logging to standard streams only will disable clustering catchup.
-
-Added in: v4.6.0 — Timestamps are **not** included in standard stream output. Console logging does not go to log files by default.
+When enabled, run Harper in the foreground (`harper`, not `harper start`).
 
 ```yaml
 logging:
@@ -191,6 +191,7 @@ Default: `false`
 Log all failed authentication attempts.
 
 Example log entry:
+
 ```
 [error] [auth-event]: {"username":"admin","status":"failure","type":"authentication","originating_ip":"127.0.0.1","request_method":"POST","path":"/","auth_strategy":"Basic"}
 ```
@@ -206,6 +207,7 @@ Default: `false`
 Log all successful authentication events.
 
 Example log entry:
+
 ```
 [notify] [auth-event]: {"username":"admin","status":"success","type":"authentication","originating_ip":"127.0.0.1","request_method":"POST","path":"/","auth_strategy":"Basic"}
 ```
@@ -241,11 +243,11 @@ HTTP request logging. Disabled by default — defining this section enables it.
 ```yaml
 http:
   logging:
-    level: info      # info = all requests, warn = 4xx+, error = 5xx
+    level: info # info = all requests, warn = 4xx+, error = 5xx
     path: ~/hdb/log/http.log
-    timing: true     # log request duration
-    headers: false   # log request headers (verbose)
-    id: true         # assign and log a unique request ID per request
+    timing: true # log request duration
+    headers: false # log request headers (verbose)
+    id: true # assign and log a unique request ID per request
 ```
 
 See [HTTP Configuration](TODO:reference_versioned_docs/version-v4/http/configuration.md 'HTTP logging configuration') for full details.
