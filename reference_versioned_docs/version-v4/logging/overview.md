@@ -34,13 +34,13 @@ Example:
 
 Fields:
 
-| Field       | Description                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| `timestamp` | ISO 8601 date/time when the event occurred.                                                 |
-| `level`     | Severity level. See [Log Levels](#log-levels) below.                                        |
-| `thread/id` | Name and ID of the thread that produced the log entry (generally, `main`, `http`, or `job`).|
-| `tags`      | Additional context tags (e.g., `custom-function`, `auth-event`). Most entries have no tags. |
-| `message`   | The log message.                                                                            |
+| Field       | Description                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `timestamp` | ISO 8601 date/time when the event occurred.                                                  |
+| `level`     | Severity level. See [Log Levels](#log-levels) below.                                         |
+| `thread/id` | Name and ID of the thread that produced the log entry (generally, `main`, `http`, or `job`). |
+| `tags`      | Additional context tags (e.g., `custom-function`, `auth-event`). Most entries have no tags.  |
+| `message`   | The log message.                                                                             |
 
 ### Log Levels
 
