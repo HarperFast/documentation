@@ -23,13 +23,13 @@ All standard log output is written to `<ROOTPATH>/log/hdb.log` (default: `~/hdb/
 Each log entry follows this structure:
 
 ```
-<timestamp> [<level>] [<thread>/<id>] ...[<tags>]: <message>
+<timestamp> [<thread>/<id>] [<level>] ...[<tags>]: <message>
 ```
 
 Example:
 
 ```
-2023-03-09T14:25:05.269Z [notify] [main/0]: HarperDB successfully started.
+2023-03-09T14:25:05.269Z [main/0] [notify]: HarperDB successfully started.
 ```
 
 Fields:
@@ -38,7 +38,7 @@ Fields:
 | ----------- | ------------------------------------------------------------------------------------------- |
 | `timestamp` | ISO 8601 date/time when the event occurred.                                                 |
 | `level`     | Severity level. See [Log Levels](#log-levels) below.                                        |
-| `thread/id` | Name and ID of the thread that produced the log entry.                                      |
+| `thread/id` | Name and ID of the thread that produced the log entry (generally, `main`, `http`, or `job`).|
 | `tags`      | Additional context tags (e.g., `custom-function`, `auth-event`). Most entries have no tags. |
 | `message`   | The log message.                                                                            |
 

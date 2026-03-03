@@ -321,7 +321,7 @@ analytics:
 
 ## Clustering Log Level
 
-Clustering (NATS Hub and Leaf servers) has a separate log level due to its verbosity. Configure with `clustering.logLevel`.
+Clustering has a separate log level due to its verbosity. Configure with `clustering.logLevel`.
 
 Valid levels from least verbose: `error`, `warn`, `info`, `debug`, `trace`.
 
