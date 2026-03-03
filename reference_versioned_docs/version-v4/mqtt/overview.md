@@ -93,45 +93,45 @@ server.mqtt.events.on('connected', (session, socket) => {
 
 Available events:
 
-| Event          | Description                                                |
-| -------------- | ---------------------------------------------------------- |
-| `connection`   | Client establishes a TCP or WebSocket connection           |
-| `connected`    | Client completes MQTT handshake and is authenticated       |
-| `auth-failed`  | Client fails to authenticate                               |
-| `disconnected` | Client disconnects                                         |
+| Event          | Description                                          |
+| -------------- | ---------------------------------------------------- |
+| `connection`   | Client establishes a TCP or WebSocket connection     |
+| `connected`    | Client completes MQTT handshake and is authenticated |
+| `auth-failed`  | Client fails to authenticate                         |
+| `disconnected` | Client disconnects                                   |
 
 ## Feature Support Matrix
 
-| Feature                                                             | Support                                                        |
-| ------------------------------------------------------------------- | -------------------------------------------------------------- |
-| MQTT v3.1.1 connections                                             | ✅                                                             |
-| MQTT v5 connections                                                 | ✅                                                             |
-| Secure MQTTS (TLS)                                                  | ✅                                                             |
-| MQTT over WebSockets                                                | ✅                                                             |
-| Authentication via username/password                                | ✅                                                             |
-| Authentication via mTLS                                             | ✅ (added v4.3.0)                                              |
-| Publish                                                             | ✅                                                             |
-| Subscribe                                                           | ✅                                                             |
-| Multi-level wildcard (`#`)                                          | ✅                                                             |
-| Single-level wildcard (`+`)                                         | ✅ (added v4.3.0)                                              |
-| QoS 0                                                               | ✅                                                             |
-| QoS 1                                                               | ✅                                                             |
-| QoS 2                                                               | Not fully supported — conversation supported, not guaranteed   |
-| Keep-Alive monitoring                                               | ✅                                                             |
-| Clean session                                                       | ✅                                                             |
-| Durable session                                                     | ✅                                                             |
-| Distributed durable session                                         | Not supported                                                  |
-| Last Will                                                           | ✅                                                             |
-| MQTT V5 Subscribe retain handling                                   | ✅ (added v4.3.0)                                              |
-| MQTT V5 User properties                                             | Not supported                                                  |
-| MQTT V5 Will properties                                             | Not supported                                                  |
-| MQTT V5 Connection properties                                       | Not supported                                                  |
-| MQTT V5 Connection acknowledgement properties                       | Not supported                                                  |
-| MQTT V5 Publish properties                                          | Not supported                                                  |
-| MQTT V5 Subscribe properties (general)                              | Not supported                                                  |
-| MQTT V5 Ack properties                                              | Not supported                                                  |
-| MQTT V5 AUTH command                                                | Not supported                                                  |
-| MQTT V5 Shared subscriptions                                        | Not supported                                                  |
+| Feature                                       | Support                                                      |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| MQTT v3.1.1 connections                       | ✅                                                           |
+| MQTT v5 connections                           | ✅                                                           |
+| Secure MQTTS (TLS)                            | ✅                                                           |
+| MQTT over WebSockets                          | ✅                                                           |
+| Authentication via username/password          | ✅                                                           |
+| Authentication via mTLS                       | ✅ (added v4.3.0)                                            |
+| Publish                                       | ✅                                                           |
+| Subscribe                                     | ✅                                                           |
+| Multi-level wildcard (`#`)                    | ✅                                                           |
+| Single-level wildcard (`+`)                   | ✅ (added v4.3.0)                                            |
+| QoS 0                                         | ✅                                                           |
+| QoS 1                                         | ✅                                                           |
+| QoS 2                                         | Not fully supported — conversation supported, not guaranteed |
+| Keep-Alive monitoring                         | ✅                                                           |
+| Clean session                                 | ✅                                                           |
+| Durable session                               | ✅                                                           |
+| Distributed durable session                   | Not supported                                                |
+| Last Will                                     | ✅                                                           |
+| MQTT V5 Subscribe retain handling             | ✅ (added v4.3.0)                                            |
+| MQTT V5 User properties                       | Not supported                                                |
+| MQTT V5 Will properties                       | Not supported                                                |
+| MQTT V5 Connection properties                 | Not supported                                                |
+| MQTT V5 Connection acknowledgement properties | Not supported                                                |
+| MQTT V5 Publish properties                    | Not supported                                                |
+| MQTT V5 Subscribe properties (general)        | Not supported                                                |
+| MQTT V5 Ack properties                        | Not supported                                                |
+| MQTT V5 AUTH command                          | Not supported                                                |
+| MQTT V5 Shared subscriptions                  | Not supported                                                |
 
 ## Related
 

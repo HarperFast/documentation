@@ -130,11 +130,11 @@ When mTLS is enabled, Harper verifies the revocation status of client certificat
 
 Set to `false` to disable revocation checking, or configure as an object:
 
-| Property       | Type     | Default   | Description                                                         |
-| -------------- | -------- | --------- | ------------------------------------------------------------------- |
-| `timeout`      | integer  | `5000`    | Maximum milliseconds to wait for an OCSP response.                  |
-| `cacheTtl`     | integer  | `3600000` | Milliseconds to cache successful verification results (default 1h). |
-| `failureMode`  | string   | `'fail-open'` | Behavior when OCSP verification fails: `'fail-open'` (allow, log warning) or `'fail-closed'` (reject). |
+| Property      | Type    | Default       | Description                                                                                            |
+| ------------- | ------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `timeout`     | integer | `5000`        | Maximum milliseconds to wait for an OCSP response.                                                     |
+| `cacheTtl`    | integer | `3600000`     | Milliseconds to cache successful verification results (default 1h).                                    |
+| `failureMode` | string  | `'fail-open'` | Behavior when OCSP verification fails: `'fail-open'` (allow, log warning) or `'fail-closed'` (reject). |
 
 ```yaml
 mqtt:
@@ -188,13 +188,13 @@ mqtt:
     stdStreams: false
 ```
 
-| Option       | Description                                        |
-| ------------ | -------------------------------------------------- |
-| `path`       | File path for the MQTT log output.                 |
+| Option       | Description                                       |
+| ------------ | ------------------------------------------------- |
+| `path`       | File path for the MQTT log output.                |
 | `root`       | Alternative to `path` — sets the log directory.   |
-| `level`      | Log level: `error`, `warn`, `info`, `debug`, etc.  |
-| `tag`        | Custom tag to prefix log entries.                  |
-| `stdStreams`  | When `true`, also logs to stdout/stderr.            |
+| `level`      | Log level: `error`, `warn`, `info`, `debug`, etc. |
+| `tag`        | Custom tag to prefix log entries.                 |
+| `stdStreams` | When `true`, also logs to stdout/stderr.          |
 
 ## Complete Example
 
