@@ -19,17 +19,17 @@ Returns the list of available metric names that can be queried with `get_analyti
 
 ### Parameters
 
-| Parameter      | Required | Type     | Description                                                                                             |
-| -------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------- |
-| `operation`    | Yes      | string   | Must be `"list_metrics"`                                                                                |
-| `metric_types` | No       | string[] | Filter by type: `"builtin"`, `"custom"`, or both. Default: `["builtin"]`                               |
+| Parameter      | Required | Type     | Description                                                              |
+| -------------- | -------- | -------- | ------------------------------------------------------------------------ |
+| `operation`    | Yes      | string   | Must be `"list_metrics"`                                                 |
+| `metric_types` | No       | string[] | Filter by type: `"builtin"`, `"custom"`, or both. Default: `["builtin"]` |
 
 ### Request
 
 ```json
 {
-    "operation": "list_metrics",
-    "metric_types": ["custom", "builtin"]
+	"operation": "list_metrics",
+	"metric_types": ["custom", "builtin"]
 }
 ```
 
@@ -47,17 +47,17 @@ Returns the structure and available attributes for a specific metric.
 
 ### Parameters
 
-| Parameter   | Required | Type   | Description                         |
-| ----------- | -------- | ------ | ----------------------------------- |
-| `operation` | Yes      | string | Must be `"describe_metric"`         |
-| `metric`    | Yes      | string | Name of the metric to describe      |
+| Parameter   | Required | Type   | Description                    |
+| ----------- | -------- | ------ | ------------------------------ |
+| `operation` | Yes      | string | Must be `"describe_metric"`    |
+| `metric`    | Yes      | string | Name of the metric to describe |
 
 ### Request
 
 ```json
 {
-    "operation": "describe_metric",
-    "metric": "resource-usage"
+	"operation": "describe_metric",
+	"metric": "resource-usage"
 }
 ```
 
@@ -65,13 +65,13 @@ Returns the structure and available attributes for a specific metric.
 
 ```json
 {
-    "attributes": [
-        { "name": "id",             "type": "number" },
-        { "name": "metric",         "type": "string" },
-        { "name": "userCPUTime",    "type": "number" },
-        { "name": "systemCPUTime",  "type": "number" },
-        { "name": "node",           "type": "string" }
-    ]
+	"attributes": [
+		{ "name": "id", "type": "number" },
+		{ "name": "metric", "type": "string" },
+		{ "name": "userCPUTime", "type": "number" },
+		{ "name": "systemCPUTime", "type": "number" },
+		{ "name": "node", "type": "string" }
+	]
 }
 ```
 
@@ -83,31 +83,31 @@ Queries analytics data for a specific metric over a time range.
 
 ### Parameters
 
-| Parameter        | Required | Type     | Description                                                                                                |
-| ---------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                  |
-| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                       |
-| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                      |
-| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                        |
-| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                              |
+| Parameter        | Required | Type     | Description                                                                                                                                                                          |
+| ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                                                                                            |
+| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                                                                                                 |
+| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                                                                                                |
+| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                                                                                                  |
+| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                                                                                                        |
 | `conditions`     | No       | object[] | Additional filter conditions. Same format as [`search_by_conditions`](TODO:reference_versioned_docs/version-v4/operations-api/operations.md 'Operations API — search_by_conditions') |
 
 ### Request
 
 ```json
 {
-    "operation": "get_analytics",
-    "metric": "resource-usage",
-    "start_time": 1769198332754,
-    "end_time": 1769198532754,
-    "get_attributes": ["id", "metric", "userCPUTime", "systemCPUTime"],
-    "conditions": [
-        {
-            "attribute": "node",
-            "operator": "equals",
-            "value": "node1.example.com"
-        }
-    ]
+	"operation": "get_analytics",
+	"metric": "resource-usage",
+	"start_time": 1769198332754,
+	"end_time": 1769198532754,
+	"get_attributes": ["id", "metric", "userCPUTime", "systemCPUTime"],
+	"conditions": [
+		{
+			"attribute": "node",
+			"operator": "equals",
+			"value": "node1.example.com"
+		}
+	]
 }
 ```
 
@@ -115,18 +115,18 @@ Queries analytics data for a specific metric over a time range.
 
 ```json
 [
-    {
-        "id": "12345",
-        "metric": "resource-usage",
-        "userCPUTime": 100,
-        "systemCPUTime": 50
-    },
-    {
-        "id": "67890",
-        "metric": "resource-usage",
-        "userCPUTime": 150,
-        "systemCPUTime": 75
-    }
+	{
+		"id": "12345",
+		"metric": "resource-usage",
+		"userCPUTime": 100,
+		"systemCPUTime": 50
+	},
+	{
+		"id": "67890",
+		"metric": "resource-usage",
+		"userCPUTime": 150,
+		"systemCPUTime": 75
+	}
 ]
 ```
 

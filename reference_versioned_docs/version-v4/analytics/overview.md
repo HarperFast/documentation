@@ -15,10 +15,10 @@ Harper collects real-time telemetry and statistics across all operations, URL en
 
 Analytics data is stored in two system tables in the `system` database:
 
-| Table               | Description                                                                                   |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `hdb_raw_analytics` | Per-second raw entries recorded by each thread. One record per second per active thread.      |
-| `hdb_analytics`     | Aggregate entries recorded once per minute, summarizing all per-second data across threads.   |
+| Table               | Description                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| `hdb_raw_analytics` | Per-second raw entries recorded by each thread. One record per second per active thread.    |
+| `hdb_analytics`     | Aggregate entries recorded once per minute, summarizing all per-second data across threads. |
 
 Both tables require `superuser` permission to query.
 
@@ -48,38 +48,38 @@ Example raw entry:
 
 ```json
 {
-    "time": 1688594390708,
-    "period": 1000.8336279988289,
-    "metrics": [
-        {
-            "metric": "bytes-sent",
-            "path": "search_by_conditions",
-            "type": "operation",
-            "median": 202,
-            "mean": 202,
-            "p95": 202,
-            "p90": 202,
-            "count": 1
-        },
-        {
-            "metric": "memory",
-            "threadId": 2,
-            "rss": 1492664320,
-            "heapTotal": 124596224,
-            "heapUsed": 119563120,
-            "external": 3469790,
-            "arrayBuffers": 798721
-        },
-        {
-            "metric": "utilization",
-            "idle": 138227.52767700003,
-            "active": 70.5066209952347,
-            "utilization": 0.0005098165086230495
-        }
-    ],
-    "threadId": 2,
-    "totalBytesProcessed": 12182820,
-    "id": 1688594390708.6853
+	"time": 1688594390708,
+	"period": 1000.8336279988289,
+	"metrics": [
+		{
+			"metric": "bytes-sent",
+			"path": "search_by_conditions",
+			"type": "operation",
+			"median": 202,
+			"mean": 202,
+			"p95": 202,
+			"p90": 202,
+			"count": 1
+		},
+		{
+			"metric": "memory",
+			"threadId": 2,
+			"rss": 1492664320,
+			"heapTotal": 124596224,
+			"heapUsed": 119563120,
+			"external": 3469790,
+			"arrayBuffers": 798721
+		},
+		{
+			"metric": "utilization",
+			"idle": 138227.52767700003,
+			"active": 70.5066209952347,
+			"utilization": 0.0005098165086230495
+		}
+	],
+	"threadId": 2,
+	"totalBytesProcessed": 12182820,
+	"id": 1688594390708.6853
 }
 ```
 
@@ -107,17 +107,17 @@ Example aggregate entry:
 
 ```json
 {
-    "period": 60000,
-    "metric": "bytes-sent",
-    "method": "connack",
-    "type": "mqtt",
-    "median": 4,
-    "mean": 4,
-    "p95": 4,
-    "p90": 4,
-    "count": 1,
-    "id": 1688589569646,
-    "time": 1688589569646
+	"period": 60000,
+	"metric": "bytes-sent",
+	"method": "connack",
+	"type": "mqtt",
+	"median": 4,
+	"mean": 4,
+	"p95": 4,
+	"p90": 4,
+	"count": 1,
+	"id": 1688589569646,
+	"time": 1688589569646
 }
 ```
 
@@ -127,67 +127,67 @@ Harper automatically tracks the following metrics for all services. Applications
 
 ### HTTP Metrics
 
-| `metric`           | `path`        | `method`       | `type`                          | Unit         | Description                                              |
-| ------------------ | ------------- | -------------- | ------------------------------- | ------------ | -------------------------------------------------------- |
-| `duration`         | resource path | request method | `cache-hit` or `cache-miss`     | ms           | Duration of request handler                              |
-| `duration`         | route path    | request method | `fastify-route`                 | ms           | Duration of Fastify route handler                        |
-| `duration`         | operation     |                | `operation`                     | ms           | Duration of Operations API operation                     |
-| `success`          | resource path | request method |                                 | %            | Percentage of successful requests                        |
-| `success`          | route path    | request method | `fastify-route`                 | %            |                                                          |
-| `success`          | operation     |                | `operation`                     | %            |                                                          |
-| `bytes-sent`       | resource path | request method |                                 | bytes        | Response bytes sent                                      |
-| `bytes-sent`       | route path    | request method | `fastify-route`                 | bytes        |                                                          |
-| `bytes-sent`       | operation     |                | `operation`                     | bytes        |                                                          |
-| `transfer`         | resource path | request method | `operation`                     | ms           | Duration of response transfer                            |
-| `transfer`         | route path    | request method | `fastify-route`                 | ms           |                                                          |
-| `transfer`         | operation     |                | `operation`                     | ms           |                                                          |
-| `socket-routed`    |               |                |                                 | %            | Percentage of sockets immediately routed                 |
-| `tls-handshake`    |               |                |                                 | ms           | TLS handshake duration                                   |
-| `tls-reused`       |               |                |                                 | %            | Percentage of TLS sessions reused                        |
-| `cache-hit`        | table name    |                |                                 | %            | Percentage of cache hits                                 |
-| `cache-resolution` | table name    |                |                                 | ms           | Duration of resolving uncached entries                   |
+| `metric`           | `path`        | `method`       | `type`                      | Unit  | Description                              |
+| ------------------ | ------------- | -------------- | --------------------------- | ----- | ---------------------------------------- |
+| `duration`         | resource path | request method | `cache-hit` or `cache-miss` | ms    | Duration of request handler              |
+| `duration`         | route path    | request method | `fastify-route`             | ms    | Duration of Fastify route handler        |
+| `duration`         | operation     |                | `operation`                 | ms    | Duration of Operations API operation     |
+| `success`          | resource path | request method |                             | %     | Percentage of successful requests        |
+| `success`          | route path    | request method | `fastify-route`             | %     |                                          |
+| `success`          | operation     |                | `operation`                 | %     |                                          |
+| `bytes-sent`       | resource path | request method |                             | bytes | Response bytes sent                      |
+| `bytes-sent`       | route path    | request method | `fastify-route`             | bytes |                                          |
+| `bytes-sent`       | operation     |                | `operation`                 | bytes |                                          |
+| `transfer`         | resource path | request method | `operation`                 | ms    | Duration of response transfer            |
+| `transfer`         | route path    | request method | `fastify-route`             | ms    |                                          |
+| `transfer`         | operation     |                | `operation`                 | ms    |                                          |
+| `socket-routed`    |               |                |                             | %     | Percentage of sockets immediately routed |
+| `tls-handshake`    |               |                |                             | ms    | TLS handshake duration                   |
+| `tls-reused`       |               |                |                             | %     | Percentage of TLS sessions reused        |
+| `cache-hit`        | table name    |                |                             | %     | Percentage of cache hits                 |
+| `cache-resolution` | table name    |                |                             | ms    | Duration of resolving uncached entries   |
 
 ### MQTT / WebSocket Metrics
 
-| `metric`           | `path`  | `method`     | `type` | Unit  | Description                                         |
-| ------------------ | ------- | ------------ | ------ | ----- | --------------------------------------------------- |
-| `mqtt-connections` |         |              |        | count | Number of open direct MQTT connections              |
-| `ws-connections`   |         |              |        | count | Number of open WebSocket connections                |
-| `connection`       | `mqtt`  | `connect`    |        | %     | Percentage of successful direct MQTT connections    |
-| `connection`       | `mqtt`  | `disconnect` |        | %     | Percentage of explicit direct MQTT disconnects      |
-| `connection`       | `ws`    | `connect`    |        | %     | Percentage of successful WebSocket connections      |
-| `connection`       | `ws`    | `disconnect` |        | %     | Percentage of explicit WebSocket disconnects        |
-| `bytes-sent`       | topic   | mqtt command | `mqtt` | bytes | Bytes sent for a given MQTT command and topic       |
+| `metric`           | `path` | `method`     | `type` | Unit  | Description                                      |
+| ------------------ | ------ | ------------ | ------ | ----- | ------------------------------------------------ |
+| `mqtt-connections` |        |              |        | count | Number of open direct MQTT connections           |
+| `ws-connections`   |        |              |        | count | Number of open WebSocket connections             |
+| `connection`       | `mqtt` | `connect`    |        | %     | Percentage of successful direct MQTT connections |
+| `connection`       | `mqtt` | `disconnect` |        | %     | Percentage of explicit direct MQTT disconnects   |
+| `connection`       | `ws`   | `connect`    |        | %     | Percentage of successful WebSocket connections   |
+| `connection`       | `ws`   | `disconnect` |        | %     | Percentage of explicit WebSocket disconnects     |
+| `bytes-sent`       | topic  | mqtt command | `mqtt` | bytes | Bytes sent for a given MQTT command and topic    |
 
 ### Replication Metrics
 
-| `metric`         | `path`          | `method`      | `type`    | Unit  | Description                                     |
-| ---------------- | --------------- | ------------- | --------- | ----- | ----------------------------------------------- |
-| `bytes-sent`     | node.database   | `replication` | `egress`  | bytes | Bytes sent for replication                      |
-| `bytes-sent`     | node.database   | `replication` | `blob`    | bytes | Bytes sent for blob replication                 |
-| `bytes-received` | node.database   | `replication` | `ingress` | bytes | Bytes received for replication                  |
-| `bytes-received` | node.database   | `replication` | `blob`    | bytes | Bytes received for blob replication             |
+| `metric`         | `path`        | `method`      | `type`    | Unit  | Description                         |
+| ---------------- | ------------- | ------------- | --------- | ----- | ----------------------------------- |
+| `bytes-sent`     | node.database | `replication` | `egress`  | bytes | Bytes sent for replication          |
+| `bytes-sent`     | node.database | `replication` | `blob`    | bytes | Bytes sent for blob replication     |
+| `bytes-received` | node.database | `replication` | `ingress` | bytes | Bytes received for replication      |
+| `bytes-received` | node.database | `replication` | `blob`    | bytes | Bytes received for blob replication |
 
 ### Resource Usage Metrics
 
-| `metric`                  | Key attributes                                                                                    | Other         | Unit    | Description                                                                                |
-| ------------------------- | ------------------------------------------------------------------------------------------------- | ------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `database-size`           | `size`, `used`, `free`, `audit`                                                                   | `database`    | bytes   | Database file size breakdown                                                               |
-| `main-thread-utilization` | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers`  | `time`        | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown          |
-| `resource-usage`          | (see below)                                                                                       |               | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))              |
-| `storage-volume`          | `available`, `free`, `size`                                                                       | `database`    | bytes   | Storage volume size breakdown                                                              |
-| `table-size`              | `size`                                                                                            | `database`, `table` | bytes | Table file size                                                                       |
-| `utilization`             |                                                                                                   |               | %       | Percentage of time the worker thread was processing requests                               |
+| `metric`                  | Key attributes                                                                                   | Other               | Unit    | Description                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------- | --------------------------------------------------------------------------------- |
+| `database-size`           | `size`, `used`, `free`, `audit`                                                                  | `database`          | bytes   | Database file size breakdown                                                      |
+| `main-thread-utilization` | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers` | `time`              | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown |
+| `resource-usage`          | (see below)                                                                                      |                     | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))     |
+| `storage-volume`          | `available`, `free`, `size`                                                                      | `database`          | bytes   | Storage volume size breakdown                                                     |
+| `table-size`              | `size`                                                                                           | `database`, `table` | bytes   | Table file size                                                                   |
+| `utilization`             |                                                                                                  |                     | %       | Percentage of time the worker thread was processing requests                      |
 
 #### `resource-usage` Metric
 
 Includes everything returned by Node.js [`process.resourceUsage()`](https://nodejs.org/api/process.html#processresourceusage) (with `userCPUTime` and `systemCPUTime` converted to milliseconds), plus:
 
-| Field            | Unit | Description                                   |
-| ---------------- | ---- | --------------------------------------------- |
-| `time`           | ms   | Unix timestamp when the metric was recorded   |
-| `period`         | ms   | Duration of the measurement period            |
-| `cpuUtilization` | %    | CPU utilization (user + system combined)      |
+| Field            | Unit | Description                                 |
+| ---------------- | ---- | ------------------------------------------- |
+| `time`           | ms   | Unix timestamp when the metric was recorded |
+| `period`         | ms   | Duration of the measurement period          |
+| `cpuUtilization` | %    | CPU utilization (user + system combined)    |
 
 ## Custom Metrics
 
