@@ -89,6 +89,24 @@
 		},
 		{
 			"type": "category",
+			"label": "Analytics",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "analytics/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "analytics/operations",
+					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "GraphQL Querying",
 			"collapsible": false,
 			"className": "learn-category-header",
