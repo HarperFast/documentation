@@ -89,6 +89,34 @@
 		},
 		{
 			"type": "category",
+			"label": "Logging",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "logging/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "logging/configuration",
+					"label": "Configuration"
+				},
+				{
+					"type": "doc",
+					"id": "logging/api",
+					"label": "API"
+				},
+				{
+					"type": "doc",
+					"id": "logging/operations",
+					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Analytics",
 			"collapsible": false,
 			"className": "learn-category-header",
