@@ -553,7 +553,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/administration/logging/index.md`
 - **Additional Sources**: Current `reference/logging.md` (if exists)
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Logging revamped, consolidated into hdb.log
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Major logging improvements
@@ -564,21 +564,21 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Per-component logging: v4.6.0
   - Granular configuration: v4.6.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Per-component logging, dynamic reloading, HTTP logging
 
 ### `reference/logging/api.md`
 
 - **Primary Source**: Extract from `versioned_docs/version-4.7/reference/globals.md` (logger global)
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Logger based on Node.js Console API
 
 ### `reference/logging/operations.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/logs.md`
-- **Status**: Not Started
+- **Status**: In Progress
 - **Notes**: Operations for managing standard logs (not transaction/audit logs, which moved to database section)
 
 ---
