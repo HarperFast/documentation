@@ -189,21 +189,29 @@
 					"type": "doc",
 					"id": "security/certificate-verification",
 					"label": "Certificate Verification"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Users & Roles",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "users-and-roles/overview",
+					"label": "Overview"
 				},
 				{
 					"type": "doc",
-					"id": "security/cors",
-					"label": "CORS"
+					"id": "users-and-roles/configuration",
+					"label": "Configuration"
 				},
 				{
 					"type": "doc",
-					"id": "security/ssl",
-					"label": "SSL / HTTPS"
-				},
-				{
-					"type": "doc",
-					"id": "security/users-and-roles",
-					"label": "Users and Roles"
+					"id": "users-and-roles/operations",
+					"label": "Operations"
 				}
 			]
 		},
