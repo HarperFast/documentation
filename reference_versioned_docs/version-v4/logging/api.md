@@ -19,13 +19,13 @@ The `logger` global is a `MainLogger`. Calling `logger.withTag(tag)` returns a `
 
 ```typescript
 interface MainLogger {
-	trace(message: any, ...args: any[]): void;
-	debug(message: any, ...args: any[]): void;
-	info(message: any, ...args: any[]): void;
-	warn(message: any, ...args: any[]): void;
-	error(message: any, ...args: any[]): void;
-	fatal(message: any, ...args: any[]): void;
-	notify(message: any, ...args: any[]): void;
+	trace(...messages: any[]): void;
+	debug(...messages: any[]): void;
+	info(...messages: any[]): void;
+	warn(...messages: any[]): void;
+	error(...messages: any[]): void;
+	fatal(...messages: any[]): void;
+	notify(...messages: any[]): void;
 	withTag(tag: string): TaggedLogger;
 }
 ```
@@ -40,13 +40,13 @@ Because `TaggedLogger` is bound to the configured log level at creation time, me
 
 ```typescript
 interface TaggedLogger {
-	trace: ((message: any, ...args: any[]) => void) | null;
-	debug: ((message: any, ...args: any[]) => void) | null;
-	info: ((message: any, ...args: any[]) => void) | null;
-	warn: ((message: any, ...args: any[]) => void) | null;
-	error: ((message: any, ...args: any[]) => void) | null;
-	fatal: ((message: any, ...args: any[]) => void) | null;
-	notify: ((message: any, ...args: any[]) => void) | null;
+	trace: ((...messages: any[]) => void) | null;
+	debug: ((...messages: any[]) => void) | null;
+	info: ((...messages: any[]) => void) | null;
+	warn: ((...messages: any[]) => void) | null;
+	error: ((...messages: any[]) => void) | null;
+	fatal: ((...messages: any[]) => void) | null;
+	notify: ((...messages: any[]) => void) | null;
 }
 ```
 
