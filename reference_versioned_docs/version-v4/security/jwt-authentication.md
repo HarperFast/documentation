@@ -1,11 +1,9 @@
-<!-- Source: versioned_docs/version-4.7/developers/security/jwt-auth.md (primary) -->
-
 ---
 id: jwt-authentication
 title: JWT Authentication
 ---
 
-# JWT Authentication
+<!-- Source: versioned_docs/version-4.7/developers/security/jwt-auth.md (primary) -->s
 
 Available since: v4.1.0
 

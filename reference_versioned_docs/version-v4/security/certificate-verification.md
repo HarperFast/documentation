@@ -1,13 +1,11 @@
-<!-- Source: versioned_docs/version-4.7/developers/security/certificate-verification.md (primary) -->
-<!-- Source: release-notes/v4-tucker/4.5.0.md (certificate revocation added) -->
-<!-- Source: release-notes/v4-tucker/4.7.0.md (confirmed OCSP support added) -->
-
 ---
 id: certificate-verification
 title: Certificate Verification
 ---
 
-# Certificate Verification
+<!-- Source: versioned_docs/version-4.7/developers/security/certificate-verification.md (primary) -->
+<!-- Source: release-notes/v4-tucker/4.5.0.md (certificate revocation added) -->
+<!-- Source: release-notes/v4-tucker/4.7.0.md (confirmed OCSP support added) -->
 
 Added in: v4.7.0 (OCSP support confirmed via release notes; certificate revocation support added in v4.5.0)
 
@@ -429,4 +427,4 @@ replication:
 
 mTLS is always required for replication and cannot be disabled. This configuration only controls whether certificate revocation checking is performed.
 
-For complete replication configuration, see [TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration'].
+For complete replication configuration, see [Replication Configuration](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration').

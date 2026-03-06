@@ -1,12 +1,10 @@
-<!-- Source: versioned_docs/version-4.7/developers/security/mtls-auth.md (primary) -->
-<!-- Source: release-notes/v4-tucker/4.3.0.md (confirmed mTLS introduction) -->
-
 ---
 id: mtls-authentication
 title: mTLS Authentication
 ---
 
-# mTLS Authentication
+<!-- Source: versioned_docs/version-4.7/developers/security/mtls-auth.md (primary) -->
+<!-- Source: release-notes/v4-tucker/4.3.0.md (confirmed mTLS introduction) -->
 
 Added in: v4.3.0
 
@@ -45,6 +43,8 @@ tls:
 
 When `required` is `false`, clients that do not present a certificate will fall back to other authentication methods (Basic Auth or JWT).
 
+For more configuration information see the [HTTP / Configuration](../http/configuration.md) and [HTTP / TLS](../http/tls.md) sections.
+
 ## Certificate Revocation Checking
 
 When using mTLS, you can optionally enable certificate revocation checking to ensure that revoked certificates cannot authenticate, even if they are otherwise valid and trusted.
@@ -76,4 +76,4 @@ For help generating and managing certificates, see [Certificate Management](./ce
 
 ## Replication
 
-mTLS is always required for Harper replication and cannot be disabled. For replication-specific mTLS configuration, see [TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration'].
+mTLS is always required for Harper replication and cannot be disabled. For replication-specific mTLS configuration, see [Replication Configuration](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration').

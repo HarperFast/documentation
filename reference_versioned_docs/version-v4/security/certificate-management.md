@@ -1,15 +1,13 @@
-<!-- Source: versioned_docs/version-4.7/developers/security/certificate-management.md (primary) -->
-<!-- Source: release-notes/v4-tucker/4.4.0.md (dynamic certificate management added) -->
-<!-- Source: release-notes/v4-tucker/4.5.0.md (certificate revocation added) -->
-
 ---
 id: certificate-management
 title: Certificate Management
 ---
 
-# Certificate Management
+<!-- Source: versioned_docs/version-4.7/developers/security/certificate-management.md (primary) -->
+<!-- Source: release-notes/v4-tucker/4.4.0.md (dynamic certificate management added) -->
+<!-- Source: release-notes/v4-tucker/4.5.0.md (certificate revocation added) -->
 
-This page covers certificate management for Harper's external-facing HTTP and Operations APIs. For replication certificate management, see [TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering and certificate management'].
+This page covers certificate management for Harper's external-facing HTTP and Operations APIs. For replication certificate management, see [Replication Certificate Management](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering and certificate management').
 
 ## Default Behavior
 

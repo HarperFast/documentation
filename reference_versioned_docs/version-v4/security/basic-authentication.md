@@ -1,21 +1,17 @@
-<!-- Source: versioned_docs/version-4.7/developers/security/basic-auth.md (primary) -->
-
 ---
 id: basic-authentication
 title: Basic Authentication
 ---
 
-# Basic Authentication
+<!-- Source: versioned_docs/version-4.7/developers/security/basic-auth.md (primary) -->
 
 Available since: v4.1.0
 
-Harper supports HTTP Basic Authentication. In the context of an HTTP transaction, basic access authentication is a method for an HTTP user agent to provide a username and password when making a request.
-
-**Basic Auth is added to each HTTP request — you do not log in separately.** The `Authorization` header must be included on every request.
+Harper supports HTTP Basic Authentication. In the context of an HTTP transaction, [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) is the simplest authorization scheme which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme or certificates. See [SSL / HTTPS](./ssl.md) for more information.
 
 ## How It Works
 
-The `Authorization` header value is `Basic <credentials>`, where `<credentials>` is the Base64 encoding of the string `username:password`.
+Each request must contain the `Authorization` header with a value if `Basic <credentials>`, where `<credentials>` is the Base64 encoding of the string `username:password`.
 
 ```
 Authorization: Basic <base64(username:password)>
@@ -23,57 +19,32 @@ Authorization: Basic <base64(username:password)>
 
 ## Example
 
-The following Node.js example shows how to construct the Authorization header using `btoa()`:
+The following example shows how to construct the Authorization header using `btoa()`:
 
 ```javascript
-function callHarperDB(call_object, operation, callback) {
-	const options = {
-		method: 'POST',
-		hostname: call_object.endpoint_url,
-		port: call_object.endpoint_port,
-		path: '/',
-		headers: {
-			'content-type': 'application/json',
-			'authorization': 'Basic ' + btoa(call_object.username + ':' + call_object.password),
-			'cache-control': 'no-cache',
-		},
-	};
+const username = 'HDB_ADMIN';
+const password = 'abc123!';
+const authorizationValue = `Basic ${btoa(`${username}:${password}`)}`;
+```
 
-	const http_req = http.request(options, function (hdb_res) {
-		let chunks = [];
+Then use the `authorizationValue` as the value for the `Authorization` header such as:
 
-		hdb_res.on('data', function (chunk) {
-			chunks.push(chunk);
-		});
-
-		hdb_res.on('end', function () {
-			const body = Buffer.concat(chunks);
-			if (isJson(body)) {
-				return callback(null, JSON.parse(body));
-			} else {
-				return callback(body, null);
-			}
-		});
-	});
-
-	http_req.on('error', function (chunk) {
-		return callback('Failed to connect', null);
-	});
-
-	http_req.write(JSON.stringify(operation));
-	http_req.end();
-}
+```javascript
+fetch('/', {
+	// ...
+	headers: {
+		Authorization: authorizationValue,
+	},
+	// ...
+});
 ```
 
 ## cURL Example
 
+With cURL you can use the `--user` (`-u`) command-line option to automatically handle the Base64 encoding:
+
 ```bash
-curl --location --request POST 'http://localhost:9925' \
---header 'Content-Type: application/json' \
---header 'Authorization: Basic <base64(username:password)>' \
---data-raw '{
-    "operation": "list_users"
-}'
+curl -u "username:password" [URL]
 ```
 
 ## When to Use Basic Auth
@@ -85,8 +56,3 @@ Basic authentication is the simplest option and is appropriate for:
 - Scenarios where token management overhead is undesirable
 
 For user-facing applications or when tokens are preferred for performance reasons, see [JWT Authentication](./jwt-authentication.md).
-
-## Security Notes
-
-- Basic Auth credentials are sent on every request. Always use HTTPS in production to prevent credential interception. See [SSL / HTTPS](./ssl.md).
-- Harper Studio uses Basic Auth internally.

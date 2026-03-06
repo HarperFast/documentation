@@ -229,10 +229,6 @@ reference/
 │   │
 │   ├── certificate-verification.md  # Certificate verification (OCSP, etc.)
 │   │
-│   ├── cors.md                      # CORS configuration and usage
-│   │
-│   ├── ssl.md                       # SSL/TLS configuration
-│   │
 │   └── users-and-roles.md           # User and role management including `roles` plugin
 │
 ├── components/
