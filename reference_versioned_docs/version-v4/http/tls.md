@@ -116,4 +116,4 @@ See the [Operations API Configuration](TODO:reference_versioned_docs/version-v4/
 
 - [HTTP Configuration](./configuration) — `http.securePort`, `http.http2`, `http.mtls`
 - [HTTP Overview](./overview)
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Certificate management, mTLS, and other security topics')
+- [Security mTLS Authentication](../security/mtls-authentication.md)

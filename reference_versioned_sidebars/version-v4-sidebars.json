@@ -156,6 +156,67 @@
 		},
 		{
 			"type": "category",
+			"label": "Security",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "security/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "security/basic-authentication",
+					"label": "Basic Authentication"
+				},
+				{
+					"type": "doc",
+					"id": "security/jwt-authentication",
+					"label": "JWT Authentication"
+				},
+				{
+					"type": "doc",
+					"id": "security/mtls-authentication",
+					"label": "mTLS Authentication"
+				},
+				{
+					"type": "doc",
+					"id": "security/certificate-management",
+					"label": "Certificate Management"
+				},
+				{
+					"type": "doc",
+					"id": "security/certificate-verification",
+					"label": "Certificate Verification"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Users & Roles",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "users-and-roles/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "users-and-roles/configuration",
+					"label": "Configuration"
+				},
+				{
+					"type": "doc",
+					"id": "users-and-roles/operations",
+					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
