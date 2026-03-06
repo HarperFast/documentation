@@ -598,6 +598,10 @@ When true, Harper will attempt to fail-over to subscribing to a different node i
 
 This defines the shard id of this instance and is used in conjunction with the [Table Resource functions](../developers/replication/sharding#custom-sharding) `setResidency` & `setResidencyById` to programmatically route traffic to the proper shard.
 
+`maxPayload` - _Type_: integer; _Default_: 100000000 (100MB)
+
+This sets the maximum payload size for replication messages.
+
 ---
 
 ### `clustering` using NATS
