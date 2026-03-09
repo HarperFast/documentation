@@ -312,7 +312,7 @@ For example, to set the expiration time for a specific record when putting it:
 await Post.put(postData, { expiresAt: 3600 });
 ```
 
-Or to disable caching on a get opperation:
+Or to disable caching on a get operation:
 
 ```javascript
 await Post.get(primaryKey, { noCache: true, noCacheStore: true });
