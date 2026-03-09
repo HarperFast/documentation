@@ -324,7 +324,7 @@ await Post.get(primaryKey, { noCache: true, noCacheStore: true });
 | `no-store`                     | `noCacheStore`               | Prevents the resource from being cached or stored.                                                                                                                                |
 | `no-cache`                     | `noCache`                    | Forces revalidation with the origin server before using cached data.                                                                                                              |
 | `only-if-cached`               | `onlyIfCached`               | Returns the resource only if it is already cached, otherwise fails with 504 response.                                                                                             |
-| `must-revalidate`              | `mustRevalidate`             | Once a resource becomes stale (i.e. past its max-age), the client must contact the origin server to revalidate before using it. It cannot serve the stale copy even as a fallback |
+| `must-revalidate`              | `mustRevalidate`             | Once a resource becomes stale (i.e. past its max-age), the client must contact the origin server to revalidate before using it. It cannot serve the stale copy even as a fallback. |
 | `stale-if-error`               | `staleIfError`               | Allows serving stale resources when the origin server encounters an error.                                                                                                        |
 
 ## Caching Flow
