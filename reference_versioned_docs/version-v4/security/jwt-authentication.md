@@ -91,16 +91,15 @@ When both tokens have expired, call `create_authentication_tokens` again with yo
 
 ## Token Expiry Configuration
 
-Token timeouts are configurable in `harperdb-config.yaml`:
+Token timeouts are configurable in `harperdb-config.yaml` under the top-level `authentication` section:
 
 ```yaml
-operationsApi:
-  authentication:
-    operationTokenTimeout: 1d # Default: 1 day
-    refreshTokenTimeout: 30d # Default: 30 days
+authentication:
+  operationTokenTimeout: 1d # Default: 1 day
+  refreshTokenTimeout: 30d # Default: 30 days
 ```
 
-Valid duration string values follow the [`ms` package format](https://github.com/vercel/ms) (e.g., `1d`, `12h`, `60m`).
+Valid duration string values follow the [`ms` package format](https://github.com/vercel/ms) (e.g., `1d`, `12h`, `60m`). See [Security / Configuration](./configuration.md) for the full authentication config reference.
 
 ## When to Use JWT Auth
 
@@ -114,6 +113,6 @@ For simple or server-to-server scenarios, see [Basic Authentication](./basic-aut
 
 ## Security Notes
 
-- Always use HTTPS in production to protect tokens in transit. See [SSL / HTTPS](./ssl.md).
+- Always use HTTPS in production to protect tokens in transit. See [HTTP / TLS](../http/tls.md).
 - Store tokens securely; treat them like passwords.
 - If a token is compromised, it will remain valid until it expires. Consider setting shorter `operationTokenTimeout` values in high-security environments.
