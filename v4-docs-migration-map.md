@@ -592,7 +592,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Resource analytics: v4.5.0
   - Storage analytics: v4.5.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Resource and storage analytics
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - New analytics and licensing functionality
@@ -600,7 +600,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ### `reference/analytics/operations.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/analytics.md`
-- **Status**: Not Started
+- **Status**: In Progress
 
 ---
 
