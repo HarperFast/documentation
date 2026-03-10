@@ -146,7 +146,7 @@
 				},
 				{
 					"type": "doc",
-					"id": " mqtt/configuration",
+					"id": "mqtt/configuration",
 					"label": "Configuration"
 				}
 			]
