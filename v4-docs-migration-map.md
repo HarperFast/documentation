@@ -411,7 +411,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: New content about `loadEnv` plugin
 - **Additional Sources**: Built-in extensions docs, configuration docs
 - **Version Annotations**: loadEnv added in v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Covers `loadEnv` extension only. Harper-level environment variable configuration (naming conventions, `HDB_CONFIG`, `HARPER_DEFAULT_CONFIG`, `HARPER_SET_CONFIG`) belongs in the Configuration section — see notes there.
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Built-in loadEnv component
@@ -426,7 +426,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**:
   - `versioned_docs/version-4.6/reference/components/built-in-extensions.md` (pre-v4.7 behavior)
   - `versioned_docs/version-4.5/developers/components/built-in.md` (early v4 behavior)
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: No separate `configuration.md` needed — all static plugin options are documented inline in the overview. The `configuration.md` entry has been removed; static file serving has no Harper-level configuration. The v4.7 Plugin API (`extensions`, `fallthrough`, `index`, `notFound` options and auto-update behavior) is annotated as added in v4.7.0 (inferred from version comparison; not present in v4.6 docs). The `static` plugin itself predates v4.7 (present in v4.4 and earlier).
 - **Release Notes**:
   - [4.7.2](release-notes/v4-tucker/4.7.2.md) - `static` handler defaults to `index.html`
@@ -440,7 +440,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: New content about HTTP server
 - **Additional Sources**: Configuration docs, architecture docs
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Worker threads for HTTP requests
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Socket management (SO_REUSEPORT), flexible port configs
@@ -450,7 +450,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: Extract from `reference/configuration.md` (http section)
 - **Version Annotations**:
   - HTTP/2 support: v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - HTTP/2 support
 
@@ -460,7 +460,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**: Current `reference/globals.md`
 - **Version Annotations**:
   - server.authenticateUser: v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - server.authenticateUser API
 
@@ -531,7 +531,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - mTLS support: v4.3.0
   - Single-level wildcards: v4.3.0
   - CRDT: v4.3.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - MQTT support introduced (QoS 0 and 1, durable sessions)
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - mTLS, single-level wildcards, retain handling, CRDT
@@ -541,7 +541,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: Extract from configuration docs and real-time docs
 - **Version Annotations**: Port change v4.5.0 (9925 → 9933)
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Default replication port change
 
