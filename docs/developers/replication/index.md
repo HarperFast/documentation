@@ -225,6 +225,23 @@ replication:
 
 When using controlled flow replication, you will typically have different route configurations for each node to every other node. In that case, typically you do want to ensure that you are _not_ replicating the `system` database, since the `system` database containes the node configurations, and replicating the `system` database will cause all nodes to be replicated and have identical route configurations.
 
+The `replicates` property also allows you to specify routes with more granularity by specifying `sendsTo` and/or `receivesFrom` properties, which each can have an array with node and database names.
+
+```yaml
+replication:
+  databases:
+    - data
+  routes:
+    - host: node-two
+      replicates:
+        sendsTo:
+          - target: node-three
+            database: data
+        receivesFrom:
+          - source: node-four
+            database: system
+```
+
 #### Explicit Subscriptions
 
 By default, Harper automatically handles connections and subscriptions between nodes, ensuring data consistency across your cluster. It even uses data routing to manage node failures. However, you can manage these connections manually by explicitly subscribing to nodes. This should _not_ be used for production replication and should be avoided and exists only for testing, debugging, and legacy migration. This will likely be removed in V5. If you choose to manage subscriptions manually, Harper will no longer handle data consistency for you. This means there’s no guarantee that all nodes will have consistent data if subscriptions don’t fully replicate in all directions. If a node goes down, it’s possible that some data wasn’t replicated before the failure. If you want single direction replication, you can use controlled replication flow described above.
