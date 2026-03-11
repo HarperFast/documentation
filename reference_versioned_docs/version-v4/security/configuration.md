@@ -14,7 +14,7 @@ authentication:
   enableSessions: true
   operationTokenTimeout: 1d
   refreshTokenTimeout: 30d
-  hashFunction: sha256 # Added in v4.5.0. Options: sha256, argon2id
+  hashFunction: sha256
 ```
 
 ## Options

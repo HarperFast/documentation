@@ -189,6 +189,7 @@ For replication servers, use the `REPLICATION_` prefix instead of `HTTP_`.
 **Default behavior.** Rejects connections when verification fails due to network errors, timeouts, or other operational issues.
 
 Use when:
+
 - Security is paramount
 - You can tolerate false positives (rejecting valid certificates due to CA unavailability)
 - Your CA infrastructure is highly available
@@ -204,6 +205,7 @@ certificateVerification:
 Allows connections when verification fails, but logs a warning. The connection is still rejected if the certificate is explicitly found to be revoked.
 
 Use when:
+
 - Availability is more important than perfect security
 - Your CA infrastructure may be intermittently unavailable
 - You have other compensating controls
@@ -238,6 +240,8 @@ certificateVerification:
 Increase CRL cache TTL for stable environments:
 
 ```yaml
+
+...
 crl:
   cacheTtl: 172800000 # 48 hours
 ```
@@ -245,6 +249,8 @@ crl:
 Increase OCSP cache TTL for long-lived connections:
 
 ```yaml
+
+...
 ocsp:
   cacheTtl: 7200000 # 2 hours
 ```
@@ -252,6 +258,8 @@ ocsp:
 Reduce grace period for tighter revocation enforcement:
 
 ```yaml
+
+...
 crl:
   gracePeriod: 0 # No grace period
 ```
@@ -314,6 +322,7 @@ http:
 **Cause:** Certificate was found to be revoked, or verification failed in fail-closed mode.
 
 **Solutions:**
+
 1. Check if the certificate is actually revoked in the CRL or OCSP responder.
 2. Verify CA infrastructure is accessible.
 3. Check timeout settings — increase if needed.
@@ -324,6 +333,7 @@ http:
 **Cause:** CRL is being downloaded for the first time.
 
 **Solutions:**
+
 1. This is normal; only happens once per CRL per `cacheTtl` period.
 2. Subsequent connections will be fast (cached CRL).
 3. Increase CRL timeout if downloads are slow:
@@ -337,6 +347,7 @@ http:
 **Cause:** `cacheTtl` is too short, or the CRL's `nextUpdate` period is very short.
 
 **Solutions:**
+
 1. Increase `cacheTtl`:
    ```yaml
    crl:
@@ -349,6 +360,7 @@ http:
 **Cause:** OCSP responder is down or unreachable.
 
 **Solutions:**
+
 1. CRL will be used as fallback automatically.
 2. Use fail-open mode to allow connections:
    ```yaml
@@ -365,6 +377,7 @@ http:
 **Cause:** Secure hosting environments often restrict outbound HTTP/HTTPS traffic. This prevents Harper from reaching CRL distribution points and OCSP responders.
 
 **Symptoms:**
+
 - Certificate verification timeouts in fail-closed mode
 - Logs show connection failures to CRL/OCSP URLs
 - First connection may succeed (no cached data), but subsequent connections fail after cache expires
@@ -377,12 +390,14 @@ http:
    - Example for Let's Encrypt: allow `http://x1.c.lencr.org/` and `http://ocsp.int-x3.letsencrypt.org/`
 
 2. **Use fail-open mode:**
+
    ```yaml
    certificateVerification:
      failureMode: fail-open
    ```
 
 3. **Set up an internal CRL mirror/proxy:**
+
    ```yaml
    certificateVerification:
      crl:
@@ -398,6 +413,7 @@ http:
 ## Security Considerations
 
 Enable certificate verification when:
+
 - Certificates have long validity periods (> 1 day)
 - You need immediate revocation capability
 - Compliance requires revocation checking (PCI DSS, HIPAA, etc.)
@@ -405,6 +421,7 @@ Enable certificate verification when:
 - Client certificates are used for API authentication
 
 Consider skipping it when:
+
 - Certificates have very short validity periods (< 24 hours)
 - You rotate certificates automatically (e.g., with cert-manager)
 - You have alternative revocation mechanisms

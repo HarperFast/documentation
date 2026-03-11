@@ -46,6 +46,7 @@ editor:
 ```
 
 **Startup behavior:**
+
 - If a declared role does not exist, Harper creates it.
 - If a declared role already exists, Harper updates its permissions to match the definition.
 

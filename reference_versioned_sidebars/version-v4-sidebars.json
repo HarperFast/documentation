@@ -167,6 +167,11 @@
 				},
 				{
 					"type": "doc",
+					"id": "security/configuration",
+					"label": "Configuration"
+				},
+				{
+					"type": "doc",
 					"id": "security/basic-authentication",
 					"label": "Basic Authentication"
 				},

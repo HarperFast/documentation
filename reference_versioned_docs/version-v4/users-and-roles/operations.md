@@ -166,7 +166,7 @@ _Restricted to `super_user` roles._
 ```json
 {
 	"operation": "drop_user",
-	"username": "sgoldberg"
+	"username": "harper"
 }
 ```
 

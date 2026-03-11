@@ -18,10 +18,10 @@ Role permissions in Harper are divided into two categories:
 
 ### Built-In Roles
 
-| Role | Description |
-|---|---|
-| `super_user` | Full access to all operations and methods. The admin role. |
-| `cluster_user` | Internal system role that allows clustered instances to communicate. Managed internally. |
+| Role             | Description                                                                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `super_user`     | Full access to all operations and methods. The admin role.                                                                                      |
+| `cluster_user`   | Internal system role that allows clustered instances to communicate. Managed internally.                                                        |
 | `structure_user` | Access to create and delete databases and tables. Can be set to `true` (all databases) or an array of database names (specific databases only). |
 
 ### User-Defined Roles
@@ -98,10 +98,12 @@ Each table entry defines CRUD access:
 ### Important Rules
 
 **Table-level:**
+
 - If a database or table is not included in the permissions, the role has no access to it.
 - If a table-level CRUD permission is `false`, setting the same CRUD permission to `true` on an attribute returns an error.
 
 **Attribute-level:**
+
 - If `attribute_permissions` is a non-empty array, only the listed attributes are accessible (plus the table's hash attribute — see below).
 - If `attribute_permissions` is empty (`[]`), attribute access follows the table-level CRUD permissions.
 - If any non-hash attribute is given CRUD access, the table's `hash_attribute` (primary key) automatically receives the same access, even if not explicitly listed.
@@ -113,108 +115,132 @@ Each table entry defines CRUD access:
 
 The following table shows which operations are restricted to `super_user` roles. Non-`super_user` roles are also restricted within their accessible operations by their CRUD permission set.
 
-| Databases and Tables | Restricted to Super User |
-|---|:---:|
-| `describe_all` | |
-| `describe_database` | |
-| `describe_table` | |
-| `create_database` | X |
-| `drop_database` | X |
-| `create_table` | X |
-| `drop_table` | X |
-| `create_attribute` | |
-| `drop_attribute` | X |
+### Databases and Tables
 
-| NoSQL Operations | Restricted to Super User |
-|---|:---:|
-| `insert` | |
-| `update` | |
-| `upsert` | |
-| `delete` | |
-| `search_by_hash` | |
-| `search_by_value` | |
-| `search_by_conditions` | |
+| Operation           | Restricted to Super User |
+| ------------------- | :----------------------: |
+| `describe_all`      |                          |
+| `describe_database` |                          |
+| `describe_table`    |                          |
+| `create_database`   |            X             |
+| `drop_database`     |            X             |
+| `create_table`      |            X             |
+| `drop_table`        |            X             |
+| `create_attribute`  |                          |
+| `drop_attribute`    |            X             |
 
-| SQL Operations | Restricted to Super User |
-|---|:---:|
-| `select` | |
-| `insert` | |
-| `update` | |
-| `delete` | |
+### NoSQL Operations
 
-| Bulk Operations | Restricted to Super User |
-|---|:---:|
-| `csv_data_load` | |
-| `csv_file_load` | |
-| `csv_url_load` | |
-| `import_from_s3` | |
+| Operation              | Restricted to Super User |
+| ---------------------- | :----------------------: |
+| `insert`               |                          |
+| `update`               |                          |
+| `upsert`               |                          |
+| `delete`               |                          |
+| `search_by_hash`       |                          |
+| `search_by_value`      |                          |
+| `search_by_conditions` |                          |
 
-| Users and Roles | Restricted to Super User |
-|---|:---:|
-| `list_roles` | X |
-| `add_role` | X |
-| `alter_role` | X |
-| `drop_role` | X |
-| `list_users` | X |
-| `user_info` | |
-| `add_user` | X |
-| `alter_user` | X |
-| `drop_user` | X |
+### SQL Operations
 
-| Clustering | Restricted to Super User |
-|---|:---:|
-| `cluster_set_routes` | X |
-| `cluster_get_routes` | X |
-| `cluster_delete_routes` | X |
-| `add_node` | X |
-| `update_node` | X |
-| `cluster_status` | X |
-| `remove_node` | X |
-| `configure_cluster` | X |
+| Operation | Restricted to Super User |
+| --------- | :----------------------: |
+| `select`  |                          |
+| `insert`  |                          |
+| `update`  |                          |
+| `delete`  |                          |
 
-| Components | Restricted to Super User |
-|---|:---:|
-| `get_components` | X |
-| `get_component_file` | X |
-| `set_component_file` | X |
-| `drop_component` | X |
-| `add_component` | X |
-| `package_component` | X |
-| `deploy_component` | X |
+### Bulk Operations
 
-| Registration | Restricted to Super User |
-|---|:---:|
-| `registration_info` | |
-| `get_fingerprint` | X |
-| `set_license` | X |
+| Operation        | Restricted to Super User |
+| ---------------- | :----------------------: |
+| `csv_data_load`  |                          |
+| `csv_file_load`  |                          |
+| `csv_url_load`   |                          |
+| `import_from_s3` |                          |
 
-| Jobs | Restricted to Super User |
-|---|:---:|
-| `get_job` | |
-| `search_jobs_by_start_date` | X |
+### Users and Roles
 
-| Logs | Restricted to Super User |
-|---|:---:|
-| `read_log` | X |
-| `read_transaction_log` | X |
-| `delete_transaction_logs_before` | X |
-| `read_audit_log` | X |
-| `delete_audit_logs_before` | X |
+| Operation    | Restricted to Super User |
+| ------------ | :----------------------: |
+| `list_roles` |            X             |
+| `add_role`   |            X             |
+| `alter_role` |            X             |
+| `drop_role`  |            X             |
+| `list_users` |            X             |
+| `user_info`  |                          |
+| `add_user`   |            X             |
+| `alter_user` |            X             |
+| `drop_user`  |            X             |
 
-| Utilities | Restricted to Super User |
-|---|:---:|
-| `delete_records_before` | X |
-| `export_local` | X |
-| `export_to_s3` | X |
-| `system_information` | X |
-| `restart` | X |
-| `restart_service` | X |
-| `get_configuration` | X |
+### Clustering
 
-| Token Authentication | Restricted to Super User |
-|---|:---:|
-| `create_authentication_tokens` | |
-| `refresh_operation_token` | |
+| Operation               | Restricted to Super User |
+| ----------------------- | :----------------------: |
+| `cluster_set_routes`    |            X             |
+| `cluster_get_routes`    |            X             |
+| `cluster_delete_routes` |            X             |
+| `add_node`              |            X             |
+| `update_node`           |            X             |
+| `cluster_status`        |            X             |
+| `remove_node`           |            X             |
+| `configure_cluster`     |            X             |
+
+### Components
+
+| Operation            | Restricted to Super User |
+| -------------------- | :----------------------: |
+| `get_components`     |            X             |
+| `get_component_file` |            X             |
+| `set_component_file` |            X             |
+| `drop_component`     |            X             |
+| `add_component`      |            X             |
+| `package_component`  |            X             |
+| `deploy_component`   |            X             |
+
+### Registration
+
+| Operation           | Restricted to Super User |
+| ------------------- | :----------------------: |
+| `registration_info` |                          |
+| `get_fingerprint`   |            X             |
+| `set_license`       |            X             |
+
+### Jobs
+
+| Operation                   | Restricted to Super User |
+| --------------------------- | :----------------------: |
+| `get_job`                   |                          |
+| `search_jobs_by_start_date` |            X             |
+
+### Logs
+
+| Operation                        | Restricted to Super User |
+| -------------------------------- | :----------------------: |
+| `read_log`                       |            X             |
+| `read_transaction_log`           |            X             |
+| `delete_transaction_logs_before` |            X             |
+| `read_audit_log`                 |            X             |
+| `delete_audit_logs_before`       |            X             |
+
+### Utilities
+
+| Operation               | Restricted to Super User |
+| ----------------------- | :----------------------: |
+| `delete_records_before` |            X             |
+| `export_local`          |            X             |
+| `export_to_s3`          |            X             |
+| `system_information`    |            X             |
+| `restart`               |            X             |
+| `restart_service`       |            X             |
+| `get_configuration`     |            X             |
+
+### Token Authentication
+
+| Operation                      | Restricted to Super User |
+| ------------------------------ | :----------------------: |
+| `create_authentication_tokens` |                          |
+| `refresh_operation_token`      |                          |
 
 ## Troubleshooting: "Must execute as User"
 
