@@ -21,3 +21,4 @@ Harper uses role-based, attribute-level security to ensure that users can only g
 
 - [Configuration](security/configuration) - Security configuration and settings
 - [Users and Roles](security/users-and-roles) - Role-based access control and permissions
+- [Impersonation](security/impersonation) - Execute operations as a different user or role
