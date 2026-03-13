@@ -151,4 +151,4 @@ Exactly one of `username` (alone), `role_name`, or `role` must be provided. If `
 - **Admin dashboards** — preview what a user sees without switching accounts.
 - **Permission testing** — verify that a role grants (or denies) the expected access before assigning it to users.
 - **Debugging** — reproduce access issues reported by a user by impersonating them directly.
-- **CI/CD** — automated tests can verify permission configurations by impersonating different roles against a single super_user credential.
+- **CI/CD** — automated tests can verify permission configurations by impersonating different roles against a single `super_user` credential.
