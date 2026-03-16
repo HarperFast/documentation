@@ -32,12 +32,12 @@ cURL example:
 
 ```bash
 curl --location --request POST 'http://localhost:9925' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "operation": "create_authentication_tokens",
-    "username": "username",
-    "password": "password"
-}'
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+      "operation": "create_authentication_tokens",
+      "username": "username",
+      "password": "password"
+  }'
 ```
 
 Response:
@@ -55,15 +55,15 @@ Pass the `operation_token` as a `Bearer` token in the `Authorization` header on 
 
 ```bash
 curl --location --request POST 'http://localhost:9925' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <operation_token>' \
---data-raw '{
-    "operation": "search_by_hash",
-    "schema": "dev",
-    "table": "dog",
-    "hash_values": [1],
-    "get_attributes": ["*"]
-}'
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer <operation_token>' \
+  --data-raw '{
+      "operation": "search_by_hash",
+      "schema": "dev",
+      "table": "dog",
+      "hash_values": [1],
+      "get_attributes": ["*"]
+  }'
 ```
 
 ## Refreshing the Operation Token
@@ -72,11 +72,11 @@ When the `operation_token` expires, use the `refresh_token` to obtain a new one.
 
 ```bash
 curl --location --request POST 'http://localhost:9925' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <refresh_token>' \
---data-raw '{
-  "operation": "refresh_operation_token"
-}'
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer <refresh_token>' \
+  --data-raw '{
+    "operation": "refresh_operation_token"
+  }'
 ```
 
 Response:

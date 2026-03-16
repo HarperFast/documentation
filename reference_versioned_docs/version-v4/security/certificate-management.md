@@ -17,7 +17,7 @@ On first run, Harper automatically generates self-signed TLS certificates at `<R
 - `privateKey.pem` — The server private key
 - `ca.pem` — A self-signed Certificate Authority
 
-These certificates do not have a valid Common Name (CN) for your Harper node. HTTPS can be used with them, but clients must be configured to accept the invalid certificate.
+These certificates have a valid Common Name (CN), but they are not signed by a root authority. HTTPS can be used with them, but clients must be configured to accept the invalid certificate.
 
 ## Development Setup
 
@@ -34,7 +34,7 @@ Harper will use the auto-generated certificates from `<ROOTPATH>/keys/`.
 
 ## Production Setup
 
-For production, use certificates from your own CA or a public CA such as Let's Encrypt, with CNs that match the Fully Qualified Domain Name (FQDN) of your Harper node.
+For production, use certificates from your own CA or a public CA, with CNs that match the Fully Qualified Domain Name (FQDN) of your Harper node.
 
 ### Option 1: Replace Harper Certificates
 
@@ -61,13 +61,13 @@ operationsApi:
 
 ### Option 2: Nginx Reverse Proxy
 
-Instead of enabling HTTPS directly on Harper, use Nginx as a reverse proxy. Configure Nginx to handle HTTPS with certificates from your own CA or a public CA (e.g. via [Certbot](https://certbot.eff.org/) for Let's Encrypt), then forward HTTP requests to Harper.
+Instead of enabling HTTPS directly on Harper, use Nginx as a reverse proxy. Configure Nginx to handle HTTPS with certificates from your own CA or a public CA, then forward HTTP requests to Harper.
 
 This approach keeps Harper's HTTP interface internal while Nginx handles TLS termination.
 
 ### Option 3: External Reverse Proxy / Load Balancer
 
-External services such as an AWS Application Load Balancer or GCP HTTPS load balancer can act as TLS-terminating reverse proxies. Configure the service to accept HTTPS connections and forward over a private network to Harper as HTTP.
+External services such as an AWS Elastic Load Balancer or Google Cloud Load Balancing can act as TLS-terminating reverse proxies. Configure the service to accept HTTPS connections and forward over a private network to Harper as HTTP.
 
 These services typically include integrated certificate management.
 
@@ -85,11 +85,11 @@ tls:
 
 For full mTLS authentication details, see [mTLS Authentication](./mtls-authentication.md).
 
-## Certificate Revocation Checking
+## Certificate Verification
 
 Added in: v4.5.0 (certificate revocation); v4.7.0 (OCSP support)
 
-When using mTLS, enable certificate revocation checking to ensure revoked certificates cannot authenticate even if still within their validity period:
+When using mTLS, enable certificate verification to ensure revoked certificates cannot authenticate even if still within their validity period:
 
 ```yaml
 http:

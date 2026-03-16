@@ -15,6 +15,7 @@ Harper supports Mutual TLS (mTLS) authentication for incoming HTTP connections. 
 1. The client presents a TLS certificate during the handshake.
 2. Harper validates the certificate against the configured CA (`tls.certificateAuthority`).
 3. If valid, Harper extracts the `CN` from the certificate subject and uses it as the username for the request.
+   1. Or it is configurable via the `http.mtls.user` option in the relevant configuration object.
 4. Optionally, Harper checks whether the certificate has been revoked (see [Certificate Verification](./certificate-verification.md)).
 
 ## Configuration

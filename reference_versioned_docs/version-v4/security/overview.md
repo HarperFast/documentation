@@ -8,6 +8,16 @@ title: Security
 
 Harper uses role-based, attribute-level security to ensure that users can only gain access to the data they are supposed to be able to access. Granular permissions allow for unparalleled flexibility and control, and can lower the total cost of ownership compared to other database solutions, since you no longer need to replicate subsets of data to isolate use cases.
 
+## Security Philosophy
+
+Harper's security model has two distinct layers:
+
+**Authentication** determines _who_ is making a request. Harper validates each request using one of the methods above, then resolves the caller to a known Harper user account.
+
+**Authorization** determines _what_ the caller can do. Each Harper user is assigned a role. Roles carry a permissions set that grants or denies CRUD access at the table and attribute level, in addition to controlling access to system operations.
+
+For details on how roles and permissions work, see [Users and Roles](./users-and-roles.md).
+
 ## Authentication Methods
 
 Harper supports three authentication methods:
@@ -30,16 +40,6 @@ Harper supports three authentication methods:
   - For HTTP server configuration see [HTTP / Configuration / TLS](../http/tls.md)
   - For Operations API configuration see [Operations API / Configuration / TLS](TODO: ../operations-api/configuration.md#tls)
 - [Users and Roles](./users-and-roles.md) — Role-Based Access Control (RBAC): defining roles, assigning permissions, and managing users.
-
-## Security Philosophy
-
-Harper's security model has two distinct layers:
-
-**Authentication** determines _who_ is making a request. Harper validates each request using one of the methods above, then resolves the caller to a known Harper user account.
-
-**Authorization** determines _what_ the caller can do. Each Harper user is assigned a role. Roles carry a permissions set that grants or denies CRUD access at the table and attribute level, in addition to controlling access to system operations.
-
-For details on how roles and permissions work, see [Users and Roles](./users-and-roles.md).
 
 ## Default Behavior
 
