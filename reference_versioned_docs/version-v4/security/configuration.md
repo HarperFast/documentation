@@ -43,13 +43,13 @@ Enables cookie-based sessions to maintain an authenticated session across reques
 
 _Type: string — Default: `1d`_
 
-How long a JWT operation token remains valid before expiring. Accepts [`ms`-format](https://github.com/vercel/ms) duration strings (e.g., `1d`, `12h`, `60m`). See [JWT Authentication](./jwt-authentication.md).
+How long a JWT operation token remains valid before expiring. Accepts [`jsonwebtoken`-compatible](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim) duration strings (e.g., `1d`, `12h`, `60m`). See [JWT Authentication](./jwt-authentication.md).
 
 ### `refreshTokenTimeout`
 
 _Type: string — Default: `30d`_
 
-How long a JWT refresh token remains valid before expiring. Accepts [`ms`-format](https://github.com/vercel/ms) duration strings. See [JWT Authentication](./jwt-authentication.md).
+How long a JWT refresh token remains valid before expiring. Accepts [`jsonwebtoken`-compatible](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim) duration strings. See [JWT Authentication](./jwt-authentication.md).
 
 ### `hashFunction`
 

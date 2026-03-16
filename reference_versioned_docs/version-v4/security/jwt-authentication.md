@@ -99,7 +99,7 @@ authentication:
   refreshTokenTimeout: 30d # Default: 30 days
 ```
 
-Valid duration string values follow the [`ms` package format](https://github.com/vercel/ms) (e.g., `1d`, `12h`, `60m`). See [Security / Configuration](./configuration.md) for the full authentication config reference.
+Valid duration string values follow the [`jsonwebtoken` package format](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim) (e.g., `1d`, `12h`, `60m`). See [Security / Configuration](./configuration.md) for the full authentication config reference.
 
 ## When to Use JWT Auth
 
