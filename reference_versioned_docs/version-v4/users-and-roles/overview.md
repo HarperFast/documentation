@@ -21,7 +21,6 @@ Role permissions in Harper are divided into two categories:
 | Role             | Description                                                                                                                                     |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `super_user`     | Full access to all operations and methods. The admin role.                                                                                      |
-| `cluster_user`   | Internal system role that allows clustered instances to communicate. Managed internally.                                                        |
 | `structure_user` | Access to create and delete databases and tables. Can be set to `true` (all databases) or an array of database names (specific databases only). |
 
 ### User-Defined Roles
