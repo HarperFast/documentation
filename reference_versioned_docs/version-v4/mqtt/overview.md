@@ -53,7 +53,7 @@ Harper supports multi-level topics for both publishing and subscribing:
 
 ### Last Will
 
-Added in: v4.3.0 (inferred from version comparison, needs verification)
+Added in: v4.3.0
 
 Harper supports the MQTT Last Will and Testament feature. If a client disconnects unexpectedly, the broker publishes the configured will message on its behalf.
 

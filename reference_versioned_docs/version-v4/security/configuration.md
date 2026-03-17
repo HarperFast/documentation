@@ -62,8 +62,6 @@ Password hashing algorithm used when storing user passwords. Replaced the previo
 - **`sha256`** — Default. Good security and excellent performance.
 - **`argon2id`** — Highest security. More CPU-intensive; recommended for environments that do not require frequent password verifications.
 
-<!-- TODO: verify the exact config key name `hashFunction` against the Harper source — not present in v4.7 config docs, inferred from release notes -->
-
 ## Related
 
 - [JWT Authentication](./jwt-authentication.md)

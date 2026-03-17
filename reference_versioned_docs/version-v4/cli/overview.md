@@ -113,7 +113,7 @@ See [CLI Commands](./commands.md) for detailed documentation on each command.
 
 ## Operations API Commands
 
-Added in: v4.3.0 (confirmed via release notes)
+Added in: v4.3.0
 
 The Harper CLI supports executing most operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') directly from the command line. This includes operations that do not require complex nested parameters.
 
@@ -174,7 +174,7 @@ harper describe_database database=dev target=https://server.com:9925 username=HD
 
 ## Development Mode
 
-Added in: v4.2.0 (confirmed via release notes)
+Added in: v4.2.0
 
 For local application and component development, use `harper dev`:
 

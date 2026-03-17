@@ -122,7 +122,7 @@ For full configuration options and troubleshooting, see [Certificate Verificatio
 
 ## Dynamic Certificate Management
 
-Added in: v4.4.0 (confirmed via release notes)
+Added in: v4.4.0
 
 Certificates — including CAs and private keys — can be dynamically managed without restarting Harper.
 
