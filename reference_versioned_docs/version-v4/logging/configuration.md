@@ -250,7 +250,7 @@ http:
     id: true # assign and log a unique request ID per request
 ```
 
-See [HTTP Configuration](TODO:reference_versioned_docs/version-v4/http/configuration.md 'HTTP logging configuration') for full details.
+See [HTTP Configuration](../http/configuration.md) for full details.
 
 ### `mqtt.logging`
 

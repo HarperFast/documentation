@@ -24,7 +24,7 @@ localStudio:
   enabled: true
 ```
 
-The local studio is provided by the [Operations API](TODO:reference_versioned_docs/version-v4/operations/configuration.md) and is available on the configured `operationsApi.port` or `operationsApi.securePort` values. This is `9925` by default.
+The local studio is provided by the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') and is available on the configured `operationsApi.port` or `operationsApi.securePort` values. This is `9925` by default.
 
 ## Accessing Local Studio
 

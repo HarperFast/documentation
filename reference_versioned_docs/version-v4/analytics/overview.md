@@ -123,7 +123,7 @@ Example aggregate entry:
 
 ## Standard Metrics
 
-Harper automatically tracks the following metrics for all services. Applications can also define custom metrics via [`server.recordAnalytics()`](TODO:reference_versioned_docs/version-v4/http/api.md 'HTTP API — server.recordAnalytics').
+Harper automatically tracks the following metrics for all services. Applications can also define custom metrics via [`server.recordAnalytics()`](../http/api.md#serverrecordanalyticsvalue-metric-path-method-type).
 
 ### HTTP Metrics
 
@@ -191,17 +191,17 @@ Includes everything returned by Node.js [`process.resourceUsage()`](https://node
 
 ## Custom Metrics
 
-Applications can record custom metrics using the `server.recordAnalytics()` API. See [HTTP API](TODO:reference_versioned_docs/version-v4/http/api.md 'server.recordAnalytics API') for details.
+Applications can record custom metrics using the `server.recordAnalytics()` API. See [HTTP API](../http/api.md) for details.
 
 ## Analytics Configuration
 
 The `analytics.aggregatePeriod` configuration option controls how frequently aggregate summaries are written. See [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full harperdb-config.yaml reference') for details.
 
-Per-component analytics logging can be configured via `analytics.logging`. See [Logging Configuration](TODO:reference_versioned_docs/version-v4/logging/configuration.md 'analytics.logging configuration').
+Per-component analytics logging can be configured via `analytics.logging`. See [Logging Configuration](../logging/configuration.md) for details.
 
 ## Related
 
 - [Analytics Operations](./operations)
-- [HTTP API](TODO:reference_versioned_docs/version-v4/http/api.md 'server.recordAnalytics')
-- [Logging Configuration](TODO:reference_versioned_docs/version-v4/logging/configuration.md 'analytics.logging')
+- [HTTP API](../http/api.md)
+- [Logging Configuration](../logging/configuration.md)
 - [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full configuration reference')

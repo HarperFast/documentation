@@ -40,7 +40,7 @@ The HTTP server handles multiple protocols on the same port:
 
 HTTPS support is enabled by setting `http.securePort` in `harperdb-config.yaml` and configuring the `tls` section with a certificate and private key. The same `tls` configuration is shared by HTTPS and MQTT secure connections.
 
-See [Configuration](./configuration) for TLS options and [Security](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security overview') for certificate management details.
+See [Configuration](./configuration) for TLS options and [Security](../security/overview.md) for certificate management details.
 
 ## HTTP/2
 
@@ -61,4 +61,4 @@ HTTP request logging is not enabled by default. To enable it, add an `http.loggi
 - [HTTP Configuration](./configuration)
 - [HTTP API](./api)
 - [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface overview')
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security, TLS, mTLS, and authentication overview')
+- [Security Overview](../security/overview.md)

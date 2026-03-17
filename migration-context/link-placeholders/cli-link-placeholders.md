@@ -190,13 +190,13 @@ This document tracks all link placeholders in the CLI section that need to be re
 
 - Line 196: `[Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md "Users and roles documentation")`
   - Context: Linking to user management and permissions (Security Best Practices section)
-  - Target: Security section users and roles page
-  - **Status**: PENDING (will be created in Security section migration)
+  - Target: Users and Roles section overview (moved to top-level section)
+  - **Status**: ~~RESOLVED~~ → `../users-and-roles/overview.md`
 
 - Line 204: `[Logging](TODO:reference_versioned_docs/version-v4/logging/overview.md "Logging documentation")`
   - Context: Linking to audit logging information (Security Best Practices section)
   - Target: Logging section overview
-  - **Status**: PENDING (will be created in Logging section migration)
+  - **Status**: ~~RESOLVED~~ → `../logging/overview.md`
 
 - Line 256: `[CLI Overview](./overview.md)`
   - Context: See Also section
@@ -216,23 +216,24 @@ This document tracks all link placeholders in the CLI section that need to be re
 - Line 259: `[Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md "Security overview")`
   - Context: See Also section
   - Target: Security section overview page
-  - **Status**: PENDING (will be created in Security section migration)
+  - **Status**: ~~RESOLVED~~ → `../security/overview.md`
 
 - Line 260: `[Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md "Users and roles")`
   - Context: See Also section
-  - Target: Security section users and roles page
-  - **Status**: PENDING (will be created in Security section migration)
+  - Target: Users and Roles section overview (moved to top-level section)
+  - **Status**: ~~RESOLVED~~ → `../users-and-roles/overview.md`
 
 ## Summary
 
-### Resolved Links (Within CLI Section)
+### Resolved Links
 
-- 12 links to pages within the CLI section (all resolved in this migration)
-- All internal CLI section links now use relative paths (e.g., `./overview.md`)
+- 12 links to pages within the CLI section (resolved in initial migration)
+- `../logging/overview.md` — resolved
+- `../security/overview.md` — resolved (×2)
+- `../users-and-roles/overview.md` — resolved (×2, was `security/users-and-roles.md`)
+- `../graphql-querying/overview.md` — resolved (×1, in operations-api-commands.md)
 
 ### Pending Links (Cross-Section References)
-
-These will be resolved in future section migrations:
 
 **Operations API Section** (~82 links):
 
@@ -262,15 +263,6 @@ These will be resolved in future section migrations:
 - `reference_versioned_docs/version-v4/database/compaction.md` (2 occurrences)
 - `reference_versioned_docs/version-v4/database/overview.md` (1 occurrence)
 
-**Security Section** (4 links):
-
-- `reference_versioned_docs/version-v4/security/overview.md` (2 occurrences)
-- `reference_versioned_docs/version-v4/security/users-and-roles.md` (2 occurrences)
-
-**Logging Section** (1 link):
-
-- `reference_versioned_docs/version-v4/logging/overview.md`
-
 **Components Section** (1 link):
 
 - `reference_versioned_docs/version-v4/components/overview.md`
@@ -279,16 +271,12 @@ These will be resolved in future section migrations:
 
 - `reference_versioned_docs/version-v4/rest/overview.md`
 
-**GraphQL Querying Section** (1 link):
+**Applications / Components Section** (1 link):
 
-- `reference_versioned_docs/version-v4/graphql-querying/overview.md`
-
-**Applications Section** (1 link):
-
-- `reference_versioned_docs/version-v4/applications/overview.md`
+- `reference_versioned_docs/version-v4/applications/overview.md` (note: this should likely be `components/overview.md`)
 
 **Learn Guides** (1 link):
 
 - Deploying Harper Applications guide (external learn link)
 
-**Total Pending Links**: ~96
+**Total Pending Links**: ~89

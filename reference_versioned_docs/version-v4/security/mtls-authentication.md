@@ -63,7 +63,7 @@ Certificate revocation checking is **disabled by default** and must be explicitl
 
 ## User Identity
 
-The username for the mTLS-authenticated request is derived from the `CN` field of the client certificate's subject. Ensure the CN value matches an existing Harper user account. See [Users and Roles](./users-and-roles.md) for managing user accounts.
+The username for the mTLS-authenticated request is derived from the `CN` field of the client certificate's subject. Ensure the CN value matches an existing Harper user account. See [Users and Roles](../users-and-roles/overview.md) for managing user accounts.
 
 ## Setup Requirements
 

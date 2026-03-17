@@ -16,7 +16,7 @@ Harper's security model has two distinct layers:
 
 **Authorization** determines _what_ the caller can do. Each Harper user is assigned a role. Roles carry a permissions set that grants or denies CRUD access at the table and attribute level, in addition to controlling access to system operations.
 
-For details on how roles and permissions work, see [Users and Roles](./users-and-roles.md).
+For details on how roles and permissions work, see [Users and Roles](../users-and-roles/overview.md).
 
 ## Authentication Methods
 
@@ -35,11 +35,11 @@ Harper supports three authentication methods:
 
 - CORS — Cross-Origin Resource Sharing.
   - For HTTP server configuration see [HTTP / Configuration / CORS](../http/configuration.md#cors)
-  - For Operations API configuration see [Operations API / Configuration / Network](TODO: ../operations-api/configuration.md#network)
+  - For Operations API configuration see [Operations API / Configuration / Network](TODO:reference_versioned_docs/version-v4/configuration/operations.md#network)
 - SSL & HTTPS — Enabling HTTPS and configuring TLS for the HTTP server.
   - For HTTP server configuration see [HTTP / Configuration / TLS](../http/tls.md)
-  - For Operations API configuration see [Operations API / Configuration / TLS](TODO: ../operations-api/configuration.md#tls)
-- [Users and Roles](./users-and-roles.md) — Role-Based Access Control (RBAC): defining roles, assigning permissions, and managing users.
+  - For Operations API configuration see [Operations API / Configuration / TLS](TODO:reference_versioned_docs/version-v4/configuration/operations.md#tls)
+- [Users and Roles](../users-and-roles/overview.md) — Role-Based Access Control (RBAC): defining roles, assigning permissions, and managing users.
 
 ## Default Behavior
 

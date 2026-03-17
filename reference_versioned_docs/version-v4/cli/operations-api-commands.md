@@ -171,7 +171,7 @@ harper search_by_value table=dog search_attribute=name search_value=harper get_a
 ```
 
 :::tip
-For more information on querying data, see the [REST Reference](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST API reference') and [GraphQL Querying](TODO:reference_versioned_docs/version-v4/graphql-querying/overview.md 'GraphQL querying reference').
+For more information on querying data, see the [REST Reference](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST API reference') and [GraphQL Querying](../graphql-querying/overview.md).
 :::
 
 ### Configuration Operations
@@ -231,7 +231,7 @@ harper list_roles
 ```
 
 :::tip
-For detailed information on users, roles, and authentication, see the [Security Reference](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security reference').
+For detailed information on users, roles, and authentication, see the [Security Reference](../security/overview.md).
 :::
 
 ## Remote Operations

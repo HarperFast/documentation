@@ -40,7 +40,7 @@ Type: `integer`
 
 Default: `8883`
 
-The port for secure MQTT connections (MQTTS). Uses the `tls` configuration for certificates. See [TLS Configuration](TODO:reference_versioned_docs/version-v4/http/tls.md 'TLS configuration shared by HTTP and MQTT') for certificate setup.
+The port for secure MQTT connections (MQTTS). Uses the `tls` configuration for certificates. See [TLS Configuration](../http/tls.md) for certificate setup.
 
 ## WebSocket
 
@@ -226,6 +226,6 @@ tls:
 ## Related
 
 - [MQTT Overview](./overview)
-- [TLS Configuration](TODO:reference_versioned_docs/version-v4/http/tls.md 'TLS configuration shared by MQTT and HTTP')
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security, certificates, and mTLS overview')
+- [TLS Configuration](../http/tls.md)
+- [Security Overview](../security/overview.md)
 - [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full harperdb-config.yaml reference')

@@ -338,5 +338,5 @@ tls:
 - [HTTP Overview](./overview)
 - [HTTP API](./api)
 - [TLS Configuration](./tls)
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security overview, including TLS and mTLS')
+- [Security Overview](../security/overview.md)
 - [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full configuration reference')

@@ -7,7 +7,7 @@ title: Basic Authentication
 
 Available since: v4.1.0
 
-Harper supports HTTP Basic Authentication. In the context of an HTTP transaction, [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) is the simplest authorization scheme which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme or certificates. See [SSL / HTTPS](./ssl.md) for more information.
+Harper supports HTTP Basic Authentication. In the context of an HTTP transaction, [Basic Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#basic_authentication_scheme) is the simplest authorization scheme which transmits credentials as username/password pairs encoded using base64. Importantly, this scheme does not encrypt credentials. If used over an insecure connection, such as HTTP, they are susceptible to being compromised. Only ever use Basic Authentication over secured connections, such as HTTPS. Even then, its better to upgrade to an encryption based authentication scheme or certificates. See [HTTP / TLS](../http/tls.md) for more information.
 
 ## How It Works
 

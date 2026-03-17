@@ -20,10 +20,12 @@
   - Context: Replication mTLS configuration reference
   - Target should be: Replication clustering page
 
-## reference_versioned_docs/version-v4/security/cors.md
+## reference_versioned_docs/version-v4/security/configuration.md
 
-- ~~Line 36: `[TODO:reference_versioned_docs/version-v4/http/configuration.md]`~~ **RESOLVED** → `../http/configuration.md`
+- No pending TODO links. (`cors.md` and `ssl.md` were consolidated into this file; their cross-section links were resolved during initial migration.)
 
-## reference_versioned_docs/version-v4/security/ssl.md
+## reference_versioned_docs/version-v4/security/overview.md
 
-- ~~Line 56: `[TODO:reference_versioned_docs/version-v4/http/tls.md]`~~ **RESOLVED** → `../http/tls.md`
+- ~~`./users-and-roles.md`~~ **FIXED** → `../users-and-roles/overview.md` (users-and-roles is now a top-level section, not a file within security/)
+- `TODO:reference_versioned_docs/version-v4/configuration/operations.md#network` — PENDING (Configuration section migration)
+- `TODO:reference_versioned_docs/version-v4/configuration/operations.md#tls` — PENDING (Configuration section migration)

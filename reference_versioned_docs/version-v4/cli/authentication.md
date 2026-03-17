@@ -167,7 +167,7 @@ harper deploy target=https://prod.example.com:9925
 
 ### 4. Use Least Privilege
 
-Create dedicated users with minimal required permissions for CLI operations instead of using the main admin account. See [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md 'Users and roles documentation') for more information.
+Create dedicated users with minimal required permissions for CLI operations instead of using the main admin account. See [Users and Roles](../users-and-roles/overview.md) for more information.
 
 ### 5. Rotate Credentials
 
@@ -175,7 +175,7 @@ Regularly rotate credentials, especially for automated systems and CI/CD pipelin
 
 ### 6. Audit Access
 
-Monitor and audit CLI operations, especially for production environments. See [Logging](TODO:reference_versioned_docs/version-v4/logging/overview.md 'Logging documentation') for more information on logging.
+Monitor and audit CLI operations, especially for production environments. See [Logging](../logging/overview.md) for more information on logging.
 
 ## Troubleshooting
 
@@ -233,5 +233,5 @@ If environment variables aren't working:
 - [CLI Overview](./overview.md) - General CLI information
 - [CLI Commands](./commands.md) - Core CLI commands
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security overview') - Harper security features
-- [Users and Roles](TODO:reference_versioned_docs/version-v4/security/users-and-roles.md 'Users and roles') - User management
+- [Security Overview](../security/overview.md) - Harper security features
+- [Users and Roles](../users-and-roles/overview.md) - User management

@@ -136,7 +136,7 @@ Available events:
 ## Related
 
 - [MQTT Configuration](./configuration)
-- [HTTP Overview](TODO:reference_versioned_docs/version-v4/http/overview.md 'HTTP server overview — handles MQTT over WebSocket')
-- [Security Overview](TODO:reference_versioned_docs/version-v4/security/overview.md 'Security, TLS, and mTLS overview')
+- [HTTP Overview](../http/overview.md)
+- [Security Overview](../security/overview.md)
 - [Database Schema](TODO:reference_versioned_docs/version-v4/database/schema.md 'Defining tables and topics with schema.graphql')
 - [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface — same path conventions as MQTT topics')

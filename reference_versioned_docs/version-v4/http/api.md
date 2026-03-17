@@ -324,7 +324,7 @@ server.recordAnalytics(value: number, metric: string, path?: string, method?: st
 | `method`  | Optional HTTP method for grouping                                            |
 | `type`    | Optional type for grouping                                                   |
 
-Metrics are aggregated and available via the [analytics API](TODO:reference_versioned_docs/version-v4/analytics/overview.md 'Analytics overview').
+Metrics are aggregated and available via the [analytics API](../analytics/overview.md).
 
 ---
 
