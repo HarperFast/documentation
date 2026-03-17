@@ -229,11 +229,20 @@ reference/
 │   │
 │   ├── certificate-verification.md  # Certificate verification (OCSP, etc.)
 │   │
-│   ├── cors.md                      # CORS configuration and usage
+│   └── configuration.md             # Authentication configuration (authorizeLocal, cacheTTL,
+│                                    # enableSessions, token timeouts, hashFunction). Top-level
+│                                    # `authentication:` section of harperdb-config.yaml.
+│
+├── users-and-roles/                 # Broken out from security/ during migration — RBAC warrants
+│   │                                # its own top-level section given the breadth of content
+│   │                                # (operations API, config file roles, permission structure).
 │   │
-│   ├── ssl.md                       # SSL/TLS configuration
+│   ├── overview.md                  # RBAC intro, roles, permission structure, operation
+│   │                                # restrictions reference table
 │   │
-│   └── users-and-roles.md           # User and role management including `roles` plugin
+│   ├── configuration.md             # Config file roles (roles.yaml), password hashing
+│   │
+│   └── operations.md                # Operations API: all role and user operations
 │
 ├── components/
 │   ├── overview.md                  # What are components? Evolution from custom functions to

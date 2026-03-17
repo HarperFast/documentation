@@ -124,28 +124,28 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/security/configuration.md`
-- **Status**: Not Started
+- **Status**: In Progress
 
 ### `reference/security/basic-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/basic-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/basic-authentication.md`
 - **Version Annotations**: Available since v4.1.0
-- **Status**: Not Started
+- **Status**: In Progress
 
 ### `reference/security/jwt-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/jwt-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/jwt.md`
 - **Version Annotations**: Available since v4.1.0
-- **Status**: Not Started
+- **Status**: In Progress
 
 ### `reference/security/mtls-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/mtls-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.3/developers/security/mtls-auth.md`
 - **Version Annotations**: Added in v4.3.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - mTLS support added
 
@@ -157,7 +157,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - `versioned_docs/version-4.4+` (dynamic cert management added)
 - **Merge Required**: Yes - dynamic certificate management added in v4.4
 - **Version Annotations**: Dynamic certs added v4.4.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Dynamic certificate management
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Certificate revocation
@@ -166,19 +166,19 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/certificate-verification.md`
 - **Version Annotations**: Added in v4.7.0 (OCSP support)
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - OCSP support
 
 ### `reference/security/cors.md`
 
 - **Primary Source**: Extract from `versioned_docs/version-4.7/developers/security/configuration.md`
-- **Status**: Not Started
+- **Status**: In Progress
 
 ### `reference/security/ssl.md`
 
 - **Primary Source**: Extract from security/configuration or certificate management docs
-- **Status**: Not Started
+- **Status**: In Progress
 
 ### `reference/security/users-and-roles.md`
 
@@ -188,7 +188,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - `versioned_docs/version-4.7/reference/roles.md`
   - Current `reference/defining-roles.md`
 - **Merge Required**: Yes - content spread across multiple files
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Password hashing upgrade (sha256, argon2id)
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Cookie-based sessions
