@@ -89,6 +89,44 @@
 		},
 		{
 			"type": "category",
+			"label": "REST",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "rest/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "rest/content-types",
+					"label": "Content Types"
+				},
+				{
+					"type": "doc",
+					"id": "rest/headers",
+					"label": "Headers"
+				},
+				{
+					"type": "doc",
+					"id": "rest/querying",
+					"label": "Querying"
+				},
+				{
+					"type": "doc",
+					"id": "rest/websockets",
+					"label": "WebSockets"
+				},
+				{
+					"type": "doc",
+					"id": "rest/server-sent-events",
+					"label": "Server Sent Events"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Logging",
 			"collapsible": false,
 			"className": "learn-category-header",

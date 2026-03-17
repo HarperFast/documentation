@@ -495,7 +495,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/rest.md`
 - **Additional Sources**: Current `reference/rest.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - REST interface introduced
 
@@ -507,7 +507,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Version Annotations**:
   - Null indexing/querying: v4.3.0
   - URL path improvements: v4.5.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Iterator-based queries
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Relationships/joins, sorting, nested select, null indexing
@@ -517,27 +517,26 @@ Broken out from the security section during migration — RBAC warrants its own 
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/headers.md`
 - **Additional Sources**: Current `reference/headers.md`
-- **Version Annotations**: Track which headers were added/removed over versions
-- **Status**: Not Started
+- **Status**: Complete
 
 ### `reference/rest/content-types.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/content-types.md`
 - **Additional Sources**: Current `reference/content-types.md`
-- **Status**: Not Started
+- **Status**: Complete
 
 ### `reference/rest/websockets.md`
 
 - **Primary Source**: Extract from `versioned_docs/version-4.7/developers/real-time.md`
 - **Additional Sources**: Current `reference/real-time.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - WebSocket support
 
 ### `reference/rest/server-sent-events.md`
 
 - **Primary Source**: Extract from real-time or REST docs
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Server-Sent Events support
 
