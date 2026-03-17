@@ -220,66 +220,71 @@ Updated status for this section to "In Progress"
 
 Based on migration map and reference plan, recommend this order. Each section is generated as a complete unit with all its pages at once:
 
-**Phase 1A - Simple, Stable Sections**
+**Phase 1A - Simple, Stable Sections** — **Complete**
 
-1. **CLI** (`reference_versioned_docs/version-v4/cli/`)
+1. **CLI** (`reference_versioned_docs/version-v4/cli/`) — **Complete**
    - `overview.md`
    - `commands.md`
    - `operations-api-commands.md`
    - `authentication.md`
 
-2. **GraphQL Querying** (`reference_versioned_docs/version-v4/graphql-querying/`)
+2. **GraphQL Querying** (`reference_versioned_docs/version-v4/graphql-querying/`) — **Complete**
    - `overview.md`
 
-3. **Studio** (`reference_versioned_docs/version-v4/studio/`)
+3. **Studio** (`reference_versioned_docs/version-v4/studio/`) — **Complete**
    - `overview.md` - Simple page covering local Studio UI configuration and access
 
-4. **Fastify Routes** (`reference_versioned_docs/version-v4/fastify-routes/`)
+4. **Fastify Routes** (`reference_versioned_docs/version-v4/fastify-routes/`) — **Complete**
    - `overview.md`
 
-**Phase 1B - Medium Complexity**
+**Phase 1B - Medium Complexity** — **Complete**
 
-1. **Environment Variables** (`reference_versioned_docs/version-v4/environment-variables/`)
+1. **Environment Variables** (`reference_versioned_docs/version-v4/environment-variables/`) — **Complete**
    - `overview.md`
-   - `configuration.md`
+   - ~~`configuration.md`~~ _(not created — content to be ported into `configuration/overview.md`)_
 
-2. **Static Files** (`reference_versioned_docs/version-v4/static-files/`)
+2. **Static Files** (`reference_versioned_docs/version-v4/static-files/`) — **Complete**
    - `overview.md`
-   - `configuration.md`
+   - ~~`configuration.md`~~ _(not needed — all options documented inline in overview)_
 
-3. **HTTP** (`reference_versioned_docs/version-v4/http/`)
+3. **HTTP** (`reference_versioned_docs/version-v4/http/`) — **Complete**
    - `overview.md`
    - `configuration.md`
    - `api.md`
+   - `tls.md` _(added during migration — TLS config warranted its own page)_
 
-4. **MQTT** (`reference_versioned_docs/version-v4/mqtt/`)
+4. **MQTT** (`reference_versioned_docs/version-v4/mqtt/`) — **Complete**
    - `overview.md`
    - `configuration.md`
 
-5. **Logging** (`reference_versioned_docs/version-v4/logging/`)
+5. **Logging** (`reference_versioned_docs/version-v4/logging/`) — **Complete**
    - `overview.md`
    - `configuration.md`
    - `api.md`
    - `operations.md`
 
-6. **Analytics** (`reference_versioned_docs/version-v4/analytics/`)
+6. **Analytics** (`reference_versioned_docs/version-v4/analytics/`) — **Complete**
    - `overview.md`
    - `operations.md`
 
 **Phase 1C - Complex Sections**
 
-1.  **Security** (`reference_versioned_docs/version-v4/security/`)
+1.  **Security** (`reference_versioned_docs/version-v4/security/`) — **Complete**
     - `overview.md`
     - `basic-authentication.md`
     - `jwt-authentication.md`
     - `mtls-authentication.md`
     - `certificate-management.md`
     - `certificate-verification.md`
-    - `cors.md`
-    - `ssl.md`
-    - `users-and-roles.md`
+    - `configuration.md` _(consolidated from planned `cors.md` + `ssl.md`)_
 
-2.  **REST** (`reference_versioned_docs/version-v4/rest/`)
+2.  **Users and Roles** (`reference_versioned_docs/version-v4/users-and-roles/`) — **Complete**
+    - `overview.md`
+    - `configuration.md`
+    - `operations.md`
+    - _Note: Broken out from Security section during migration; RBAC content warranted its own top-level section._
+
+3.  **REST** (`reference_versioned_docs/version-v4/rest/`)
     - `overview.md`
     - `querying.md`
     - `headers.md`
@@ -287,7 +292,7 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `websockets.md`
     - `server-sent-events.md`
 
-3.  **Database** (`reference_versioned_docs/version-v4/database/`)
+4.  **Database** (`reference_versioned_docs/version-v4/database/`)
     - `overview.md`
     - `schema.md`
     - `data-loader.md`
@@ -297,19 +302,19 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `compaction.md`
     - `transaction.md`
 
-4.  **Resources** (`reference_versioned_docs/version-v4/resources/`)
+5.  **Resources** (`reference_versioned_docs/version-v4/resources/`)
     - `overview.md`
     - `resource-api.md`
     - `global-apis.md`
     - `query-optimization.md`
 
-5.  **Components** (`reference_versioned_docs/version-v4/components/`)
+6.  **Components** (`reference_versioned_docs/version-v4/components/`)
     - `overview.md`
     - `applications.md`
     - `extension-api.md`
     - `plugin-api.md`
 
-6.  **Replication** (`reference_versioned_docs/version-v4/replication/`)
+7.  **Replication** (`reference_versioned_docs/version-v4/replication/`)
     - `overview.md`
     - `clustering.md`
     - `sharding.md`

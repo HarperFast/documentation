@@ -124,28 +124,28 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.7/developers/security/configuration.md`
-- **Status**: In Progress
+- **Status**: Complete
 
 ### `reference/security/basic-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/basic-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/basic-authentication.md`
 - **Version Annotations**: Available since v4.1.0
-- **Status**: In Progress
+- **Status**: Complete
 
 ### `reference/security/jwt-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/jwt-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.1/security/jwt.md`
 - **Version Annotations**: Available since v4.1.0
-- **Status**: In Progress
+- **Status**: Complete
 
 ### `reference/security/mtls-authentication.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/mtls-auth.md`
 - **Additional Sources**: `versioned_docs/version-4.3/developers/security/mtls-auth.md`
 - **Version Annotations**: Added in v4.3.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - mTLS support added
 
@@ -157,7 +157,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - `versioned_docs/version-4.4+` (dynamic cert management added)
 - **Merge Required**: Yes - dynamic certificate management added in v4.4
 - **Version Annotations**: Dynamic certs added v4.4.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Dynamic certificate management
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Certificate revocation
@@ -166,32 +166,48 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/certificate-verification.md`
 - **Version Annotations**: Added in v4.7.0 (OCSP support)
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - OCSP support
 
-### `reference/security/cors.md`
+### `reference/security/configuration.md`
 
-- **Primary Source**: Extract from `versioned_docs/version-4.7/developers/security/configuration.md`
-- **Status**: In Progress
+- **Primary Source**: `versioned_docs/version-4.7/developers/security/configuration.md`
+- **Status**: Complete
+- **Notes**: Covers authentication configuration (authorizeLocal, cacheTTL, enableSessions, token timeouts, hashFunction), CORS, and SSL/TLS settings. Originally planned as separate `cors.md` and `ssl.md` pages; consolidated into a single `configuration.md` during migration.
 
-### `reference/security/ssl.md`
+---
 
-- **Primary Source**: Extract from security/configuration or certificate management docs
-- **Status**: In Progress
+## Users and Roles Section
 
-### `reference/security/users-and-roles.md`
+Broken out from the security section during migration — RBAC warrants its own top-level section given the breadth of content (operations API, config file roles, permission structure).
+
+### `reference/users-and-roles/overview.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/security/users-and-roles.md`
 - **Additional Sources**:
-  - `versioned_docs/version-4.7/developers/operations-api/users-and-roles.md`
   - `versioned_docs/version-4.7/reference/roles.md`
   - Current `reference/defining-roles.md`
 - **Merge Required**: Yes - content spread across multiple files
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Password hashing upgrade (sha256, argon2id)
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Cookie-based sessions
+
+### `reference/users-and-roles/configuration.md`
+
+- **Primary Source**: `versioned_docs/version-4.7/reference/roles.md`
+- **Additional Sources**: `versioned_docs/version-4.7/developers/security/configuration.md`
+- **Status**: Complete
+- **Notes**: Config file roles (roles.yaml), password hashing
+
+### `reference/users-and-roles/operations.md`
+
+- **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/users-and-roles.md`
+- **Status**: Complete
+- **Notes**: Operations API — all role and user operations
+- **Release Notes**:
+  - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Password hashing upgrade (sha256, argon2id)
 
 ---
 
@@ -412,7 +428,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**: Built-in extensions docs, configuration docs
 - **Version Annotations**: loadEnv added in v4.5.0
 - **Status**: Complete
-- **Notes**: Covers `loadEnv` extension only. Harper-level environment variable configuration (naming conventions, `HDB_CONFIG`, `HARPER_DEFAULT_CONFIG`, `HARPER_SET_CONFIG`) belongs in the Configuration section — see notes there.
+- **Notes**: Covers `loadEnv` extension only. Harper-level environment variable configuration (naming conventions, `HDB_CONFIG`, `HARPER_DEFAULT_CONFIG`, `HARPER_SET_CONFIG`) belongs in the Configuration section — see notes there. The originally planned `configuration.md` sub-page was not created; that content is to be ported into `configuration/overview.md` (see Configuration section notes).
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Built-in loadEnv component
 
@@ -463,6 +479,13 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - server.authenticateUser API
+
+### `reference/http/tls.md`
+
+- **Primary Source**: Extract from `versioned_docs/version-4.7/developers/security/` (TLS/certificate configuration)
+- **Additional Sources**: `versioned_docs/version-4.7/deployments/configuration.md` (tls config section)
+- **Status**: Complete
+- **Notes**: Created during migration as a dedicated TLS configuration reference for the HTTP server. Originally not in the plan (TLS was expected to be in security section); added as a separate HTTP sub-page given the close relationship to HTTP configuration.
 
 ---
 
@@ -531,7 +554,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
   - mTLS support: v4.3.0
   - Single-level wildcards: v4.3.0
   - CRDT: v4.3.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - MQTT support introduced (QoS 0 and 1, durable sessions)
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - mTLS, single-level wildcards, retain handling, CRDT
@@ -541,7 +564,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: Extract from configuration docs and real-time docs
 - **Version Annotations**: Port change v4.5.0 (9925 → 9933)
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Default replication port change
 
@@ -553,7 +576,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 
 - **Primary Source**: `versioned_docs/version-4.7/administration/logging/index.md`
 - **Additional Sources**: Current `reference/logging.md` (if exists)
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Logging revamped, consolidated into hdb.log
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Major logging improvements
@@ -564,21 +587,21 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Per-component logging: v4.6.0
   - Granular configuration: v4.6.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Per-component logging, dynamic reloading, HTTP logging
 
 ### `reference/logging/api.md`
 
 - **Primary Source**: Extract from `versioned_docs/version-4.7/reference/globals.md` (logger global)
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Logger based on Node.js Console API
 
 ### `reference/logging/operations.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/logs.md`
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Operations for managing standard logs (not transaction/audit logs, which moved to database section)
 
 ---
@@ -592,7 +615,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Version Annotations**:
   - Resource analytics: v4.5.0
   - Storage analytics: v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Resource and storage analytics
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - New analytics and licensing functionality
@@ -600,7 +623,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 ### `reference/analytics/operations.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/analytics.md`
-- **Status**: In Progress
+- **Status**: Complete
 
 ---
 
