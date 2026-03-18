@@ -34,6 +34,7 @@ The operations API reference is available below and categorized by topic:
 - [Configuration](operations-api/configuration)
 - [Certificate Management](operations-api/certificate-management)
 - [Token Authentication](operations-api/token-authentication)
+- [Impersonation](../security/impersonation)
 - [SQL Operations](operations-api/sql-operations)
 - [Advanced JSON SQL Examples](operations-api/advanced-json-sql-examples)
 - [Analytics](operations-api/analytics)
