@@ -296,6 +296,54 @@
 		},
 		{
 			"type": "category",
+			"label": "Database",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "database/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "database/schema",
+					"label": "Schema"
+				},
+				{
+					"type": "doc",
+					"id": "database/data-loader",
+					"label": "Data Loader"
+				},
+				{
+					"type": "doc",
+					"id": "database/storage-algorithm",
+					"label": "Storage Algorithm"
+				},
+				{
+					"type": "doc",
+					"id": "database/jobs",
+					"label": "Jobs"
+				},
+				{
+					"type": "doc",
+					"id": "database/system-tables",
+					"label": "System Tables"
+				},
+				{
+					"type": "doc",
+					"id": "database/compaction",
+					"label": "Compaction"
+				},
+				{
+					"type": "doc",
+					"id": "database/transaction",
+					"label": "Transaction Logging"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
