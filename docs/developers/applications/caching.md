@@ -302,6 +302,31 @@ Cache-Control: only-if-cached, no-store
 
 You may also use the `stale-if-error` to indicate if it is acceptable to return a stale cached resource when the data source returns an error (network connection error, 500, 502, 503, or 504). The `must-revalidate` directive can indicate a stale cached resource can not be returned, even when the data source has an error (by default a stale cached resource is returned when there is a network connection error).
 
+### Context Caching Directives
+
+You can also specify caching directives within the context object of a CRUD operation call to a table resource.
+
+For example, to set the expiration time for a specific record when putting it:
+
+```javascript
+await Post.put(postData, { expiresAt: 3600 });
+```
+
+Or to disable caching on a get operation:
+
+```javascript
+await Post.get(primaryKey, { noCache: true, noCacheStore: true });
+```
+
+| Cache-Control Header Directive | Context Directive Equivalent | Definition                                                                                                                                                                        |
+| ------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max-age`                      | `expiresAt`                  | Specifies the time in seconds at which the record is scheduled to expire.                                                                                                         |
+| `no-store`                     | `noCacheStore`               | Prevents the resource from being cached or stored.                                                                                                                                |
+| `no-cache`                     | `noCache`                    | Forces revalidation with the origin server before using cached data.                                                                                                              |
+| `only-if-cached`               | `onlyIfCached`               | Returns the resource only if it is already cached, otherwise fails with 504 response.                                                                                             |
+| `must-revalidate`              | `mustRevalidate`             | Once a resource becomes stale (i.e. past its max-age), the client must contact the origin server to revalidate before using it. It cannot serve the stale copy even as a fallback. |
+| `stale-if-error`               | `staleIfError`               | Allows serving stale resources when the origin server encounters an error.                                                                                                        |
+
 ## Caching Flow
 
 It may be helpful to understand the flow of a cache request. When a request is made to a caching table:
