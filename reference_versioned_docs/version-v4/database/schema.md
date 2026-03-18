@@ -34,15 +34,15 @@ A minimal example:
 
 ```graphql
 type Dog @table {
-  id: ID @primaryKey
-  name: String
-  breed: String
-  age: Int
+	id: ID @primaryKey
+	name: String
+	breed: String
+	age: Int
 }
 
 type Breed @table {
-  id: ID @primaryKey
-  name: String @indexed
+	id: ID @primaryKey
+	name: String @indexed
 }
 ```
 
@@ -65,18 +65,18 @@ Marks a GraphQL type as a Harper database table. The type name becomes the table
 
 ```graphql
 type MyTable @table {
-  id: ID @primaryKey
+	id: ID @primaryKey
 }
 ```
 
 Optional arguments:
 
-| Argument | Type | Default | Description |
-|---|---|---|---|
-| `table` | `String` | type name | Override the table name |
-| `database` | `String` | `"data"` | Database to place the table in |
-| `expiration` | `Int` | — | Auto-expire records after this many seconds (useful for caching tables) |
-| `audit` | `Boolean` | config default | Enable audit log for this table |
+| Argument     | Type      | Default        | Description                                                             |
+| ------------ | --------- | -------------- | ----------------------------------------------------------------------- |
+| `table`      | `String`  | type name      | Override the table name                                                 |
+| `database`   | `String`  | `"data"`       | Database to place the table in                                          |
+| `expiration` | `Int`     | —              | Auto-expire records after this many seconds (useful for caching tables) |
+| `audit`      | `Boolean` | config default | Enable audit log for this table                                         |
 
 **Database naming:** The default `data` database is a good choice for tables that won't be reused elsewhere. Components designed for reuse should specify a unique database name (e.g., `"my-component-data"`) to avoid naming collisions with other components.
 
@@ -86,7 +86,7 @@ Exposes the table as an externally accessible resource endpoint, available via R
 
 ```graphql
 type MyTable @table @export(name: "my-table") {
-  id: ID @primaryKey
+	id: ID @primaryKey
 }
 ```
 
@@ -102,12 +102,13 @@ Designates the attribute as the table's primary key. Primary keys must be unique
 
 ```graphql
 type Product @table {
-  id: Long @primaryKey
-  name: String
+	id: Long @primaryKey
+	name: String
 }
 ```
 
 If no primary key is provided on insert, Harper auto-generates one:
+
 - **UUID string** — when type is `String` or `ID`
 - **Auto-incrementing integer** — when type is `Int`, `Long`, or `Any`
 
@@ -123,9 +124,9 @@ Creates a secondary index on the attribute for fast querying. Required for filte
 
 ```graphql
 type Product @table {
-  id: ID @primaryKey
-  category: String @indexed
-  price: Float @indexed
+	id: ID @primaryKey
+	category: String @indexed
+	price: Float @indexed
 }
 ```
 
@@ -141,8 +142,8 @@ Automatically assigns a creation timestamp (Unix epoch milliseconds) to the attr
 
 ```graphql
 type Event @table {
-  id: ID @primaryKey
-  createdAt: Long @createdTime
+	id: ID @primaryKey
+	createdAt: Long @createdTime
 }
 ```
 
@@ -152,8 +153,8 @@ Automatically assigns a timestamp (Unix epoch milliseconds) each time the record
 
 ```graphql
 type Event @table {
-  id: ID @primaryKey
-  updatedAt: Long @updatedTime
+	id: ID @primaryKey
+	updatedAt: Long @updatedTime
 }
 ```
 
@@ -163,8 +164,8 @@ Prevents records from including any properties beyond those explicitly declared 
 
 ```graphql
 type StrictRecord @table @sealed {
-  id: ID @primaryKey
-  name: String
+	id: ID @primaryKey
+	name: String
 }
 ```
 
@@ -180,14 +181,14 @@ The foreign key is in this table, referencing the primary key of the target tabl
 
 ```graphql
 type Product @table @export {
-  id: ID @primaryKey
-  brandId: ID @indexed          # foreign key
-  brand: Brand @relationship(from: brandId)  # many-to-one
+	id: ID @primaryKey
+	brandId: ID @indexed # foreign key
+	brand: Brand @relationship(from: brandId) # many-to-one
 }
 
 type Brand @table @export {
-  id: ID @primaryKey
-  name: String @indexed
+	id: ID @primaryKey
+	name: String @indexed
 }
 ```
 
@@ -201,9 +202,9 @@ If the foreign key is an array, this establishes a many-to-many relationship:
 
 ```graphql
 type Product @table @export {
-  id: ID @primaryKey
-  featureIds: [ID] @indexed
-  features: [Feature] @relationship(from: featureIds)
+	id: ID @primaryKey
+	featureIds: [ID] @indexed
+	features: [Feature] @relationship(from: featureIds)
 }
 ```
 
@@ -213,9 +214,9 @@ The foreign key is in the target table, referencing the primary key of this tabl
 
 ```graphql
 type Brand @table @export {
-  id: ID @primaryKey
-  name: String @indexed
-  products: [Product] @relationship(to: brandId)  # one-to-many
+	id: ID @primaryKey
+	name: String @indexed
+	products: [Product] @relationship(to: brandId) # one-to-many
 }
 ```
 
@@ -231,10 +232,10 @@ The `@computed` directive marks a field as derived from other fields at query ti
 
 ```graphql
 type Product @table {
-  id: ID @primaryKey
-  price: Float
-  taxRate: Float
-  totalPrice: Float @computed(from: "price + (price * taxRate)")
+	id: ID @primaryKey
+	price: Float
+	taxRate: Float
+	totalPrice: Float @computed(from: "price + (price * taxRate)")
 }
 ```
 
@@ -244,14 +245,14 @@ Computed properties can also be defined in JavaScript for complex logic:
 
 ```graphql
 type Product @table {
-  id: ID @primaryKey
-  totalPrice: Float @computed
+	id: ID @primaryKey
+	totalPrice: Float @computed
 }
 ```
 
 ```javascript
 tables.Product.setComputedAttribute('totalPrice', (record) => {
-  return record.price + record.price * record.taxRate;
+	return record.price + record.price * record.taxRate;
 });
 ```
 
@@ -273,8 +274,8 @@ When using a JavaScript function for an indexed computed property, use the `vers
 
 ```graphql
 type Product @table {
-  id: ID @primaryKey
-  totalPrice: Float @computed(version: 1) @indexed
+	id: ID @primaryKey
+	totalPrice: Float @computed(version: 1) @indexed
 }
 ```
 
@@ -288,8 +289,8 @@ Use `@indexed(type: "HNSW")` to create a vector index using the Hierarchical Nav
 
 ```graphql
 type Document @table {
-  id: Long @primaryKey
-  textEmbeddings: [Float] @indexed(type: "HNSW")
+	id: Long @primaryKey
+	textEmbeddings: [Float] @indexed(type: "HNSW")
 }
 ```
 
@@ -297,8 +298,8 @@ Query by nearest neighbors using the `sort` parameter:
 
 ```javascript
 let results = Document.search({
-  sort: { attribute: 'textEmbeddings', target: searchVector },
-  limit: 5,
+	sort: { attribute: 'textEmbeddings', target: searchVector },
+	limit: 5,
 });
 ```
 
@@ -306,29 +307,29 @@ HNSW can be combined with filter conditions:
 
 ```javascript
 let results = Document.search({
-  conditions: [{ attribute: 'price', comparator: 'lt', value: 50 }],
-  sort: { attribute: 'textEmbeddings', target: searchVector },
-  limit: 5,
+	conditions: [{ attribute: 'price', comparator: 'lt', value: 50 }],
+	sort: { attribute: 'textEmbeddings', target: searchVector },
+	limit: 5,
 });
 ```
 
 ### HNSW Parameters
 
-| Parameter | Default | Description |
-|---|---|---|
-| `distance` | `"cosine"` | Distance function: `"euclidean"` or `"cosine"` (negative cosine similarity) |
-| `efConstruction` | `100` | Max nodes explored during index construction. Higher = better recall, lower = better performance |
-| `M` | `16` | Preferred connections per graph layer. Higher = more space, better recall for high-dimensional data |
-| `optimizeRouting` | `0.5` | Heuristic aggressiveness for omitting redundant connections (0 = off, 1 = most aggressive) |
-| `mL` | computed from `M` | Normalization factor for level generation |
-| `efSearchConstruction` | `50` | Max nodes explored during search |
+| Parameter              | Default           | Description                                                                                         |
+| ---------------------- | ----------------- | --------------------------------------------------------------------------------------------------- |
+| `distance`             | `"cosine"`        | Distance function: `"euclidean"` or `"cosine"` (negative cosine similarity)                         |
+| `efConstruction`       | `100`             | Max nodes explored during index construction. Higher = better recall, lower = better performance    |
+| `M`                    | `16`              | Preferred connections per graph layer. Higher = more space, better recall for high-dimensional data |
+| `optimizeRouting`      | `0.5`             | Heuristic aggressiveness for omitting redundant connections (0 = off, 1 = most aggressive)          |
+| `mL`                   | computed from `M` | Normalization factor for level generation                                                           |
+| `efSearchConstruction` | `50`              | Max nodes explored during search                                                                    |
 
 Example with custom parameters:
 
 ```graphql
 type Document @table {
-  id: Long @primaryKey
-  textEmbeddings: [Float] @indexed(type: "HNSW", distance: "euclidean", optimizeRouting: 0, efSearchConstruction: 100)
+	id: Long @primaryKey
+	textEmbeddings: [Float] @indexed(type: "HNSW", distance: "euclidean", optimizeRouting: 0, efSearchConstruction: 100)
 }
 ```
 
@@ -336,19 +337,19 @@ type Document @table {
 
 Harper supports the following field types:
 
-| Type | Description |
-|---|---|
-| `String` | Unicode text, UTF-8 encoded |
-| `Int` | 32-bit signed integer (−2,147,483,648 to 2,147,483,647) |
-| `Long` | 54-bit signed integer (−9,007,199,254,740,992 to 9,007,199,254,740,992) |
-| `Float` | 64-bit double precision floating point |
-| `BigInt` | Integer up to ~300 digits. Note: distinct JavaScript type; handle appropriately in custom code |
-| `Boolean` | `true` or `false` |
-| `ID` | String; indicates a non-human-readable identifier |
-| `Any` | Any primitive, object, or array |
-| `Date` | JavaScript `Date` object |
-| `Bytes` | Binary data as `Buffer` or `Uint8Array` |
-| `Blob` | Binary large object; designed for streaming content >20KB |
+| Type      | Description                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `String`  | Unicode text, UTF-8 encoded                                                                    |
+| `Int`     | 32-bit signed integer (−2,147,483,648 to 2,147,483,647)                                        |
+| `Long`    | 54-bit signed integer (−9,007,199,254,740,992 to 9,007,199,254,740,992)                        |
+| `Float`   | 64-bit double precision floating point                                                         |
+| `BigInt`  | Integer up to ~300 digits. Note: distinct JavaScript type; handle appropriately in custom code |
+| `Boolean` | `true` or `false`                                                                              |
+| `ID`      | String; indicates a non-human-readable identifier                                              |
+| `Any`     | Any primitive, object, or array                                                                |
+| `Date`    | JavaScript `Date` object                                                                       |
+| `Bytes`   | Binary data as `Buffer` or `Uint8Array`                                                        |
+| `Blob`    | Binary large object; designed for streaming content >20KB                                      |
 
 Added in for `BigInt`: v4.3.0
 
@@ -370,8 +371,8 @@ Declare a blob field:
 
 ```graphql
 type MyTable @table {
-  id: Any! @primaryKey
-  data: Blob
+	id: Any! @primaryKey
+	data: Blob
 }
 ```
 
@@ -404,14 +405,14 @@ When returning a blob via REST, register an error handler to handle interrupted 
 
 ```javascript
 export class MyEndpoint extends MyTable {
-  async get(target) {
-    const record = super.get(target);
-    let blob = record.data;
-    blob.on('error', () => {
-      MyTable.invalidate(target);
-    });
-    return { status: 200, headers: {}, body: blob };
-  }
+	async get(target) {
+		const record = super.get(target);
+		let blob = record.data;
+		blob.on('error', () => {
+			MyTable.invalidate(target);
+		});
+		return { status: 200, headers: {}, body: blob };
+	}
 }
 ```
 

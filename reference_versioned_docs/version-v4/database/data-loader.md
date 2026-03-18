@@ -30,22 +30,22 @@ Each data file loads records into a single table. The file specifies the target 
 
 ```json
 {
-  "database": "myapp",
-  "table": "users",
-  "records": [
-    {
-      "id": 1,
-      "username": "admin",
-      "email": "admin@example.com",
-      "role": "administrator"
-    },
-    {
-      "id": 2,
-      "username": "user1",
-      "email": "user1@example.com",
-      "role": "standard"
-    }
-  ]
+	"database": "myapp",
+	"table": "users",
+	"records": [
+		{
+			"id": 1,
+			"username": "admin",
+			"email": "admin@example.com",
+			"role": "administrator"
+		},
+		{
+			"id": 2,
+			"username": "user1",
+			"email": "user1@example.com",
+			"role": "standard"
+		}
+	]
 }
 ```
 
@@ -96,14 +96,14 @@ When Harper starts a component with `dataLoader` configured:
 
 ### Change Detection
 
-| Scenario | Behavior |
-|---|---|
-| New record | Inserted; content hash stored |
-| Unchanged record | Skipped (no writes) |
-| Changed data file | Updated via `patch`, preserving any extra fields |
-| Record created by user (not data loader) | Never overwritten |
-| Record modified by user after load | Preserved, not overwritten |
-| Extra fields added by user to a data-loaded record | Preserved during updates |
+| Scenario                                           | Behavior                                         |
+| -------------------------------------------------- | ------------------------------------------------ |
+| New record                                         | Inserted; content hash stored                    |
+| Unchanged record                                   | Skipped (no writes)                              |
+| Changed data file                                  | Updated via `patch`, preserving any extra fields |
+| Record created by user (not data loader)           | Never overwritten                                |
+| Record modified by user after load                 | Preserved, not overwritten                       |
+| Extra fields added by user to a data-loaded record | Preserved during updates                         |
 
 This design makes data files safe to redeploy without losing manual modifications.
 

@@ -31,11 +31,11 @@ Ingests CSV data provided directly in the request body.
 
 ```json
 {
-  "operation": "csv_data_load",
-  "database": "dev",
-  "action": "insert",
-  "table": "breed",
-  "data": "id,name,country\n1,Labrador,Canada\n2,Poodle,France\n"
+	"operation": "csv_data_load",
+	"database": "dev",
+	"action": "insert",
+	"table": "breed",
+	"data": "id,name,country\n1,Labrador,Canada\n2,Poodle,France\n"
 }
 ```
 
@@ -43,8 +43,8 @@ Response:
 
 ```json
 {
-  "message": "Starting job with id 2fe25039-566e-4670-8bb3-2db3d4e07e69",
-  "job_id": "2fe25039-566e-4670-8bb3-2db3d4e07e69"
+	"message": "Starting job with id 2fe25039-566e-4670-8bb3-2db3d4e07e69",
+	"job_id": "2fe25039-566e-4670-8bb3-2db3d4e07e69"
 }
 ```
 
@@ -64,11 +64,11 @@ Ingests CSV data from a file on the server's local filesystem.
 
 ```json
 {
-  "operation": "csv_file_load",
-  "action": "insert",
-  "database": "dev",
-  "table": "breed",
-  "file_path": "/home/user/imports/breeds.csv"
+	"operation": "csv_file_load",
+	"action": "insert",
+	"database": "dev",
+	"table": "breed",
+	"file_path": "/home/user/imports/breeds.csv"
 }
 ```
 
@@ -86,11 +86,11 @@ Ingests CSV data from a URL.
 
 ```json
 {
-  "operation": "csv_url_load",
-  "action": "insert",
-  "database": "dev",
-  "table": "breed",
-  "csv_url": "https://s3.amazonaws.com/mydata/breeds.csv"
+	"operation": "csv_url_load",
+	"action": "insert",
+	"database": "dev",
+	"table": "breed",
+	"csv_url": "https://s3.amazonaws.com/mydata/breeds.csv"
 }
 ```
 
@@ -113,17 +113,17 @@ Imports CSV or JSON files from an AWS S3 bucket.
 
 ```json
 {
-  "operation": "import_from_s3",
-  "action": "insert",
-  "database": "dev",
-  "table": "dog",
-  "s3": {
-    "aws_access_key_id": "YOUR_KEY",
-    "aws_secret_access_key": "YOUR_SECRET_KEY",
-    "bucket": "BUCKET_NAME",
-    "key": "dogs.json",
-    "region": "us-east-1"
-  }
+	"operation": "import_from_s3",
+	"action": "insert",
+	"database": "dev",
+	"table": "dog",
+	"s3": {
+		"aws_access_key_id": "YOUR_KEY",
+		"aws_secret_access_key": "YOUR_SECRET_KEY",
+		"bucket": "BUCKET_NAME",
+		"key": "dogs.json",
+		"region": "us-east-1"
+	}
 }
 ```
 
@@ -144,13 +144,13 @@ Changed in: v4.3.0 — `search_by_conditions` added as a supported search operat
 
 ```json
 {
-  "operation": "export_local",
-  "format": "json",
-  "path": "/data/exports/",
-  "search_operation": {
-    "operation": "sql",
-    "sql": "SELECT * FROM dev.breed"
-  }
+	"operation": "export_local",
+	"format": "json",
+	"path": "/data/exports/",
+	"search_operation": {
+		"operation": "sql",
+		"sql": "SELECT * FROM dev.breed"
+	}
 }
 ```
 
@@ -169,19 +169,19 @@ Changed in: v4.3.0 — `search_by_conditions` added as a supported search operat
 
 ```json
 {
-  "operation": "export_to_s3",
-  "format": "json",
-  "s3": {
-    "aws_access_key_id": "YOUR_KEY",
-    "aws_secret_access_key": "YOUR_SECRET_KEY",
-    "bucket": "BUCKET_NAME",
-    "key": "exports/dogs.json",
-    "region": "us-east-1"
-  },
-  "search_operation": {
-    "operation": "sql",
-    "sql": "SELECT * FROM dev.dog"
-  }
+	"operation": "export_to_s3",
+	"format": "json",
+	"s3": {
+		"aws_access_key_id": "YOUR_KEY",
+		"aws_secret_access_key": "YOUR_SECRET_KEY",
+		"bucket": "BUCKET_NAME",
+		"key": "exports/dogs.json",
+		"region": "us-east-1"
+	},
+	"search_operation": {
+		"operation": "sql",
+		"sql": "SELECT * FROM dev.dog"
+	}
 }
 ```
 
@@ -200,10 +200,10 @@ _Restricted to `super_user` roles._
 
 ```json
 {
-  "operation": "delete_records_before",
-  "date": "2024-01-01T00:00:00.000Z",
-  "schema": "dev",
-  "table": "breed"
+	"operation": "delete_records_before",
+	"date": "2024-01-01T00:00:00.000Z",
+	"schema": "dev",
+	"table": "breed"
 }
 ```
 
@@ -218,8 +218,8 @@ Returns status, metrics, and messages for a specific job by ID.
 
 ```json
 {
-  "operation": "get_job",
-  "id": "4a982782-929a-4507-8794-26dae1132def"
+	"operation": "get_job",
+	"id": "4a982782-929a-4507-8794-26dae1132def"
 }
 ```
 
@@ -227,21 +227,21 @@ Response:
 
 ```json
 [
-  {
-    "__createdtime__": 1611615798782,
-    "__updatedtime__": 1611615801207,
-    "created_datetime": 1611615798774,
-    "end_datetime": 1611615801206,
-    "id": "4a982782-929a-4507-8794-26dae1132def",
-    "job_body": null,
-    "message": "successfully loaded 350 of 350 records",
-    "start_datetime": 1611615798805,
-    "status": "COMPLETE",
-    "type": "csv_url_load",
-    "user": "HDB_ADMIN",
-    "start_datetime_converted": "2021-01-25T23:03:18.805Z",
-    "end_datetime_converted": "2021-01-25T23:03:21.206Z"
-  }
+	{
+		"__createdtime__": 1611615798782,
+		"__updatedtime__": 1611615801207,
+		"created_datetime": 1611615798774,
+		"end_datetime": 1611615801206,
+		"id": "4a982782-929a-4507-8794-26dae1132def",
+		"job_body": null,
+		"message": "successfully loaded 350 of 350 records",
+		"start_datetime": 1611615798805,
+		"status": "COMPLETE",
+		"type": "csv_url_load",
+		"user": "HDB_ADMIN",
+		"start_datetime_converted": "2021-01-25T23:03:18.805Z",
+		"end_datetime_converted": "2021-01-25T23:03:21.206Z"
+	}
 ]
 ```
 
@@ -259,9 +259,9 @@ _Restricted to `super_user` roles._
 
 ```json
 {
-  "operation": "search_jobs_by_start_date",
-  "from_date": "2024-01-01T00:00:00.000+0000",
-  "to_date": "2024-01-02T00:00:00.000+0000"
+	"operation": "search_jobs_by_start_date",
+	"from_date": "2024-01-01T00:00:00.000+0000",
+	"to_date": "2024-01-02T00:00:00.000+0000"
 }
 ```
 

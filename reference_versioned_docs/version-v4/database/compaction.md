@@ -57,10 +57,10 @@ STORAGE_COMPACTONSTART=true STORAGE_COMPACTONSTARTKEEPBACKUP=true harperdb
 
 ### Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `compactOnStart` | Boolean | `false` | Compact all databases at startup. Automatically reset to `false` after running. |
-| `compactOnStartKeepBackup` | Boolean | `false` | Retain the backup copy created during compact on start |
+| Option                     | Type    | Default | Description                                                                     |
+| -------------------------- | ------- | ------- | ------------------------------------------------------------------------------- |
+| `compactOnStart`           | Boolean | `false` | Compact all databases at startup. Automatically reset to `false` after running. |
+| `compactOnStartKeepBackup` | Boolean | `false` | Retain the backup copy created during compact on start                          |
 
 > **Note:** `compactOnStart` is automatically set back to `false` after it runs, so compaction only happens on the next start if you explicitly re-enable it.
 

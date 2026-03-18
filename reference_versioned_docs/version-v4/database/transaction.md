@@ -13,15 +13,15 @@ title: Transaction Logging
 
 Harper provides two complementary mechanisms for recording a history of data changes on a table: the **audit log** and the **transaction log**. Both are available at the table level and serve different use cases.
 
-| Feature | Audit Log | Transaction Log |
-|---|---|---|
-| Storage | Standard Harper table (per-table) | Clustering streams (per-table) |
-| Requires clustering | No | Yes |
-| Available since | v4.1.0 | v4.1.0 |
-| Stores original record values | Yes | No |
-| Query by username | Yes | No |
-| Query by primary key | Yes | No |
-| Used for real-time messaging | Yes (required) | No |
+| Feature                       | Audit Log                         | Transaction Log                |
+| ----------------------------- | --------------------------------- | ------------------------------ |
+| Storage                       | Standard Harper table (per-table) | Clustering streams (per-table) |
+| Requires clustering           | No                                | Yes                            |
+| Available since               | v4.1.0                            | v4.1.0                         |
+| Stores original record values | Yes                               | No                             |
+| Query by username             | Yes                               | No                             |
+| Query by primary key          | Yes                               | No                             |
+| Used for real-time messaging  | Yes (required)                    | No                             |
 
 ## Audit Log
 
@@ -43,31 +43,31 @@ Queries the audit log for a specific table. Supports filtering by timestamp, use
 
 ```json
 {
-  "operation": "read_audit_log",
-  "schema": "dev",
-  "table": "dog",
-  "search_type": "timestamp",
-  "search_values": [1660585740558]
+	"operation": "read_audit_log",
+	"schema": "dev",
+	"table": "dog",
+	"search_type": "timestamp",
+	"search_values": [1660585740558]
 }
 ```
 
 Timestamp behavior:
 
-| `search_values` | Result |
-|---|---|
-| `[]` | All records for the table |
-| `[timestamp]` | All records after the provided timestamp |
-| `[from, to]` | Records between the two timestamps |
+| `search_values` | Result                                   |
+| --------------- | ---------------------------------------- |
+| `[]`            | All records for the table                |
+| `[timestamp]`   | All records after the provided timestamp |
+| `[from, to]`    | Records between the two timestamps       |
 
 **By username:**
 
 ```json
 {
-  "operation": "read_audit_log",
-  "schema": "dev",
-  "table": "dog",
-  "search_type": "username",
-  "search_values": ["admin"]
+	"operation": "read_audit_log",
+	"schema": "dev",
+	"table": "dog",
+	"search_type": "username",
+	"search_values": ["admin"]
 }
 ```
 
@@ -75,11 +75,11 @@ Timestamp behavior:
 
 ```json
 {
-  "operation": "read_audit_log",
-  "schema": "dev",
-  "table": "dog",
-  "search_type": "hash_value",
-  "search_values": [318]
+	"operation": "read_audit_log",
+	"schema": "dev",
+	"table": "dog",
+	"search_type": "hash_value",
+	"search_values": [318]
 }
 ```
 
@@ -87,28 +87,28 @@ Timestamp behavior:
 
 ```json
 {
-  "operation": "update",
-  "user_name": "HDB_ADMIN",
-  "timestamp": 1607035559122.277,
-  "hash_values": [1, 2],
-  "records": [
-    {
-      "id": 1,
-      "breed": "Muttzilla",
-      "age": 6,
-      "__updatedtime__": 1607035559122
-    }
-  ],
-  "original_records": [
-    {
-      "__createdtime__": 1607035556801,
-      "__updatedtime__": 1607035556801,
-      "age": 5,
-      "breed": "Mutt",
-      "id": 1,
-      "name": "Harper"
-    }
-  ]
+	"operation": "update",
+	"user_name": "HDB_ADMIN",
+	"timestamp": 1607035559122.277,
+	"hash_values": [1, 2],
+	"records": [
+		{
+			"id": 1,
+			"breed": "Muttzilla",
+			"age": 6,
+			"__updatedtime__": 1607035559122
+		}
+	],
+	"original_records": [
+		{
+			"__createdtime__": 1607035556801,
+			"__updatedtime__": 1607035556801,
+			"age": 5,
+			"breed": "Mutt",
+			"id": 1,
+			"name": "Harper"
+		}
+	]
 }
 ```
 
@@ -124,10 +124,10 @@ Changed in: v4.5.0 — Storage reclamation: Harper automatically evicts older au
 
 ```json
 {
-  "operation": "delete_audit_logs_before",
-  "schema": "dev",
-  "table": "dog",
-  "timestamp": 1598290282817
+	"operation": "delete_audit_logs_before",
+	"schema": "dev",
+	"table": "dog",
+	"timestamp": 1598290282817
 }
 ```
 
@@ -151,12 +151,12 @@ Returns a prescribed set of transaction records based on a time range and option
 
 ```json
 {
-  "operation": "read_transaction_log",
-  "schema": "dev",
-  "table": "dog",
-  "from": 1598290235769,
-  "to": 1660249020865,
-  "limit": 2
+	"operation": "read_transaction_log",
+	"schema": "dev",
+	"table": "dog",
+	"from": 1598290235769,
+	"to": 1660249020865,
+	"limit": 2
 }
 ```
 
@@ -164,32 +164,32 @@ Returns a prescribed set of transaction records based on a time range and option
 
 ```json
 [
-  {
-    "operation": "insert",
-    "user": "admin",
-    "timestamp": 1660165619736,
-    "records": [
-      {
-        "id": 1,
-        "dog_name": "Penny",
-        "owner_name": "Kyle",
-        "__updatedtime__": 1660165619688,
-        "__createdtime__": 1660165619688
-      }
-    ]
-  },
-  {
-    "operation": "update",
-    "user": "admin",
-    "timestamp": 1660165620040,
-    "records": [
-      {
-        "id": 1,
-        "dog_name": "Penny B",
-        "__updatedtime__": 1660165620036
-      }
-    ]
-  }
+	{
+		"operation": "insert",
+		"user": "admin",
+		"timestamp": 1660165619736,
+		"records": [
+			{
+				"id": 1,
+				"dog_name": "Penny",
+				"owner_name": "Kyle",
+				"__updatedtime__": 1660165619688,
+				"__createdtime__": 1660165619688
+			}
+		]
+	},
+	{
+		"operation": "update",
+		"user": "admin",
+		"timestamp": 1660165620040,
+		"records": [
+			{
+				"id": 1,
+				"dog_name": "Penny B",
+				"__updatedtime__": 1660165620036
+			}
+		]
+	}
 ]
 ```
 
@@ -201,10 +201,10 @@ Deletes transaction log entries older than the specified timestamp.
 
 ```json
 {
-  "operation": "delete_transaction_logs_before",
-  "schema": "dev",
-  "table": "dog",
-  "timestamp": 1598290282817
+	"operation": "delete_transaction_logs_before",
+	"schema": "dev",
+	"table": "dog",
+	"timestamp": 1598290282817
 }
 ```
 
@@ -216,8 +216,8 @@ You can enable or disable the audit log for individual tables using the `@table`
 
 ```graphql
 type Dog @table(audit: true) {
-  id: ID @primaryKey
-  name: String
+	id: ID @primaryKey
+	name: String
 }
 ```
 

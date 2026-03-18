@@ -88,6 +88,7 @@ Tables group records with a common data pattern. A table must have:
 - **Primary key** — the unique identifier for each record (also referred to as `hash_attribute` in the Operations API)
 
 Primary keys must be unique. If a primary key is not provided on insert, Harper auto-generates one:
+
 - A **UUID string** for primary keys typed as `String` or `ID`
 - An **auto-incrementing integer** for primary keys typed as `Int`, `Long`, or `Any`
 

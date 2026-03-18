@@ -31,6 +31,7 @@ Changed in: v4.3.0 — Storage performance improvements including better free-sp
 All top-level attributes are automatically indexed immediately upon ingestion. For [dynamic schema tables](./overview.md#dynamic-vs-defined-schemas), Harper reflexively creates the attribute and its index as new data arrives. For [schema-defined tables](./schema.md), indexes are created for all attributes marked with `@indexed`.
 
 Indexes are type-agnostic, ordering values as follows:
+
 1. Booleans
 2. Numbers (ordered numerically)
 3. Strings (ordered lexically)

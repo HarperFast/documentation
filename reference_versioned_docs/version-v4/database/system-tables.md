@@ -26,14 +26,16 @@ Query with `search_by_conditions` (requires `superuser` permission):
 
 ```json
 {
-  "operation": "search_by_conditions",
-  "schema": "system",
-  "table": "hdb_raw_analytics",
-  "conditions": [{
-    "search_attribute": "id",
-    "search_type": "between",
-    "search_value": [1688594000000, 1688594010000]
-  }]
+	"operation": "search_by_conditions",
+	"schema": "system",
+	"table": "hdb_raw_analytics",
+	"conditions": [
+		{
+			"search_attribute": "id",
+			"search_type": "between",
+			"search_value": [1688594000000, 1688594010000]
+		}
+	]
 }
 ```
 
@@ -41,38 +43,38 @@ A typical record:
 
 ```json
 {
-  "time": 1688594390708,
-  "period": 1000.8336279988289,
-  "metrics": [
-    {
-      "metric": "bytes-sent",
-      "path": "search_by_conditions",
-      "type": "operation",
-      "median": 202,
-      "mean": 202,
-      "p95": 202,
-      "p90": 202,
-      "count": 1
-    },
-    {
-      "metric": "memory",
-      "threadId": 2,
-      "rss": 1492664320,
-      "heapTotal": 124596224,
-      "heapUsed": 119563120,
-      "external": 3469790,
-      "arrayBuffers": 798721
-    },
-    {
-      "metric": "utilization",
-      "idle": 138227.52767700003,
-      "active": 70.5066209952347,
-      "utilization": 0.0005098165086230495
-    }
-  ],
-  "threadId": 2,
-  "totalBytesProcessed": 12182820,
-  "id": 1688594390708.6853
+	"time": 1688594390708,
+	"period": 1000.8336279988289,
+	"metrics": [
+		{
+			"metric": "bytes-sent",
+			"path": "search_by_conditions",
+			"type": "operation",
+			"median": 202,
+			"mean": 202,
+			"p95": 202,
+			"p90": 202,
+			"count": 1
+		},
+		{
+			"metric": "memory",
+			"threadId": 2,
+			"rss": 1492664320,
+			"heapTotal": 124596224,
+			"heapUsed": 119563120,
+			"external": 3469790,
+			"arrayBuffers": 798721
+		},
+		{
+			"metric": "utilization",
+			"idle": 138227.52767700003,
+			"active": 70.5066209952347,
+			"utilization": 0.0005098165086230495
+		}
+	],
+	"threadId": 2,
+	"totalBytesProcessed": 12182820,
+	"id": 1688594390708.6853
 }
 ```
 
@@ -82,14 +84,16 @@ Stores per-minute aggregate analytics. Once per minute, Harper aggregates all pe
 
 ```json
 {
-  "operation": "search_by_conditions",
-  "schema": "system",
-  "table": "hdb_analytics",
-  "conditions": [{
-    "search_attribute": "id",
-    "search_type": "between",
-    "search_value": [1688194100000, 1688594990000]
-  }]
+	"operation": "search_by_conditions",
+	"schema": "system",
+	"table": "hdb_analytics",
+	"conditions": [
+		{
+			"search_attribute": "id",
+			"search_type": "between",
+			"search_value": [1688194100000, 1688594990000]
+		}
+	]
 }
 ```
 
@@ -97,17 +101,17 @@ A typical aggregate record:
 
 ```json
 {
-  "period": 60000,
-  "metric": "bytes-sent",
-  "method": "connack",
-  "type": "mqtt",
-  "median": 4,
-  "mean": 4,
-  "p95": 4,
-  "p90": 4,
-  "count": 1,
-  "id": 1688589569646,
-  "time": 1688589569646
+	"period": 60000,
+	"metric": "bytes-sent",
+	"method": "connack",
+	"type": "mqtt",
+	"median": 4,
+	"mean": 4,
+	"p95": 4,
+	"p90": 4,
+	"count": 1,
+	"id": 1688589569646,
+	"time": 1688589569646
 }
 ```
 
@@ -133,10 +137,10 @@ Can be queried to inspect the current replication topology:
 
 ```json
 {
-  "operation": "search_by_hash",
-  "schema": "system",
-  "table": "hdb_nodes",
-  "hash_values": ["node-id"]
+	"operation": "search_by_hash",
+	"schema": "system",
+	"table": "hdb_nodes",
+	"hash_values": ["node-id"]
 }
 ```
 
