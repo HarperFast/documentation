@@ -88,11 +88,19 @@ dataLoader:
 
 ## Loading Behavior
 
-When Harper starts a component with `dataLoader` configured:
+The Data Loader runs on every full system start and every component deployment — this includes fresh installs, restarts of the Harper process, and redeployments of the component. It does **not** re-run on individual thread restarts within a running Harper process.
 
-1. All specified data files are read
+Because the Data Loader runs on every startup and deployment, change detection is central to how it works safely. On each run:
+
+1. All specified data files are read (JSON or YAML)
 2. Each file is validated to reference a single table
-3. Records are inserted or updated using content hash comparison (SHA-256 hashes stored in the `hdb_dataloader_hash` system table)
+3. Records are inserted or updated based on content hash comparison:
+   - New records are inserted if they don't exist
+   - Existing records are updated only if the data file content has changed
+   - Records created outside the Data Loader (via Operations API, REST, etc.) are never overwritten
+   - Records modified by users after being loaded are preserved and not overwritten
+   - Extra fields added by users to data-loaded records are preserved during updates
+4. SHA-256 content hashes are stored in the [`hdb_dataloader_hash`](./system-tables.md#hdb_dataloader_hash) system table to track which records have been loaded and detect changes
 
 ### Change Detection
 
@@ -105,7 +113,7 @@ When Harper starts a component with `dataLoader` configured:
 | Record modified by user after load                 | Preserved, not overwritten                       |
 | Extra fields added by user to a data-loaded record | Preserved during updates                         |
 
-This design makes data files safe to redeploy without losing manual modifications.
+This design makes data files safe to redeploy repeatedly — across deployments, node scaling, and system restarts — without losing manual modifications or causing unnecessary writes.
 
 ## Best Practices
 
@@ -113,27 +121,33 @@ This design makes data files safe to redeploy without losing manual modification
 
 **One table per file.** Each data file must target a single table. Organize files accordingly.
 
-**Idempotent data.** Design files to be safe to load multiple times without creating conflicts.
+**Idempotent data.** Design files to be safe to load multiple times without creating duplicate or conflicting records.
 
 **Version control.** Include data files in version control for consistency across deployments and environments.
+
+**Environment-specific data.** Consider using different data files for different environments (development, staging, production) to avoid loading inappropriate records.
+
+**Validate before deploying.** Ensure data files are valid JSON or YAML and match your table schemas before deployment to catch type mismatches early.
 
 **No sensitive data.** Do not include passwords, API keys, or secrets directly in data files. Use environment variables or secure configuration management instead.
 
 ## Example Component Structure
 
+A common production use case is shipping reference data — lookup tables like countries and regions — as part of a component. The records are version-controlled alongside the code, consistent across every environment, and the data loader keeps them in sync on every deployment without touching any user-modified fields.
+
 ```
 my-component/
 ├── config.yaml
-├── data/
-│   ├── users.json
-│   ├── roles.json
-│   └── settings.json
 ├── schemas.graphql
-└── roles.yaml
+├── roles.yaml
+└── data/
+    ├── countries.json    # ISO country codes — reference data, ships with component
+    └── regions.json      # region/subdivision codes
 ```
 
+**`config.yaml`**:
+
 ```yaml
-# config.yaml
 graphqlSchema:
   files: 'schemas.graphql'
 
@@ -145,6 +159,55 @@ dataLoader:
 
 rest: true
 ```
+
+**`schemas.graphql`**:
+
+```graphql
+type Country @table(database: "myapp") @export {
+	id: ID @primaryKey # ISO 3166-1 alpha-2, e.g. "US"
+	name: String @indexed
+	region: String @indexed
+}
+
+type Region @table(database: "myapp") @export {
+	id: ID @primaryKey # ISO 3166-2, e.g. "US-CA"
+	name: String @indexed
+	countryId: ID @indexed
+	country: Country @relationship(from: countryId)
+}
+```
+
+**`data/countries.json`**:
+
+```json
+{
+	"database": "myapp",
+	"table": "Country",
+	"records": [
+		{ "id": "US", "name": "United States", "region": "Americas" },
+		{ "id": "GB", "name": "United Kingdom", "region": "Europe" },
+		{ "id": "DE", "name": "Germany", "region": "Europe" }
+		// ... all ~250 ISO countries
+	]
+}
+```
+
+**`data/regions.json`**:
+
+```json
+{
+	"database": "myapp",
+	"table": "Region",
+	"records": [
+		{ "id": "US-CA", "name": "California", "countryId": "US" },
+		{ "id": "US-NY", "name": "New York", "countryId": "US" },
+		{ "id": "GB-ENG", "name": "England", "countryId": "GB" }
+		// ...
+	]
+}
+```
+
+Because the data loader uses content hashing, adding new countries or correcting a name in the file will update only the changed records on the next deployment — existing records that haven't changed are skipped entirely.
 
 ## Related Documentation
 

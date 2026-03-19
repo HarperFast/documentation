@@ -55,6 +55,8 @@ graphqlSchema:
   files: 'schema.graphql'
 ```
 
+Keep in mind that both plugins and applications can specify schemas.
+
 ## Type Directives
 
 Type directives apply to the entire table type definition.
@@ -83,30 +85,30 @@ Optional arguments:
 ```graphql
 # Override table name
 type Product @table(table: "products") {
-  id: ID @primaryKey
+	id: ID @primaryKey
 }
 
 # Place in a specific database
 type Order @table(database: "commerce") {
-  id: ID @primaryKey
+	id: ID @primaryKey
 }
 
 # Auto-expire records after 1 hour (e.g., a session cache)
 type Session @table(expiration: 3600) {
-  id: ID @primaryKey
-  userId: String
+	id: ID @primaryKey
+	userId: String
 }
 
 # Enable audit log for this table explicitly
 type AuditedRecord @table(audit: true) {
-  id: ID @primaryKey
-  value: String
+	id: ID @primaryKey
+	value: String
 }
 
 # Combine multiple arguments
 type Event @table(database: "analytics", expiration: 86400) {
-  id: Long @primaryKey
-  name: String @indexed
+	id: Long @primaryKey
+	name: String @indexed
 }
 ```
 
@@ -212,31 +214,32 @@ The `@relationship` directive defines how one table relates to another through a
 The foreign key is in this table, referencing the primary key of the target table.
 
 ```graphql
-type Product @table @export {
+type RealityShow @table @export {
 	id: ID @primaryKey
-	brandId: ID @indexed # foreign key
-	brand: Brand @relationship(from: brandId) # many-to-one
+	networkId: ID @indexed # foreign key
+	network: Network @relationship(from: networkId) # many-to-one
+	title: String @indexed
 }
 
-type Brand @table @export {
+type Network @table @export {
 	id: ID @primaryKey
-	name: String @indexed
+	name: String @indexed # e.g. "Bravo", "Peacock", "Netflix"
 }
 ```
 
-Query products by brand name:
+Query shows by network name:
 
 ```http
-GET /Product?brand.name=Microsoft
+GET /RealityShow?network.name=Bravo
 ```
 
-If the foreign key is an array, this establishes a many-to-many relationship:
+If the foreign key is an array, this establishes a many-to-many relationship (e.g., a show with multiple streaming homes):
 
 ```graphql
-type Product @table @export {
+type RealityShow @table @export {
 	id: ID @primaryKey
-	featureIds: [ID] @indexed
-	features: [Feature] @relationship(from: featureIds)
+	networkIds: [ID] @indexed
+	networks: [Network] @relationship(from: networkIds)
 }
 ```
 
@@ -245,10 +248,11 @@ type Product @table @export {
 The foreign key is in the target table, referencing the primary key of this table. The result type must be an array.
 
 ```graphql
-type Brand @table @export {
+type Network @table @export {
 	id: ID @primaryKey
-	name: String @indexed
-	products: [Product] @relationship(to: brandId) # one-to-many
+	name: String @indexed # e.g. "Bravo", "Peacock", "Netflix"
+	shows: [RealityShow] @relationship(to: networkId) # one-to-many
+	# shows like "Real Housewives of Atlanta", "The Traitors", "Vanderpump Rules"
 }
 ```
 
@@ -383,9 +387,9 @@ Harper supports the following field types:
 | `Bytes`   | Binary data as `Buffer` or `Uint8Array`                                                        |
 | `Blob`    | Binary large object; designed for streaming content >20KB                                      |
 
-Added in for `BigInt`: v4.3.0
+Added `BigInt` in v4.3.0
 
-Added in for `Blob`: v4.5.0
+Added `Blob` in v4.5.0
 
 Arrays of a type are expressed with `[Type]` syntax (e.g., `[Float]` for a vector).
 
@@ -393,7 +397,7 @@ Arrays of a type are expressed with `[Type]` syntax (e.g., `[Float]` for a vecto
 
 Added in: v4.5.0
 
-`Blob` fields are designed for large binary content. Unlike `Bytes`, blobs are stored separately from the record, support streaming, and do not need to be held entirely in memory. Use `Blob` for content typically larger than 20KB (images, video, audio, large HTML, etc.).
+`Blob` fields are designed for large binary content. Harper's `Blob` type implements the [Web API `Blob` interface](https://developer.mozilla.org/en-US/docs/Web/API/Blob), so all standard `Blob` methods (`.text()`, `.arrayBuffer()`, `.stream()`, `.slice()`) are available. Unlike `Bytes`, blobs are stored separately from the record, support streaming, and do not need to be held entirely in memory. Use `Blob` for content typically larger than 20KB (images, video, audio, large HTML, etc.).
 
 See [Blob usage details](#blob-usage) below.
 
@@ -415,13 +419,13 @@ let blob = createBlob(largeBuffer);
 await MyTable.put({ id: 'my-record', data: blob });
 ```
 
-Retrieve blob data:
+Retrieve blob data using standard Web API `Blob` methods:
 
 ```javascript
 let record = await MyTable.get('my-record');
-let buffer = await record.data.bytes();
-// or stream it:
-let stream = record.data.stream();
+let buffer = await record.data.bytes(); // ArrayBuffer
+let text = await record.data.text(); // string
+let stream = record.data.stream(); // ReadableStream
 ```
 
 Blobs support asynchronous streaming, meaning a record can reference a blob before it is fully written to storage. Use `saveBeforeCommit: true` to wait for full write before committing:
@@ -462,22 +466,22 @@ Use `create_attribute` and `drop_attribute` operations to manually manage attrib
 
 ## OpenAPI Specification
 
-Tables exported with `@export` are described in a default endpoint:
+Tables exported with `@export` are described via the Operations API server (default port 9925), which is separate from the main HTTP server where REST, MQTT, and WebSocket services run:
 
 ```http
-GET /openapi
+GET http://localhost:9925/openapi
 ```
 
 This provides an OpenAPI 3.x description of all exported resource endpoints. The endpoint is a starting guide and may not cover every edge case.
 
 ## Renaming Tables
 
-> Harper does not support renaming tables. Changing a type name in a schema definition creates a new, empty table — the original table and its data are unaffected.
+Harper does **not** support renaming tables. Changing a type name in a schema definition creates a new, empty table — the original table and its data are unaffected.
 
 ## Related Documentation
 
 - [Data Loader](./data-loader.md) — Seed tables with initial data alongside schema deployment
-- [REST Querying](TODO:reference_versioned_docs/version-v4/rest/querying.md) — Querying tables via HTTP using schema-defined attributes and relationships
+- [REST Querying](../rest/querying.md) — Querying tables via HTTP using schema-defined attributes and relationships
 - [Resources](TODO:reference_versioned_docs/version-v4/resources/resource-api.md) — Extending table behavior with custom application logic
 - [Storage Algorithm](./storage-algorithm.md) — How Harper indexes and stores schema-defined data
 - [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'graphqlSchema component and storage options') — Component configuration for schemas

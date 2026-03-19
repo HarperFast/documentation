@@ -29,7 +29,7 @@ Available since: v4.1.0
 
 The audit log uses a standard Harper table to track every transaction against a user table. For each user table, Harper automatically creates and maintains a corresponding audit log table. The audit log captures the operation type, the user who made the change, the timestamp, and both the new and original record values.
 
-The audit log is **enabled by default**. To disable it, set `logging.auditLog` to `false` in `harperdb-config.yaml` and restart Harper.
+The audit log is **enabled by default**. To disable it, set [`logging.auditLog`](../logging/configuration.md) to `false` in `harperdb-config.yaml` and restart Harper.
 
 > The audit log is required for real-time messaging (WebSocket and MQTT subscriptions). Do not disable it if real-time features are in use.
 
@@ -221,11 +221,11 @@ type Dog @table(audit: true) {
 }
 ```
 
-This overrides the `logging.auditLog` global configuration for that specific table.
+This overrides the [`logging.auditLog`](../logging/configuration.md) global configuration for that specific table.
 
 ## Related Documentation
 
-- [Logging](TODO:reference_versioned_docs/version-v4/logging/overview.md) — Application and system logging (separate from transaction/audit logging)
+- [Logging](../logging/overview.md) — Application and system logging (separate from transaction/audit logging)
 - [Replication](TODO:reference_versioned_docs/version-v4/replication/overview.md) — Clustering setup required for transaction logs
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'logging.auditLog option') — Global audit log configuration
+- [Logging Configuration](../logging/configuration.md) — Global audit log configuration (`logging.auditLog`)
 - [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Sending operations to Harper

@@ -17,7 +17,7 @@ Job status values:
 
 ## Bulk Operations
 
-The following operations create jobs. All bulk operations are sent to the Operations API.
+The following operations create jobs. All bulk operations are sent to the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md).
 
 ### CSV Data Load
 

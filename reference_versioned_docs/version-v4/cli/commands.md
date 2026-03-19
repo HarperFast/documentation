@@ -230,7 +230,7 @@ This copies the default `data` database to a new location with compaction applie
 - Creating compacted backups
 - Reclaiming free space
 
-See also: [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md 'Database compaction reference') for more information.
+See also: [Database Compaction](../database/compaction.md) for more information.
 
 #### How Backups Work
 
@@ -266,4 +266,4 @@ The CLI supports executing commands on remote Harper instances. For details, see
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
 - [CLI Authentication](./authentication.md) - Authentication mechanisms
 - [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration') - Configuration parameters for installation
-- [Database Compaction](TODO:reference_versioned_docs/version-v4/database/compaction.md 'Compaction') - More on database compaction
+- [Database Compaction](../database/compaction.md) - More on database compaction

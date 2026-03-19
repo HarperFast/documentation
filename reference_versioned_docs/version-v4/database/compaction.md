@@ -21,7 +21,7 @@ Creates a compacted copy of a database file. The original database is left uncha
 
 > **Recommendation:** Stop Harper before performing copy compaction to prevent any record loss during the copy operation.
 
-Run using the [CLI](TODO:reference_versioned_docs/version-v4/cli/commands.md):
+Run using the [CLI](../cli/commands.md):
 
 ```bash
 harperdb copy-db <source-database> <target-database-path>
@@ -67,5 +67,5 @@ STORAGE_COMPACTONSTART=true STORAGE_COMPACTONSTARTKEEPBACKUP=true harperdb
 ## Related Documentation
 
 - [Storage Algorithm](./storage-algorithm.md) — How Harper stores data using LMDB
-- [CLI Commands](TODO:reference_versioned_docs/version-v4/cli/commands.md) — `copy-db` CLI command reference
+- [CLI Commands](../cli/commands.md) — `copy-db` CLI command reference
 - [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'storage section') — Full storage configuration options including compression settings

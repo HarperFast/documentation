@@ -58,12 +58,51 @@ Harper inherits the following performance properties from LMDB:
 
 ## Indexing Example
 
-The diagram below illustrates how a single table's data and attribute indexes are laid out within Harper's LMDB-based storage:
+Given a table with records like this:
 
-<!-- TODO-IMAGE: Original image at versioned_docs/version-4.7/assets/HarperDB-3.0-Storage-Algorithm.png.webp -->
-<!-- Human reviewer: Determine if this image should be migrated, updated, or removed -->
+```
+┌────┬────────┬────────┐
+│ id │ field1 │ field2 │
+├────┼────────┼────────┤
+│  1 │ A      │ X      │
+│  2 │ 25     │ X      │
+│  3 │ -1     │ Y      │
+│  4 │ A      │        │
+│  5 │ true   │ 2      │
+└────┴────────┴────────┘
+```
 
-![Storage Algorithm Diagram](TODO:IMAGE)
+Harper maintains three separate LMDB sub-databases for that table:
+
+```
+Table (LMDB environment file)
+│
+├── primary index: id
+│   ┌─────┬──────────────────────────────────────┐
+│   │ Key │ Value (full record)                  │
+│   ├─────┼──────────────────────────────────────┤
+│   │  1  │ { id:1, field1:"A",  field2:"X"    } │
+│   │  2  │ { id:2, field1:25,   field2:"X"    } │
+│   │  3  │ { id:3, field1:-1,   field2:"Y"    } │
+│   │  4  │ { id:4, field1:"A"                 } │
+│   │  5  │ { id:5, field1:true, field2:2      } │
+│   └─────┴──────────────────────────────────────┘
+│
+├── secondary index: field1          secondary index: field2
+│   ┌────────┬───────┐               ┌────────┬───────┐
+│   │ Key    │ Value │               │ Key    │ Value │
+│   ├────────┼───────┤               ├────────┼───────┤
+│   │ -1     │  3    │               │  2     │  5    │
+│   │  25    │  2    │               │  X     │  1    │
+│   │  A     │  1    │               │  X     │  2    │
+│   │  A     │  4    │               │  Y     │  3    │
+│   │  true  │  5    │               └────────┴───────┘
+│   └────────┴───────┘
+```
+
+Secondary indexes store the attribute value as the key and the record's primary key (`id`) as the value. To resolve a query result, Harper looks up the matching ids in the secondary index, then fetches the full records from the primary index.
+
+Indexes are ordered — booleans first, then numbers (numerically), then strings (lexically) — enabling efficient range queries across all types.
 
 ## Related Documentation
 

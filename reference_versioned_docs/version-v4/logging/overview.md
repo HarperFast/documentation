@@ -10,7 +10,7 @@ title: Logging
 
 Harper's core logging system is used for diagnostics, monitoring, and observability. It has an extensive configuration system, and even supports feature-specific (per-component) configurations in latest versions. Furthermore, the `logger` global API is available for creating custom logs from any JavaScript application or plugin code.
 
-> If you are looking for information on Harper's Audit and Transaction logging system, refer to the [Database](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit and transaction logging') section.
+> If you are looking for information on Harper's Audit and Transaction logging system, refer to the [Database](../database/transaction.md) section.
 
 ## Log File
 
@@ -89,4 +89,4 @@ The `logger` global provides `trace`, `debug`, `info`, `warn`, `error`, `fatal`,
 - [Logging Configuration](./configuration)
 - [Logging API](./api)
 - [Logging Operations](./operations)
-- [Database / Transaction Logging](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit and transaction logging')
+- [Database / Transaction Logging](../database/transaction.md)

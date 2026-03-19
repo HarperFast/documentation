@@ -118,7 +118,7 @@ For deeper coverage of each database feature, see the dedicated pages in this se
 
 ## Related Documentation
 
-- [REST](TODO:reference_versioned_docs/version-v4/rest/overview.md) — HTTP interface built on top of the database resource system
+- [REST](../rest/overview.md) — HTTP interface built on top of the database resource system
 - [Resources](TODO:reference_versioned_docs/version-v4/resources/overview.md) — Custom application logic extending database tables
 - [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Direct database management operations (create/drop databases and tables, insert/update/delete records)
 - [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md) — Storage configuration options (compression, blob paths, compaction)

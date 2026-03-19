@@ -115,7 +115,7 @@ A typical aggregate record:
 }
 ```
 
-For a full reference of available metrics and their fields, see [Analytics](TODO:reference_versioned_docs/version-v4/analytics/overview.md 'Complete analytics metrics reference').
+For a full reference of available metrics and their fields, see [Analytics](../analytics/overview.md 'Complete analytics metrics reference').
 
 ## Data Loader Table
 
@@ -152,7 +152,7 @@ Stores TLS certificates used in replication. Can be queried to inspect the certi
 
 ## Related Documentation
 
-- [Analytics](TODO:reference_versioned_docs/version-v4/analytics/overview.md) — Full reference for analytics metrics tracked in `hdb_analytics` and `hdb_raw_analytics`
+- [Analytics](../analytics/overview.md) — Full reference for analytics metrics tracked in `hdb_analytics` and `hdb_raw_analytics`
 - [Data Loader](./data-loader.md) — Component that writes to `hdb_dataloader_hash`
 - [Replication](TODO:reference_versioned_docs/version-v4/replication/overview.md) — Clustering and replication system that uses `hdb_nodes` and `hdb_certificate`
 - [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Querying system tables using `search_by_conditions`
