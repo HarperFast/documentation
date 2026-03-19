@@ -78,6 +78,38 @@ Optional arguments:
 | `expiration` | `Int`     | —              | Auto-expire records after this many seconds (useful for caching tables) |
 | `audit`      | `Boolean` | config default | Enable audit log for this table                                         |
 
+**Examples:**
+
+```graphql
+# Override table name
+type Product @table(table: "products") {
+  id: ID @primaryKey
+}
+
+# Place in a specific database
+type Order @table(database: "commerce") {
+  id: ID @primaryKey
+}
+
+# Auto-expire records after 1 hour (e.g., a session cache)
+type Session @table(expiration: 3600) {
+  id: ID @primaryKey
+  userId: String
+}
+
+# Enable audit log for this table explicitly
+type AuditedRecord @table(audit: true) {
+  id: ID @primaryKey
+  value: String
+}
+
+# Combine multiple arguments
+type Event @table(database: "analytics", expiration: 86400) {
+  id: Long @primaryKey
+  name: String @indexed
+}
+```
+
 **Database naming:** The default `data` database is a good choice for tables that won't be reused elsewhere. Components designed for reuse should specify a unique database name (e.g., `"my-component-data"`) to avoid naming collisions with other components.
 
 ### `@export`
