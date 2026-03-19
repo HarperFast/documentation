@@ -124,6 +124,17 @@ type MyTable @table @export(name: "my-table") {
 
 The optional `name` parameter specifies the URL path segment (e.g., `/my-table/`). Without `name`, the type name is used.
 
+### `@sealed`
+
+Prevents records from including any properties beyond those explicitly declared in the type. By default, Harper allows records to have additional properties.
+
+```graphql
+type StrictRecord @table @sealed {
+	id: ID @primaryKey
+	name: String
+}
+```
+
 ## Field Directives
 
 Field directives apply to individual attributes in a type definition.
@@ -187,17 +198,6 @@ Automatically assigns a timestamp (Unix epoch milliseconds) each time the record
 type Event @table {
 	id: ID @primaryKey
 	updatedAt: Long @updatedTime
-}
-```
-
-### `@sealed`
-
-Prevents records from including any properties beyond those explicitly declared in the type. By default, Harper allows records to have additional properties.
-
-```graphql
-type StrictRecord @table @sealed {
-	id: ID @primaryKey
-	name: String
 }
 ```
 
