@@ -296,6 +296,34 @@
 		},
 		{
 			"type": "category",
+			"label": "Resources",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "resources/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "resources/resource-api",
+					"label": "Resource API"
+				},
+				{
+					"type": "doc",
+					"id": "resources/global-apis",
+					"label": "Global APIs"
+				},
+				{
+					"type": "doc",
+					"id": "resources/query-optimization",
+					"label": "Query Optimization"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
