@@ -196,7 +196,7 @@ Handler properties:
 
 ## `server`
 
-The `server` global provides extension points for HTTP, WebSocket, socket, and authentication services. See also [HTTP API](TODO:reference_versioned_docs/version-v4/http/api.md 'HTTP section — server global reference') for full server documentation.
+The `server` global provides extension points for HTTP, WebSocket, socket, and authentication services. See also [HTTP API](../http/api.md) for full server documentation.
 
 ### `server.http(listener, options?): HttpServer[]`
 

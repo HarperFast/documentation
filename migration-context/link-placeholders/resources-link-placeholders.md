@@ -20,10 +20,6 @@
   - Context: Documenting `server.recordAnalytics` and linking to analytics docs
   - Target should be: Analytics section overview page (already merged)
 
-- Line 109: `[HTTP API](TODO:reference_versioned_docs/version-v4/http/api.md)`
-  - Context: Referring readers to the full server global docs in the HTTP section
-  - Target should be: HTTP section API page (already merged)
-
 ## reference_versioned_docs/version-v4/resources/resource-api.md
 
 No TODO placeholders — all cross-section links use relative paths for in-section links and section-relative paths otherwise. The global-apis.md has the external TODOs listed above.

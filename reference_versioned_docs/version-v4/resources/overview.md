@@ -34,9 +34,23 @@ The Resource API has two behavioral modes controlled by the `loadAsInstance` sta
 
 The [Resource API reference](./resource-api.md) is written against V2. For V1 behavior and migration guidance, see the legacy instance binding section of that page.
 
-## Quick Start: Extending a Table
+## Extending a Table
 
-The most common use case is extending an existing table to add custom logic:
+The most common use case is extending an existing table to add custom logic.
+
+Starting with a table definition in a `schema.graphql`:
+
+```graphql
+# Omit the `@export` directive
+type MyTable @table {
+	id: ID
+	# ...
+}
+```
+
+> For more info on the schema API see [`Database / Schema`]()
+
+Then, in a `resources.js` extend from the `tables.MyTable` global:
 
 ```javascript
 export class MyTable extends tables.MyTable {
@@ -54,13 +68,31 @@ export class MyTable extends tables.MyTable {
 }
 ```
 
-> If you export your extended class, remove the `@export` directive from the corresponding schema definition to avoid double-registration.
+Finally, ensure everything is configured appropriately:
+
+```yaml
+rest: true
+graphqlSchema:
+  files: schema.graphql
+jsResource:
+  files: resources.js
+```
 
 ## Custom External Data Source
 
-You can also extend the base `Resource` class to wrap an external API or service:
+You can also extend the base `Resource` class directly to implement custom endpoints, or even wrap an external API or service as a custom caching layer:
 
 ```javascript
+export class CustomEndpoint extends Resource {
+	static loadAsInstance = false;
+
+	get (target) {
+		return {
+			data: doSomething()
+		}
+	}
+}
+
 export class MyExternalData extends Resource {
 	static loadAsInstance = false;
 
@@ -81,18 +113,11 @@ export class MyExternalData extends Resource {
 tables.MyCache.sourcedFrom(MyExternalData);
 ```
 
+Resources are the true customization point for Harper. This is where the business logic of a Harper application really lives. There is a lot more to this API than these examples show. Ensure you fully review the [Resource API](./resource-api.md) documentation, and consider exploring the Learn guides for more information.
+
 ## Exporting Resources as Endpoints
 
-Resources become HTTP/MQTT endpoints when they are exported. The recommended way is to use the `@export` directive in your schema:
-
-```graphql
-type Product @table @export {
-	id: ID @primaryKey
-	name: String
-}
-```
-
-Alternatively, you can register resources programmatically using `server.resources.set()`. See [Global APIs — server.resources](./global-apis.md#serverresources-resources).
+Resources become HTTP/MQTT endpoints when they are exported. As the examples demonstrated if a Resource extends an existing table, make sure to not have conflicting exports between the schema and the JavaScript implementation. Alternatively, you can register resources programmatically using `server.resources.set()`. See [Global APIs — server.resources](./global-apis.md#serverresources-resources).
 
 ## Pages in This Section
 
