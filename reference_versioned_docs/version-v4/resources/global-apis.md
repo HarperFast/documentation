@@ -16,11 +16,13 @@ For TypeScript support and better IDE autocomplete, these can also be explicitly
 import { tables, databases, Resource, transaction, contentTypes, server } from 'harperdb';
 ```
 
-To set up the TypeScript link (done automatically for installed components):
+The `harperdb` package is automatically linked for components installed into Harper. If you are developing locally against a globally installed Harper instance, you may need to link the package manually:
 
 ```bash
 npm link harperdb
 ```
+
+See the [installation guide](/learn/getting-started/install-and-connect-harper) for more on setting up a local Harper environment.
 
 ---
 
