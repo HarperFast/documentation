@@ -86,10 +86,10 @@ You can also extend the base `Resource` class directly to implement custom endpo
 export class CustomEndpoint extends Resource {
 	static loadAsInstance = false;
 
-	get (target) {
+	get(target) {
 		return {
-			data: doSomething()
-		}
+			data: doSomething(),
+		};
 	}
 }
 
@@ -121,8 +121,8 @@ Resources become HTTP/MQTT endpoints when they are exported. As the examples dem
 
 ## Pages in This Section
 
-| Page | Description |
-|------|-------------|
-| [Resource API](./resource-api.md) | Complete reference for instance methods, static methods, the Query object, RequestTarget, and response handling |
-| [Global APIs](./global-apis.md) | `tables`, `databases`, `transaction`, `contentTypes`, and `server` globals |
-| [Query Optimization](./query-optimization.md) | How Harper executes queries and how to write performant conditions |
+| Page                                          | Description                                                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [Resource API](./resource-api.md)             | Complete reference for instance methods, static methods, the Query object, RequestTarget, and response handling |
+| [Global APIs](./global-apis.md)               | `tables`, `databases`, `transaction`, `contentTypes`, and `server` globals                                      |
+| [Query Optimization](./query-optimization.md) | How Harper executes queries and how to write performant conditions                                              |

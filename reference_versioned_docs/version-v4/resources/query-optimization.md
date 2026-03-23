@@ -36,15 +36,15 @@ When a query is executed, conditions are evaluated against the database. Indexed
 
 ### Index Performance Characteristics
 
-| Operator | Uses index | Notes |
-|----------|-----------|-------|
-| `=` (equals) | Yes | Fast lookup in sorted index |
-| `>`, `>=`, `<`, `<=` | Yes | Range scan in sorted index; narrower range = faster |
-| `starts_with` | Yes | Prefix search in sorted index |
-| `!=` (not_equal) | No | Full scan required (unless combined with selective indexed condition) |
-| `contains` | No | Full scan required |
-| `ends_with` | No | Full scan required |
-| `!= null` | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields |
+| Operator             | Uses index         | Notes                                                                    |
+| -------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `=` (equals)         | Yes                | Fast lookup in sorted index                                              |
+| `>`, `>=`, `<`, `<=` | Yes                | Range scan in sorted index; narrower range = faster                      |
+| `starts_with`        | Yes                | Prefix search in sorted index                                            |
+| `!=` (not_equal)     | No                 | Full scan required (unless combined with selective indexed condition)    |
+| `contains`           | No                 | Full scan required                                                       |
+| `ends_with`          | No                 | Full scan required                                                       |
+| `!= null`            | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields |
 
 **Rule of thumb**: Use `=`, range operators, and `starts_with` on indexed fields. Avoid `contains`, `ends_with`, and `!=` as the sole or first condition in large datasets.
 
@@ -79,12 +79,12 @@ Example of an indexed foreign key that enables efficient join queries:
 ```graphql
 type Product @table {
 	id: ID @primaryKey
-	brandId: ID @indexed           # foreign key — index this
+	brandId: ID @indexed # foreign key — index this
 	brand: Related @relation(from: "brandId")
 }
 type Brand @table {
 	id: ID @primaryKey
-	name: String @indexed          # indexed — enables efficient brand.name queries
+	name: String @indexed # indexed — enables efficient brand.name queries
 	products: Product @relation(to: "brandId")
 }
 ```
@@ -105,6 +105,7 @@ Best practice: sort on the same indexed field you are filtering on, or sort on a
 Harper can stream query results — returning records as they are found rather than waiting for the entire query to complete. This improves time-to-first-byte for large queries and reduces peak memory usage.
 
 **Streaming is defeated** when:
+
 - A sort order is specified that is not aligned with the condition's index
 - The full result set must be materialized to perform sorting
 
@@ -125,9 +126,9 @@ Failing to iterate the `AsyncIterable` to completion keeps a read transaction op
 ```graphql
 type Product @table {
 	id: ID @primaryKey
-	name: String @indexed      # queried frequently
-	category: String @indexed  # queried frequently
-	description: String        # not indexed (rarely in conditions)
+	name: String @indexed # queried frequently
+	category: String @indexed # queried frequently
+	description: String # not indexed (rarely in conditions)
 }
 ```
 
@@ -152,8 +153,8 @@ When Harper cannot auto-reorder (e.g. with `enforceExecutionOrder`), put the mos
 // Better: indexed, selective condition first
 Product.search({
 	conditions: [
-		{ attribute: 'sku', value: 'ABC-001' },      // exact match on indexed unique field
-		{ attribute: 'active', value: true },          // low cardinality filter
+		{ attribute: 'sku', value: 'ABC-001' }, // exact match on indexed unique field
+		{ attribute: 'active', value: true }, // low cardinality filter
 	],
 });
 ```
@@ -180,7 +181,7 @@ Product.search({
 // Better: use an indexed field condition to narrow first
 Product.search({
 	conditions: [
-		{ attribute: 'category', value: 'clothing' },  // indexed — narrows to subset
+		{ attribute: 'category', value: 'clothing' }, // indexed — narrows to subset
 		{ attribute: 'description', comparator: 'contains', value: 'sale' }, // non-indexed, applied to smaller set
 	],
 });

@@ -21,10 +21,10 @@ The Resource API provides a unified JavaScript interface for accessing, querying
 
 The Resource API has two behavioral modes selected by the `loadAsInstance` static property:
 
-| Version | `loadAsInstance` | Status |
-|---------|-----------------|--------|
-| V2 (current) | `false` | Recommended — will be default in Harper v5 |
-| V1 (legacy) | `true` | Preserved for backwards compatibility |
+| Version      | `loadAsInstance` | Status                                     |
+| ------------ | ---------------- | ------------------------------------------ |
+| V2 (current) | `false`          | Recommended — will be default in Harper v5 |
+| V1 (legacy)  | `true`           | Preserved for backwards compatibility      |
 
 This page documents V2 behavior (`loadAsInstance = false`). For V1 (legacy instance binding) behavior and migration examples, see [Legacy Instance Binding](#legacy-instance-binding-v1).
 
@@ -57,10 +57,10 @@ class MyResource extends Resource {
 	static loadAsInstance = false;
 
 	get(target) {
-		const id = target.id;           // primary key from URL path
+		const id = target.id; // primary key from URL path
 		const param = target.get('param1'); // query string param
-		const path = target.pathname;   // path relative to resource
-		return super.get(target);       // default: return the record
+		const path = target.pathname; // path relative to resource
+		return super.get(target); // default: return the record
 	}
 }
 ```
@@ -149,12 +149,12 @@ Called for MQTT subscribe commands. Returns a `Subscription` — an `AsyncIterab
 
 All properties are optional:
 
-| Property | Description |
-|----------|-------------|
-| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`) |
-| `startTime` | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
-| `previousCount` | Return the last N updates/messages. Cannot be used with `startTime`. |
-| `omitCurrent` | Do not send the current/retained record as the first update. |
+| Property             | Description                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                    |
+| `startTime`          | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
+| `previousCount`      | Return the last N updates/messages. Cannot be used with `startTime`.                           |
+| `omitCurrent`        | Do not send the current/retained record as the first update.                                   |
 
 ### `connect(target: RequestTarget, incomingMessages?: AsyncIterable): AsyncIterable`
 
@@ -169,6 +169,7 @@ Marks the specified record as invalid in a caching table, so it will be reloaded
 For caching tables: return `true` to serve the stale entry while revalidation happens concurrently; `false` to wait for the fresh value.
 
 Entry properties:
+
 - `version` — Timestamp/version from the source
 - `localTime` — When the resource was last refreshed locally
 - `expiresAt` — When the entry became stale
@@ -233,6 +234,7 @@ for await (const record of Product.get({ conditions: [{ attribute: 'inStock', va
 ```
 
 ### `put(target: RequestTarget | Id, record: object, context?): Promise<void>`
+
 ### `put(record: object, context?): Promise<void>`
 
 Save a record (create or replace). The second form reads the primary key from the `record` object.
@@ -288,6 +290,7 @@ Added in: v4.5.0
 Configure a table to use another resource as its data source (caching behavior). When a record is not found locally, it is fetched from the source and cached. Writes are delegated to the source.
 
 Options:
+
 - `expiration` — Default TTL in seconds
 - `eviction` — Eviction time in seconds
 - `scanInterval` — Period for scanning expired records
@@ -338,13 +341,13 @@ The `Query` object is accepted by `search()` and the static `get()` method.
 
 Array of condition objects to filter records. Each condition:
 
-| Property | Description |
-|----------|-------------|
-| `attribute` | Property name, or an array for chained/joined properties (e.g. `['brand', 'name']`) |
-| `value` | The value to match |
+| Property     | Description                                                                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attribute`  | Property name, or an array for chained/joined properties (e.g. `['brand', 'name']`)                                                                      |
+| `value`      | The value to match                                                                                                                                       |
 | `comparator` | `equals` (default), `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal`, `starts_with`, `contains`, `ends_with`, `between`, `not_equal` |
-| `conditions` | Nested conditions array |
-| `operator` | `and` (default) or `or` for the nested `conditions` |
+| `conditions` | Nested conditions array                                                                                                                                  |
+| `operator`   | `and` (default) or `or` for the nested `conditions`                                                                                                      |
 
 Example with nested conditions:
 
@@ -392,6 +395,7 @@ Properties to include in each returned record. Can be:
 - String to return a single property per record: `'id'`
 
 Special properties:
+
 - `$id` — Returns the primary key regardless of its name
 - `$updatedtime` — Returns the last-updated timestamp
 
@@ -399,11 +403,11 @@ Special properties:
 
 Sort order object:
 
-| Property | Description |
-|----------|-------------|
-| `attribute` | Property name (or array for chained relationship property) |
-| `descending` | Sort descending if `true` (default: `false`) |
-| `next` | Secondary sort to resolve ties (same structure) |
+| Property     | Description                                                |
+| ------------ | ---------------------------------------------------------- |
+| `attribute`  | Property name (or array for chained relationship property) |
+| `descending` | Sort descending if `true` (default: `false`)               |
+| `next`       | Secondary sort to resolve ties (same structure)            |
 
 ### `explain`
 
@@ -420,6 +424,7 @@ If `true`, forces conditions to execute in the order supplied, disabling Harper'
 `RequestTarget` represents a URL path mapped to a resource. It is a subclass of `URLSearchParams`.
 
 Properties:
+
 - `pathname` — Path relative to the resource, without query string
 - `search` — The query/search string portion of the URL
 - `id` — Primary key derived from the path
@@ -427,10 +432,12 @@ Properties:
 - `checkPermission` — Set to indicate authorization should be performed; has `action`, `resource`, and `user` sub-properties
 
 Standard `URLSearchParams` methods are available:
+
 - `get(name)`, `getAll(name)`, `set(name, value)`, `append(name, value)`, `delete(name)`, `has(name)`
 - Iterable: `for (const [name, value] of target) { ... }`
 
 When a URL uses Harper's extended query syntax, these are parsed onto the target:
+
 - `conditions`, `limit`, `offset`, `sort`, `select`
 
 ---

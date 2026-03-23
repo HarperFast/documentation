@@ -59,8 +59,8 @@ for await (const record of Product.search({
 An object containing all databases defined in Harper. Each database is an object containing its tables (same structure as `tables`). `databases.data` is the default database and is the same object as `tables`.
 
 ```javascript
-const Product = databases.data.Product;       // default database
-const Events = databases.analytics.Events;    // another database
+const Product = databases.data.Product; // default database
+const Events = databases.analytics.Events; // another database
 
 await Events.create({ eventType: 'login', timestamp: Date.now() });
 ```
@@ -110,12 +110,12 @@ If called with a context that already has a transaction, the existing transactio
 
 The callback receives a `transaction` object with:
 
-| Method/Property | Description |
-|----------------|-------------|
-| `commit(): Promise` | Commits the current transaction |
-| `abort(): void` | Aborts the current transaction and resets it |
+| Method/Property             | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `commit(): Promise`         | Commits the current transaction                                |
+| `abort(): void`             | Aborts the current transaction and resets it                   |
 | `resetReadSnapshot(): void` | Resets to the latest data (discards the current read snapshot) |
-| `timestamp: number` | Timestamp associated with the current transaction |
+| `timestamp: number`         | Timestamp associated with the current transaction              |
 
 **Transaction scope**: Each transaction spans a database. Reads within a transaction share a consistent snapshot. Writes across multiple tables in the same database are committed atomically. Transactions across different databases use separate underlying transactions with no cross-database atomicity guarantee.
 
@@ -163,13 +163,13 @@ A `Map` of content type handlers used for request/response serialization. Harper
 
 ### Built-in content types
 
-| MIME type | Format |
-|-----------|--------|
-| `application/json` | JSON |
-| `application/cbor` | CBOR |
+| MIME type             | Format      |
+| --------------------- | ----------- |
+| `application/json`    | JSON        |
+| `application/cbor`    | CBOR        |
 | `application/msgpack` | MessagePack |
-| `text/csv` | CSV |
-| `text/event-stream` | SSE |
+| `text/csv`            | CSV         |
+| `text/event-stream`   | SSE         |
 
 ### Custom content types
 
@@ -186,13 +186,13 @@ contentTypes.set('text/xml', {
 
 Handler properties:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `serialize(data)` | `(any) => Buffer \| string` | Convert data to response format |
-| `serializeStream(data)` | `(any) => ReadableStream` | Stream version for large/async data |
-| `deserialize(buffer)` | `(Buffer \| string) => any` | Convert request body to data. Used if `deserializeStream` is not defined. |
-| `deserializeStream(stream)` | `(ReadableStream) => any` | Stream-based deserialization |
-| `q` | `number` (0–1) | Quality factor for content negotiation. Default: 1 |
+| Property                    | Type                        | Description                                                               |
+| --------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| `serialize(data)`           | `(any) => Buffer \| string` | Convert data to response format                                           |
+| `serializeStream(data)`     | `(any) => ReadableStream`   | Stream version for large/async data                                       |
+| `deserialize(buffer)`       | `(Buffer \| string) => any` | Convert request body to data. Used if `deserializeStream` is not defined. |
+| `deserializeStream(stream)` | `(ReadableStream) => any`   | Stream-based deserialization                                              |
+| `q`                         | `number` (0–1)              | Quality factor for content negotiation. Default: 1                        |
 
 ---
 
