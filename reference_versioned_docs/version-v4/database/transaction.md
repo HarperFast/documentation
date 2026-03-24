@@ -27,11 +27,11 @@ Harper provides two complementary mechanisms for recording a history of data cha
 
 Available since: v4.1.0
 
-The audit log uses a standard Harper table to track every transaction against a user table. For each user table, Harper automatically creates and maintains a corresponding audit log table. The audit log captures the operation type, the user who made the change, the timestamp, and both the new and original record values.
+The audit log is a data store that tracks every transaction across all tables in a database. Harper automatically creates and maintains a single audit log per database. The audit log captures the operation type, the user who made the change, the timestamp, and both the new and original record values.
 
 The audit log is **enabled by default**. To disable it, set [`logging.auditLog`](../logging/configuration.md) to `false` in `harperdb-config.yaml` and restart Harper.
 
-> The audit log is required for real-time messaging (WebSocket and MQTT subscriptions). Do not disable it if real-time features are in use.
+> The audit log is required for real-time messaging (WebSocket and MQTT subscriptions) and replication. Do not disable it if real-time features or replication are in use.
 
 ### Audit Log Operations
 

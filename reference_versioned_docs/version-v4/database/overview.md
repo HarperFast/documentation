@@ -72,8 +72,6 @@ For more advanced use cases, you can extend table behavior using the [Resource A
 
 ## Databases
 
-Added in: v4.2.0
-
 Harper databases hold a collection of tables in a single transactionally-consistent file. This means reads and writes can be performed atomically across all tables in the same database, and multi-table transactions are replicated as a single atomic unit.
 
 The default database is named `data`. Most applications will use this default. Additional databases can be created for namespace separation — this is particularly useful for components designed for reuse across multiple applications, where a unique database name avoids naming collisions.

@@ -112,7 +112,7 @@ type Event @table(database: "analytics", expiration: 86400) {
 }
 ```
 
-**Database naming:** The default `data` database is a good choice for tables that won't be reused elsewhere. Components designed for reuse should specify a unique database name (e.g., `"my-component-data"`) to avoid naming collisions with other components.
+**Database naming:** Since all tables default to the `data` database, when designing plugins or applications, consider using unique database names to avoid table naming collisions.
 
 ### `@export`
 
@@ -177,9 +177,7 @@ type Product @table {
 
 If the field value is an array, each element in the array is individually indexed, enabling queries by any individual value.
 
-Null values are indexed by default on new tables (added in v4.3.0), enabling queries like `GET /Product/?category=null`.
-
-> **Note:** Existing indexes created before v4.3.0 do not include null values. To add null indexing to an existing attribute, drop and re-add the attribute index.
+Null values are indexed by default (added in v4.3.0), enabling queries like `GET /Product/?category=null`.
 
 ### `@createdTime`
 
@@ -256,7 +254,24 @@ type Network @table @export {
 }
 ```
 
-> **Note:** Do not combine `from` and `to` in the same `@relationship` directive.
+### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
+
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. This is useful for many-to-many relationships that join on non-primary-key attributes.
+
+```graphql
+type OrderItem @table @export {
+	id: ID @primaryKey
+	orderId: ID @indexed
+	productSku: ID @indexed
+	product: Product @relationship(from: productSku, to: sku) # join on sku, not primary key
+}
+
+type Product @table @export {
+	id: ID @primaryKey
+	sku: ID @indexed
+	name: String
+}
+```
 
 Schemas can also define self-referential relationships, enabling parent-child hierarchies within a single table.
 
@@ -466,10 +481,10 @@ Use `create_attribute` and `drop_attribute` operations to manually manage attrib
 
 ## OpenAPI Specification
 
-Tables exported with `@export` are described via the Operations API server (default port 9925), which is separate from the main HTTP server where REST, MQTT, and WebSocket services run:
+Tables exported with `@export` are described via an `/openapi` endpoint on the main HTTP server associated with the REST service (default port 9926).
 
 ```http
-GET http://localhost:9925/openapi
+GET http://localhost:9926/openapi
 ```
 
 This provides an OpenAPI 3.x description of all exported resource endpoints. The endpoint is a starting guide and may not cover every edge case.
