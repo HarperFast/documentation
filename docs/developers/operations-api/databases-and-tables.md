@@ -26,7 +26,7 @@ Returns the definitions of all databases and tables within the database. Record 
 		"dog": {
 			"schema": "dev",
 			"name": "dog",
-			"hash_attribute": "id",
+			"primary_key": "id",
 			"audit": true,
 			"schema_defined": false,
 			"attributes": [
@@ -82,7 +82,7 @@ Returns the definitions of all tables within the specified database.
 	"dog": {
 		"schema": "dev",
 		"name": "dog",
-		"hash_attribute": "id",
+		"primary_key": "id",
 		"audit": true,
 		"schema_defined": false,
 		"attributes": [
@@ -137,7 +137,7 @@ Returns the definition of the specified table.
 {
 	"schema": "dev",
 	"name": "dog",
-	"hash_attribute": "id",
+	"primary_key": "id",
 	"audit": true,
 	"schema_defined": false,
 	"attributes": [
