@@ -37,7 +37,23 @@ When `loadAsInstance = false`:
 - Instance methods receive a `RequestTarget` as their first argument; no record is preloaded onto `this`.
 - The `get` method returns the record as a plain (frozen) object rather than a Resource instance.
 - `put`, `post`, and `patch` receive `(target, data)` — **arguments are reversed from V1**.
-- Authorization is handled via `target.checkPermission` rather than `allowRead`/`allowUpdate`/etc. methods.
+- Authorization is handled via `target.checkPermission` rather than `allowRead`/`allowUpdate`/etc. methods. Set it to `false` to bypass permission checks entirely (e.g. for a public read endpoint), or leave it at its default to require superuser access for write operations:
+
+  ```javascript
+  // Public read — no auth required
+  get(target) {
+  	target.checkPermission = false;
+  	return super.get(target);
+  }
+
+  // POST is superuser-only by default — no change needed
+  post(target, data) {
+  	return super.post(target, data);
+  }
+  ```
+
+  `checkPermission` can also be set to a non-boolean value to delegate to role-based or schema-defined permissions — see the authorization documentation for details.
+
 - The `update` method returns an `Updatable` object instead of a Resource instance.
 - Context is tracked automatically via async context tracking; set `static explicitContext = true` to disable (improves performance).
 - `getId()` is not used and returns `undefined`.

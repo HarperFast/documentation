@@ -59,7 +59,9 @@ export class MyTable extends tables.MyTable {
 	get(target) {
 		// add a computed property before returning
 
-		return { ...super.get(target), computedField: 'value' };
+		const record = await super.get(target)
+
+		return { ...record, computedField: 'value' };
 	}
 
 	post(target, data) {
