@@ -296,6 +296,29 @@
 		},
 		{
 			"type": "category",
+			"label": "Configuration",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "configuration/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "configuration/options",
+					"label": "Options"
+				},
+				{
+					"type": "doc",
+					"id": "configuration/operations",
+					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
