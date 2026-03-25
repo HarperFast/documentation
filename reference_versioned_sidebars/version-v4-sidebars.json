@@ -296,6 +296,29 @@
 		},
 		{
 			"type": "category",
+			"label": "Replication",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "replication/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "replication/clustering",
+					"label": "Clustering"
+				},
+				{
+					"type": "doc",
+					"id": "replication/sharding",
+					"label": "Sharding"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
