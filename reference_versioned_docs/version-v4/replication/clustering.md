@@ -2,27 +2,12 @@
 title: Clustering
 ---
 
-<!-- Source: versioned_docs/version-4.7/developers/operations-api/clustering.md (primary — native replication operations) -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/index.md (legacy NATS overview) -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/requirements-and-definitions.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/enabling-clustering.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/establishing-routes.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/naming-a-node.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/creating-a-cluster-user.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/managing-subscriptions.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/subscription-overview.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/certificate-management.md -->
-<!-- Source: versioned_docs/version-4.7/reference/clustering/things-worth-knowing.md -->
-<!-- Source: release-notes/v4-tucker/4.4.0.md (confirmed native replication in v4.4.0) -->
-<!-- Source: release-notes/v4-tucker/4.5.0.md (confirmed cluster status improvements in v4.5.0) -->
+<!-- Source: versioned_docs/version-4.7/developers/operations-api/clustering.md (primary) -->
+<!-- Source: release-notes/v4-tucker/4.5.0.md (confirmed cluster status timing statistics in v4.5.0) -->
 
 # Clustering
 
-This page documents the Operations API for managing Harper's native replication system (available since v4.4.0). For an overview of how replication works, see [Replication Overview](./overview.md). For sharding configuration, see [Sharding](./sharding.md).
-
-> **Legacy NATS Clustering**: The NATS-based clustering used in v4.0–4.3 is described in the [Legacy NATS Clustering](#legacy-nats-clustering) section below. The operations described here apply to the native replication system in v4.4.0+.
-
-## Operations API
+Operations API for managing Harper's replication system. For an overview of how replication works, see [Replication Overview](./overview.md). For sharding configuration, see [Sharding](./sharding.md).
 
 All clustering operations require `super_user` role.
 
@@ -31,8 +16,6 @@ All clustering operations require `super_user` role.
 ### Add Node
 
 Adds a new Harper instance to the cluster. If `subscriptions` are provided, it creates the specified replication relationships between the nodes. Without `subscriptions`, a fully replicating system is created (all data in all databases).
-
-Added in: v4.4.0
 
 **Parameters**:
 
@@ -80,8 +63,6 @@ Added in: v4.4.0
 
 Modifies an existing Harper instance in the cluster. Will attempt to add the node if it does not exist.
 
-Added in: v4.4.0
-
 **Parameters**:
 
 - `operation` _(required)_ — must be `update_node`
@@ -120,8 +101,6 @@ Added in: v4.4.0
 ### Remove Node
 
 Removes a Harper node from the cluster and stops all replication to and from that node.
-
-Added in: v4.4.0
 
 **Parameters**:
 
@@ -212,8 +191,6 @@ Added in: v4.4.0; timing statistics added in v4.5.0
 
 Bulk creates or resets subscriptions for any number of remote nodes. **Resets and replaces any existing clustering setup.**
 
-Added in: v4.4.0
-
 **Parameters**:
 
 - `operation` _(required)_ — must be `configure_cluster`
@@ -274,8 +251,6 @@ Added in: v4.4.0
 ### Cluster Set Routes
 
 Adds routes to the `replication.routes` configuration. Behaves as a PATCH/upsert — adds new routes while leaving existing routes untouched.
-
-Added in: v4.4.0
 
 **Parameters**:
 
@@ -372,159 +347,3 @@ Removes routes from the Harper config file.
 }
 ```
 
----
-
-## Legacy NATS Clustering
-
-> **Applies to v4.0–4.3 only.** Harper v4.4.0 replaced NATS clustering with the native replication system. The operations and configuration below are documented for legacy reference.
-
-Harper 4.0–4.3 used a clustering system based on NATS. NATS clustering used a bi-directional pub/sub model on a per-table basis with eventual consistency. Individual transactions were sent in the order they were transacted, and once received by the destination instance, processed in an ACID-compliant manner. Conflict resolution used last-writer-wins based on recorded transaction time.
-
-### Requirements
-
-A cluster requires two or more Harper nodes (instances). A node is a single installation of Harper and can operate independently with clustering enabled or disabled.
-
-### Enabling NATS Clustering
-
-Clustering must be explicitly enabled. Set `clustering.enabled` to `true` in `harperdb-config.yaml`:
-
-```yaml
-clustering:
-  enabled: true
-```
-
-Or via the operations API (requires restart):
-
-```json
-{
-	"operation": "set_configuration",
-	"clustering_enabled": true
-}
-```
-
-Or via CLI / environment variable:
-
-```bash
-harperdb --CLUSTERING_ENABLED true
-# or
-CLUSTERING_ENABLED=true
-```
-
-### Naming a Node
-
-Each node must have a unique name in the cluster. The name cannot contain `.`, `,`, `*`, `>`, or whitespace.
-
-```yaml
-clustering:
-  nodeName: Node1
-```
-
-Or via the operations API:
-
-```json
-{
-	"operation": "set_configuration",
-	"clustering_nodeName": "Node1"
-}
-```
-
-### Creating a Cluster User
-
-Inter-node authentication in NATS clustering used a special `cluster_user` role. All clustered nodes must share the same cluster user credentials.
-
-Create the user via the operations API:
-
-```json
-{
-	"operation": "add_user",
-	"role": "cluster_user",
-	"username": "cluster_account",
-	"password": "letsCluster123!",
-	"active": true
-}
-```
-
-Then configure the cluster user in `harperdb-config.yaml`:
-
-```yaml
-clustering:
-  user: cluster_account
-```
-
-Or set both at install time:
-
-```bash
-harperdb install \
-  --CLUSTERING_ENABLED true \
-  --CLUSTERING_NODENAME Node1 \
-  --CLUSTERING_USER cluster_account \
-  --CLUSTERING_PASSWORD letsCluster123!
-```
-
-### Routes
-
-A route is a connection between two nodes. Routes create a mesh network — you do not need to cross-connect all nodes. One route from any node to the cluster is sufficient for all nodes to reach each other.
-
-Route configuration used the `clustering.hubServer.cluster.network.routes` key:
-
-```yaml
-clustering:
-  hubServer:
-    cluster:
-      network:
-        routes:
-          - host: 3.62.184.22
-            port: 9932
-          - host: 3.735.184.8
-            port: 9932
-```
-
-Routes could also be set via `cluster_set_routes`, `cluster_get_routes`, and `cluster_delete_routes` operations (same API as the native system, but with NATS-specific parameters).
-
-### Subscriptions
-
-In NATS clustering, subscriptions were the mechanism for controlling which tables replicated and in which direction. A subscription consisted of:
-
-- `database` — the database the table belongs to
-- `table` — the table name
-- `publish` — if `true`, local transactions are replicated to the remote table
-- `subscribe` — if `true`, remote transactions are replicated to the local table
-
-Subscriptions were managed with the `set_node_replication` operation:
-
-```json
-{
-	"operation": "set_node_replication",
-	"node_name": "Node2",
-	"subscriptions": [
-		{
-			"database": "data",
-			"table": "dog",
-			"publish": true,
-			"subscribe": true
-		}
-	]
-}
-```
-
-### Certificate Management (NATS)
-
-Harper generated self-signed certificates for NATS cluster connections by default, stored in `<ROOTPATH>/keys/`. For development:
-
-```yaml
-clustering:
-  tls:
-    certificate: ~/hdb/keys/certificate.pem
-    certificateAuthority: ~/hdb/keys/ca.pem
-    privateKey: ~/hdb/keys/privateKey.pem
-    insecure: true
-    verify: true
-```
-
-For production, use certificates from your own CA or a public CA with matching CNs. Certificates must have `Extended Key Usage` including both `TLS Web Server Authentication` and `TLS Web Client Authentication`.
-
-### What Replicated
-
-The same data operations that replicate in the native system also replicated in NATS: insert, update, upsert, delete, and bulk loads. Destructive operations (`drop_database`, `drop_table`, `drop_attribute`) and users/roles did not replicate.
-
-NATS clustering had built-in resiliency for network interruptions — when reconnected, a catchup routine replayed missed transactions.

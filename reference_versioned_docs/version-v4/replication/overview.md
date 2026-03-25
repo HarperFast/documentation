@@ -3,16 +3,11 @@ title: Replication Overview
 ---
 
 <!-- Source: versioned_docs/version-4.7/developers/replication/index.md (primary) -->
-<!-- Source: release-notes/v4-tucker/4.4.0.md (confirmed native replication introduction) -->
 <!-- Source: release-notes/v4-tucker/4.5.0.md (confirmed cluster status improvements, default port change, certificate revocation, expanded sharding) -->
 
 # Replication Overview
 
-Added in: v4.4.0
-
 Harper's replication system is designed to make distributed data replication fast and reliable across multiple nodes. You can build a distributed database that ensures high availability, disaster recovery, and data localization — all without complex setup. Nodes can be added or removed dynamically, you can choose which data to replicate, and you can monitor cluster health without jumping through hoops.
-
-> **Legacy NATS Clustering**: Harper 4.0–4.3 used a NATS-based clustering system. In v4.4.0, Harper replaced this with a new native replication system (codenamed Plexus) that provides better performance, reliability, and data consistency. The legacy NATS system is documented in [Clustering](./clustering.md).
 
 ## Peer-to-Peer Model
 
@@ -43,7 +38,7 @@ replication:
       port: 9933
 ```
 
-By default, replication connects on the secure port `9933`. Added in: v4.5.0 (changed from 9925).
+By default, replication connects on the secure port `9933`.
 
 ```yaml
 replication:
@@ -289,7 +284,7 @@ The following data operations are replicated across the cluster:
 
 Users and roles are not replicated across the cluster.
 
-Added in: v4.4.0 (replicated operations): certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
+Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
 
 ## Inspecting Cluster Configuration
 
