@@ -296,6 +296,34 @@
 		},
 		{
 			"type": "category",
+			"label": "Components",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "components/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "components/applications",
+					"label": "Applications"
+				},
+				{
+					"type": "doc",
+					"id": "components/extension-api",
+					"label": "Extension API"
+				},
+				{
+					"type": "doc",
+					"id": "components/plugin-api",
+					"label": "Plugin API"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
