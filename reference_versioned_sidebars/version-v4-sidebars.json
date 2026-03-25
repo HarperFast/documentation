@@ -296,6 +296,24 @@
 		},
 		{
 			"type": "category",
+			"label": "Operations API",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "operations-api/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "operations-api/operations",
+					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
 			"label": "Legacy",
 			"collapsible": false,
 			"className": "learn-category-header",
