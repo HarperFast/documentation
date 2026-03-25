@@ -29,7 +29,7 @@ The Resource API is designed to mirror REST/HTTP semantics: methods map directly
 
 The Resource API has two behavioral modes controlled by the `loadAsInstance` static property:
 
-- **V2 (recommended, `loadAsInstance = false`)**: Instance methods receive a `RequestTarget` as the first argument; no record is preloaded onto `this`. This is the current default for new code and will become the only behavior in Harper v5.
+- **V2 (recommended, `loadAsInstance = false`)**: Instance methods receive a `RequestTarget` as the first argument; no record is preloaded onto `this`. Recommended for all new code.
 - **V1 (legacy, `loadAsInstance = true`)**: Instance methods are called with `this` pre-bound to the matching record. Preserved for backwards compatibility.
 
 The [Resource API reference](./resource-api.md) is written against V2. For V1 behavior and migration guidance, see the legacy instance binding section of that page.
@@ -43,7 +43,7 @@ Starting with a table definition in a `schema.graphql`:
 ```graphql
 # Omit the `@export` directive
 type MyTable @table {
-	id: ID
+	id: ID @primaryKey
 	# ...
 }
 ```
@@ -58,12 +58,13 @@ export class MyTable extends tables.MyTable {
 
 	get(target) {
 		// add a computed property before returning
+
 		return { ...super.get(target), computedField: 'value' };
 	}
 
 	post(target, data) {
 		// custom action on POST
-		this.create({ ...data, createdAt: Date.now() });
+		this.create({ ...data, status: 'pending' });
 	}
 }
 ```

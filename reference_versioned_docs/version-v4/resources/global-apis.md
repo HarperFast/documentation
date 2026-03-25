@@ -16,7 +16,7 @@ For TypeScript support and better IDE autocomplete, these can also be explicitly
 import { tables, databases, Resource, transaction, contentTypes, server } from 'harperdb';
 ```
 
-The `harperdb` package is automatically linked for components installed into Harper. If you are developing locally against a globally installed Harper instance, you may need to link the package manually:
+The `harperdb` package is automatically linked for components installed into Harper. If you are developing with TypeScript locally against a globally installed Harper instance, you need to link the package manually to get the necessary type references:
 
 ```bash
 npm link harperdb
@@ -62,7 +62,7 @@ An object containing all databases defined in Harper. Each database is an object
 const Product = databases.data.Product; // default database
 const Events = databases.analytics.Events; // another database
 
-await Events.create({ eventType: 'login', timestamp: Date.now() });
+await Events.create({ eventType: 'login', userId: 'user-123' });
 ```
 
 ---

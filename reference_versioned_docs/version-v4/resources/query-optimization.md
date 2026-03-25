@@ -36,17 +36,17 @@ When a query is executed, conditions are evaluated against the database. Indexed
 
 ### Index Performance Characteristics
 
-| Operator             | Uses index         | Notes                                                                    |
-| -------------------- | ------------------ | ------------------------------------------------------------------------ |
-| `=` (equals)         | Yes                | Fast lookup in sorted index                                              |
-| `>`, `>=`, `<`, `<=` | Yes                | Range scan in sorted index; narrower range = faster                      |
-| `starts_with`        | Yes                | Prefix search in sorted index                                            |
-| `!=` (not_equal)     | No                 | Full scan required (unless combined with selective indexed condition)    |
-| `contains`           | No                 | Full scan required                                                       |
-| `ends_with`          | No                 | Full scan required                                                       |
-| `!= null`            | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields |
+| Operator                                                             | Uses index         | Notes                                                                    |
+| -------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `equals`                                                             | Yes                | Fast lookup in sorted index                                              |
+| `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal` | Yes                | Range scan in sorted index; narrower range = faster                      |
+| `starts_with`                                                        | Yes                | Prefix search in sorted index                                            |
+| `not_equal`                                                          | No                 | Full scan required (unless combined with selective indexed condition)    |
+| `contains`                                                           | No                 | Full scan required                                                       |
+| `ends_with`                                                          | No                 | Full scan required                                                       |
+| `!= null`                                                            | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields |
 
-**Rule of thumb**: Use `=`, range operators, and `starts_with` on indexed fields. Avoid `contains`, `ends_with`, and `!=` as the sole or first condition in large datasets.
+**Rule of thumb**: Use `equals`, range operators, and `starts_with` on indexed fields. Avoid `contains`, `ends_with`, and `not_equal` as the sole or first condition in large datasets.
 
 ### Indexed vs. Non-Indexed Fields
 
@@ -118,6 +118,37 @@ for await (const record of MyTable.search({ conditions: [...] })) {
 ```
 
 Failing to iterate the `AsyncIterable` to completion keeps a read transaction open, degrading performance. Always ensure you either fully iterate or explicitly release the query.
+
+### Draining or Releasing a Query
+
+An open query holds an active read transaction. While that transaction is open, the underlying data pages and internal state for the query cannot be freed — they remain pinned in memory until the transaction closes. In long-running processes or under high concurrency, accumulating unreleased transactions degrades throughput and increases memory pressure.
+
+The transaction closes automatically once the `AsyncIterable` is fully iterated. If you need to stop early, you must explicitly signal that iteration is complete so Harper can release the transaction.
+
+**Breaking out of a `for await...of` loop** is the most natural way. The JavaScript runtime automatically calls `.return()` on the iterator when a `break`, `return`, or `throw` exits the loop:
+
+```javascript
+for await (const record of MyTable.search({ conditions: [...] })) {
+	if (meetsStopCriteria(record)) {
+		break; // iterator.return() is called automatically — transaction is released
+	}
+	process(record);
+}
+```
+
+**Calling `.return()` manually** is useful when you hold an iterator reference directly:
+
+```javascript
+const iterator = MyTable.search({ conditions: [...] })[Symbol.asyncIterator]();
+try {
+	const { value } = await iterator.next();
+	process(value);
+} finally {
+	await iterator.return(); // explicitly closes the iterator and releases the transaction
+}
+```
+
+Avoid storing an iterator and abandoning it (e.g. never calling `.next()` again without calling `.return()`), as the transaction will remain open until the iterator is garbage collected — which is non-deterministic.
 
 ## Practical Guidance
 

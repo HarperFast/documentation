@@ -21,10 +21,10 @@ The Resource API provides a unified JavaScript interface for accessing, querying
 
 The Resource API has two behavioral modes selected by the `loadAsInstance` static property:
 
-| Version      | `loadAsInstance` | Status                                     |
-| ------------ | ---------------- | ------------------------------------------ |
-| V2 (current) | `false`          | Recommended — will be default in Harper v5 |
-| V1 (legacy)  | `true`           | Preserved for backwards compatibility      |
+| Version      | `loadAsInstance` | Status                                |
+| ------------ | ---------------- | ------------------------------------- |
+| V2 (current) | `false`          | Recommended for new code              |
+| V1 (legacy)  | `true`           | Preserved for backwards compatibility |
 
 This page documents V2 behavior (`loadAsInstance = false`). For V1 (legacy instance binding) behavior and migration examples, see [Legacy Instance Binding](#legacy-instance-binding-v1).
 
@@ -37,7 +37,7 @@ When `loadAsInstance = false`:
 - Instance methods receive a `RequestTarget` as their first argument; no record is preloaded onto `this`.
 - The `get` method returns the record as a plain (frozen) object rather than a Resource instance.
 - `put`, `post`, and `patch` receive `(target, data)` — **arguments are reversed from V1**.
-- Authorization is handled via `target.checkPermissions` rather than `allowRead`/`allowUpdate`/etc. methods.
+- Authorization is handled via `target.checkPermission` rather than `allowRead`/`allowUpdate`/etc. methods.
 - The `update` method returns an `Updatable` object instead of a Resource instance.
 - Context is tracked automatically via async context tracking; set `static explicitContext = true` to disable (improves performance).
 - `getId()` is not used and returns `undefined`.
@@ -67,6 +67,13 @@ class MyResource extends Resource {
 
 The default `super.get(target)` returns a `RecordObject` — a frozen plain object with the record's properties plus `getUpdatedTime()` and `getExpiresAt()`.
 
+:::caution Common gotchas
+
+- **`/Table` vs `/Table/`** — `GET /Table` returns metadata about the table resource itself. `GET /Table/` (trailing slash) targets the collection and invokes `get()` as a collection request. These are distinct endpoints.
+- **Case sensitivity** — The URL path must match the exact casing of the exported resource or table name. `/Table/` works; `/table/` returns a 404.
+
+:::
+
 ### `search(query: RequestTarget): AsyncIterable`
 
 Performs a query on the resource or table. Called by `get()` on collection requests. Can be overridden to define custom query behavior. The default implementation on tables queries by the `conditions`, `limit`, `offset`, `select`, and `sort` properties parsed from the URL.
@@ -78,7 +85,7 @@ Called for HTTP PUT requests. Writes the full record to the table, creating or r
 ```javascript
 put(target, data) {
 	// validate or transform before saving
-	super.put(target, { ...data, updatedAt: Date.now() });
+	super.put(target, { ...data, status: data.status ?? 'active' });
 }
 ```
 
@@ -128,6 +135,24 @@ post(target, data) {
 ##### `subtractFrom(property: string, value: number)`
 
 Subtracts `value` from `property` using CRDT incrementation.
+
+##### `set(property: string, value: any): void`
+
+Sets a property to `value`. Equivalent to direct property assignment (`record.property = value`), but useful when the property name is dynamic.
+
+```javascript
+const record = this.update(target.id);
+record.set('status', 'active');
+```
+
+##### `getProperty(property: string): any`
+
+Returns the current value of `property` from the record. Useful when the property name is dynamic or when you want an explicit read rather than direct property access.
+
+```javascript
+const record = this.update(target.id);
+const current = record.getProperty('status');
+```
 
 ##### `getUpdatedTime(): number`
 
@@ -575,7 +600,7 @@ async get(target) {
 		error.statusCode = 401;
 		throw error;
 	}
-	target.checkPermissions = false;
+	target.checkPermission = false;
 	return super.get(target);
 }
 ```
