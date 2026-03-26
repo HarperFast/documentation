@@ -312,6 +312,11 @@
 				},
 				{
 					"type": "doc",
+					"id": "database/api",
+					"label": "API"
+				},
+				{
+					"type": "doc",
 					"id": "database/data-loader",
 					"label": "Data Loader"
 				},

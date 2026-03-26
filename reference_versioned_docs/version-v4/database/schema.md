@@ -427,7 +427,7 @@ type MyTable @table {
 }
 ```
 
-Create and store a blob:
+Create and store a blob using [`createBlob()`](./api.md#createblobdata-options):
 
 ```javascript
 let blob = createBlob(largeBuffer);
@@ -495,6 +495,7 @@ Harper does **not** support renaming tables. Changing a type name in a schema de
 
 ## Related Documentation
 
+- [JavaScript API](./api.md) — `tables`, `databases`, `transaction()`, and `createBlob()` globals for working with schema-defined tables in code
 - [Data Loader](./data-loader.md) — Seed tables with initial data alongside schema deployment
 - [REST Querying](../rest/querying.md) — Querying tables via HTTP using schema-defined attributes and relationships
 - [Resources](TODO:reference_versioned_docs/version-v4/resources/resource-api.md) — Extending table behavior with custom application logic

@@ -94,6 +94,24 @@
   - Context: Storage configuration options
   - Target should be: Configuration options page (storage section)
 
+## reference_versioned_docs/version-v4/database/api.md
+
+- Line ~20: `[Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md)`
+  - Context: Noting that table classes implement the Resource API
+  - Target should be: Resource API reference page
+
+- Line ~48: `[Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md)` (second reference)
+  - Context: Pointing to full table method reference
+  - Target should be: Resource API reference page
+
+- Line ~186: `[Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md)` (Related Documentation)
+  - Context: Related docs footer
+  - Target should be: Resource API reference page
+
+- Line ~188: `[Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md)`
+  - Context: Blob storage path configuration
+  - Target should be: Configuration options page (storage section)
+
 ## reference_versioned_docs/version-v4/database/transaction.md
 
 - Line ~73: `[Replication](TODO:reference_versioned_docs/version-v4/replication/overview.md)`
