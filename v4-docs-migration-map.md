@@ -348,6 +348,19 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Compact database functionality
 
+### `reference/database/api.md`
+
+- **Primary Source**: `versioned_docs/version-4.7/reference/globals.md` (tables, databases globals)
+- **Additional Sources**:
+  - `versioned_docs/version-4.7/reference/transactions.md` (transaction() function)
+  - `versioned_docs/version-4.7/reference/blob.md` (createBlob() function)
+- **Merge Required**: Yes — combines tables/databases globals, transaction(), and createBlob() into one page
+- **Version Annotations**: Blob type added in v4.5.0
+- **Status**: In Progress
+- **Notes**: Covers the JS globals most relevant to database interaction. Server globals (server.http, server.ws, etc.) belong in the HTTP/Resources sections.
+- **Release Notes**:
+  - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Blob storage and createBlob() added
+
 ### `reference/database/transaction.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/administration/logging/transaction-logging.md`
