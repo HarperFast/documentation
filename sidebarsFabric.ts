@@ -1,5 +1,8 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
+
+
+
 const sidebarsFabric: SidebarsConfig = {
 	fabricSidebar: [
 		{
@@ -26,6 +29,11 @@ const sidebarsFabric: SidebarsConfig = {
 			type: 'doc',
 			id: 'cluster-creation-management',
 			label: 'Cluster Creation & Management',
+		},
+		{
+			type: 'doc',
+			id: 'custom-domains',
+			label: 'Custom Domains',
 		},
 		{
 			type: 'doc',
@@ -56,4 +64,10 @@ const sidebarsFabric: SidebarsConfig = {
 	],
 };
 
+
+
+
 export default sidebarsFabric;
+
+
+
