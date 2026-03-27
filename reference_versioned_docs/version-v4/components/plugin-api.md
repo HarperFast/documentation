@@ -85,7 +85,7 @@ customPlugin:
 All classes and types are exported from the `harperdb` package:
 
 ```typescript
-import { Scope, type Config } from 'harperdb';
+import type { Scope, Config } from 'harperdb';
 ```
 
 ## API Reference

@@ -20,7 +20,7 @@ title: Components
 
 Added in: v4.2.0
 
-**Applications** implement specific user-facing features or functionality. Applications are built on top of extensions and represent the end product that users interact with. For example, a Next.js application serving a web interface or an Apollo GraphQL server providing a GraphQL API are both applications.
+**Applications** implement specific user-facing features or functionality. Applications are built on top of extensions and represent the end product that users interact with. For example, a Next.js application serving a web interface or an Apollo GraphQL server providing a GraphQL API are both applications. Also, a collection of Harper Schemas and/or custom Resources is also an application.
 
 ### Extensions
 
@@ -121,19 +121,17 @@ Extensions require an `extensionModule` option pointing to the extension source.
 
 ## Built-In Extensions Reference
 
-| Name            | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `dataLoader`    | Load data from JSON/YAML files into Harper tables |
-| `fastifyRoutes` | Define custom endpoints with Fastify              |
-| `graphql`       | Enable GraphQL querying (experimental)            |
-| `graphqlSchema` | Define table schemas with GraphQL syntax          |
-| `jsResource`    | Define custom JavaScript-based resources          |
-| `loadEnv`       | Load environment variables from `.env` files      |
-| `rest`          | Enable automatic REST endpoint generation         |
-| `roles`         | Define role-based access control from YAML files  |
-| `static`        | Serve static files via HTTP                       |
-
-For details on each built-in extension, see the [Applications](./applications.md) reference.
+| Name                                                           | Description                                       |
+| -------------------------------------------------------------- | ------------------------------------------------- |
+| [`dataLoader`](../database/data-loader.md)                     | Load data from JSON/YAML files into Harper tables |
+| [`fastifyRoutes`](../fastify-routes/overview.md)               | Define custom endpoints with Fastify              |
+| [`graphql`](../graphql-querying/overview.md)                   | Enable GraphQL querying (experimental)            |
+| [`graphqlSchema`](../database/schema.md)                       | Define table schemas with GraphQL syntax          |
+| [`jsResource`](../resources/overview.md)                       | Define custom JavaScript-based resources          |
+| [`loadEnv`](../environment-variables/overview.md)              | Load environment variables from `.env` files      |
+| [`rest`](../rest/overview.md)                                  | Enable automatic REST endpoint generation         |
+| [`roles`](../users-and-roles/overview.md)                      | Define role-based access control from YAML files  |
+| [`static`](../static-files/overview.md)                        | Serve static files via HTTP                       |
 
 ## Known Custom Components
 
