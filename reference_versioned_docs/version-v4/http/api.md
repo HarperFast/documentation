@@ -398,4 +398,4 @@ contentTypes.set('text/xml', {
 - [HTTP Overview](./overview)
 - [HTTP Configuration](./configuration)
 - [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface overview')
-- [Global APIs](TODO:reference_versioned_docs/version-v4/resources/global-apis.md 'All global APIs including tables, databases, Resource, logger, auth')
+- [Security API](../security/api.md)

@@ -8,7 +8,7 @@ title: Logging Operations
 
 Operations for reading the standard Harper log (`hdb.log`). All operations are restricted to `super_user` roles only.
 
-> Audit log and transaction log operations (`read_audit_log`, `read_transaction_log`, `delete_audit_logs_before`, `delete_transaction_logs_before`) are documented in [Database / Transaction Logging](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit and transaction logging operations').
+> Audit log and transaction log operations (`read_audit_log`, `read_transaction_log`, `delete_audit_logs_before`, `delete_transaction_logs_before`) are documented in [Database / Transaction Logging](../database/transaction.md).
 
 ---
 
@@ -87,5 +87,5 @@ _Restricted to super_user roles only._
 
 - [Logging Overview](./overview)
 - [Logging Configuration](./configuration)
-- [Database / Transaction Logging](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit log and transaction log operations')
+- [Database / Transaction Logging](../database/transaction.md)
 - [Operations API Overview](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview')
