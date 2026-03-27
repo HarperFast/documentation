@@ -83,7 +83,7 @@ Or specify explicit nodes:
 ```jsonc
 {
 	// ...
-	"replicateTo": ["node-1", "node-2"]
+	"replicateTo": ["node-1", "node-2"],
 	// ...
 }
 ```

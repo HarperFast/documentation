@@ -27,7 +27,7 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
 - `revoked_certificates` _(optional)_ — array of revoked certificate serial numbers that will not be accepted for any connections
 - `shard` _(optional)_ — shard number for this node. Only needed when using sharding
 - `start_time` _(optional)_ — ISO 8601 UTC datetime. If set, only data after this time is downloaded during initial synchronization instead of the entire database
-- `subscriptions` _(optional)_ — explicit table-level replication relationships. Each subscription is an object with:
+- `subscriptions` _(optional)_ — explicit table-level replication relationships. This is optional (and discouraged). Each subscription is an object with:
   - `database` — database name
   - `table` — table name
   - `subscribe` — if `true`, transactions on the remote table are replicated locally
@@ -76,15 +76,7 @@ Modifies an existing Harper instance in the cluster. Will attempt to add the nod
 ```json
 {
 	"operation": "update_node",
-	"hostname": "server-two",
-	"subscriptions": [
-		{
-			"database": "dev",
-			"table": "my-table",
-			"subscribe": true,
-			"publish": true
-		}
-	]
+	"hostname": "server-two"
 }
 ```
 
@@ -178,12 +170,12 @@ Added in: v4.4.0; timing statistics added in v4.5.0
 
 `database_sockets` shows the actual WebSocket connections between nodes — one socket per database per node. Timing fields:
 
-| Field | Description |
-|---|---|
-| `lastCommitConfirmed` | Last time a receipt of confirmation was received for an outgoing commit |
-| `lastReceivedRemoteTime` | Timestamp (from the originating node) of the last received transaction |
-| `lastReceivedLocalTime` | Local time when the last transaction was received. A gap between this and `lastReceivedRemoteTime` suggests the node is catching up |
-| `sendingMessage` | Timestamp of the transaction actively being sent. Absent when waiting for the next transaction |
+| Field                    | Description                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `lastCommitConfirmed`    | Last time a receipt of confirmation was received for an outgoing commit                                                             |
+| `lastReceivedRemoteTime` | Timestamp (from the originating node) of the last received transaction                                                              |
+| `lastReceivedLocalTime`  | Local time when the last transaction was received. A gap between this and `lastReceivedRemoteTime` suggests the node is catching up |
+| `sendingMessage`         | Timestamp of the transaction actively being sent. Absent when waiting for the next transaction                                      |
 
 ---
 
@@ -208,15 +200,7 @@ Bulk creates or resets subscriptions for any number of remote nodes. **Resets an
 			"authorization": {
 				"username": "admin",
 				"password": "password2"
-			},
-			"subscriptions": [
-				{
-					"database": "dev",
-					"table": "my-table",
-					"subscribe": true,
-					"publish": false
-				}
-			]
+			}
 		},
 		{
 			"hostname": "server-three",
@@ -224,15 +208,7 @@ Bulk creates or resets subscriptions for any number of remote nodes. **Resets an
 			"authorization": {
 				"username": "admin",
 				"password": "password3"
-			},
-			"subscriptions": [
-				{
-					"database": "dev",
-					"table": "dog",
-					"subscribe": true,
-					"publish": true
-				}
-			]
+			}
 		}
 	]
 }
@@ -277,10 +253,7 @@ Adds routes to the `replication.routes` configuration. Behaves as a PATCH/upsert
 ```json
 {
 	"message": "cluster routes successfully set",
-	"set": [
-		"wss://server-two:9925",
-		{ "hostname": "server-three", "port": 9930 }
-	],
+	"set": ["wss://server-two:9925", { "hostname": "server-three", "port": 9930 }],
 	"skipped": []
 }
 ```
@@ -306,10 +279,7 @@ Returns the replication routes from the Harper config file.
 **Response**:
 
 ```json
-[
-	"wss://server-two:9925",
-	{ "hostname": "server-three", "port": 9930 }
-]
+["wss://server-two:9925", { "hostname": "server-three", "port": 9930 }]
 ```
 
 ---
@@ -346,4 +316,3 @@ Removes routes from the Harper config file.
 	"skipped": []
 }
 ```
-

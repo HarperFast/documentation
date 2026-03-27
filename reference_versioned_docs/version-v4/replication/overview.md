@@ -80,7 +80,7 @@ Harper supports PKI-based security and authorization for replication connections
 - **Certificate-based authentication** (recommended for production): Nodes are identified by the certificate's common name (CN) or Subject Alternative Names (SANs).
 - **IP-based authentication** (for development/testing): Nodes are identified by IP address when using insecure connections.
 
-Harper can automatically perform CRL (Certificate Revocation List) and OCSP (Online Certificate Status Protocol) verification to ensure revoked certificates cannot be used. OCSP and CRL work automatically with certificates from public CAs (like Let's Encrypt or DigiCert) when `enableRootCAs` is enabled. For self-signed certificates or private CAs without OCSP/CRL support, use Harper's manual certificate revocation feature. Certificate verification settings follow the same configuration as HTTP mTLS connections (see [Certificate Verification](TODO:reference_versioned_docs/version-v4/security/certificate-verification.md 'HTTP mTLS certificate verification configuration')).
+Harper can automatically perform CRL (Certificate Revocation List) and OCSP (Online Certificate Status Protocol) verification to ensure revoked certificates cannot be used. OCSP and CRL work automatically with certificates from public CAs when `enableRootCAs` is enabled. For self-signed certificates or private CAs without OCSP/CRL support, use Harper's manual certificate revocation feature. Certificate verification settings follow the same configuration as HTTP mTLS connections (see [Certificate Verification](TODO:reference_versioned_docs/version-v4/security/certificate-verification.md 'HTTP mTLS certificate verification configuration')).
 
 ### Providing Your Own Certificates
 
