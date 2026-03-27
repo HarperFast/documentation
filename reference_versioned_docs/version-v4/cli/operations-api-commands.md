@@ -153,7 +153,7 @@ last_updated_record: 1724483231970.9949
 ```
 
 :::tip
-For detailed information on database and table structures, see the [Database Reference](TODO:reference_versioned_docs/version-v4/database/overview.md 'Database reference documentation').
+For detailed information on database and table structures, see the [Database Reference](../database/overview.md).
 :::
 
 ### Data Operations

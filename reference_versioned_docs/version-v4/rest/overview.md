@@ -17,7 +17,7 @@ Harper provides a powerful, efficient, and standard-compliant HTTP REST interfac
 
 Harper's REST interface exposes database tables and custom resources as RESTful endpoints. Tables are **not** exported by default; they must be explicitly exported in a schema definition. The name of the exported resource defines the base of the endpoint path, served on the application HTTP server port (default `9926`).
 
-For more on defining schemas and exporting resources, see [TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema definition'].
+For more on defining schemas and exporting resources, see [Database / Schema](../database/schema.md).
 
 ## Configuration
 
@@ -156,4 +156,4 @@ GET /openapi
 - [WebSockets](./websockets.md) — Real-time connections via WebSocket
 - [Server-Sent Events](./server-sent-events.md) — One-way streaming via SSE
 - [HTTP Server](../http/overview.md) — Underlying HTTP server configuration
-- [Database / Schema](TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema definition') — How to define and export resources
+- [Database / Schema](../database/schema.md) — How to define and export resources

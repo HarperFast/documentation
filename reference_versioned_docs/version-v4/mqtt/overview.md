@@ -23,7 +23,7 @@ A topic of `my-resource/some-id` corresponds to the record with id `some-id` in 
 - **Publishing** with the `retain` flag set replaces the record in the database (equivalent to a PUT operation).
 - **Publishing without** the `retain` flag delivers the message to current subscribers without writing to the database.
 
-Defining a table that creates a topic can be as simple as adding a table with no attributes to your [schema.graphql](TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema definition for defining tables and topics') in a Harper application:
+Defining a table that creates a topic can be as simple as adding a table with no attributes to your [schema.graphql](../database/schema.md) in a Harper application:
 
 ```graphql
 type MyTopic @table @export
@@ -138,5 +138,5 @@ Available events:
 - [MQTT Configuration](./configuration)
 - [HTTP Overview](../http/overview.md)
 - [Security Overview](../security/overview.md)
-- [Database Schema](TODO:reference_versioned_docs/version-v4/database/schema.md 'Defining tables and topics with schema.graphql')
+- [Database Schema](../database/schema.md)
 - [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface — same path conventions as MQTT topics')
