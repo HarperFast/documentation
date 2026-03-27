@@ -31,22 +31,20 @@ For endpoint and authentication setup, see the [Operations API Overview](./overv
 
 Operations for managing databases, tables, and attributes.
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
+Detailed documentation: [Database Overview](../database/overview.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/database/overview.md 'Database overview']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `describe_all` | Returns definitions of all databases and tables, with record counts | any |
-| `describe_database` | Returns all table definitions for a specified database | any |
-| `describe_table` | Returns the definition of a specified table | any |
-| `create_database` | Creates a new database | super_user |
-| `drop_database` | Drops a database and all its tables/records | super_user |
-| `create_table` | Creates a new table with optional schema and expiration | super_user |
-| `drop_table` | Drops a table and all its records | super_user |
-| `create_attribute` | Adds a new attribute to a table | super_user |
-| `drop_attribute` | Removes an attribute and all its values from a table | super_user |
-| `get_backup` | Returns a binary snapshot of a database for backup purposes | super_user |
+| Operation           | Description                                                         | Role Required |
+| ------------------- | ------------------------------------------------------------------- | ------------- |
+| `describe_all`      | Returns definitions of all databases and tables, with record counts | any           |
+| `describe_database` | Returns all table definitions for a specified database              | any           |
+| `describe_table`    | Returns the definition of a specified table                         | any           |
+| `create_database`   | Creates a new database                                              | super_user    |
+| `drop_database`     | Drops a database and all its tables/records                         | super_user    |
+| `create_table`      | Creates a new table with optional schema and expiration             | super_user    |
+| `drop_table`        | Drops a table and all its records                                   | super_user    |
+| `create_attribute`  | Adds a new attribute to a table                                     | super_user    |
+| `drop_attribute`    | Removes an attribute and all its values from a table                | super_user    |
+| `get_backup`        | Returns a binary snapshot of a database for backup purposes         | super_user    |
 
 ### `describe_all`
 
@@ -94,10 +92,10 @@ Creates a new table. Optional fields: `database` (defaults to `data`), `attribut
 
 ```json
 {
-  "operation": "create_table",
-  "database": "dev",
-  "table": "dog",
-  "primary_key": "id"
+	"operation": "create_table",
+	"database": "dev",
+	"table": "dog",
+	"primary_key": "id"
 }
 ```
 
@@ -115,10 +113,10 @@ Creates a new attribute within a table. Harper auto-creates attributes on insert
 
 ```json
 {
-  "operation": "create_attribute",
-  "database": "dev",
-  "table": "dog",
-  "attribute": "is_adorable"
+	"operation": "create_attribute",
+	"database": "dev",
+	"table": "dog",
+	"attribute": "is_adorable"
 }
 ```
 
@@ -128,10 +126,10 @@ Drops an attribute and all its values from the specified table.
 
 ```json
 {
-  "operation": "drop_attribute",
-  "database": "dev",
-  "table": "dog",
-  "attribute": "is_adorable"
+	"operation": "drop_attribute",
+	"database": "dev",
+	"table": "dog",
+	"attribute": "is_adorable"
 }
 ```
 
@@ -149,19 +147,17 @@ Returns a binary snapshot of the specified database (or individual table). Safe 
 
 Operations for inserting, updating, deleting, and querying records using NoSQL.
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
+Detailed documentation: [REST Querying Reference](../rest/querying.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/rest/querying.md 'REST querying reference']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `insert` | Inserts one or more records | any |
-| `update` | Updates one or more records by primary key | any |
-| `upsert` | Inserts or updates records | any |
-| `delete` | Deletes records by primary key | any |
-| `search_by_id` | Retrieves records by primary key | any |
-| `search_by_value` | Retrieves records matching a value on any attribute | any |
-| `search_by_conditions` | Retrieves records matching complex conditions with sorting and pagination | any |
+| Operation              | Description                                                               | Role Required |
+| ---------------------- | ------------------------------------------------------------------------- | ------------- |
+| `insert`               | Inserts one or more records                                               | any           |
+| `update`               | Updates one or more records by primary key                                | any           |
+| `upsert`               | Inserts or updates records                                                | any           |
+| `delete`               | Deletes records by primary key                                            | any           |
+| `search_by_id`         | Retrieves records by primary key                                          | any           |
+| `search_by_value`      | Retrieves records matching a value on any attribute                       | any           |
+| `search_by_conditions` | Retrieves records matching complex conditions with sorting and pagination | any           |
 
 ### `insert`
 
@@ -169,10 +165,10 @@ Inserts one or more records. If a primary key is not provided, a GUID or auto-in
 
 ```json
 {
-  "operation": "insert",
-  "database": "dev",
-  "table": "dog",
-  "records": [{ "id": 1, "dog_name": "Penny" }]
+	"operation": "insert",
+	"database": "dev",
+	"table": "dog",
+	"records": [{ "id": 1, "dog_name": "Penny" }]
 }
 ```
 
@@ -182,10 +178,10 @@ Updates one or more records. Primary key must be supplied for each record.
 
 ```json
 {
-  "operation": "update",
-  "database": "dev",
-  "table": "dog",
-  "records": [{ "id": 1, "weight_lbs": 38 }]
+	"operation": "update",
+	"database": "dev",
+	"table": "dog",
+	"records": [{ "id": 1, "weight_lbs": 38 }]
 }
 ```
 
@@ -195,10 +191,10 @@ Updates existing records and inserts new ones. Matches on primary key if provide
 
 ```json
 {
-  "operation": "upsert",
-  "database": "dev",
-  "table": "dog",
-  "records": [{ "id": 1, "weight_lbs": 40 }]
+	"operation": "upsert",
+	"database": "dev",
+	"table": "dog",
+	"records": [{ "id": 1, "weight_lbs": 40 }]
 }
 ```
 
@@ -208,10 +204,10 @@ Deletes records by primary key values.
 
 ```json
 {
-  "operation": "delete",
-  "database": "dev",
-  "table": "dog",
-  "ids": [1, 2]
+	"operation": "delete",
+	"database": "dev",
+	"table": "dog",
+	"ids": [1, 2]
 }
 ```
 
@@ -221,11 +217,11 @@ Returns records matching the given primary key values. Use `"get_attributes": ["
 
 ```json
 {
-  "operation": "search_by_id",
-  "database": "dev",
-  "table": "dog",
-  "ids": [1, 2],
-  "get_attributes": ["dog_name", "breed_id"]
+	"operation": "search_by_id",
+	"database": "dev",
+	"table": "dog",
+	"ids": [1, 2],
+	"get_attributes": ["dog_name", "breed_id"]
 }
 ```
 
@@ -235,12 +231,12 @@ Returns records with a matching value on any attribute. Supports wildcards (e.g.
 
 ```json
 {
-  "operation": "search_by_value",
-  "database": "dev",
-  "table": "dog",
-  "attribute": "owner_name",
-  "value": "Ky*",
-  "get_attributes": ["id", "dog_name"]
+	"operation": "search_by_value",
+	"database": "dev",
+	"table": "dog",
+	"attribute": "owner_name",
+	"value": "Ky*",
+	"get_attributes": ["id", "dog_name"]
 }
 ```
 
@@ -248,19 +244,15 @@ Returns records with a matching value on any attribute. Supports wildcards (e.g.
 
 Returns records matching one or more conditions. Supports `operator` (`and`/`or`), `offset`, `limit`, nested `conditions` groups, and `sort` with multi-level tie-breaking.
 
-Added in: v4.1.0 (sort with `next` tie-breaking added later, needs verification)
-
 ```json
 {
-  "operation": "search_by_conditions",
-  "database": "dev",
-  "table": "dog",
-  "operator": "and",
-  "limit": 10,
-  "get_attributes": ["*"],
-  "conditions": [
-    { "attribute": "age", "comparator": "between", "value": [5, 8] }
-  ]
+	"operation": "search_by_conditions",
+	"database": "dev",
+	"table": "dog",
+	"operator": "and",
+	"limit": 10,
+	"get_attributes": ["*"],
+	"conditions": [{ "attribute": "age", "comparator": "between", "value": [5, 8] }]
 }
 ```
 
@@ -270,19 +262,17 @@ Added in: v4.1.0 (sort with `next` tie-breaking added later, needs verification)
 
 Operations for bulk import/export of data.
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
+Detailed documentation: [Database Jobs](../database/jobs.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/database/jobs.md 'Database jobs reference']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `export_local` | Exports query results to a local file in JSON or CSV | super_user |
-| `csv_data_load` | Ingests CSV data provided inline | any |
-| `csv_file_load` | Ingests CSV data from a server-local file path | any |
-| `csv_url_load` | Ingests CSV data from a URL | any |
-| `export_to_s3` | Exports query results to AWS S3 | super_user |
-| `import_from_s3` | Imports CSV or JSON data from AWS S3 | any |
-| `delete_records_before` | Deletes records older than a given timestamp (local node only) | super_user |
+| Operation               | Description                                                    | Role Required |
+| ----------------------- | -------------------------------------------------------------- | ------------- |
+| `export_local`          | Exports query results to a local file in JSON or CSV           | super_user    |
+| `csv_data_load`         | Ingests CSV data provided inline                               | any           |
+| `csv_file_load`         | Ingests CSV data from a server-local file path                 | any           |
+| `csv_url_load`          | Ingests CSV data from a URL                                    | any           |
+| `export_to_s3`          | Exports query results to AWS S3                                | super_user    |
+| `import_from_s3`        | Imports CSV or JSON data from AWS S3                           | any           |
+| `delete_records_before` | Deletes records older than a given timestamp (local node only) | super_user    |
 
 All bulk import/export operations are asynchronous and return a job ID. Use [`get_job`](#get_job) to check status.
 
@@ -292,10 +282,10 @@ Exports query results to a local path on the server. Formats: `json` or `csv`.
 
 ```json
 {
-  "operation": "export_local",
-  "format": "json",
-  "path": "/data/",
-  "search_operation": { "operation": "sql", "sql": "SELECT * FROM dev.dog" }
+	"operation": "export_local",
+	"format": "json",
+	"path": "/data/",
+	"search_operation": { "operation": "sql", "sql": "SELECT * FROM dev.dog" }
 }
 ```
 
@@ -305,11 +295,11 @@ Ingests inline CSV data. Actions: `insert` (default), `update`, `upsert`.
 
 ```json
 {
-  "operation": "csv_data_load",
-  "database": "dev",
-  "table": "dog",
-  "action": "insert",
-  "data": "id,name\n1,Penny\n"
+	"operation": "csv_data_load",
+	"database": "dev",
+	"table": "dog",
+	"action": "insert",
+	"data": "id,name\n1,Penny\n"
 }
 ```
 
@@ -319,10 +309,10 @@ Ingests CSV from a file path on the server running Harper.
 
 ```json
 {
-  "operation": "csv_file_load",
-  "database": "dev",
-  "table": "dog",
-  "file_path": "/home/user/imports/dogs.csv"
+	"operation": "csv_file_load",
+	"database": "dev",
+	"table": "dog",
+	"file_path": "/home/user/imports/dogs.csv"
 }
 ```
 
@@ -332,10 +322,10 @@ Ingests CSV from a URL.
 
 ```json
 {
-  "operation": "csv_url_load",
-  "database": "dev",
-  "table": "dog",
-  "csv_url": "https://example.com/dogs.csv"
+	"operation": "csv_url_load",
+	"database": "dev",
+	"table": "dog",
+	"csv_url": "https://example.com/dogs.csv"
 }
 ```
 
@@ -345,16 +335,16 @@ Exports query results to an AWS S3 bucket as JSON or CSV.
 
 ```json
 {
-  "operation": "export_to_s3",
-  "format": "json",
-  "s3": {
-    "aws_access_key_id": "YOUR_KEY",
-    "aws_secret_access_key": "YOUR_SECRET",
-    "bucket": "my-bucket",
-    "key": "dogs.json",
-    "region": "us-east-1"
-  },
-  "search_operation": { "operation": "sql", "sql": "SELECT * FROM dev.dog" }
+	"operation": "export_to_s3",
+	"format": "json",
+	"s3": {
+		"aws_access_key_id": "YOUR_KEY",
+		"aws_secret_access_key": "YOUR_SECRET",
+		"bucket": "my-bucket",
+		"key": "dogs.json",
+		"region": "us-east-1"
+	},
+	"search_operation": { "operation": "sql", "sql": "SELECT * FROM dev.dog" }
 }
 ```
 
@@ -364,16 +354,16 @@ Imports CSV or JSON from an AWS S3 bucket. File must include a valid `.csv` or `
 
 ```json
 {
-  "operation": "import_from_s3",
-  "database": "dev",
-  "table": "dog",
-  "s3": {
-    "aws_access_key_id": "YOUR_KEY",
-    "aws_secret_access_key": "YOUR_SECRET",
-    "bucket": "my-bucket",
-    "key": "dogs.csv",
-    "region": "us-east-1"
-  }
+	"operation": "import_from_s3",
+	"database": "dev",
+	"table": "dog",
+	"s3": {
+		"aws_access_key_id": "YOUR_KEY",
+		"aws_secret_access_key": "YOUR_SECRET",
+		"bucket": "my-bucket",
+		"key": "dogs.csv",
+		"region": "us-east-1"
+	}
 }
 ```
 
@@ -383,10 +373,10 @@ Deletes records older than the specified timestamp from the local node only. Clu
 
 ```json
 {
-  "operation": "delete_records_before",
-  "date": "2021-01-25T23:05:27.464",
-  "schema": "dev",
-  "table": "dog"
+	"operation": "delete_records_before",
+	"date": "2021-01-25T23:05:27.464",
+	"schema": "dev",
+	"table": "dog"
 }
 ```
 
@@ -400,13 +390,11 @@ Operations for executing SQL statements.
 Harper SQL is intended for data investigation and use cases where performance is not a priority. For production workloads, use NoSQL or REST operations. SQL performance optimizations are on the roadmap.
 :::
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
-
 Detailed documentation: [TODO:reference_versioned_docs/version-v4/legacy/sql 'Legacy SQL reference']
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `sql` | Executes a SQL `SELECT`, `INSERT`, `UPDATE`, or `DELETE` statement | any |
+| Operation | Description                                                        | Role Required |
+| --------- | ------------------------------------------------------------------ | ------------- |
+| `sql`     | Executes a SQL `SELECT`, `INSERT`, `UPDATE`, or `DELETE` statement | any           |
 
 ### `sql`
 
@@ -422,23 +410,128 @@ Executes a standard SQL statement.
 
 Operations for managing users and role-based access control (RBAC).
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
+Detailed documentation: [Users & Roles Operations](../users-and-roles/operations.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/users-and-roles/operations.md 'Users & Roles operations']
+| Operation    | Description                                         | Role Required |
+| ------------ | --------------------------------------------------- | ------------- |
+| `list_roles` | Returns all roles                                   | super_user    |
+| `add_role`   | Creates a new role with permissions                 | super_user    |
+| `alter_role` | Modifies an existing role's permissions             | super_user    |
+| `drop_role`  | Deletes a role (role must have no associated users) | super_user    |
+| `list_users` | Returns all users                                   | super_user    |
+| `user_info`  | Returns data for the authenticated user             | any           |
+| `add_user`   | Creates a new user                                  | super_user    |
+| `alter_user` | Modifies an existing user's credentials or role     | super_user    |
+| `drop_user`  | Deletes a user                                      | super_user    |
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `list_roles` | Returns all roles | super_user |
-| `add_role` | Creates a new role with permissions | super_user |
-| `alter_role` | Modifies an existing role's permissions | super_user |
-| `drop_role` | Deletes a role (role must have no associated users) | super_user |
-| `list_users` | Returns all users | super_user |
-| `user_info` | Returns data for the authenticated user | any |
-| `add_user` | Creates a new user | super_user |
-| `alter_user` | Modifies an existing user's credentials or role | super_user |
-| `drop_user` | Deletes a user | super_user |
+### `list_roles`
 
-See [TODO:reference_versioned_docs/version-v4/users-and-roles/operations.md 'Users & Roles operations'] for full documentation including permission object structure.
+Returns all roles defined in the instance.
+
+```json
+{ "operation": "list_roles" }
+```
+
+### `add_role`
+
+Creates a new role with the specified permissions. The `permission` object maps database names to table-level access rules (`read`, `insert`, `update`, `delete`). Set `super_user: true` to grant full access.
+
+```json
+{
+	"operation": "add_role",
+	"role": "developer",
+	"permission": {
+		"super_user": false,
+		"dev": {
+			"tables": {
+				"dog": { "read": true, "insert": true, "update": true, "delete": false }
+			}
+		}
+	}
+}
+```
+
+### `alter_role`
+
+Modifies an existing role's name or permissions. Requires the role's `id` (returned by `list_roles`).
+
+```json
+{
+	"operation": "alter_role",
+	"id": "f92162e2-cd17-450c-aae0-372a76859038",
+	"role": "senior_developer",
+	"permission": {
+		"super_user": false,
+		"dev": {
+			"tables": {
+				"dog": { "read": true, "insert": true, "update": true, "delete": true }
+			}
+		}
+	}
+}
+```
+
+### `drop_role`
+
+Deletes a role. The role must have no associated users before it can be dropped.
+
+```json
+{ "operation": "drop_role", "id": "f92162e2-cd17-450c-aae0-372a76859038" }
+```
+
+### `list_users`
+
+Returns all users.
+
+```json
+{ "operation": "list_users" }
+```
+
+### `user_info`
+
+Returns data for the currently authenticated user.
+
+```json
+{ "operation": "user_info" }
+```
+
+### `add_user`
+
+Creates a new user. `username` cannot be changed after creation. `password` is stored encrypted.
+
+```json
+{
+	"operation": "add_user",
+	"role": "developer",
+	"username": "hdb_user",
+	"password": "password",
+	"active": true
+}
+```
+
+### `alter_user`
+
+Modifies an existing user's password, role, or active status. All fields except `username` are optional.
+
+```json
+{
+	"operation": "alter_user",
+	"username": "hdb_user",
+	"password": "new_password",
+	"role": "senior_developer",
+	"active": true
+}
+```
+
+### `drop_user`
+
+Deletes a user by username.
+
+```json
+{ "operation": "drop_user", "username": "hdb_user" }
+```
+
+See [Users & Roles Operations](../users-and-roles/operations.md) for full documentation including permission object structure.
 
 ---
 
@@ -446,14 +539,12 @@ See [TODO:reference_versioned_docs/version-v4/users-and-roles/operations.md 'Use
 
 Operations for JWT token creation and refresh.
 
-Added in: v4.1.0 (inferred from version comparison, needs verification)
+Detailed documentation: [JWT Authentication](../security/jwt-authentication.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/security/jwt-authentication.md 'JWT authentication reference']
-
-| Operation | Description | Role Required |
-|---|---|---|
+| Operation                      | Description                                             | Role Required          |
+| ------------------------------ | ------------------------------------------------------- | ---------------------- |
 | `create_authentication_tokens` | Creates an operation token and refresh token for a user | none (unauthenticated) |
-| `refresh_operation_token` | Creates a new operation token from a refresh token | any |
+| `refresh_operation_token`      | Creates a new operation token from a refresh token      | any                    |
 
 ### `create_authentication_tokens`
 
@@ -461,9 +552,9 @@ Does not require prior authentication. Returns `operation_token` (short-lived JW
 
 ```json
 {
-  "operation": "create_authentication_tokens",
-  "username": "my-user",
-  "password": "my-password"
+	"operation": "create_authentication_tokens",
+	"username": "my-user",
+	"password": "my-password"
 }
 ```
 
@@ -473,8 +564,8 @@ Creates a new operation token from an existing refresh token.
 
 ```json
 {
-  "operation": "refresh_operation_token",
-  "refresh_token": "EXISTING_REFRESH_TOKEN"
+	"operation": "refresh_operation_token",
+	"refresh_token": "EXISTING_REFRESH_TOKEN"
 }
 ```
 
@@ -484,26 +575,24 @@ Creates a new operation token from an existing refresh token.
 
 Operations for deploying and managing Harper components (applications, extensions, plugins).
 
-Added in: v4.2.0 (component architecture introduced)
+Detailed documentation: [Components Overview](../components/overview.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/components/overview.md 'Components overview']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `add_component` | Creates a new component project from a template | super_user |
-| `deploy_component` | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user |
-| `package_component` | Packages a component project into a base64-encoded tar | super_user |
-| `drop_component` | Deletes a component or a file within a component | super_user |
-| `get_components` | Lists all component files and config | super_user |
-| `get_component_file` | Returns the contents of a file within a component | super_user |
-| `set_component_file` | Creates or updates a file within a component | super_user |
-| `add_ssh_key` | Adds an SSH key for deploying from private repositories | super_user |
-| `update_ssh_key` | Updates an existing SSH key | super_user |
-| `delete_ssh_key` | Deletes an SSH key | super_user |
-| `list_ssh_keys` | Lists all configured SSH key names | super_user |
-| `set_ssh_known_hosts` | Overwrites the SSH known_hosts file | super_user |
-| `get_ssh_known_hosts` | Returns the contents of the SSH known_hosts file | super_user |
-| `install_node_modules` | _(Deprecated)_ Run npm install on component projects | super_user |
+| Operation              | Description                                                             | Role Required |
+| ---------------------- | ----------------------------------------------------------------------- | ------------- |
+| `add_component`        | Creates a new component project from a template                         | super_user    |
+| `deploy_component`     | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
+| `package_component`    | Packages a component project into a base64-encoded tar                  | super_user    |
+| `drop_component`       | Deletes a component or a file within a component                        | super_user    |
+| `get_components`       | Lists all component files and config                                    | super_user    |
+| `get_component_file`   | Returns the contents of a file within a component                       | super_user    |
+| `set_component_file`   | Creates or updates a file within a component                            | super_user    |
+| `add_ssh_key`          | Adds an SSH key for deploying from private repositories                 | super_user    |
+| `update_ssh_key`       | Updates an existing SSH key                                             | super_user    |
+| `delete_ssh_key`       | Deletes an SSH key                                                      | super_user    |
+| `list_ssh_keys`        | Lists all configured SSH key names                                      | super_user    |
+| `set_ssh_known_hosts`  | Overwrites the SSH known_hosts file                                     | super_user    |
+| `get_ssh_known_hosts`  | Returns the contents of the SSH known_hosts file                        | super_user    |
+| `install_node_modules` | _(Deprecated)_ Run npm install on component projects                    | super_user    |
 
 ### `deploy_component`
 
@@ -511,11 +600,11 @@ Deploys a component. The `package` option accepts any valid NPM reference includ
 
 ```json
 {
-  "operation": "deploy_component",
-  "project": "my-app",
-  "package": "my-org/my-app#semver:v1.2.3",
-  "replicated": true,
-  "restart": "rolling"
+	"operation": "deploy_component",
+	"project": "my-app",
+	"package": "my-org/my-app#semver:v1.2.3",
+	"replicated": true,
+	"restart": "rolling"
 }
 ```
 
@@ -525,11 +614,11 @@ Adds an SSH key (must be ed25519) for authenticating deployments from private re
 
 ```json
 {
-  "operation": "add_ssh_key",
-  "name": "my-key",
-  "key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----\n",
-  "host": "my-key.github.com",
-  "hostname": "github.com"
+	"operation": "add_ssh_key",
+	"name": "my-key",
+	"key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----\n",
+	"host": "my-key.github.com",
+	"hostname": "github.com"
 }
 ```
 
@@ -539,20 +628,18 @@ Adds an SSH key (must be ed25519) for authenticating deployments from private re
 
 Operations for configuring and managing Harper cluster replication.
 
-Added in: v4.4.0 (Native Plexus replication; confirmed via release notes)
+Detailed documentation: [Replication & Clustering](../replication/clustering.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering reference']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `add_node` | Adds a Harper instance to the cluster | super_user |
-| `update_node` | Modifies an existing node's subscriptions | super_user |
-| `remove_node` | Removes a node from the cluster | super_user |
-| `cluster_status` | Returns current cluster connection status | super_user |
-| `configure_cluster` | Bulk-creates/resets cluster subscriptions across multiple nodes | super_user |
-| `cluster_set_routes` | Adds routes to the replication routes config (PATCH/upsert) | super_user |
-| `cluster_get_routes` | Returns the current replication routes config | super_user |
-| `cluster_delete_routes` | Removes routes from the replication routes config | super_user |
+| Operation               | Description                                                     | Role Required |
+| ----------------------- | --------------------------------------------------------------- | ------------- |
+| `add_node`              | Adds a Harper instance to the cluster                           | super_user    |
+| `update_node`           | Modifies an existing node's subscriptions                       | super_user    |
+| `remove_node`           | Removes a node from the cluster                                 | super_user    |
+| `cluster_status`        | Returns current cluster connection status                       | super_user    |
+| `configure_cluster`     | Bulk-creates/resets cluster subscriptions across multiple nodes | super_user    |
+| `cluster_set_routes`    | Adds routes to the replication routes config (PATCH/upsert)     | super_user    |
+| `cluster_get_routes`    | Returns the current replication routes config                   | super_user    |
+| `cluster_delete_routes` | Removes routes from the replication routes config               | super_user    |
 
 ### `add_node`
 
@@ -560,10 +647,10 @@ Adds a remote Harper node to the cluster. If `subscriptions` are not provided, a
 
 ```json
 {
-  "operation": "add_node",
-  "hostname": "server-two",
-  "verify_tls": false,
-  "authorization": { "username": "admin", "password": "password" }
+	"operation": "add_node",
+	"hostname": "server-two",
+	"verify_tls": false,
+	"authorization": { "username": "admin", "password": "password" }
 }
 ```
 
@@ -581,15 +668,13 @@ Resets and replaces the entire clustering configuration. Each entry follows the 
 
 ```json
 {
-  "operation": "configure_cluster",
-  "connections": [
-    {
-      "hostname": "server-two",
-      "subscriptions": [
-        { "database": "dev", "table": "dog", "subscribe": true, "publish": true }
-      ]
-    }
-  ]
+	"operation": "configure_cluster",
+	"connections": [
+		{
+			"hostname": "server-two",
+			"subscriptions": [{ "database": "dev", "table": "dog", "subscribe": true, "publish": true }]
+		}
+	]
 }
 ```
 
@@ -601,10 +686,10 @@ Operations for reading and updating Harper configuration.
 
 Detailed documentation: [TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview']
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `set_configuration` | Modifies Harper configuration file parameters (requires restart) | super_user |
-| `get_configuration` | Returns the current Harper configuration | super_user |
+| Operation           | Description                                                      | Role Required |
+| ------------------- | ---------------------------------------------------------------- | ------------- |
+| `set_configuration` | Modifies Harper configuration file parameters (requires restart) | super_user    |
+| `get_configuration` | Returns the current Harper configuration                         | super_user    |
 
 ### `set_configuration`
 
@@ -612,9 +697,9 @@ Updates configuration parameters in `harperdb-config.yaml`. A restart (`restart`
 
 ```json
 {
-  "operation": "set_configuration",
-  "logging_level": "trace",
-  "clustering_enabled": true
+	"operation": "set_configuration",
+	"logging_level": "trace",
+	"clustering_enabled": true
 }
 ```
 
@@ -632,14 +717,14 @@ Returns the full current configuration object.
 
 Operations for restarting Harper and managing system state.
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `restart` | Restarts the Harper instance | super_user |
-| `restart_service` | Restarts a specific Harper service | super_user |
-| `system_information` | Returns detailed host system metrics | super_user |
-| `set_status` | Sets an application-specific status value (in-memory) | super_user |
-| `get_status` | Returns a previously set status value | super_user |
-| `clear_status` | Removes a status entry | super_user |
+| Operation            | Description                                           | Role Required |
+| -------------------- | ----------------------------------------------------- | ------------- |
+| `restart`            | Restarts the Harper instance                          | super_user    |
+| `restart_service`    | Restarts a specific Harper service                    | super_user    |
+| `system_information` | Returns detailed host system metrics                  | super_user    |
+| `set_status`         | Sets an application-specific status value (in-memory) | super_user    |
+| `get_status`         | Returns a previously set status value                 | super_user    |
+| `clear_status`       | Removes a status entry                                | super_user    |
 
 ### `restart`
 
@@ -679,12 +764,12 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 
 Operations for querying background job status.
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/database/jobs.md 'Database jobs reference']
+Detailed documentation: [Database Jobs](../database/jobs.md)
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `get_job` | Returns status and results for a specific job ID | any |
-| `search_jobs_by_start_date` | Returns jobs within a specified time window | super_user |
+| Operation                   | Description                                      | Role Required |
+| --------------------------- | ------------------------------------------------ | ------------- |
+| `get_job`                   | Returns status and results for a specific job ID | any           |
+| `search_jobs_by_start_date` | Returns jobs within a specified time window      | super_user    |
 
 ### `get_job`
 
@@ -700,9 +785,9 @@ Returns all jobs started within the specified datetime range.
 
 ```json
 {
-  "operation": "search_jobs_by_start_date",
-  "from_date": "2021-01-25T22:05:27.464+0000",
-  "to_date": "2021-01-25T23:05:27.464+0000"
+	"operation": "search_jobs_by_start_date",
+	"from_date": "2021-01-25T22:05:27.464+0000",
+	"to_date": "2021-01-25T23:05:27.464+0000"
 }
 ```
 
@@ -712,15 +797,15 @@ Returns all jobs started within the specified datetime range.
 
 Operations for reading Harper logs.
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/logging/operations.md 'Logging operations']
+Detailed documentation: [Logging Operations](../logging/operations.md)
 
-| Operation | Description | Role Required |
-|---|---|---|
-| `read_log` | Returns entries from the primary `hdb.log` | super_user |
-| `read_transaction_log` | Returns transaction history for a table | super_user |
-| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp | super_user |
-| `read_audit_log` | Returns verbose audit history for a table (requires audit log enabled) | super_user |
-| `delete_audit_logs_before` | Deletes audit log entries older than a timestamp | super_user |
+| Operation                        | Description                                                            | Role Required |
+| -------------------------------- | ---------------------------------------------------------------------- | ------------- |
+| `read_log`                       | Returns entries from the primary `hdb.log`                             | super_user    |
+| `read_transaction_log`           | Returns transaction history for a table                                | super_user    |
+| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp                 | super_user    |
+| `read_audit_log`                 | Returns verbose audit history for a table (requires audit log enabled) | super_user    |
+| `delete_audit_logs_before`       | Deletes audit log entries older than a timestamp                       | super_user    |
 
 ### `read_log`
 
@@ -728,10 +813,10 @@ Returns entries from `hdb.log`. Filter by `level` (`notify`, `error`, `warn`, `i
 
 ```json
 {
-  "operation": "read_log",
-  "start": 0,
-  "limit": 100,
-  "level": "error"
+	"operation": "read_log",
+	"start": 0,
+	"limit": 100,
+	"level": "error"
 }
 ```
 
@@ -741,10 +826,10 @@ Returns transaction history for a specific table. Optionally filter by `from`/`t
 
 ```json
 {
-  "operation": "read_transaction_log",
-  "schema": "dev",
-  "table": "dog",
-  "limit": 10
+	"operation": "read_transaction_log",
+	"schema": "dev",
+	"table": "dog",
+	"limit": 10
 }
 ```
 
@@ -754,11 +839,11 @@ Returns verbose audit history including original record state. Requires `logging
 
 ```json
 {
-  "operation": "read_audit_log",
-  "schema": "dev",
-  "table": "dog",
-  "search_type": "username",
-  "search_values": ["admin"]
+	"operation": "read_audit_log",
+	"schema": "dev",
+	"table": "dog",
+	"search_type": "username",
+	"search_values": ["admin"]
 }
 ```
 
@@ -768,15 +853,13 @@ Returns verbose audit history including original record state. Requires `logging
 
 Operations for managing TLS certificates in the `hdb_certificate` system table.
 
-Added in: v4.4.0 (Dynamic certificate management; confirmed via release notes)
+Detailed documentation: [Certificate Management](../security/certificate-management.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/security/certificate-management.md 'Certificate management reference']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `add_certificate` | Adds or updates a certificate | super_user |
-| `remove_certificate` | Removes a certificate and its private key file | super_user |
-| `list_certificates` | Lists all certificates | super_user |
+| Operation            | Description                                    | Role Required |
+| -------------------- | ---------------------------------------------- | ------------- |
+| `add_certificate`    | Adds or updates a certificate                  | super_user    |
+| `remove_certificate` | Removes a certificate and its private key file | super_user    |
+| `list_certificates`  | Lists all certificates                         | super_user    |
 
 ### `add_certificate`
 
@@ -784,11 +867,11 @@ Adds a certificate to `hdb_certificate`. If a `private_key` is provided, it is w
 
 ```json
 {
-  "operation": "add_certificate",
-  "name": "my-cert",
-  "certificate": "-----BEGIN CERTIFICATE-----...",
-  "is_authority": false,
-  "private_key": "-----BEGIN RSA PRIVATE KEY-----..."
+	"operation": "add_certificate",
+	"name": "my-cert",
+	"certificate": "-----BEGIN CERTIFICATE-----...",
+	"is_authority": false,
+	"private_key": "-----BEGIN RSA PRIVATE KEY-----..."
 }
 ```
 
@@ -798,15 +881,13 @@ Adds a certificate to `hdb_certificate`. If a `private_key` is provided, it is w
 
 Operations for querying analytics metrics.
 
-Added in: v4.5.0 (Resource and storage analytics; confirmed via release notes)
+Detailed documentation: [Analytics Operations](../analytics/operations.md)
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/analytics/operations.md 'Analytics operations']
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `get_analytics` | Retrieves analytics data for a specified metric | any |
-| `list_metrics` | Lists available analytics metrics | any |
-| `describe_metric` | Returns the schema of a specific metric | any |
+| Operation         | Description                                     | Role Required |
+| ----------------- | ----------------------------------------------- | ------------- |
+| `get_analytics`   | Retrieves analytics data for a specified metric | any           |
+| `list_metrics`    | Lists available analytics metrics               | any           |
+| `describe_metric` | Returns the schema of a specific metric         | any           |
 
 ### `get_analytics`
 
@@ -814,10 +895,10 @@ Retrieves analytics data. Supports `start_time`/`end_time` (Unix ms), `get_attri
 
 ```json
 {
-  "operation": "get_analytics",
-  "metric": "resource-usage",
-  "start_time": 1769198332754,
-  "end_time": 1769198532754
+	"operation": "get_analytics",
+	"metric": "resource-usage",
+	"start_time": 1769198332754,
+	"end_time": 1769198532754
 }
 ```
 
@@ -835,15 +916,13 @@ Returns available metric names. Filter by `metric_types`: `custom`, `builtin` (d
 
 Operations for license management.
 
-Added in: v4.7.0 (Usage-based licensing and analytics; confirmed via release notes)
-
-| Operation | Description | Role Required |
-|---|---|---|
-| `registration_info` | Returns registration and version information | any |
-| `install_usage_license` | Installs a Harper usage license block | super_user |
-| `get_usage_licenses` | Returns all usage licenses with consumption counts | super_user |
-| `get_fingerprint` | _(Deprecated)_ Returns the machine fingerprint | super_user |
-| `set_license` | _(Deprecated)_ Sets a license key | super_user |
+| Operation               | Description                                        | Role Required |
+| ----------------------- | -------------------------------------------------- | ------------- |
+| `registration_info`     | Returns registration and version information       | any           |
+| `install_usage_license` | Installs a Harper usage license block              | super_user    |
+| `get_usage_licenses`    | Returns all usage licenses with consumption counts | super_user    |
+| `get_fingerprint`       | _(Deprecated)_ Returns the machine fingerprint     | super_user    |
+| `set_license`           | _(Deprecated)_ Sets a license key                  | super_user    |
 
 ### `registration_info`
 
@@ -859,8 +938,8 @@ Installs a usage license block. A license is a JWT-like structure (`header.paylo
 
 ```json
 {
-  "operation": "install_usage_license",
-  "license": "abc...0123.abc...0123.abc...0123"
+	"operation": "install_usage_license",
+	"license": "abc...0123.abc...0123.abc...0123"
 }
 ```
 
@@ -884,28 +963,28 @@ Custom Functions were the precursor to the Component architecture introduced in 
 
 Deprecated in: v4.2.0 (moved to legacy in v4.7+)
 
-For modern equivalents, see [TODO:reference_versioned_docs/version-v4/components/overview.md 'Components overview'].
+For modern equivalents, see [Components Overview](../components/overview.md).
 
-| Operation | Description |
-|---|---|
-| `custom_functions_status` | Returns Custom Functions server status |
-| `get_custom_functions` | Lists all Custom Function projects |
-| `get_custom_function` | Returns a Custom Function file's content |
-| `set_custom_function` | Creates or updates a Custom Function file |
-| `drop_custom_function` | Deletes a Custom Function file |
-| `add_custom_function_project` | Creates a new Custom Function project |
-| `drop_custom_function_project` | Deletes a Custom Function project |
+| Operation                         | Description                                      |
+| --------------------------------- | ------------------------------------------------ |
+| `custom_functions_status`         | Returns Custom Functions server status           |
+| `get_custom_functions`            | Lists all Custom Function projects               |
+| `get_custom_function`             | Returns a Custom Function file's content         |
+| `set_custom_function`             | Creates or updates a Custom Function file        |
+| `drop_custom_function`            | Deletes a Custom Function file                   |
+| `add_custom_function_project`     | Creates a new Custom Function project            |
+| `drop_custom_function_project`    | Deletes a Custom Function project                |
 | `package_custom_function_project` | Packages a Custom Function project as base64 tar |
-| `deploy_custom_function_project` | Deploys a packaged Custom Function project |
+| `deploy_custom_function_project`  | Deploys a packaged Custom Function project       |
 
 ### Other Deprecated Operations
 
-| Operation | Replaced By |
-|---|---|
-| `install_node_modules` | Handled automatically by `deploy_component` and `restart` |
-| `get_fingerprint` | Use `registration_info` |
-| `set_license` | Use `install_usage_license` |
-| `search_by_hash` | Use `search_by_id` |
-| `search_attribute` | Use `attribute` field in `search_by_value` / `search_by_conditions` |
-| `search_value` | Use `value` field in `search_by_value` / `search_by_conditions` |
-| `search_type` | Use `comparator` field in `search_by_conditions` |
+| Operation              | Replaced By                                                         |
+| ---------------------- | ------------------------------------------------------------------- |
+| `install_node_modules` | Handled automatically by `deploy_component` and `restart`           |
+| `get_fingerprint`      | Use `registration_info`                                             |
+| `set_license`          | Use `install_usage_license`                                         |
+| `search_by_hash`       | Use `search_by_id`                                                  |
+| `search_attribute`     | Use `attribute` field in `search_by_value` / `search_by_conditions` |
+| `search_value`         | Use `value` field in `search_by_value` / `search_by_conditions`     |
+| `search_type`          | Use `comparator` field in `search_by_conditions`                    |
