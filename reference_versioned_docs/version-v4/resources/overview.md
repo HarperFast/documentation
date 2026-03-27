@@ -22,7 +22,7 @@ The Resource API is designed to mirror REST/HTTP semantics: methods map directly
 - **Database tables** extend `Resource` automatically. You can use tables through the Resource API without writing any custom code.
 - The **REST plugin** maps incoming HTTP requests to Resource methods. See [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST plugin reference').
 - The **MQTT plugin** routes publish/subscribe messages to `publish` and `subscribe` Resource methods. See [MQTT Overview](TODO:reference_versioned_docs/version-v4/mqtt/overview.md 'MQTT plugin reference').
-- **Global APIs** (`tables`, `databases`, `transaction`) provide access to resources from JavaScript code. See [Global APIs](./global-apis.md).
+- **Global APIs** (`tables`, `databases`, `transaction`) provide access to resources from JavaScript code.
 - The **`jsResource` plugin** (configured in `config.yaml`) registers a JavaScript file's exported Resource classes as endpoints.
 
 ## Resource API Versions
@@ -120,12 +120,11 @@ Resources are the true customization point for Harper. This is where the busines
 
 ## Exporting Resources as Endpoints
 
-Resources become HTTP/MQTT endpoints when they are exported. As the examples demonstrated if a Resource extends an existing table, make sure to not have conflicting exports between the schema and the JavaScript implementation. Alternatively, you can register resources programmatically using `server.resources.set()`. See [Global APIs — server.resources](./global-apis.md#serverresources-resources).
+Resources become HTTP/MQTT endpoints when they are exported. As the examples demonstrated if a Resource extends an existing table, make sure to not have conflicting exports between the schema and the JavaScript implementation. Alternatively, you can register resources programmatically using `server.resources.set()`. See [HTTP API](../http/api.md) for server extension documentation.
 
 ## Pages in This Section
 
 | Page                                          | Description                                                                                                     |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | [Resource API](./resource-api.md)             | Complete reference for instance methods, static methods, the Query object, RequestTarget, and response handling |
-| [Global APIs](./global-apis.md)               | `tables`, `databases`, `transaction`, `contentTypes`, and `server` globals                                      |
 | [Query Optimization](./query-optimization.md) | How Harper executes queries and how to write performant conditions                                              |

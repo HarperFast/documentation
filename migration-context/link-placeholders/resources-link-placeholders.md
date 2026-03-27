@@ -10,16 +10,6 @@
   - Context: Explaining that the MQTT plugin routes publish/subscribe to Resource methods
   - Target should be: MQTT section overview page
 
-## reference_versioned_docs/version-v4/resources/global-apis.md
-
-- Line 103: `[Logging API](TODO:reference_versioned_docs/version-v4/logging/api.md)`
-  - Context: Mentioning the logger global and pointing to fuller docs
-  - Target should be: Logging section API reference page (already merged)
-
-- Line 184: `[Analytics Overview](TODO:reference_versioned_docs/version-v4/analytics/overview.md)`
-  - Context: Documenting `server.recordAnalytics` and linking to analytics docs
-  - Target should be: Analytics section overview page (already merged)
-
 ## reference_versioned_docs/version-v4/resources/resource-api.md
 
 No TODO placeholders — all cross-section links use relative paths for in-section links and section-relative paths otherwise. The global-apis.md has the external TODOs listed above.
