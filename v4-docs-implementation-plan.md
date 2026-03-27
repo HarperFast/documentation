@@ -292,9 +292,10 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `websockets.md`
     - `server-sent-events.md`
 
-4.  **Database** (`reference_versioned_docs/version-v4/database/`)
+4.  **Database** (`reference_versioned_docs/version-v4/database/`) — **Complete**
     - `overview.md`
     - `schema.md`
+    - `api.md` _(JS globals: `tables`, `databases`, `transaction()`, `createBlob()`)_
     - `data-loader.md`
     - `storage-algorithm.md`
     - `jobs.md`
@@ -302,7 +303,7 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `compaction.md`
     - `transaction.md`
 
-5.  **Resources** (`reference_versioned_docs/version-v4/resources/`)
+5.  **Resources** (`reference_versioned_docs/version-v4/resources/`) — **Complete**
     - `overview.md`
     - `resource-api.md`
     - `global-apis.md`

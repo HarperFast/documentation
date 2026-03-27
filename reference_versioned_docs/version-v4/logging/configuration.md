@@ -102,7 +102,7 @@ Default: `false`
 
 Enables audit (table transaction) logging. When enabled, Harper records every insert, update, and delete to a corresponding audit table. Audit log data is accessed via the `read_audit_log` operation.
 
-See [Database / Transaction Logging](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit and transaction logging') for details on using audit logs.
+See [Database / Transaction Logging](../database/transaction.md) for details on using audit logs.
 
 ```yaml
 logging:
@@ -366,5 +366,5 @@ http:
 - [Logging Overview](./overview)
 - [Logging API](./api)
 - [Logging Operations](./operations)
-- [Database / Transaction Logging](TODO:reference_versioned_docs/version-v4/database/transaction.md 'Audit and transaction logging')
+- [Database / Transaction Logging](../database/transaction.md)
 - [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full harperdb-config.yaml reference')

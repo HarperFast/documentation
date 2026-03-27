@@ -268,6 +268,11 @@
 					"type": "doc",
 					"id": "security/certificate-verification",
 					"label": "Certificate Verification"
+				},
+				{
+					"type": "doc",
+					"id": "security/api",
+					"label": "API"
 				}
 			]
 		},
@@ -291,6 +296,138 @@
 					"type": "doc",
 					"id": "users-and-roles/operations",
 					"label": "Operations"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Database",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "database/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "database/schema",
+					"label": "Schema"
+				},
+				{
+					"type": "doc",
+					"id": "database/api",
+					"label": "API"
+				},
+				{
+					"type": "doc",
+					"id": "database/data-loader",
+					"label": "Data Loader"
+				},
+				{
+					"type": "doc",
+					"id": "database/storage-algorithm",
+					"label": "Storage Algorithm"
+				},
+				{
+					"type": "doc",
+					"id": "database/jobs",
+					"label": "Jobs"
+				},
+				{
+					"type": "doc",
+					"id": "database/system-tables",
+					"label": "System Tables"
+				},
+				{
+					"type": "doc",
+					"id": "database/compaction",
+					"label": "Compaction"
+				},
+				{
+					"type": "doc",
+					"id": "database/transaction",
+					"label": "Transaction Logging"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Resources",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "resources/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "resources/resource-api",
+					"label": "Resource API"
+				},
+				{
+					"type": "doc",
+					"id": "resources/query-optimization",
+					"label": "Query Optimization"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Components",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "components/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "components/applications",
+					"label": "Applications"
+				},
+				{
+					"type": "doc",
+					"id": "components/extension-api",
+					"label": "Extension API"
+				},
+				{
+					"type": "doc",
+					"id": "components/plugin-api",
+					"label": "Plugin API"
+				},
+				{
+					"type": "doc",
+					"id": "components/javascript-environment",
+					"label": "JavaScript Environment"
+				}
+			]
+		},
+		{
+			"type": "category",
+			"label": "Replication",
+			"collapsible": false,
+			"className": "learn-category-header",
+			"items": [
+				{
+					"type": "doc",
+					"id": "replication/overview",
+					"label": "Overview"
+				},
+				{
+					"type": "doc",
+					"id": "replication/clustering",
+					"label": "Clustering"
+				},
+				{
+					"type": "doc",
+					"id": "replication/sharding",
+					"label": "Sharding"
 				}
 			]
 		},

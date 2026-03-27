@@ -185,13 +185,13 @@ Harper supports querying across related tables through dot-syntax chained attrib
 
 ```graphql
 type Product @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
-	brandId: ID @indexed
+	brandId: Long @indexed
 	brand: Brand @relation(from: "brandId")
 }
 type Brand @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 	products: [Product] @relation(to: "brandId")
 }
@@ -222,9 +222,9 @@ Many-to-many relationships can be modeled with an array of foreign key values, w
 
 ```graphql
 type Product @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
-	resellerIds: [ID] @indexed
+	resellerIds: [Long] @indexed
 	resellers: [Reseller] @relation(from: "resellerId")
 }
 ```
@@ -251,11 +251,11 @@ This only works for properties declared in the schema. As of v4.5.0, dots in URL
 
 Added in: v4.5.0
 
-Resources can be configured with `directURLMapping: true` for more direct URL path handling. When enabled, the URL path is mapped more directly to the resource without the default query parameter parsing semantics. See [Database / Schema](TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema and resource configuration') for configuration details.
+Resources can be configured with `directURLMapping: true` for more direct URL path handling. When enabled, the URL path is mapped more directly to the resource without the default query parameter parsing semantics. See [Database / Schema](../database/schema.md) for configuration details.
 
 ## See Also
 
 - [REST Overview](./overview.md) — HTTP methods, URL structure, and caching
 - [Headers](./headers.md) — Request and response headers
 - [Content Types](./content-types.md) — Encoding formats
-- [Database / Schema](TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema definition') — Defining schemas, relationships, and indexes
+- [Database / Schema](../database/schema.md) — Defining schemas, relationships, and indexes
