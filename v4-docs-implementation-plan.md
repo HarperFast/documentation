@@ -295,6 +295,7 @@ Based on migration map and reference plan, recommend this order. Each section is
 4.  **Database** (`reference_versioned_docs/version-v4/database/`)
     - `overview.md`
     - `schema.md`
+    - `api.md` _(JS globals: `tables`, `databases`, `transaction()`, `createBlob()`)_
     - `data-loader.md`
     - `storage-algorithm.md`
     - `jobs.md`

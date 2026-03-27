@@ -41,6 +41,10 @@ Harper supports three authentication methods:
   - For Operations API configuration see [Operations API / Configuration / TLS](TODO:reference_versioned_docs/version-v4/configuration/operations.md#tls)
 - [Users and Roles](../users-and-roles/overview.md) — Role-Based Access Control (RBAC): defining roles, assigning permissions, and managing users.
 
+## API
+
+- [Security API](./api.md) — JavaScript globals for security operations (e.g. `auth()`).
+
 ## Default Behavior
 
 Out of the box, Harper:
