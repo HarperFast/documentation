@@ -121,17 +121,17 @@ Extensions require an `extensionModule` option pointing to the extension source.
 
 ## Built-In Extensions Reference
 
-| Name                                                           | Description                                       |
-| -------------------------------------------------------------- | ------------------------------------------------- |
-| [`dataLoader`](../database/data-loader.md)                     | Load data from JSON/YAML files into Harper tables |
-| [`fastifyRoutes`](../fastify-routes/overview.md)               | Define custom endpoints with Fastify              |
-| [`graphql`](../graphql-querying/overview.md)                   | Enable GraphQL querying (experimental)            |
-| [`graphqlSchema`](../database/schema.md)                       | Define table schemas with GraphQL syntax          |
-| [`jsResource`](../resources/overview.md)                       | Define custom JavaScript-based resources          |
-| [`loadEnv`](../environment-variables/overview.md)              | Load environment variables from `.env` files      |
-| [`rest`](../rest/overview.md)                                  | Enable automatic REST endpoint generation         |
-| [`roles`](../users-and-roles/overview.md)                      | Define role-based access control from YAML files  |
-| [`static`](../static-files/overview.md)                        | Serve static files via HTTP                       |
+| Name                                              | Description                                       |
+| ------------------------------------------------- | ------------------------------------------------- |
+| [`dataLoader`](../database/data-loader.md)        | Load data from JSON/YAML files into Harper tables |
+| [`fastifyRoutes`](../fastify-routes/overview.md)  | Define custom endpoints with Fastify              |
+| [`graphql`](../graphql-querying/overview.md)      | Enable GraphQL querying (experimental)            |
+| [`graphqlSchema`](../database/schema.md)          | Define table schemas with GraphQL syntax          |
+| [`jsResource`](../resources/overview.md)          | Define custom JavaScript-based resources          |
+| [`loadEnv`](../environment-variables/overview.md) | Load environment variables from `.env` files      |
+| [`rest`](../rest/overview.md)                     | Enable automatic REST endpoint generation         |
+| [`roles`](../users-and-roles/overview.md)         | Define role-based access control from YAML files  |
+| [`static`](../static-files/overview.md)           | Serve static files via HTTP                       |
 
 ## Known Custom Components
 
