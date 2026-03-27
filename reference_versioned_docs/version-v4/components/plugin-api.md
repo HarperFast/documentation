@@ -98,11 +98,12 @@ Avoid event-loop-blocking operations within `handleApplication()`.
 
 ```typescript
 export function handleApplication(scope: Scope) {
-  // Use scope to access config, resources, server, etc.
+	// Use scope to access config, resources, server, etc.
 }
 ```
 
 Parameters:
+
 - `scope` — [`Scope`](#class-scope) — Access to the application's configuration, resources, and APIs
 
 The `handleApplication()` method cannot coexist with Extension API methods (`start`, `handleFile`, etc.). Defining both will throw an error.
@@ -124,6 +125,7 @@ The central object passed to `handleApplication()`. Provides access to configura
 Returns an [`EntryHandler`](#class-entryhandler) for watching and processing file system entries.
 
 Overloads:
+
 - `scope.handleEntry()` — Returns the default `EntryHandler` based on `files`/`urlPath` in `config.yaml`
 - `scope.handleEntry(handler)` — Returns default `EntryHandler`, registers `handler` for the `'all'` event
 - `scope.handleEntry(files)` — Returns a new `EntryHandler` for custom `files` config
@@ -133,21 +135,21 @@ Example:
 
 ```js
 export function handleApplication(scope) {
-  // Default handler with inline callback
-  scope.handleEntry((entry) => {
-    switch (entry.eventType) {
-      case 'add':
-      case 'change':
-        // handle file add/change
-        break;
-      case 'unlink':
-        // handle file deletion
-        break;
-    }
-  });
+	// Default handler with inline callback
+	scope.handleEntry((entry) => {
+		switch (entry.eventType) {
+			case 'add':
+			case 'change':
+				// handle file add/change
+				break;
+			case 'unlink':
+				// handle file deletion
+				break;
+		}
+	});
 
-  // Custom handler for specific files
-  const tsHandler = scope.handleEntry({ files: 'src/**/*.ts' });
+	// Custom handler for specific files
+	const tsHandler = scope.handleEntry({ files: 'src/**/*.ts' });
 }
 ```
 
@@ -205,11 +207,11 @@ Example:
 
 ```typescript
 export function handleApplication(scope) {
-  scope.options.on('change', (key, value, config) => {
-    if (key[0] === 'files') {
-      scope.logger.info(`Files option changed to: ${value}`);
-    }
-  });
+	scope.options.on('change', (key, value, config) => {
+		if (key[0] === 'files') {
+			scope.logger.info(`Files option changed to: ${value}`);
+		}
+	});
 }
 ```
 
@@ -251,13 +253,18 @@ Recommended pattern for handling all events:
 
 ```js
 scope.handleEntry((entry) => {
-  switch (entry.eventType) {
-    case 'add':      break;
-    case 'change':   break;
-    case 'unlink':   break;
-    case 'addDir':   break;
-    case 'unlinkDir': break;
-  }
+	switch (entry.eventType) {
+		case 'add':
+			break;
+		case 'change':
+			break;
+		case 'unlink':
+			break;
+		case 'addDir':
+			break;
+		case 'unlinkDir':
+			break;
+	}
 });
 ```
 
@@ -372,43 +379,41 @@ A simplified form of the built-in `static` extension demonstrating key Plugin AP
 
 ```js
 export function handleApplication(scope) {
-  const staticFiles = new Map();
+	const staticFiles = new Map();
 
-  // React to config changes
-  scope.options.on('change', (key, value, config) => {
-    if (key[0] === 'files' || key[0] === 'urlPath') {
-      staticFiles.clear();
-      scope.logger.info(`Static files reset due to change in ${key.join('.')}`);
-    }
-  });
+	// React to config changes
+	scope.options.on('change', (key, value, config) => {
+		if (key[0] === 'files' || key[0] === 'urlPath') {
+			staticFiles.clear();
+			scope.logger.info(`Static files reset due to change in ${key.join('.')}`);
+		}
+	});
 
-  // Handle file entry events
-  scope.handleEntry((entry) => {
-    if (entry.entryType === 'directory') return;
+	// Handle file entry events
+	scope.handleEntry((entry) => {
+		if (entry.entryType === 'directory') return;
 
-    switch (entry.eventType) {
-      case 'add':
-      case 'change':
-        staticFiles.set(entry.urlPath, entry.contents);
-        break;
-      case 'unlink':
-        staticFiles.delete(entry.urlPath);
-        break;
-    }
-  });
+		switch (entry.eventType) {
+			case 'add':
+			case 'change':
+				staticFiles.set(entry.urlPath, entry.contents);
+				break;
+			case 'unlink':
+				staticFiles.delete(entry.urlPath);
+				break;
+		}
+	});
 
-  // Register HTTP middleware
-  scope.server.http(
-    (req, next) => {
-      if (req.method !== 'GET') return next(req);
+	// Register HTTP middleware
+	scope.server.http(
+		(req, next) => {
+			if (req.method !== 'GET') return next(req);
 
-      const file = staticFiles.get(req.pathname);
-      return file
-        ? { statusCode: 200, body: file }
-        : { statusCode: 404, body: 'File not found' };
-    },
-    { runFirst: true }
-  );
+			const file = staticFiles.get(req.pathname);
+			return file ? { statusCode: 200, body: file } : { statusCode: 404, body: 'File not found' };
+		},
+		{ runFirst: true }
+	);
 }
 ```
 

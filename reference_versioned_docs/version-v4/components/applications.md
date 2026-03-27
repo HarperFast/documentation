@@ -141,14 +141,14 @@ myApp:
 
 ```json
 {
-  "name": "my-app",
-  "version": "1.0.0",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "onFail": "error"
-    }
-  }
+	"name": "my-app",
+	"version": "1.0.0",
+	"devEngines": {
+		"packageManager": {
+			"name": "pnpm",
+			"onFail": "error"
+		}
+	}
 }
 ```
 
@@ -202,8 +202,8 @@ Options:
 
 ```yaml
 rest:
-  lastModified: true   # Enable Last-Modified header support
-  webSocket: false     # Disable automatic WebSocket support
+  lastModified: true # Enable Last-Modified header support
+  webSocket: false # Disable automatic WebSocket support
 ```
 
 See [TODO:reference_versioned_docs/version-v4/rest/overview.md](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST reference') for complete documentation.
@@ -340,8 +340,8 @@ Creates a new component project in the component root directory using a template
 
 ```json
 {
-  "operation": "add_component",
-  "project": "my-component"
+	"operation": "add_component",
+	"project": "my-component"
 }
 ```
 
@@ -360,11 +360,11 @@ Deploys a component using a package reference or a base64-encoded `.tar` payload
 
 ```json
 {
-  "operation": "deploy_component",
-  "project": "my-component",
-  "package": "HarperDB/application-template#semver:v1.0.0",
-  "replicated": true,
-  "restart": "rolling"
+	"operation": "deploy_component",
+	"project": "my-component",
+	"package": "HarperDB/application-template#semver:v1.0.0",
+	"replicated": true,
+	"restart": "rolling"
 }
 ```
 
@@ -379,8 +379,8 @@ Deletes a component project or a specific file within it.
 
 ```json
 {
-  "operation": "drop_component",
-  "project": "my-component"
+	"operation": "drop_component",
+	"project": "my-component"
 }
 ```
 
@@ -393,9 +393,9 @@ Packages a project folder as a base64-encoded `.tar` string.
 
 ```json
 {
-  "operation": "package_component",
-  "project": "my-component",
-  "skip_node_modules": true
+	"operation": "package_component",
+	"project": "my-component",
+	"skip_node_modules": true
 }
 ```
 
@@ -405,7 +405,7 @@ Returns all local component files, folders, and configuration from `harperdb-con
 
 ```json
 {
-  "operation": "get_components"
+	"operation": "get_components"
 }
 ```
 
@@ -419,9 +419,9 @@ Returns the contents of a file within a component project.
 
 ```json
 {
-  "operation": "get_component_file",
-  "project": "my-component",
-  "file": "resources.js"
+	"operation": "get_component_file",
+	"project": "my-component",
+	"file": "resources.js"
 }
 ```
 
@@ -437,10 +437,10 @@ Creates or updates a file within a component project.
 
 ```json
 {
-  "operation": "set_component_file",
-  "project": "my-component",
-  "file": "test.js",
-  "payload": "console.log('hello world')"
+	"operation": "set_component_file",
+	"project": "my-component",
+	"file": "test.js",
+	"payload": "console.log('hello world')"
 }
 ```
 
@@ -459,11 +459,11 @@ For deploying from private repositories, SSH keys must be registered on the Harp
 
 ```json
 {
-  "operation": "add_ssh_key",
-  "name": "my-key",
-  "key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----\n",
-  "host": "my-key.github.com",
-  "hostname": "github.com"
+	"operation": "add_ssh_key",
+	"name": "my-key",
+	"key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----\n",
+	"host": "my-key.github.com",
+	"hostname": "github.com"
 }
 ```
 

@@ -34,12 +34,12 @@ extensionModule: ./dist/index.js
 
 A Resource Extension processes specific files or directories. It is comprised of four function exports:
 
-| Method | Thread | Timing |
-|---|---|---|
-| `handleFile()` | All worker threads | Executed on every restart |
+| Method              | Thread             | Timing                    |
+| ------------------- | ------------------ | ------------------------- |
+| `handleFile()`      | All worker threads | Executed on every restart |
 | `handleDirectory()` | All worker threads | Executed on every restart |
-| `setupFile()` | Main thread only | Once, at initial start |
-| `setupDirectory()` | Main thread only | Once, at initial start |
+| `setupFile()`       | Main thread only   | Once, at initial start    |
+| `setupDirectory()`  | Main thread only   | Once, at initial start    |
 
 > **Important**: `harperdb restart` only restarts worker threads. Code in `setupFile()` and `setupDirectory()` runs only when Harper fully shuts down and starts again—not on `deploy` or `restart`.
 
@@ -104,24 +104,27 @@ When returned by a Protocol Extension, define them on the returned object:
 
 ```js
 export function start() {
-  return {
-    handleFile() {},
-  };
+	return {
+		handleFile() {},
+	};
 }
 ```
 
 #### `handleFile(contents, urlPath, absolutePath, resources): void | Promise<void>`
+
 #### `setupFile(contents, urlPath, absolutePath, resources): void | Promise<void>`
 
 Process individual files. Can be async.
 
 Parameters:
+
 - `contents` — `Buffer` — File contents
 - `urlPath` — `string` — Recommended URL path for the file
 - `absolutePath` — `string` — Absolute filesystem path
 - `resources` — `Object` — Currently loaded resources
 
 #### `handleDirectory(urlPath, absolutePath, resources): boolean | void | Promise<boolean | void>`
+
 #### `setupDirectory(urlPath, absolutePath, resources): boolean | void | Promise<boolean | void>`
 
 Process directories. Can be async.
@@ -129,6 +132,7 @@ Process directories. Can be async.
 If the function returns a truthy value, the component loading sequence ends and no other entries in the directory are processed.
 
 Parameters:
+
 - `urlPath` — `string` — Recommended URL path for the directory
 - `absolutePath` — `string` — Absolute filesystem path
 - `resources` — `Object` — Currently loaded resources
@@ -159,17 +163,19 @@ Example using `@harperdb/nextjs`:
 
 A Protocol Extension defines up to two methods:
 
-| Method | Thread | Timing |
-|---|---|---|
-| `start()` | All worker threads | Executed on every restart |
-| `startOnMainThread()` | Main thread only | Once, at initial start |
+| Method                | Thread             | Timing                    |
+| --------------------- | ------------------ | ------------------------- |
+| `start()`             | All worker threads | Executed on every restart |
+| `startOnMainThread()` | Main thread only   | Once, at initial start    |
 
 Both methods receive the same `options` object and can return a Resource Extension (an object with any of the Resource Extension methods).
 
 #### `start(options): ResourceExtension | Promise<ResourceExtension>`
+
 #### `startOnMainThread(options): ResourceExtension | Promise<ResourceExtension>`
 
 Parameters:
+
 - `options` — `Object` — Extension configuration options from `config.yaml`
 
 Returns: An object implementing any of the Resource Extension methods

@@ -101,9 +101,9 @@ Any custom component must be configured with a `package` option for Harper to lo
 
 ```json
 {
-  "dependencies": {
-    "@harperdb/nextjs": "1.0.0"
-  }
+	"dependencies": {
+		"@harperdb/nextjs": "1.0.0"
+	}
 }
 ```
 
@@ -121,17 +121,17 @@ Extensions require an `extensionModule` option pointing to the extension source.
 
 ## Built-In Extensions Reference
 
-| Name | Description |
-|---|---|
-| `dataLoader` | Load data from JSON/YAML files into Harper tables |
-| `fastifyRoutes` | Define custom endpoints with Fastify |
-| `graphql` | Enable GraphQL querying (experimental) |
-| `graphqlSchema` | Define table schemas with GraphQL syntax |
-| `jsResource` | Define custom JavaScript-based resources |
-| `loadEnv` | Load environment variables from `.env` files |
-| `rest` | Enable automatic REST endpoint generation |
-| `roles` | Define role-based access control from YAML files |
-| `static` | Serve static files via HTTP |
+| Name            | Description                                       |
+| --------------- | ------------------------------------------------- |
+| `dataLoader`    | Load data from JSON/YAML files into Harper tables |
+| `fastifyRoutes` | Define custom endpoints with Fastify              |
+| `graphql`       | Enable GraphQL querying (experimental)            |
+| `graphqlSchema` | Define table schemas with GraphQL syntax          |
+| `jsResource`    | Define custom JavaScript-based resources          |
+| `loadEnv`       | Load environment variables from `.env` files      |
+| `rest`          | Enable automatic REST endpoint generation         |
+| `roles`         | Define role-based access control from YAML files  |
+| `static`        | Serve static files via HTTP                       |
 
 For details on each built-in extension, see the [Applications](./applications.md) reference.
 
