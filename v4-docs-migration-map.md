@@ -226,7 +226,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - Components concept: v4.2.0
   - Applications/Extensions: v4.3.0+
   - Plugin API: v4.6.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Notes**: This is a critical page that explains the evolution
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Custom functions with worker threads
@@ -240,7 +240,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.7/developers/applications/*.md`
   - Current `reference/components/applications.md`
 - **Merge Required**: Yes - application developer docs scattered across multiple files
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Component architecture, NPM/GitHub deployment
 
@@ -249,7 +249,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/extensions.md`
 - **Additional Sources**: Current `reference/components/extensions.md`
 - **Version Annotations**: Extension API formalized around v4.4-4.5
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - New extension API
 
@@ -258,7 +258,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/plugins.md`
 - **Additional Sources**: Current `reference/components/plugins.md`
 - **Version Annotations**: Added in v4.6.0
-- **Status**: Not Started
+- **Status**: In Progress
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Plugin API introduced
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - Further plugin API improvements
