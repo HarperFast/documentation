@@ -64,7 +64,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**:
   - Current `reference/configuration.md`
   - `versioned_docs/version-4.1/configuration.md` (baseline)
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Must include a dedicated section on environment variable configuration. Content researched and ready from the environment-variables migration:
   - **Naming convention**: YAML keys map to `SCREAMING_SNAKE_CASE` env vars (e.g. `http.port` → `HTTP_PORT`, `operationsApi.network.port` → `OPERATIONSAPI_NETWORK_PORT`). Case-insensitive. Component configuration cannot be set this way.
   - **`HDB_CONFIG`**: CLI/ENV variable to specify a custom config file path at install time. Source: `versioned_docs/version-4.7/deployments/configuration.md` lines 51-55.
@@ -85,7 +85,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Additional Sources**: Compare all version-X/deployments/configuration.md files
 - **Merge Required**: Yes - configuration options added across versions
 - **Version Annotations**: Each config option needs version introduced
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: This will be a large migration task - the current configuration.md is 59KB
 - **Release Notes**: Major config changes across many versions - see all major releases
 
@@ -94,7 +94,7 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/configuration.md`
 - **Additional Sources**: Earlier versions for feature evolution
 - **Version Annotations**: Track when ops were added
-- **Status**: Not Started
+- **Status**: Complete
 
 ---
 
@@ -105,14 +105,14 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Primary Source**: `versioned_docs/version-4.7/developers/operations-api/index.md`
 - **Additional Sources**:
   - `versioned_docs/version-4.2/developers/operations-api/index.md` (first structured ops api section)
-- **Status**: Not Started
+- **Status**: Complete
 
 ### `reference/operations-api/operations.md`
 
 - **Primary Source**: Synthesize from all `versioned_docs/version-4.7/developers/operations-api/*.md` files
 - **Merge Required**: Yes - comprehensive list linking to primary references
 - **Version Annotations**: Each operation needs version introduced
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: This should be a simplified reference table/list with links to detailed docs in feature sections
 
 ---
@@ -226,7 +226,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - Components concept: v4.2.0
   - Applications/Extensions: v4.3.0+
   - Plugin API: v4.6.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: This is a critical page that explains the evolution
 - **Release Notes**:
   - [4.1.0](release-notes/v4-tucker/4.1.0.md) - Custom functions with worker threads
@@ -240,7 +240,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.7/developers/applications/*.md`
   - Current `reference/components/applications.md`
 - **Merge Required**: Yes - application developer docs scattered across multiple files
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Component architecture, NPM/GitHub deployment
 
@@ -249,7 +249,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/extensions.md`
 - **Additional Sources**: Current `reference/components/extensions.md`
 - **Version Annotations**: Extension API formalized around v4.4-4.5
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - New extension API
 
@@ -258,10 +258,15 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/reference/components/plugins.md`
 - **Additional Sources**: Current `reference/components/plugins.md`
 - **Version Annotations**: Added in v4.6.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Plugin API introduced
   - [4.7.0](release-notes/v4-tucker/4.7.0.md) - Further plugin API improvements
+
+### `reference/components/javascript-environment.md`
+
+- **Status**: Complete
+- **Notes**: Added during migration — JavaScript environment details for component development warranted its own page. Not in the original plan.
 
 ---
 
@@ -375,6 +380,15 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Balanced audit log cleanup
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Transaction reuse, storage reclamation (audit log eviction)
+
+### `reference/database/sql.md`
+
+- **Primary Source**: `versioned_docs/version-4.7/reference/sql-guide/` (all files)
+- **Additional Sources**:
+  - `versioned_docs/version-4.7/developers/operations-api/sql-operations.md`
+- **Merge Required**: Yes — consolidates all sql-guide sub-pages into one
+- **Status**: Complete
+- **Notes**: Moved here from Legacy section. Includes a prominent warning that SQL is not recommended for production use or large tables. Covers DML syntax, features matrix, all function categories (aggregate, string, math, logical, date/time), SEARCH_JSON, geospatial functions, and reserved words.
 
 ---
 
@@ -647,7 +661,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Additional Sources**: Current `reference/replication/` (if exists)
 - **Version Annotations**:
   - Native Replication (Plexus): v4.4.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Native replication system (Plexus), replicated operations
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Cluster status information, improved replication timestamps
@@ -660,7 +674,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.7/developers/operations-api/clustering.md`
   - Current `reference/clustering/` folder
 - **Merge Required**: Yes - extensive clustering documentation needs consolidation
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Large section with many sub-pages
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Clone node functionality
@@ -673,7 +687,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Version Annotations**:
   - Sharding: v4.4.0
   - Expanded functionality: v4.5.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.4.0](release-notes/v4-tucker/4.4.0.md) - Sharding introduced
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Expanded sharding functionality
@@ -735,21 +749,17 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Status**: Complete
 - **Notes**: The primary and additional sources are to be completely removed and this section is to act as a basic landing page to direct users to Fabric instead.
 
-### `reference/legacy/custom-functions/`
+### `reference/legacy/custom-functions.md`
 
-- **Primary Source**: `versioned_docs/version-4.1/custom-functions/*`
+- **Primary Source**: `versioned_docs/version-4.1/custom-functions/index.md`
 - **Additional Sources**: `versioned_docs/version-4.7/developers/operations-api/custom-functions.md`
-- **Status**: N/A
-- **Notes**: Move as-is with deprecation notice pointing to Components
+- **Status**: Complete
+- **Notes**: Single page (not a folder) — describes what Custom Functions were and directs users to the Components section as the modern alternative.
 
-### `reference/legacy/sql/`
+### ~~`reference/legacy/sql.md`~~
 
-- **Primary Source**: `versioned_docs/version-4.7/reference/sql-guide/*`
-- **Additional Sources**:
-  - `versioned_docs/version-4.7/developers/operations-api/sql-operations.md`
-  - Current `reference/sql-guide/`
 - **Status**: N/A
-- **Notes**: Move entire section as-is with deprecation notice
+- **Notes**: Moved to `reference/database/sql.md` — SQL is documented content (not just a deprecation notice), so it belongs in the Database section. See entry there.
 
 ---
 

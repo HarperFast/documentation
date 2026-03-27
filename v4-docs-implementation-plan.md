@@ -284,7 +284,7 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `operations.md`
     - _Note: Broken out from Security section during migration; RBAC content warranted its own top-level section._
 
-3.  **REST** (`reference_versioned_docs/version-v4/rest/`)
+3.  **REST** (`reference_versioned_docs/version-v4/rest/`) — **Complete**
     - `overview.md`
     - `querying.md`
     - `headers.md`
@@ -309,36 +309,35 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `global-apis.md`
     - `query-optimization.md`
 
-6.  **Components** (`reference_versioned_docs/version-v4/components/`)
+6.  **Components** (`reference_versioned_docs/version-v4/components/`) — **Complete**
     - `overview.md`
     - `applications.md`
     - `extension-api.md`
     - `plugin-api.md`
+    - `javascript-environment.md` _(added during migration — JS environment details warranted its own page)_
 
-7.  **Replication** (`reference_versioned_docs/version-v4/replication/`)
+7.  **Replication** (`reference_versioned_docs/version-v4/replication/`) — **Complete**
     - `overview.md`
     - `clustering.md`
     - `sharding.md`
 
-**Phase 1D - Cross-Cutting Sections**
+**Phase 1D - Cross-Cutting Sections** — **Complete**
 
-1.  **Operations API** (`reference_versioned_docs/version-v4/operations-api/`)
+1.  **Operations API** (`reference_versioned_docs/version-v4/operations-api/`) — **Complete**
     - `overview.md`
     - `operations.md`
 
-2.  **Configuration** (`reference_versioned_docs/version-v4/configuration/`)
+2.  **Configuration** (`reference_versioned_docs/version-v4/configuration/`) — **Complete**
     - `overview.md`
     - `options.md`
     - `operations.md`
 
-**Phase 1E - Legacy Content**
+**Phase 1E - Legacy Content** — **Complete**
 
-1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`)
-    - `cloud/` - Harper Cloud landing page to direct users to Fabric instead
-    - `custom-functions/` (entire folder as-is)
-    - `sql/` (entire folder as-is)
-
-(But ensure we reflect version changes from v4.1 to v4.7 using version annotations)
+1.  **Legacy** (`reference_versioned_docs/version-v4/legacy/`) — **Complete**
+    - `cloud.md` - Harper Cloud landing page directing users to Fabric
+    - `custom-functions.md` - What Custom Functions were; directs to Components
+    - ~~`sql.md`~~ - Moved to `database/sql.md` (SQL is documented content, not just a deprecation notice)
 
 ---
 

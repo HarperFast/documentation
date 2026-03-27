@@ -372,6 +372,11 @@
 					"type": "doc",
 					"id": "database/transaction",
 					"label": "Transaction Logging"
+				},
+				{
+					"type": "doc",
+					"id": "database/sql",
+					"label": "SQL"
 				}
 			]
 		},
@@ -482,6 +487,11 @@
 					"type": "doc",
 					"id": "legacy/cloud",
 					"label": "Harper Cloud"
+				},
+				{
+					"type": "doc",
+					"id": "legacy/custom-functions",
+					"label": "Custom Functions"
 				}
 			]
 		}
