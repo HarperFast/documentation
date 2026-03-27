@@ -88,7 +88,7 @@ dataLoader:
 
 ## Loading Behavior
 
-The Data Loader runs on every full system start and every component deployment — this includes fresh installs, restarts of the Harper process, and redeployments of the component. It does **not** re-run on individual thread restarts within a running Harper process.
+The Data Loader runs on every full system start and every component deployment — this includes fresh installs, restarts of the Harper process or threads, and redeployments of the component.
 
 Because the Data Loader runs on every startup and deployment, change detection is central to how it works safely. On each run:
 
@@ -164,15 +164,15 @@ rest: true
 
 ```graphql
 type Country @table(database: "myapp") @export {
-	id: ID @primaryKey # ISO 3166-1 alpha-2, e.g. "US"
+	id: String @primaryKey # ISO 3166-1 alpha-2, e.g. "US"
 	name: String @indexed
 	region: String @indexed
 }
 
 type Region @table(database: "myapp") @export {
-	id: ID @primaryKey # ISO 3166-2, e.g. "US-CA"
+	id: String @primaryKey # ISO 3166-2, e.g. "US-CA"
 	name: String @indexed
-	countryId: ID @indexed
+	countryId: String @indexed
 	country: Country @relationship(from: countryId)
 }
 ```

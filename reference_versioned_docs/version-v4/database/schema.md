@@ -34,14 +34,14 @@ A minimal example:
 
 ```graphql
 type Dog @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 	breed: String
 	age: Int
 }
 
 type Breed @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String @indexed
 }
 ```
@@ -67,7 +67,7 @@ Marks a GraphQL type as a Harper database table. The type name becomes the table
 
 ```graphql
 type MyTable @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 }
 ```
 
@@ -85,23 +85,23 @@ Optional arguments:
 ```graphql
 # Override table name
 type Product @table(table: "products") {
-	id: ID @primaryKey
+	id: Long @primaryKey
 }
 
 # Place in a specific database
 type Order @table(database: "commerce") {
-	id: ID @primaryKey
+	id: Long @primaryKey
 }
 
 # Auto-expire records after 1 hour (e.g., a session cache)
 type Session @table(expiration: 3600) {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	userId: String
 }
 
 # Enable audit log for this table explicitly
 type AuditedRecord @table(audit: true) {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	value: String
 }
 
@@ -120,7 +120,7 @@ Exposes the table as an externally accessible resource endpoint, available via R
 
 ```graphql
 type MyTable @table @export(name: "my-table") {
-	id: ID @primaryKey
+	id: Long @primaryKey
 }
 ```
 
@@ -132,7 +132,7 @@ Prevents records from including any properties beyond those explicitly declared 
 
 ```graphql
 type StrictRecord @table @sealed {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 }
 ```
@@ -169,7 +169,7 @@ Creates a secondary index on the attribute for fast querying. Required for filte
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	category: String @indexed
 	price: Float @indexed
 }
@@ -185,7 +185,7 @@ Automatically assigns a creation timestamp (Unix epoch milliseconds) to the attr
 
 ```graphql
 type Event @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	createdAt: Long @createdTime
 }
 ```
@@ -196,7 +196,7 @@ Automatically assigns a timestamp (Unix epoch milliseconds) each time the record
 
 ```graphql
 type Event @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	updatedAt: Long @updatedTime
 }
 ```
@@ -213,14 +213,14 @@ The foreign key is in this table, referencing the primary key of the target tabl
 
 ```graphql
 type RealityShow @table @export {
-	id: ID @primaryKey
-	networkId: ID @indexed # foreign key
+	id: Long @primaryKey
+	networkId: Long @indexed # foreign key
 	network: Network @relationship(from: networkId) # many-to-one
 	title: String @indexed
 }
 
 type Network @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String @indexed # e.g. "Bravo", "Peacock", "Netflix"
 }
 ```
@@ -235,8 +235,8 @@ If the foreign key is an array, this establishes a many-to-many relationship (e.
 
 ```graphql
 type RealityShow @table @export {
-	id: ID @primaryKey
-	networkIds: [ID] @indexed
+	id: Long @primaryKey
+	networkIds: [Long] @indexed
 	networks: [Network] @relationship(from: networkIds)
 }
 ```
@@ -247,7 +247,7 @@ The foreign key is in the target table, referencing the primary key of this tabl
 
 ```graphql
 type Network @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String @indexed # e.g. "Bravo", "Peacock", "Netflix"
 	shows: [RealityShow] @relationship(to: networkId) # one-to-many
 	# shows like "Real Housewives of Atlanta", "The Traitors", "Vanderpump Rules"
@@ -260,15 +260,15 @@ Both `from` and `to` can be specified together to define a relationship where ne
 
 ```graphql
 type OrderItem @table @export {
-	id: ID @primaryKey
-	orderId: ID @indexed
-	productSku: ID @indexed
+	id: Long @primaryKey
+	orderId: Long @indexed
+	productSku: Long @indexed
 	product: Product @relationship(from: productSku, to: sku) # join on sku, not primary key
 }
 
 type Product @table @export {
-	id: ID @primaryKey
-	sku: ID @indexed
+	id: Long @primaryKey
+	sku: Long @indexed
 	name: String
 }
 ```
@@ -283,7 +283,7 @@ The `@computed` directive marks a field as derived from other fields at query ti
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	price: Float
 	taxRate: Float
 	totalPrice: Float @computed(from: "price + (price * taxRate)")
@@ -296,7 +296,7 @@ Computed properties can also be defined in JavaScript for complex logic:
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	totalPrice: Float @computed
 }
 ```
@@ -315,7 +315,7 @@ Computed properties can be indexed with `@indexed`, enabling custom indexing str
 
 ```graphql
 type Product @table {
-  id: ID @primaryKey
+  id: Long @primaryKey
   tags: String
   tagsSeparated: String[] @computed(from: "tags.split(/\\s*,\\s*/)") @indexed
 }
@@ -325,7 +325,7 @@ When using a JavaScript function for an indexed computed property, use the `vers
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	totalPrice: Float @computed(version: 1) @indexed
 }
 ```

@@ -273,7 +273,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Additional Sources**:
   - `versioned_docs/version-4.7/reference/architecture.md`
   - Current `reference/architecture.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Should explain Resources + Schema + Auto-REST relationship
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Database structure changes (single file per database)
@@ -297,7 +297,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - Computed properties: v4.4.0
   - Blob storage: v4.5.0
   - Vector indexing: v4.6.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Large consolidation - may want to keep blobs/vectors separate
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Configurable schemas with GraphQL syntax
@@ -311,7 +311,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/developers/applications/data-loader.md`
 - **Additional Sources**: Current `reference/data-loader.md`
 - **Version Annotations**: Added in v4.5.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Data loader introduced
 
@@ -319,7 +319,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/storage-algorithm.md`
 - **Additional Sources**: Current `reference/storage-algorithm.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Storage performance improvements, compression by default
 
@@ -330,13 +330,13 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.7/developers/operations-api/jobs.md`
   - `versioned_docs/version-4.7/developers/operations-api/bulk-operations.md`
 - **Merge Required**: Yes - jobs/bulk operations content scattered
-- **Status**: Not Started
+- **Status**: Complete
 
 ### `reference/database/system-tables.md`
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/analytics.md`
 - **Additional Sources**: Current `reference/analytics.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: System tables for analytics and other features
 
 ### `reference/database/compaction.md`
@@ -344,7 +344,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 - **Primary Source**: `versioned_docs/version-4.7/administration/compact.md`
 - **Additional Sources**: Current `reference/compact.md`
 - **Version Annotations**: Added in v4.3.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Compact database functionality
 
@@ -356,7 +356,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.7/reference/blob.md` (createBlob() function)
 - **Merge Required**: Yes — combines tables/databases globals, transaction(), and createBlob() into one page
 - **Version Annotations**: Blob type added in v4.5.0
-- **Status**: In Progress
+- **Status**: Complete
 - **Notes**: Covers the JS globals most relevant to database interaction. Server globals (server.http, server.ws, etc.) belong in the HTTP/Resources sections.
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Blob storage and createBlob() added
@@ -370,7 +370,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - `versioned_docs/version-4.1/audit-logging.md`
 - **Merge Required**: Yes - combines audit and transaction logging
 - **Version Annotations**: Transaction logging available since v4.1.0, audit logging since v4.1.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Consolidated from separate audit and transaction logging pages
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Balanced audit log cleanup
@@ -384,7 +384,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/resources/index.md`
 - **Additional Sources**: Current `reference/resources/` folder
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Resource API introduced
 
@@ -401,7 +401,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - Basic Resource API: v4.2.0
   - loadAsInstance changes: v4.4.0+
   - Response objects: v4.4.0
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.2.0](release-notes/v4-tucker/4.2.0.md) - Resource API introduced
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - CRDT support
@@ -418,7 +418,7 @@ Broken out from the security section during migration — RBAC warrants its own 
   - Current `reference/transactions.md`
 - **Merge Required**: Yes - consolidate global APIs (tables, databases, transactions, etc.)
 - **Version Annotations**: Various APIs added across versions
-- **Status**: Not Started
+- **Status**: Complete
 - **Notes**: Should reference out to http/api.md for `server` global
 - **Release Notes**:
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Table.getRecordCount()
@@ -427,7 +427,7 @@ Broken out from the security section during migration — RBAC warrants its own 
 
 - **Primary Source**: `versioned_docs/version-4.7/reference/resources/query-optimization.md`
 - **Additional Sources**: Current `reference/resources/query-optimization.md`
-- **Status**: Not Started
+- **Status**: Complete
 - **Release Notes**:
   - [4.3.0](release-notes/v4-tucker/4.3.0.md) - Query optimizations
 

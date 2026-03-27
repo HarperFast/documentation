@@ -17,7 +17,7 @@ Harper exposes a set of global variables and functions that JavaScript code (in 
 ```graphql
 # schema.graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 	price: Float
 }
@@ -76,7 +76,7 @@ To define tables in a non-default database, use the `database` argument on the `
 
 ```graphql
 type Events @table(database: "analytics") {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	eventType: String @indexed
 }
 ```

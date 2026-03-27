@@ -139,7 +139,7 @@ You can enable or disable the audit log for individual tables using the `@table`
 
 ```graphql
 type Dog @table(audit: true) {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 }
 ```

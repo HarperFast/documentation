@@ -24,7 +24,9 @@ The Resource API has two behavioral modes selected by the `loadAsInstance` stati
 | Version      | `loadAsInstance` | Status                                |
 | ------------ | ---------------- | ------------------------------------- |
 | V2 (current) | `false`          | Recommended for new code              |
-| V1 (legacy)  | `true`           | Preserved for backwards compatibility |
+| V1 (legacy)  | `true` (default) | Preserved for backwards compatibility |
+
+The default value of `loadAsInstance` is `true` (V1 behavior). To opt in to V2, you must explicitly set `static loadAsInstance = false` on your resource class.
 
 This page documents V2 behavior (`loadAsInstance = false`). For V1 (legacy instance binding) behavior and migration examples, see [Legacy Instance Binding](#legacy-instance-binding-v1).
 

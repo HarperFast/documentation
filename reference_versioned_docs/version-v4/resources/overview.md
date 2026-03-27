@@ -43,7 +43,7 @@ Starting with a table definition in a `schema.graphql`:
 ```graphql
 # Omit the `@export` directive
 type MyTable @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	# ...
 }
 ```

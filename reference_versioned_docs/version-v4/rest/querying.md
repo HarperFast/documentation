@@ -185,13 +185,13 @@ Harper supports querying across related tables through dot-syntax chained attrib
 
 ```graphql
 type Product @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
-	brandId: ID @indexed
+	brandId: Long @indexed
 	brand: Brand @relation(from: "brandId")
 }
 type Brand @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
 	products: [Product] @relation(to: "brandId")
 }
@@ -222,9 +222,9 @@ Many-to-many relationships can be modeled with an array of foreign key values, w
 
 ```graphql
 type Product @table @export {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String
-	resellerIds: [ID] @indexed
+	resellerIds: [Long] @indexed
 	resellers: [Reseller] @relation(from: "resellerId")
 }
 ```

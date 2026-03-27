@@ -78,12 +78,12 @@ Example of an indexed foreign key that enables efficient join queries:
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
-	brandId: ID @indexed # foreign key — index this
+	id: Long @primaryKey
+	brandId: Long @indexed # foreign key — index this
 	brand: Related @relation(from: "brandId")
 }
 type Brand @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String @indexed # indexed — enables efficient brand.name queries
 	products: Product @relation(to: "brandId")
 }
@@ -156,7 +156,7 @@ Avoid storing an iterator and abandoning it (e.g. never calling `.next()` again 
 
 ```graphql
 type Product @table {
-	id: ID @primaryKey
+	id: Long @primaryKey
 	name: String @indexed # queried frequently
 	category: String @indexed # queried frequently
 	description: String # not indexed (rarely in conditions)
