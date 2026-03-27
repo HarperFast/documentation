@@ -253,6 +253,13 @@ Added in: v4.5.0
 
 Resources can be configured with `directURLMapping: true` for more direct URL path handling. When enabled, the URL path is mapped more directly to the resource without the default query parameter parsing semantics. See [Database / Schema](../database/schema.md) for configuration details.
 
+:::caution Common gotchas
+
+- **`/Table` vs `/Table/`** — `GET /Table` returns metadata about the table resource itself. `GET /Table/` (trailing slash) targets the collection and invokes `get()` as a collection request. These are distinct endpoints.
+- **Case sensitivity** — The URL path must match the exact casing of the exported resource or table name. `/Table/` works; `/table/` returns a 404.
+
+:::
+
 ## See Also
 
 - [REST Overview](./overview.md) — HTTP methods, URL structure, and caching

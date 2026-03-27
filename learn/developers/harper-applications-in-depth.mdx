@@ -373,8 +373,7 @@ function calculateHumanAge(dogAge) {
 }
 
 export class DogWithHumanAge extends tables.Dog {
-	static loadAsInstance = false;
-	async async get(target) {
+	static async get(target) {
 		const dogRecord = await super.get(target);
 
 		return {
@@ -433,8 +432,7 @@ Notably, did you see how we were able to use the `001` id with the new resource 
 
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
-	static loadAsInstance = false;
-	async get(target) {
+	static async get(target) {
 		// ...
 	}
 }
@@ -444,8 +442,7 @@ The `DogWithHumanAge` class extends from `tables.Dog`. The `tables` reference is
 
 ```javascript
 export class DogWithHumanAge extends tables.Dog {
-	static loadAsInstance = false;
-	async get(target) {
+	static async get(target) {
 		const dogRecord = await super.get(target);
 
 		return {
