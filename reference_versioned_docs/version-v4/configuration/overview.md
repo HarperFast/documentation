@@ -43,6 +43,7 @@ logging:
 Map YAML keys to `SCREAMING_SNAKE_CASE`. Use underscores for nesting. Keys are case-insensitive.
 
 Examples:
+
 - `http.port` → `HTTP_PORT=9926`
 - `logging.rotation.enabled` → `LOGGING_ROTATION_ENABLED=false`
 - `operationsApi.network.port` → `OPERATIONSAPI_NETWORK_PORT=9925`
@@ -67,9 +68,9 @@ Use `set_configuration` with underscore-separated key paths:
 
 ```json
 {
-  "operation": "set_configuration",
-  "http_port": 9926,
-  "logging_level": "warn"
+	"operation": "set_configuration",
+	"http_port": 9926,
+	"logging_level": "warn"
 }
 ```
 
@@ -107,11 +108,13 @@ export HARPER_SET_CONFIG='{"authentication":{"enabled":true}}'
 Provides default configuration values while respecting user modifications. Ideal for supplying sensible defaults without preventing administrators from customizing their instances.
 
 **At installation time:**
+
 - Overrides template default values
 - Respects values set by `HARPER_SET_CONFIG`
 - Respects values from existing config files (when using `HDB_CONFIG`)
 
 **At runtime:**
+
 - Only updates values it originally set
 - Detects and respects manual user edits to the config file
 - When a key is removed from the variable, the original value is restored
@@ -134,6 +137,7 @@ harperdb
 Forces configuration values that cannot be overridden by user edits. Designed for security policies, compliance requirements, or critical operational settings.
 
 **At runtime:**
+
 - Always overrides all other configuration sources
 - Takes precedence over user edits, file values, and `HARPER_DEFAULT_CONFIG`
 - When a key is removed from the variable, it is deleted from the config (not restored)
@@ -180,6 +184,7 @@ Harper maintains a state file at `{rootPath}/backup/.harper-config-state.json` t
 The JSON structure mirrors the YAML config file:
 
 **YAML:**
+
 ```yaml
 http:
   port: 8080
@@ -191,8 +196,9 @@ logging:
 ```
 
 **Environment variable (JSON):**
+
 ```json
-{"http":{"port":8080,"cors":true},"logging":{"level":"info","rotation":{"enabled":true}}}
+{ "http": { "port": 8080, "cors": true }, "logging": { "level": "info", "rotation": { "enabled": true } } }
 ```
 
 ### Important Notes
