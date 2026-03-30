@@ -1,7 +1,7 @@
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
-import { generateRedirects, createRedirects as createRedirectsBase } from './redirects';
+import { redirects, createRedirects } from './redirects';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -215,14 +215,14 @@ const config: Config = {
 			},
 		],
 
-		// // Redirects
-		// [
-		// 	'@docusaurus/plugin-client-redirects',
-		// 	{
-		// 		redirects: generateRedirects(routeBasePath),
-		// 		createRedirects: (existingPath: string) => createRedirectsBase(existingPath, routeBasePath),
-		// 	},
-		// ],
+		// Redirects
+		[
+			'@docusaurus/plugin-client-redirects',
+			{
+				redirects,
+				createRedirects,
+			},
+		],
 
 		// Sitemap
 		[

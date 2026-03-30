@@ -50,7 +50,7 @@ All Phase 1A–1D sections are complete and merged:
 - Updated 8 release note files (4.1.0–4.6.0 + index.mdx) and 3 learn guides
 - Left `/docs/administration/cloning` as-is in 4.2.0.md (no learn guide exists yet)
 
-**Part 5 (Redirects)** — Configure redirects from old paths (`/docs/reference/`, `/docs/developers/`, `/docs/deployments/`, `/docs/administration/`) to new `/reference/v4/` paths in `docusaurus.config.js`.
+**Part 5 (Redirects)** — Complete. `redirects.ts` rewritten from analytics data, plugin uncommented in `docusaurus.config.ts`. See `memory/part5-redirects.md` for details. Needs build verification + review of LOW TRAFFIC (<10 view) paths.
 
 ### Part 3 Key Decisions
 
