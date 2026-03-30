@@ -112,7 +112,7 @@ HarperDB/application-template#semver:v1.0.0
 
 Harper generates a `package.json` from component configurations and uses a form of `npm install` to resolve them. This is why specifying a local file path creates a symlink (changes are picked up between restarts without redeploying).
 
-For SSH-based private repos, use the [Add SSH Key](#add-ssh-key) operation to register keys first.
+For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to register keys first.
 
 ## Dependency Management
 

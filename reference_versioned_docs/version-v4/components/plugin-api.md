@@ -120,7 +120,7 @@ The central object passed to `handleApplication()`. Provides access to configura
 - **`'error'`** — `error: unknown` — An error occurred
 - **`'ready'`** — Emitted when the Scope is ready after loading the config file
 
-#### `scope.handleEntry([files][, handler])`
+#### `scope.handleEntry([files][, handler])` {#scopehandleentry}
 
 Returns an [`EntryHandler`](#class-entryhandler) for watching and processing file system entries.
 

@@ -48,7 +48,7 @@ type MyTable @table {
 }
 ```
 
-> For more info on the schema API see [`Database / Schema`]()
+> For more info on the schema API see [`Database / Schema`](../database/schema.md)
 
 Then, in a `resources.js` extend from the `tables.MyTable` global:
 

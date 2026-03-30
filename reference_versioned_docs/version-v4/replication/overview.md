@@ -45,7 +45,7 @@ replication:
   securePort: 9933
 ```
 
-You can also manage nodes dynamically through the [Operations API](./clustering.md#operations-api) without editing the config file.
+You can also manage nodes dynamically through the [Operations API](./clustering.md) without editing the config file.
 
 ### Gossip Discovery
 

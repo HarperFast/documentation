@@ -9,7 +9,7 @@ title: Logging API
 
 ## `logger`
 
-The `logger` global is available in all JavaScript components without any imports. It writes structured log entries to the standard Harper log file (`hdb.log`) at the configured `logging.external` level and path. See [Logging Configuration](./configuration#logging-external) for per-component log configuration.
+The `logger` global is available in all JavaScript components without any imports. It writes structured log entries to the standard Harper log file (`hdb.log`) at the configured `logging.external` level and path. See [Logging Configuration](./configuration#loggingexternal) for per-component log configuration.
 
 The `logger` global is a `MainLogger`. Calling `logger.withTag(tag)` returns a `TaggedLogger` scoped to that tag.
 
