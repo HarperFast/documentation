@@ -42,15 +42,15 @@ All Phase 1A–1D sections are complete and merged:
 
 ## Next Steps
 
-**Part 3 (Link Resolution) — Complete** on `link-resolution` branch (10 commits). Merge to `major-version-reorg` via PR review, then continue:
+**Part 3 (Link Resolution) — Complete** on `link-resolution` branch. Merged to `major-version-reorg`.
 
-**Part 4 (Cross-Reference Updates)** — Full plan in [`memory/part4-plan.md`](part4-plan.md).
+**Part 4 (Cross-Reference Updates) — Complete** on `cross-reference-updates` branch (2 commits).
 
-- Branch: `cross-reference-updates` off `major-version-reorg`
-- Scope: ~7 release note files + 1 learn guide with old `/docs/` links
-- **First step**: verify URL prefix for new reference pages (check `docusaurus.config.js`)
+- URL prefix confirmed: `/reference/v4/` (not `/docs/v4/`)
+- Updated 8 release note files (4.1.0–4.6.0 + index.mdx) and 3 learn guides
+- Left `/docs/administration/cloning` as-is in 4.2.0.md (no learn guide exists yet)
 
-**Part 5 (Redirects)** — Configure redirects from old paths (`/docs/reference/`, `/docs/developers/`, etc.) to new paths in `docusaurus.config.js`.
+**Part 5 (Redirects)** — Configure redirects from old paths (`/docs/reference/`, `/docs/developers/`, `/docs/deployments/`, `/docs/administration/`) to new `/reference/v4/` paths in `docusaurus.config.js`.
 
 ### Part 3 Key Decisions
 
