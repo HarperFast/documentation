@@ -139,4 +139,4 @@ Available events:
 - [HTTP Overview](../http/overview.md)
 - [Security Overview](../security/overview.md)
 - [Database Schema](../database/schema.md)
-- [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface — same path conventions as MQTT topics')
+- [REST Overview](../rest/overview.md)

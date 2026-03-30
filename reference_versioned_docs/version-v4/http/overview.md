@@ -22,7 +22,7 @@ In previous versions: Session-affinity based socket delegation was used to route
 
 ## Request Handling
 
-Harper uses a layered middleware chain for HTTP request processing. Components and applications can add handlers to this chain using the [`server.http()`](./api#serverhttp) API. Handlers are called in order; each handler can either process the request and return a `Response`, or pass it along to the next handler with `next(request)`.
+Harper uses a layered middleware chain for HTTP request processing. Components and applications can add handlers to this chain using the [`server.http()`](./api#serverhttplistener-options) API. Handlers are called in order; each handler can either process the request and return a `Response`, or pass it along to the next handler with `next(request)`.
 
 Request and response objects follow the [WHATWG Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) conventions (`Request` and `Response` classes), providing good composability for layered middleware and clean mapping to REST resource handlers.
 
@@ -60,5 +60,5 @@ HTTP request logging is not enabled by default. To enable it, add an `http.loggi
 
 - [HTTP Configuration](./configuration)
 - [HTTP API](./api)
-- [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface overview')
+- [REST Overview](../rest/overview.md)
 - [Security Overview](../security/overview.md)

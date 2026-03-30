@@ -20,8 +20,8 @@ The Resource API is designed to mirror REST/HTTP semantics: methods map directly
 ## Relationship to Other Features
 
 - **Database tables** extend `Resource` automatically. You can use tables through the Resource API without writing any custom code.
-- The **REST plugin** maps incoming HTTP requests to Resource methods. See [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST plugin reference').
-- The **MQTT plugin** routes publish/subscribe messages to `publish` and `subscribe` Resource methods. See [MQTT Overview](TODO:reference_versioned_docs/version-v4/mqtt/overview.md 'MQTT plugin reference').
+- The **REST plugin** maps incoming HTTP requests to Resource methods. See [REST Overview](../rest/overview.md).
+- The **MQTT plugin** routes publish/subscribe messages to `publish` and `subscribe` Resource methods. See [MQTT Overview](../mqtt/overview.md).
 - **Global APIs** (`tables`, `databases`, `transaction`) provide access to resources from JavaScript code.
 - The **`jsResource` plugin** (configured in `config.yaml`) registers a JavaScript file's exported Resource classes as endpoints.
 
@@ -48,7 +48,7 @@ type MyTable @table {
 }
 ```
 
-> For more info on the schema API see [`Database / Schema`]()
+> For more info on the schema API see [`Database / Schema`](../database/schema.md)
 
 Then, in a `resources.js` extend from the `tables.MyTable` global:
 

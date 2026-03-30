@@ -10,7 +10,7 @@ title: Environment Variables
 Harper supports loading environment variables in Harper applications `process.env` using the built-in `loadEnv` plugin. This is the standard way to supply secrets and configuration to your Harper components without hardcoding values. `loadEnv` does **not** need to be installed as it is built into Harper and only needs to be declared in your `config.yaml`.
 
 :::note
-If you are looking for information on how to configure your Harper installation using environment variables, see [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration section overview, including environment variable configuration') section for more information.
+If you are looking for information on how to configure your Harper installation using environment variables, see [Configuration](../configuration/overview.md) section for more information.
 :::
 
 ## Basic Usage
@@ -73,5 +73,5 @@ Files are loaded in the order specified.
 
 ## Related
 
-- [Components Overview](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Extensions overview')
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration section, including environment variable configuration conventions and HARPER_DEFAULT_CONFIG / HARPER_SET_CONFIG')
+- [Components Overview](../components/overview.md)
+- [Configuration](../configuration/overview.md)

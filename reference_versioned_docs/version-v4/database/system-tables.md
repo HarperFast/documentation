@@ -144,7 +144,7 @@ Can be queried to inspect the current replication topology:
 }
 ```
 
-Used by the `add_node`, `update_node`, and related clustering operations. See [Replication](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Clustering and node management') for details.
+Used by the `add_node`, `update_node`, and related clustering operations. See [Replication](../replication/clustering.md) for details.
 
 ### `hdb_certificate`
 
@@ -154,5 +154,5 @@ Stores TLS certificates used in replication. Can be queried to inspect the certi
 
 - [Analytics](../analytics/overview.md) — Full reference for analytics metrics tracked in `hdb_analytics` and `hdb_raw_analytics`
 - [Data Loader](./data-loader.md) — Component that writes to `hdb_dataloader_hash`
-- [Replication](TODO:reference_versioned_docs/version-v4/replication/overview.md) — Clustering and replication system that uses `hdb_nodes` and `hdb_certificate`
-- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Querying system tables using `search_by_conditions`
+- [Replication](../replication/overview.md) — Clustering and replication system that uses `hdb_nodes` and `hdb_certificate`
+- [Operations API](../operations-api/overview.md) — Querying system tables using `search_by_conditions`

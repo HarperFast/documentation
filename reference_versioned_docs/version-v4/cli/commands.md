@@ -58,7 +58,7 @@ harper \
   --ROOTPATH='/hdb'
 ```
 
-**Note**: When used in conjunction, command line arguments override environment variables. See [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview') for a full list of configuration parameters.
+**Note**: When used in conjunction, command line arguments override environment variables. See [Configuration](../configuration/overview.md) for a full list of configuration parameters.
 
 :::info
 For more information on installation, see [Getting Started / Install and Connect Harper](/learn/getting-started/install-and-connect-harper).
@@ -265,5 +265,5 @@ The CLI supports executing commands on remote Harper instances. For details, see
 - [CLI Overview](./overview.md) - General CLI information
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
 - [CLI Authentication](./authentication.md) - Authentication mechanisms
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration') - Configuration parameters for installation
+- [Configuration](../configuration/overview.md) - Configuration parameters for installation
 - [Database Compaction](../database/compaction.md) - More on database compaction

@@ -46,7 +46,7 @@ Files are accessed relative to the matched directory root, so `GET /index.html` 
 
 Added in: v4.5
 
-`static` is a [Plugin](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Plugins overview') and supports the standard `files` and `urlPath` configuration options for controlling which files to serve and at what URL path.
+`static` is a [Plugin](../components/overview.md) and supports the standard `files` and `urlPath` configuration options for controlling which files to serve and at what URL path.
 
 Use `urlPath` to mount the files at a specific URL prefix:
 
@@ -58,7 +58,7 @@ static:
 
 Now `GET /app/index.html` returns `site/index.html` and `GET /app/blog/post-1.html` returns `site/blog/post-1.html`.
 
-See [Components Overview](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Plugins overview — files and urlPath options') for full `files` glob pattern and `urlPath` documentation.
+See [Components Overview](../components/overview.md) for full `files` glob pattern and `urlPath` documentation.
 
 ## Additional Options
 
@@ -171,4 +171,4 @@ A request to any unmatched path returns `static/index.html` with a `200` status 
 
 ## Related
 
-- [Components Overview](TODO:reference_versioned_docs/version-v4/components/overview.md 'Components, Applications, and Plugins overview — including files/urlPath options')
+- [Components Overview](../components/overview.md)

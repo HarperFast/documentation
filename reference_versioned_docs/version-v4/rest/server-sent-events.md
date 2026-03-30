@@ -61,4 +61,4 @@ SSE is simpler to implement and has built-in reconnection in browsers. For scena
 - [WebSockets](./websockets.md) — Bidirectional real-time connections
 - [MQTT Overview](../mqtt/overview.md) — Full MQTT pub/sub documentation
 - [REST Overview](./overview.md) — HTTP methods and URL structure
-- [Resources](TODO:reference_versioned_docs/version-v4/resources/overview.md 'Resources overview') — Custom resource API including `connect()`
+- [Resources](../resources/overview.md) — Custom resource API including `connect()`

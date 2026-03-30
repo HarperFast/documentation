@@ -77,4 +77,4 @@ For help generating and managing certificates, see [Certificate Management](./ce
 
 ## Replication
 
-mTLS is always required for Harper replication and cannot be disabled. For replication-specific mTLS configuration, see [Replication Configuration](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration').
+mTLS is always required for Harper replication and cannot be disabled. For replication-specific mTLS configuration, see [Replication Configuration](../replication/clustering.md).

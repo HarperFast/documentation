@@ -17,14 +17,14 @@ If you're looking for the platform as a service interface, go to [Harper Fabric]
 
 ## Configuration
 
-To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](TODO:reference_versioned_docs/version-v4/configuration/options.md#localstudio 'Configuration options'):
+To enable the local Studio, set `localStudio.enabled` to `true` in your [configuration file](../configuration/options.md#localstudio):
 
 ```yaml
 localStudio:
   enabled: true
 ```
 
-The local studio is provided by the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') and is available on the configured `operationsApi.port` or `operationsApi.securePort` values. This is `9925` by default.
+The local studio is provided by the [Operations API](../operations-api/overview.md) and is available on the configured `operationsApi.port` or `operationsApi.securePort` values. This is `9925` by default.
 
 ## Accessing Local Studio
 

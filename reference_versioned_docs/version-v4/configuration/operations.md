@@ -16,7 +16,7 @@ For the full list of configurable options, see [Configuration Options](./options
 
 ## Set Configuration
 
-Modifies one or more Harper configuration parameters. **Requires a [restart](TODO:reference_versioned_docs/version-v4/operations-api/operations.md#restart 'restart operation') or [restart_service](TODO:reference_versioned_docs/version-v4/operations-api/operations.md#restart-service 'restart_service operation') to take effect.**
+Modifies one or more Harper configuration parameters. **Requires a [restart](../operations-api/operations.md#restart) or [restart_service](../operations-api/operations.md#restart_service) to take effect.**
 
 `operation` _(required)_ — must be `set_configuration`
 

@@ -88,4 +88,4 @@ _Restricted to super_user roles only._
 - [Logging Overview](./overview)
 - [Logging Configuration](./configuration)
 - [Database / Transaction Logging](../database/transaction.md)
-- [Operations API Overview](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview')
+- [Operations API Overview](../operations-api/overview.md)

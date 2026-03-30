@@ -17,7 +17,7 @@ Job status values:
 
 ## Bulk Operations
 
-The following operations create jobs. All bulk operations are sent to the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md).
+The following operations create jobs. All bulk operations are sent to the [Operations API](../operations-api/overview.md).
 
 ### CSV Data Load
 
@@ -268,5 +268,5 @@ _Restricted to `super_user` roles._
 ## Related Documentation
 
 - [Data Loader](./data-loader.md) — Component-based data loading as part of deployment
-- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Sending operations to Harper
+- [Operations API](../operations-api/overview.md) — Sending operations to Harper
 - [Transaction Logging](./transaction.md) — Recording a history of changes made to tables

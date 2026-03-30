@@ -83,14 +83,14 @@ Queries analytics data for a specific metric over a time range.
 
 ### Parameters
 
-| Parameter        | Required | Type     | Description                                                                                                                                                                          |
-| ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                                                                                            |
-| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                                                                                                 |
-| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                                                                                                |
-| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                                                                                                  |
-| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                                                                                                        |
-| `conditions`     | No       | object[] | Additional filter conditions. Same format as [`search_by_conditions`](TODO:reference_versioned_docs/version-v4/operations-api/operations.md 'Operations API — search_by_conditions') |
+| Parameter        | Required | Type     | Description                                                                                                             |
+| ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                               |
+| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                                    |
+| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                                   |
+| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                                     |
+| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                                           |
+| `conditions`     | No       | object[] | Additional filter conditions. Same format as [`search_by_conditions`](../operations-api/operations.md#nosql-operations) |
 
 ### Request
 
@@ -133,4 +133,4 @@ Queries analytics data for a specific metric over a time range.
 ## Related
 
 - [Analytics Overview](./overview)
-- [Operations API Overview](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Full Operations API reference')
+- [Operations API Overview](../operations-api/overview.md)

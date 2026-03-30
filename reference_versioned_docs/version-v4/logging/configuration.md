@@ -367,4 +367,4 @@ http:
 - [Logging API](./api)
 - [Logging Operations](./operations)
 - [Database / Transaction Logging](../database/transaction.md)
-- [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full harperdb-config.yaml reference')
+- [Configuration Overview](../configuration/overview.md)

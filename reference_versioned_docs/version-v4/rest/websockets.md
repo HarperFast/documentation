@@ -36,7 +36,7 @@ By default, `new WebSocket('wss://server/my-resource/341')` accesses the resourc
 
 ## Custom `connect()` Handler
 
-WebSocket behavior is driven by the `connect(incomingMessages)` method on a resource class. The method must return an async iterable (or generator) that produces messages to send to the client. For more on implementing custom resources, see [Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md 'Resource API reference').
+WebSocket behavior is driven by the `connect(incomingMessages)` method on a resource class. The method must return an async iterable (or generator) that produces messages to send to the client. For more on implementing custom resources, see [Resource API](../resources/resource-api.md).
 
 **Simple echo server**:
 
@@ -103,4 +103,4 @@ In a scenario where messages arrive out-of-order across nodes:
 - [Server-Sent Events](./server-sent-events.md) — One-way real-time streaming
 - [MQTT Overview](../mqtt/overview.md) — Full MQTT pub/sub documentation
 - [REST Overview](./overview.md) — HTTP methods and URL structure
-- [Resources](TODO:reference_versioned_docs/version-v4/resources/overview.md 'Resources overview') — Custom resource API including `connect()`
+- [Resources](../resources/overview.md) — Custom resource API including `connect()`

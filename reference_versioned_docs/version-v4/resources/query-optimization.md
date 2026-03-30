@@ -66,7 +66,7 @@ More unique values (higher cardinality) = more efficient indexed lookups. For ex
 
 ## Relationships and Joins
 
-Harper supports relationship-based queries that join data across tables. See [Schema documentation](TODO:reference_versioned_docs/version-v4/database/schema.md 'Database schema section with relationship directives') for how to define relationships.
+Harper supports relationship-based queries that join data across tables. See [Schema documentation](../database/schema.md) for how to define relationships.
 
 Join queries involve more lookups and naturally carry more overhead. The same indexing principles apply:
 

@@ -115,7 +115,7 @@ See [CLI Commands](./commands.md) for detailed documentation on each command.
 
 Added in: v4.3.0
 
-The Harper CLI supports executing most operations from the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') directly from the command line. This includes operations that do not require complex nested parameters.
+The Harper CLI supports executing most operations from the [Operations API](../operations-api/overview.md) directly from the command line. This includes operations that do not require complex nested parameters.
 
 **Syntax**: `harper <operation> <parameter>=<value>`
 
@@ -196,5 +196,5 @@ See [CLI Commands](./commands.md) for detailed information on `harper dev` and o
 - [CLI Commands](./commands.md) - Detailed reference for each CLI command
 - [Operations API Commands](./operations-api-commands.md) - Operations available through CLI
 - [CLI Authentication](./authentication.md) - Authentication mechanisms
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview') - Harper configuration options
-- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API') - Full operations API reference
+- [Configuration](../configuration/overview.md) - Harper configuration options
+- [Operations API](../operations-api/overview.md) - Full operations API reference
