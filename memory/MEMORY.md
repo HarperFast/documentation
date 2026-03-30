@@ -31,7 +31,7 @@ All Phase 1A–1D sections are complete and merged:
 
 ## Key Decisions / Learnings
 
-- Each section gets its own branch `migration/[section-name]` off `major-version-reorg`
+- Each section gets its own branch `migration/[section-name]` off `major-version-reorg` (for phase 1 content generation)
 - PRs are draft by default, opened against `major-version-reorg`
 - `@relationship` in v4.7 source (not `@relation` from 4.3 release notes) — needs human verification
 - Audit log required for real-time messaging (MQTT/WebSocket) — verify still true
@@ -42,7 +42,14 @@ All Phase 1A–1D sections are complete and merged:
 
 ## Next Steps
 
-**Part 3 (Link Resolution) — Complete** on `link-resolution` branch (9 commits). Merge to `major-version-reorg` then continue with Part 4 (cross-references in release notes / learn guides) and Part 5 (redirects).
+**Part 3 (Link Resolution) — Complete** on `link-resolution` branch (10 commits). Merge to `major-version-reorg` via PR review, then continue:
+
+**Part 4 (Cross-Reference Updates)** — Full plan in [`memory/part4-plan.md`](part4-plan.md).
+- Branch: `cross-reference-updates` off `major-version-reorg`
+- Scope: ~7 release note files + 1 learn guide with old `/docs/` links
+- **First step**: verify URL prefix for new reference pages (check `docusaurus.config.js`)
+
+**Part 5 (Redirects)** — Configure redirects from old paths (`/docs/reference/`, `/docs/developers/`, etc.) to new paths in `docusaurus.config.js`.
 
 ### Part 3 Key Decisions
 
