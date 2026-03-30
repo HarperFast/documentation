@@ -294,7 +294,7 @@ server.resources.getMatch('/NewResource/some-id', 'rest');
 
 ## `server.operation(operation, context?, authorize?)`
 
-Execute an [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md 'Operations API overview') operation programmatically.
+Execute an [Operations API](../operations-api/overview.md) operation programmatically.
 
 ```ts
 server.operation(operation: object, context?: { username: string }, authorize?: boolean): Promise<any>
@@ -397,5 +397,5 @@ contentTypes.set('text/xml', {
 
 - [HTTP Overview](./overview)
 - [HTTP Configuration](./configuration)
-- [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface overview')
+- [REST Overview](../rest/overview.md)
 - [Security API](../security/api.md)

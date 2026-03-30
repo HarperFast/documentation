@@ -60,5 +60,5 @@ HTTP request logging is not enabled by default. To enable it, add an `http.loggi
 
 - [HTTP Configuration](./configuration)
 - [HTTP API](./api)
-- [REST Overview](TODO:reference_versioned_docs/version-v4/rest/overview.md 'REST interface overview')
+- [REST Overview](../rest/overview.md)
 - [Security Overview](../security/overview.md)

@@ -8,7 +8,7 @@ title: TLS Configuration
 
 Harper uses a top-level `tls` section in `harperdb-config.yaml` to configure Transport Layer Security. This configuration is shared by the HTTP server (HTTPS), the MQTT broker (secure MQTT), and any TLS socket servers created via the [HTTP API](./api#serversocketlistener-options).
 
-The `operationsApi` section can optionally define its own `tls` block, which overrides the root `tls` for Operations API traffic only. See the [Operations API Configuration](TODO:reference_versioned_docs/version-v4/configuration/operations.md 'Operations API configuration reference') for more details.
+The `operationsApi` section can optionally define its own `tls` block, which overrides the root `tls` for Operations API traffic only. See the [Operations API Configuration](../configuration/operations.md) for more details.
 
 Harper must be restarted for TLS configuration changes to take effect.
 
@@ -110,7 +110,7 @@ operationsApi:
     privateKey: ~/hdb/keys/ops-privateKey.pem
 ```
 
-See the [Operations API Configuration](TODO:reference_versioned_docs/version-v4/configuration/operations.md 'Operations API configuration reference') for more details.
+See the [Operations API Configuration](../configuration/operations.md) for more details.
 
 ## Related
 

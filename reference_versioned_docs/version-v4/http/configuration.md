@@ -339,4 +339,4 @@ tls:
 - [HTTP API](./api)
 - [TLS Configuration](./tls)
 - [Security Overview](../security/overview.md)
-- [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full configuration reference')
+- [Configuration Overview](../configuration/overview.md)
