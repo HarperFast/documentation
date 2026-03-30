@@ -8,7 +8,7 @@ Fabric Studio is the web-based GUI for Harper. Studio enables you to administer,
 
 [Sign up for free!](https://fabric.harper.fast/#/sign-up)
 
-Harper includes a simplified local Studio that is packaged with all Harper installations and served directly from the cluster. It can be enabled in the [configuration file](/docs/deployments/configuration#localstudio). This section is dedicated to the hosted Studio accessed at [studio.harperdb.io](https://fabric.harper.fast/).
+Harper includes a simplified local Studio that is packaged with all Harper installations and served directly from the cluster. It can be enabled in the [configuration file](/reference/v4/configuration/options#localstudio). This section is dedicated to the hosted Studio accessed at [studio.harperdb.io](https://fabric.harper.fast/).
 
 ---
 
