@@ -446,4 +446,4 @@ replication:
 
 mTLS is always required for replication and cannot be disabled. This configuration only controls whether certificate revocation checking is performed.
 
-For complete replication configuration, see [Replication Configuration](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering configuration').
+For complete replication configuration, see [Replication Configuration](../replication/clustering.md).

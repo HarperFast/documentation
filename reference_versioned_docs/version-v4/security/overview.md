@@ -35,10 +35,10 @@ Harper supports three authentication methods:
 
 - CORS — Cross-Origin Resource Sharing.
   - For HTTP server configuration see [HTTP / Configuration / CORS](../http/configuration.md#cors)
-  - For Operations API configuration see [Operations API / Configuration / Network](TODO:reference_versioned_docs/version-v4/configuration/operations.md#network)
+  - For Operations API configuration see [Operations API / Configuration / Network](../configuration/operations.md#network)
 - SSL & HTTPS — Enabling HTTPS and configuring TLS for the HTTP server.
   - For HTTP server configuration see [HTTP / Configuration / TLS](../http/tls.md)
-  - For Operations API configuration see [Operations API / Configuration / TLS](TODO:reference_versioned_docs/version-v4/configuration/operations.md#tls)
+  - For Operations API configuration see [Operations API / Configuration / TLS](../configuration/operations.md#tls)
 - [Users and Roles](../users-and-roles/overview.md) — Role-Based Access Control (RBAC): defining roles, assigning permissions, and managing users.
 
 ## API

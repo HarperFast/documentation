@@ -7,7 +7,7 @@ title: Certificate Management
 <!-- Source: release-notes/v4-tucker/4.4.0.md (dynamic certificate management added) -->
 <!-- Source: release-notes/v4-tucker/4.5.0.md (certificate revocation added) -->
 
-This page covers certificate management for Harper's external-facing HTTP and Operations APIs. For replication certificate management, see [Replication Certificate Management](TODO:reference_versioned_docs/version-v4/replication/clustering.md 'Replication clustering and certificate management').
+This page covers certificate management for Harper's external-facing HTTP and Operations APIs. For replication certificate management, see [Replication Certificate Management](../replication/clustering.md).
 
 ## Default Behavior
 
