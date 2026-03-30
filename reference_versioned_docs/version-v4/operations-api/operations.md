@@ -390,7 +390,7 @@ Operations for executing SQL statements.
 Harper SQL is intended for data investigation and use cases where performance is not a priority. For production workloads, use NoSQL or REST operations. SQL performance optimizations are on the roadmap.
 :::
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/legacy/sql 'Legacy SQL reference']
+Detailed documentation: [SQL Reference](../database/sql.md)
 
 | Operation | Description                                                        | Role Required |
 | --------- | ------------------------------------------------------------------ | ------------- |
@@ -684,7 +684,7 @@ Resets and replaces the entire clustering configuration. Each entry follows the 
 
 Operations for reading and updating Harper configuration.
 
-Detailed documentation: [TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview']
+Detailed documentation: [Configuration Overview](../configuration/overview.md)
 
 | Operation           | Description                                                      | Role Required |
 | ------------------- | ---------------------------------------------------------------- | ------------- |

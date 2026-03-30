@@ -16,7 +16,7 @@ All Operations API requests are sent as HTTP POST requests to the Operations API
 POST http://<host>:9925/
 ```
 
-See [TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Configuration overview'] for how to change the port and other network settings (`operationsApi.network.port`, `operationsApi.network.securePort`).
+See [Configuration Overview](../configuration/overview.md) for how to change the port and other network settings (`operationsApi.network.port`, `operationsApi.network.securePort`).
 
 ## Request Format
 
