@@ -29,6 +29,11 @@ const sidebarsFabric: SidebarsConfig = {
 		},
 		{
 			type: 'doc',
+			id: 'custom-domains',
+			label: 'Custom Domains',
+		},
+		{
+			type: 'doc',
 			id: 'managing-applications',
 			label: 'Managing Applications',
 		},
