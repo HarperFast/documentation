@@ -166,5 +166,5 @@ Harper collects status from each component at load time and tracks any registere
 - [Applications](./applications.md) — Managing and deploying applications
 - [Extension API](./extension-api.md) — Building custom extensions
 - [Plugin API](./plugin-api.md) — Building plugins (experimental, recommended for new extensions)
-- [TODO:reference_versioned_docs/version-v4/resources/resource-api.md](TODO:reference_versioned_docs/version-v4/resources/resource-api.md 'Resource API reference') — Resource class interface
-- [TODO:reference_versioned_docs/version-v4/database/schema.md](TODO:reference_versioned_docs/version-v4/database/schema.md 'Schema definition') — Defining schemas with graphqlSchema
+- [Resource API](../resources/resource-api.md) — Resource class interface
+- [Database Schema](../database/schema.md) — Defining schemas with graphqlSchema

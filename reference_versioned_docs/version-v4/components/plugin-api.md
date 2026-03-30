@@ -159,11 +159,11 @@ Request a Harper restart. Does not restart immediately—indicates to the user t
 
 #### `scope.resources`
 
-Returns: `Map<string, Resource>` — Currently loaded [Resource](TODO:reference_versioned_docs/version-v4/resources/resource-api.md 'Resource API') instances.
+Returns: `Map<string, Resource>` — Currently loaded [Resource](../resources/resource-api.md) instances.
 
 #### `scope.server`
 
-Returns: `server` — Reference to the [server](TODO:reference_versioned_docs/version-v4/http/api.md 'HTTP server global API') global API. Use for registering HTTP middleware, custom networking, etc.
+Returns: `server` — Reference to the [server](../http/api.md) global API. Use for registering HTTP middleware, custom networking, etc.
 
 #### `scope.options`
 

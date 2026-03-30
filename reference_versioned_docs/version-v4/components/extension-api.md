@@ -141,7 +141,7 @@ Parameters:
 
 A Protocol Extension is a more advanced form of Resource Extension, primarily used for implementing higher-level protocols (e.g., building and running a Next.js project) or adding custom networking handlers.
 
-Protocol Extensions use the [`server`](TODO:reference_versioned_docs/version-v4/http/api.md 'HTTP server global API') global API for custom networking.
+Protocol Extensions use the [`server`](../http/api.md) global API for custom networking.
 
 ### Protocol Extension Configuration
 
