@@ -12,7 +12,7 @@ Harper exposes a set of global variables and functions that JavaScript code (in 
 
 ## `tables`
 
-`tables` is an object whose properties are the tables in the default database (`data`). Each table defined in your `schema.graphql` file is available as a property, and the value is the table class that implements the [Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md).
+`tables` is an object whose properties are the tables in the default database (`data`). Each table defined in your `schema.graphql` file is available as a property, and the value is the table class that implements the [Resource API](../resources/resource-api.md).
 
 ```graphql
 # schema.graphql
@@ -49,7 +49,7 @@ for await (const record of Product.search(query)) {
 }
 ```
 
-For the full set of methods available on table classes, see the [Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md).
+For the full set of methods available on table classes, see the [Resource API](../resources/resource-api.md).
 
 ## `databases`
 
@@ -238,6 +238,6 @@ When a field is typed as `Blob` in the schema, any string or buffer assigned via
 ## Related Documentation
 
 - [Schema](./schema.md) — Defining tables and blob fields
-- [Resource API](TODO:reference_versioned_docs/version-v4/resources/resource-api.md) — Full table class method reference
+- [Resource API](../resources/resource-api.md) — Full table class method reference
 - [Transaction Logging](./transaction.md) — Audit log and transaction log for data change history
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md) — Blob storage path configuration
+- [Configuration](../configuration/options.md) — Blob storage path configuration

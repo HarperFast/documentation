@@ -68,4 +68,4 @@ STORAGE_COMPACTONSTART=true STORAGE_COMPACTONSTARTKEEPBACKUP=true harperdb
 
 - [Storage Algorithm](./storage-algorithm.md) — How Harper stores data using LMDB
 - [CLI Commands](../cli/commands.md) — `copy-db` CLI command reference
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'storage section') — Full storage configuration options including compression settings
+- [Configuration](../configuration/options.md) — Full storage configuration options including compression settings

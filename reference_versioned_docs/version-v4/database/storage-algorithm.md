@@ -44,7 +44,7 @@ Within the LMDB implementation, table records are grouped into a single LMDB env
 
 Changed in: v4.3.0 — Compression is now enabled by default for all records over 4KB
 
-Harper compresses record data automatically for records over 4KB. Compression settings can be configured in the [storage configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'storage configuration options'). Note that compression settings cannot be changed on existing databases without creating a new compacted copy — see [Compaction](./compaction.md).
+Harper compresses record data automatically for records over 4KB. Compression settings can be configured in the [storage configuration](../configuration/options.md). Note that compression settings cannot be changed on existing databases without creating a new compacted copy — see [Compaction](./compaction.md).
 
 ## Performance Characteristics
 
@@ -108,4 +108,4 @@ Indexes are ordered — booleans first, then numbers (numerically), then strings
 
 - [Schema](./schema.md) — Defining indexed attributes and vector indexes
 - [Compaction](./compaction.md) — Reclaiming free space and applying new storage configuration to existing databases
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'storage section') — Storage configuration options (compression, memory maps, blob paths)
+- [Configuration](../configuration/options.md) — Storage configuration options (compression, memory maps, blob paths)

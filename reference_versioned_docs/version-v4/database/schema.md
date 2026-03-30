@@ -477,7 +477,7 @@ When a table is created through the Operations API or Studio without a schema de
 
 Dynamic schema tables are additive — new attributes are added as new data arrives. Existing records will have `null` for any newly added attributes.
 
-Use `create_attribute` and `drop_attribute` operations to manually manage attributes on dynamic schema tables. See the [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/operations.md 'NoSQL and database operations') for details.
+Use `create_attribute` and `drop_attribute` operations to manually manage attributes on dynamic schema tables. See the [Operations API](../operations-api/operations.md#databases--tables) for details.
 
 ## OpenAPI Specification
 
@@ -498,6 +498,6 @@ Harper does **not** support renaming tables. Changing a type name in a schema de
 - [JavaScript API](./api.md) — `tables`, `databases`, `transaction()`, and `createBlob()` globals for working with schema-defined tables in code
 - [Data Loader](./data-loader.md) — Seed tables with initial data alongside schema deployment
 - [REST Querying](../rest/querying.md) — Querying tables via HTTP using schema-defined attributes and relationships
-- [Resources](TODO:reference_versioned_docs/version-v4/resources/resource-api.md) — Extending table behavior with custom application logic
+- [Resources](../resources/resource-api.md) — Extending table behavior with custom application logic
 - [Storage Algorithm](./storage-algorithm.md) — How Harper indexes and stores schema-defined data
-- [Configuration](TODO:reference_versioned_docs/version-v4/configuration/options.md 'graphqlSchema component and storage options') — Component configuration for schemas
+- [Configuration](../configuration/options.md) — Component configuration for schemas

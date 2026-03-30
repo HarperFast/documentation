@@ -149,6 +149,6 @@ This overrides the [`logging.auditLog`](../logging/configuration.md) global conf
 ## Related Documentation
 
 - [Logging](../logging/overview.md) — Application and system logging (separate from transaction/audit logging)
-- [Replication](TODO:reference_versioned_docs/version-v4/replication/overview.md) — Clustering setup required for transaction logs
+- [Replication](../replication/overview.md) — Clustering setup required for transaction logs
 - [Logging Configuration](../logging/configuration.md) — Global audit log configuration (`logging.auditLog`)
-- [Operations API](TODO:reference_versioned_docs/version-v4/operations-api/overview.md) — Sending operations to Harper
+- [Operations API](../operations-api/overview.md) — Sending operations to Harper
