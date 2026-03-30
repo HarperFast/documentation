@@ -14,7 +14,7 @@ Added in: v4.4.0 (provisional)
 
 Changed in: v4.5.0 (disabled by default, configuration options)
 
-Harper supports GraphQL in a variety of ways. It can be used for [defining schemas](TODO:reference_versioned_docs/version-v4/components/applications.md 'Schema definition documentation'), and for querying [Resources](TODO:reference_versioned_docs/version-v4/resources/overview.md 'Resources overview').
+Harper supports GraphQL in a variety of ways. It can be used for [defining schemas](../components/applications.md), and for querying [Resources](../resources/overview.md).
 
 Get started by setting `graphql: true` in `config.yaml`. This configuration option was added in v4.5.0 to allow more granular control over the GraphQL endpoint.
 
@@ -56,7 +56,7 @@ Accept: application/graphql-response+json
 
 > Tip: For the best user experience, include the `Accept: application/graphql-response+json` header in your request. This provides better status codes for errors.
 
-The Harper GraphQL querying system is strictly limited to exported Harper Resources. This will typically be a table that uses the `@exported` directive in its schema or `export`'ed custom resources. Queries can only specify Harper Resources and their attributes in the selection set. Queries can filter using [arguments](https://graphql.org/learn/queries/#arguments) on the top-level Resource field. Harper provides a short form pattern for simple queries, and a long form pattern based off of the [Resource Query API](TODO:reference_versioned_docs/version-v4/resources/overview.md#query 'Resource Query API') for more complex queries.
+The Harper GraphQL querying system is strictly limited to exported Harper Resources. This will typically be a table that uses the `@exported` directive in its schema or `export`'ed custom resources. Queries can only specify Harper Resources and their attributes in the selection set. Queries can filter using [arguments](https://graphql.org/learn/queries/#arguments) on the top-level Resource field. Harper provides a short form pattern for simple queries, and a long form pattern based off of the [Resource Query API](../resources/overview.md#query) for more complex queries.
 
 Unlike REST queries, GraphQL queries can specify multiple resources simultaneously:
 
