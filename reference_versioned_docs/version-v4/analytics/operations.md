@@ -83,13 +83,13 @@ Queries analytics data for a specific metric over a time range.
 
 ### Parameters
 
-| Parameter        | Required | Type     | Description                                                                                                                                                                          |
-| ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                                                                                            |
-| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                                                                                                 |
-| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                                                                                                |
-| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                                                                                                  |
-| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                                                                                                        |
+| Parameter        | Required | Type     | Description                                                                                                             |
+| ---------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `operation`      | Yes      | string   | Must be `"get_analytics"`                                                                                               |
+| `metric`         | Yes      | string   | Metric name — use `list_metrics` to get valid values                                                                    |
+| `start_time`     | No       | number   | Start of time range as Unix timestamp in milliseconds                                                                   |
+| `end_time`       | No       | number   | End of time range as Unix timestamp in milliseconds                                                                     |
+| `get_attributes` | No       | string[] | Attributes to include in each result. If omitted, all attributes are returned                                           |
 | `conditions`     | No       | object[] | Additional filter conditions. Same format as [`search_by_conditions`](../operations-api/operations.md#nosql-operations) |
 
 ### Request

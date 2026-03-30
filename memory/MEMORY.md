@@ -45,6 +45,7 @@ All Phase 1A–1D sections are complete and merged:
 **Part 3 (Link Resolution) — Complete** on `link-resolution` branch (10 commits). Merge to `major-version-reorg` via PR review, then continue:
 
 **Part 4 (Cross-Reference Updates)** — Full plan in [`memory/part4-plan.md`](part4-plan.md).
+
 - Branch: `cross-reference-updates` off `major-version-reorg`
 - Scope: ~7 release note files + 1 learn guide with old `/docs/` links
 - **First step**: verify URL prefix for new reference pages (check `docusaurus.config.js`)
