@@ -195,7 +195,7 @@ Applications can record custom metrics using the `server.recordAnalytics()` API.
 
 ## Analytics Configuration
 
-The `analytics.aggregatePeriod` configuration option controls how frequently aggregate summaries are written. See [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full harperdb-config.yaml reference') for details.
+The `analytics.aggregatePeriod` configuration option controls how frequently aggregate summaries are written. See [Configuration Overview](../configuration/overview.md) for details.
 
 Per-component analytics logging can be configured via `analytics.logging`. See [Logging Configuration](../logging/configuration.md) for details.
 
@@ -204,4 +204,4 @@ Per-component analytics logging can be configured via `analytics.logging`. See [
 - [Analytics Operations](./operations)
 - [HTTP API](../http/api.md)
 - [Logging Configuration](../logging/configuration.md)
-- [Configuration Overview](TODO:reference_versioned_docs/version-v4/configuration/overview.md 'Full configuration reference')
+- [Configuration Overview](../configuration/overview.md)
