@@ -23,14 +23,27 @@ Before adding a custom domain, make sure you have:
 - Access to your DNS registrar or DNS management provider (e.g., Cloudflare, Route 53, GoDaddy, Namecheap)
 
 
+## Accessing Domain Configuration
+
+Domain configuration is accessible through two primary paths:
+
+1.  **From the Fabric Dashboard:**
+    - Log in to [https://fabric.harper.fast/](https://fabric.harper.fast/).
+    - Click on your organization name.
+    - Locate the cluster you want to configure and click the context menu (three dots "**...**").
+    - Select the **Domains** configuration option.
+2.  **From Cluster Configuration:**
+    - Navigate to your cluster’s page within your organization.
+    - Select **Config** from the top navigation menu.
+    - Select **Domains** from the left sidebar.
+
+
 ## Adding a Custom Domain
 
 
-1. Navigate to your cluster’s page within your organization.
-2. Select **Config** from the top navigation menu.
-3. Select **Domains** from the left sidebar.
-4. Enter your domain in the **New Domain Name** field — for example, `api.example.com` or `example.com`.
-5. Click the **+ Add** button.
+1. Access domain configuration using one of the paths above.
+2. Enter your domain in the **New Domain Name** field — for example, `api.example.com` or `example.com`.
+3. Click the **+ Add** button.
 
 
 Harper Fabric will register the domain and display the DNS records you need to configure. A confirmation notification will appear: *“Domain added! Please add the TXT record above to your domain registrar.”*
@@ -60,8 +73,7 @@ This record proves that you own the domain. Add the following to your DNS regist
 ### CNAME Record (Traffic Routing)
 
 
-This record points your domain to your Harper Fabric cluster. Add the following to your DNS registrar:
-
+After ownership is verified, you will be instructed to add a CNAME record to your domain registrar pointing to the Harper Fabric load balancer.
 
 - **Type**: `CNAME`
 - **Name**: Your subdomain prefix (e.g., `api` for `api.example.com`)
@@ -69,7 +81,14 @@ This record points your domain to your Harper Fabric cluster. Add the following 
 - **Target**: Your cluster’s Fabric hostname (e.g., `my-cluster.my-org.harperfabric.com`)
 
 
-(Note: If you’re using a root/apex domain like `example.com`, some DNS providers don’t support CNAME records at the root. Check with your provider for ALIAS or CNAME flattening support.)
+:::info Apex Domains
+Some registrars do not support CNAME records for apex domains (e.g., `yourdomain.com`). In this case, we recommend:
+
+1.  Registering a subdomain like `www.yourdomain.com`.
+2.  Redirecting the apex domain (`@` or `yourdomain.com`) to the `www` subdomain.
+
+Alternatively, check if your provider supports ALIAS or CNAME flattening.
+:::
 
 
 ## Validating Your Domain
@@ -78,7 +97,7 @@ This record points your domain to your Harper Fabric cluster. Add the following 
 After adding both DNS records at your registrar, you’ll need to wait for DNS propagation. This typically takes a few minutes to an hour, depending on your TTL settings.
 
 
-Once your DNS records have propagated:
+Once your DNS records have propagated (this may take **10 minutes** or more):
 
 
 1. Return to **Config** → **Domains** in your cluster.
@@ -99,7 +118,14 @@ dig _fabric.api.example.com TXT
 ## Binding the Domain
 
 
-After successful validation, use the **Bind** column in the domains table to bind the domain to your cluster. Once bound, traffic to your custom domain will be routed to your Harper Fabric cluster and TLS certificates will be provisioned automatically.
+After successful validation, use the **Bind** column in the domains table to bind the domain to your cluster. 
+
+Once bound, Harper Fabric will automatically begin generating an SSL certificate for your domain:
+
+- This process typically takes **5-10 minutes**.
+- The interface will show you the progress as it goes.
+
+Everything should be working once the SSL certificate is successfully generated! Traffic to your custom domain will then be routed to your Harper Fabric cluster.
 
 
 ## Managing Domains
