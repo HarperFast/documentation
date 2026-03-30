@@ -1,8 +1,5 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
-
-
-
 const sidebarsFabric: SidebarsConfig = {
 	fabricSidebar: [
 		{
@@ -64,10 +61,4 @@ const sidebarsFabric: SidebarsConfig = {
 	],
 };
 
-
-
-
 export default sidebarsFabric;
-
-
-
