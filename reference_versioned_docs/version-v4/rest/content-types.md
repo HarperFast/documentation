@@ -61,7 +61,7 @@ Using the `Accept` header is the recommended approach for clean, standard HTTP i
 
 ## Custom Content Types
 
-Harper's content type system is extensible. Custom handlers for any serialization format (XML, YAML, proprietary formats, etc.) can be registered in the [`contentTypes`](../resources/global-apis.md) global Map.
+Harper's content type system is extensible. Custom handlers for any serialization format (XML, YAML, proprietary formats, etc.) can be registered in the [`contentTypes`](../components/javascript-environment.md#contenttypes) global Map.
 
 ## Storing Arbitrary Content Types
 

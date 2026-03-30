@@ -277,6 +277,7 @@ Based on migration map and reference plan, recommend this order. Each section is
     - `certificate-management.md`
     - `certificate-verification.md`
     - `configuration.md` _(consolidated from planned `cors.md` + `ssl.md`)_
+    - `api.md` _(added during migration — not in original plan)_
 
 2.  **Users and Roles** (`reference_versioned_docs/version-v4/users-and-roles/`) — **Complete**
     - `overview.md`
@@ -306,7 +307,7 @@ Based on migration map and reference plan, recommend this order. Each section is
 5.  **Resources** (`reference_versioned_docs/version-v4/resources/`) — **Complete**
     - `overview.md`
     - `resource-api.md`
-    - `global-apis.md`
+    - ~~`global-apis.md`~~ _(not created — content covered by `components/javascript-environment.md`)_
     - `query-optimization.md`
 
 6.  **Components** (`reference_versioned_docs/version-v4/components/`) — **Complete**

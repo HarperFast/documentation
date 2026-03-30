@@ -176,6 +176,11 @@ This document maps existing documentation paths from `versioned_docs/version-4.X
 - **Status**: Complete
 - **Notes**: Covers authentication configuration (authorizeLocal, cacheTTL, enableSessions, token timeouts, hashFunction), CORS, and SSL/TLS settings. Originally planned as separate `cors.md` and `ssl.md` pages; consolidated into a single `configuration.md` during migration.
 
+### `reference/security/api.md`
+
+- **Status**: Complete
+- **Notes**: Added during migration — not in the original plan. Security-related API reference.
+
 ---
 
 ## Users and Roles Section
@@ -423,19 +428,10 @@ Broken out from the security section during migration — RBAC warrants its own 
   - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Property forwarding
   - [4.6.0](release-notes/v4-tucker/4.6.0.md) - Resource API upgrades
 
-### `reference/resources/global-apis.md`
+### ~~`reference/resources/global-apis.md`~~
 
-- **Primary Source**: `versioned_docs/version-4.7/reference/globals.md`
-- **Additional Sources**:
-  - `versioned_docs/version-4.7/reference/transactions.md`
-  - Current `reference/globals.md`
-  - Current `reference/transactions.md`
-- **Merge Required**: Yes - consolidate global APIs (tables, databases, transactions, etc.)
-- **Version Annotations**: Various APIs added across versions
-- **Status**: Complete
-- **Notes**: Should reference out to http/api.md for `server` global
-- **Release Notes**:
-  - [4.5.0](release-notes/v4-tucker/4.5.0.md) - Table.getRecordCount()
+- **Status**: N/A
+- **Notes**: Content superseded by `reference/components/javascript-environment.md`, which covers all global APIs (`tables`, `databases`, `transaction`, `createBlob`, `Resource`, `server`, `contentTypes`, `logger`) and references out to the appropriate sections for full detail. The two broken links in `resources/resource-api.md:547` and `rest/content-types.md:64` need to be updated to point to `../components/javascript-environment.md`.
 
 ### `reference/resources/query-optimization.md`
 

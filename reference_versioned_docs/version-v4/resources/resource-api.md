@@ -544,7 +544,7 @@ export class BlogPost extends tables.BlogPost {
 }
 ```
 
-See [Global APIs — transaction](./global-apis.md#transaction) for explicitly starting transactions outside of request handlers.
+See [JavaScript Environment — transaction](../components/javascript-environment.md#transactionfn) for explicitly starting transactions outside of request handlers.
 
 ---
 
