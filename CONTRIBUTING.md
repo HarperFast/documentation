@@ -44,6 +44,31 @@ Depending on the specific change, you may need to make updates to similar files 
 
 The site organization is ever evolving so make sure to revisit this file over time to stay up to date with the latest structure.
 
+## Known Issues
+
+### `docusaurus serve` 404s on `/docs/4.X` paths
+
+`docusaurus serve` uses `serve-handler`, which treats ending URL path segments containing a singular dot (e.g. `4.6`) as file extensions rather than directory names. This causes `/docs/4.6` to 404 locally even though the redirect page exists at `build/docs/4.6/index.html`. This doesn't apply to nested paths such as `/docs/4.6/developers`.
+
+A fix has been submitted upstream at https://github.com/vercel/serve-handler/pull/230. Once it merges and Docusaurus upgrades its dependency, the local patch can be removed.
+
+In the meantime, if you need to test these redirects locally, apply a change in `node_modules/serve-handler/src/index.js` around line 608 where you clear the `stats` variable from `lstat` if it is a directory so it falls through to the nested `index.html`.
+
+```js
+if (path.extname(relativePath) !== '') {
+	try {
+		stats = await handlers.lstat(absolutePath);
+		if (stats && stats.isDirectory()) {
+			stats = null;
+		}
+	} catch (err) {
+		if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') {
+			return internalError(absolutePath, response, acceptsJSON, current, handlers, config, err);
+		}
+	}
+}
+```
+
 ## Release Notes Process
 
 When adding release notes for a new HarperDB version, follow these steps:

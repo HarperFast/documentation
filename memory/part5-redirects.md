@@ -13,28 +13,28 @@ The redirect plugin is currently commented out in `docusaurus.config.ts` (lines 
 
 New reference paths live at `/reference/v4/[section]/[page]`:
 
-| Section              | Key Pages                                                                 |
-|----------------------|---------------------------------------------------------------------------|
-| analytics            | overview, operations                                                      |
-| cli                  | overview, commands, authentication, operations-api-commands               |
-| components           | overview, applications, extension-api, javascript-environment, plugin-api |
-| configuration        | overview, options, operations                                             |
-| database             | overview, schema, api, data-loader, storage-algorithm, jobs, system-tables, compaction, transaction, sql |
-| environment-variables| overview                                                                  |
-| fastify-routes       | overview                                                                  |
-| graphql-querying     | overview                                                                  |
-| http                 | overview, configuration, api, tls                                         |
-| legacy               | cloud, custom-functions                                                   |
-| logging              | overview, configuration, api, operations                                  |
-| mqtt                 | overview, configuration                                                   |
-| operations-api       | overview, operations                                                       |
-| replication          | overview, clustering, sharding                                            |
-| resources            | overview, resource-api, query-optimization                                |
-| rest                 | overview, querying, headers, content-types, websockets, server-sent-events|
-| security             | overview, basic-authentication, jwt-authentication, mtls-authentication, certificate-management, certificate-verification, configuration, api |
-| static-files         | overview                                                                  |
-| studio               | overview                                                                  |
-| users-and-roles      | overview, configuration, operations                                       |
+| Section               | Key Pages                                                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| analytics             | overview, operations                                                                                                                          |
+| cli                   | overview, commands, authentication, operations-api-commands                                                                                   |
+| components            | overview, applications, extension-api, javascript-environment, plugin-api                                                                     |
+| configuration         | overview, options, operations                                                                                                                 |
+| database              | overview, schema, api, data-loader, storage-algorithm, jobs, system-tables, compaction, transaction, sql                                      |
+| environment-variables | overview                                                                                                                                      |
+| fastify-routes        | overview                                                                                                                                      |
+| graphql-querying      | overview                                                                                                                                      |
+| http                  | overview, configuration, api, tls                                                                                                             |
+| legacy                | cloud, custom-functions                                                                                                                       |
+| logging               | overview, configuration, api, operations                                                                                                      |
+| mqtt                  | overview, configuration                                                                                                                       |
+| operations-api        | overview, operations                                                                                                                          |
+| replication           | overview, clustering, sharding                                                                                                                |
+| resources             | overview, resource-api, query-optimization                                                                                                    |
+| rest                  | overview, querying, headers, content-types, websockets, server-sent-events                                                                    |
+| security              | overview, basic-authentication, jwt-authentication, mtls-authentication, certificate-management, certificate-verification, configuration, api |
+| static-files          | overview                                                                                                                                      |
+| studio                | overview                                                                                                                                      |
+| users-and-roles       | overview, configuration, operations                                                                                                           |
 
 ## Old Path Structure (v4.7)
 
@@ -58,7 +58,7 @@ The old docs were at `/docs/` serving the latest (4.7) content:
 - `/docs/administration/cloning` → Replication
 - `/docs/administration/compact` → Database/compaction
 - `/docs/administration/jobs` → Database/jobs
-- `/docs/reference/*` → Old reference section (reference/analytics, reference/resources/*, etc.)
+- `/docs/reference/*` → Old reference section (reference/analytics, reference/resources/\*, etc.)
 - `/docs/foundations/*` → learn/ (already handled)
 - `/docs/getting-started/*` → learn/ (already handled)
 
@@ -67,6 +67,7 @@ The old docs were at `/docs/` serving the latest (4.7) content:
 Paths from GA data (Oct 2025 – Feb 2026) that need redirects to `/reference/v4/`:
 
 ### High Priority (>200 views)
+
 - `/docs/developers/operations-api` (1028) → `/reference/v4/operations-api/overview`
 - `/docs/developers/applications` (727) → `/reference/v4/components/overview`
 - `/docs/reference/resources` (667) → `/reference/v4/resources/overview`
@@ -86,6 +87,7 @@ Paths from GA data (Oct 2025 – Feb 2026) that need redirects to `/reference/v4
 - `/docs/developers/operations-api/bulk-operations` (158) → `/reference/v4/operations-api/operations`
 
 ### Medium Priority (50–200 views)
+
 - `/docs/developers/applications/data-loader` (218) → `/reference/v4/database/data-loader`
 - `/docs/developers/operations-api/system-operations` (213) → `/reference/v4/operations-api/operations`
 - `/docs/reference/components/built-in-extensions` (204) → `/reference/v4/components/extension-api`
@@ -168,6 +170,7 @@ Paths from GA data (Oct 2025 – Feb 2026) that need redirects to `/reference/v4
 ## Versioned Doc Paths (/docs/4.X/) in Analytics
 
 Low traffic but some exist. Recommend a general catch-all pattern:
+
 - `/docs/4.X/developers/...` → strip version prefix, apply same rules as `/docs/developers/...`
 - `/docs/4.X/reference/...` → strip version prefix, apply same rules as `/docs/reference/...`
 - Alternative: redirect `/docs/4.X/...` → `/docs/...` (simpler, single hop)
@@ -175,19 +178,23 @@ Low traffic but some exist. Recommend a general catch-all pattern:
 ## Special Notes for Non-Reference Sections
 
 ### /learn/ — needs few/no new redirects
+
 - Already has redirects for `/getting-started/*` and `/foundations/*`
 - `/learn/developers/coming-soon` and `/learn/administration/coming-soon` are real pages, no redirects needed
 
 ### /release-notes/ — existing redirects are fine
+
 - The existing `createRedirects` logic for release-notes path variants (old naming) is worth keeping
 - No new redirects needed unless we change the release-notes structure
 
 ### /fabric/ — no redirects needed
+
 - Brand new section with no old paths to redirect from
 
 ## Old redirects.ts Issues
 
 The existing file has:
+
 1. Many rules dragged from very old docs (HarperDB Studio → Harper Studio, HarperDB Cloud, custom-functions etc.) that are still valid but very old
 2. `withBase()` abstraction that adds complexity — the basePath was used when docs were at `/docs/` but now everything is at root
 3. Separate `generateRedirects()` and `createRedirects()` (wildcard) functions — the split is conceptually fine

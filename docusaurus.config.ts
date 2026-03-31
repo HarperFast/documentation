@@ -20,7 +20,6 @@ if (process.env.NODE_ENV === 'production') {
 const baseUrl = process.env.DOCUSAURUS_BASE_URL || '/';
 
 // Determine route base path for docs
-// Can be set to '/docs/' if we need docs under a subdirectory
 // Default is '/' to serve docs at the root
 const routeBasePath = process.env.DOCUSAURUS_ROUTE_BASE_PATH; // matching the production URL structure since this will currently affect some relative links in the docs
 
