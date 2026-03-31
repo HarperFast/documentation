@@ -25,7 +25,7 @@ npm run dev
 4. Format your code:
 
 ```bash
-npm run format
+npm run format:write
 ```
 
 5. Push changes to a branch and create a pull request
