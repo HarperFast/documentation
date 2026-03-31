@@ -5,330 +5,14 @@ const sidebars: SidebarsConfig = {
 		{
 			type: 'doc',
 			id: 'index',
-			label: 'Welcome',
-		},
-		{
-			type: 'category',
-			label: 'CLI',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'cli/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'cli/commands',
-					label: 'Commands',
-				},
-				{
-					type: 'doc',
-					id: 'cli/operations-api-commands',
-					label: 'Operations API Commands',
-				},
-				{
-					type: 'doc',
-					id: 'cli/authentication',
-					label: 'Authentication',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Configuration',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'configuration/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'configuration/options',
-					label: 'Options',
-				},
-				{
-					type: 'doc',
-					id: 'configuration/operations',
-					label: 'Operations',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Environment Variables',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'environment-variables/overview',
-					label: 'Overview',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Static Files',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'static-files/overview',
-					label: 'Overview',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'HTTP',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'http/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'http/configuration',
-					label: 'Configuration',
-				},
-				{
-					type: 'doc',
-					id: 'http/api',
-					label: 'API',
-				},
-				{
-					type: 'doc',
-					id: 'http/tls',
-					label: 'TLS',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'REST',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'rest/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'rest/content-types',
-					label: 'Content Types',
-				},
-				{
-					type: 'doc',
-					id: 'rest/headers',
-					label: 'Headers',
-				},
-				{
-					type: 'doc',
-					id: 'rest/querying',
-					label: 'Querying',
-				},
-				{
-					type: 'doc',
-					id: 'rest/websockets',
-					label: 'WebSockets',
-				},
-				{
-					type: 'doc',
-					id: 'rest/server-sent-events',
-					label: 'Server Sent Events',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Logging',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'logging/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'logging/configuration',
-					label: 'Configuration',
-				},
-				{
-					type: 'doc',
-					id: 'logging/api',
-					label: 'API',
-				},
-				{
-					type: 'doc',
-					id: 'logging/operations',
-					label: 'Operations',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Analytics',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'analytics/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'analytics/operations',
-					label: 'Operations',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'MQTT',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'mqtt/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'mqtt/configuration',
-					label: 'Configuration',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'GraphQL Querying',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'graphql-querying/overview',
-					label: 'Overview',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Studio',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'studio/overview',
-					label: 'Overview',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Fastify Routes',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'fastify-routes/overview',
-					label: 'Overview',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Security',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'security/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'security/configuration',
-					label: 'Configuration',
-				},
-				{
-					type: 'doc',
-					id: 'security/basic-authentication',
-					label: 'Basic Authentication',
-				},
-				{
-					type: 'doc',
-					id: 'security/jwt-authentication',
-					label: 'JWT Authentication',
-				},
-				{
-					type: 'doc',
-					id: 'security/mtls-authentication',
-					label: 'mTLS Authentication',
-				},
-				{
-					type: 'doc',
-					id: 'security/certificate-management',
-					label: 'Certificate Management',
-				},
-				{
-					type: 'doc',
-					id: 'security/certificate-verification',
-					label: 'Certificate Verification',
-				},
-				{
-					type: 'doc',
-					id: 'security/api',
-					label: 'API',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'Users & Roles',
-			collapsible: false,
-			className: 'learn-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'users-and-roles/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'users-and-roles/configuration',
-					label: 'Configuration',
-				},
-				{
-					type: 'doc',
-					id: 'users-and-roles/operations',
-					label: 'Operations',
-				},
-			],
+			label: 'Reference',
+			className: 'reference-index-item',
 		},
 		{
 			type: 'category',
 			label: 'Database',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
@@ -386,7 +70,7 @@ const sidebars: SidebarsConfig = {
 			type: 'category',
 			label: 'Resources',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
@@ -409,7 +93,7 @@ const sidebars: SidebarsConfig = {
 			type: 'category',
 			label: 'Components',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
@@ -440,9 +124,305 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'REST',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'rest/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'rest/content-types',
+					label: 'Content Types',
+				},
+				{
+					type: 'doc',
+					id: 'rest/headers',
+					label: 'Headers',
+				},
+				{
+					type: 'doc',
+					id: 'rest/querying',
+					label: 'Querying',
+				},
+				{
+					type: 'doc',
+					id: 'rest/websockets',
+					label: 'WebSockets',
+				},
+				{
+					type: 'doc',
+					id: 'rest/server-sent-events',
+					label: 'Server Sent Events',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'HTTP',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'http/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'http/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'http/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'http/tls',
+					label: 'TLS',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Security',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'security/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'security/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'security/basic-authentication',
+					label: 'Basic Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/jwt-authentication',
+					label: 'JWT Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/mtls-authentication',
+					label: 'mTLS Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/certificate-management',
+					label: 'Certificate Management',
+				},
+				{
+					type: 'doc',
+					id: 'security/certificate-verification',
+					label: 'Certificate Verification',
+				},
+				{
+					type: 'doc',
+					id: 'security/api',
+					label: 'API',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Users & Roles',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'users-and-roles/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'users-and-roles/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'users-and-roles/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'CLI',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'cli/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'cli/commands',
+					label: 'Commands',
+				},
+				{
+					type: 'doc',
+					id: 'cli/operations-api-commands',
+					label: 'Operations API Commands',
+				},
+				{
+					type: 'doc',
+					id: 'cli/authentication',
+					label: 'Authentication',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Configuration',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'configuration/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'configuration/options',
+					label: 'Options',
+				},
+				{
+					type: 'doc',
+					id: 'configuration/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Operations API',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'operations-api/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'operations-api/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Logging',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'logging/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'logging/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'logging/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'logging/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Analytics',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'analytics/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'analytics/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'MQTT',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'mqtt/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'mqtt/configuration',
+					label: 'Configuration',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Static Files',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'static-files/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Environment Variables',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'environment-variables/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Replication',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
@@ -463,19 +443,40 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
-			label: 'Operations API',
+			label: 'GraphQL Querying',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
-					id: 'operations-api/overview',
+					id: 'graphql-querying/overview',
 					label: 'Overview',
 				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Studio',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
 				{
 					type: 'doc',
-					id: 'operations-api/operations',
-					label: 'Operations',
+					id: 'studio/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Fastify Routes',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'fastify-routes/overview',
+					label: 'Overview',
 				},
 			],
 		},
@@ -483,7 +484,7 @@ const sidebars: SidebarsConfig = {
 			type: 'category',
 			label: 'Legacy',
 			collapsible: false,
-			className: 'learn-category-header',
+			className: 'reference-category-header',
 			items: [
 				{
 					type: 'doc',
