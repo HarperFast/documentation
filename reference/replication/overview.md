@@ -135,7 +135,7 @@ Credentials are not stored — they are discarded immediately after use. You can
 
 ### Revoking Certificates
 
-Added in: v4.5.0
+<VersionBadge version="v4.5.0" />
 
 Certificates used in replication can be revoked using the certificate serial number. Use either the `revoked_certificates` attribute in the `hdb_nodes` system table or route config:
 
@@ -242,7 +242,7 @@ Update a subscription with `update_node`:
 
 ## Monitoring Replication
 
-Added in: v4.5.0 (cluster status timing statistics)
+<VersionBadge version="v4.5.0" /> (cluster status timing statistics)
 
 Use `cluster_status` to monitor the state of replication:
 

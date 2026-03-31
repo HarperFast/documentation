@@ -122,7 +122,7 @@ Removes a Harper node from the cluster and stops all replication to and from tha
 
 Returns an array of status objects from the cluster, including active WebSocket connections and replication timing statistics.
 
-Added in: v4.4.0; timing statistics added in v4.5.0
+<VersionBadge version="v4.4.0" /> ; timing statistics added in v4.5.0
 
 **Parameters**:
 

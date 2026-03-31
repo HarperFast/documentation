@@ -8,9 +8,9 @@ title: Sharding
 
 # Sharding
 
-Added in: v4.4.0 (provisional)
+<VersionBadge version="v4.4.0" /> (provisional)
 
-Changed in: v4.5.0 — expanded sharding functionality: Harper now honors write requests with residency information that will not be stored on the local node, and nodes can be declaratively configured as part of a shard.
+<VersionBadge type="changed" version="v4.5.0" /> — expanded sharding functionality: Harper now honors write requests with residency information that will not be stored on the local node, and nodes can be declaratively configured as part of a shard.
 
 Harper's replication system supports sharding — storing different data across different subsets of nodes — while still allowing data to be accessed from any node in the cluster. This enables horizontal scalability for storage and write performance, while maintaining optimal data locality and consistency.
 
