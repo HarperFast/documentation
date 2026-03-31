@@ -1,55 +1,46 @@
 ---
-title: Welcome to Harper Documentation Site
+title: Harper Documentation
 ---
 
 import CustomDocCardList from '@site/src/components/CustomDocCardList';
 
 # Harper Docs
 
-:::info
+Harper is an all-in-one backend that fuses a database, caching, application hosting, and messaging into a single system — eliminating the serialization overhead and network latency of traditional multi-service architectures.
 
-### Get the Most Out of Harper
+:::info Join the Community
 
-Join our Discord to access expert support, collaborate with Harper's core team, and stay up to date on the latest platform updates. [Join Our Discord →](https://harper.fast/discord)
+Get help from Harper's core team, collaborate with other developers, and stay current on platform updates. [Join our Discord →](https://harper.fast/discord)
+
 :::
 
-Harper is an all-in-one backend technology that fuses database technologies, caching, application hosting, and messaging functions into a single system. Unlike traditional architectures where each piece runs independently and incurs extra costs and latency from serialization and network operations between processes, Harper systems can handle workloads seamlessly and efficiently.
-
-Here, you'll find all things Harper, and everything you need to get started, troubleshoot issues, and make the most of our platform.
-
-## Getting Started
-
-The best way to get started using Harper is to head over to the [Learn](/learn/) section and work through the Getting Started and Developer guides.
-
-## Building with Harper
-
 <CustomDocCardList
-	columns={3}
+	columns={2}
 	items={[
 		{
 			type: 'link',
-			href: '/reference/v4/components/overview',
-			label: 'Harper Applications',
-			description: 'Build your a fully featured Harper Component with custom functionality',
+			href: '/learn',
+			label: 'Learn',
+			badge: 'Start here',
+			description: 'Guides and tutorials for getting started, building applications, and deploying Harper',
 		},
 		{
 			type: 'link',
-			href: '/reference/v4/rest/overview',
-			label: 'REST Queries',
-			description: 'The recommended HTTP interface for data access, querying, and manipulation',
+			href: '/reference/v4',
+			label: 'Reference',
+			description: 'Complete technical reference for every Harper feature, API, and configuration option',
 		},
 		{
 			type: 'link',
-			href: '/reference/v4/operations-api/overview',
-			label: 'Operations API',
-			description: 'Configure, deploy, administer, and control your Harper instance',
+			href: '/release-notes',
+			label: 'Release Notes',
+			description: 'Changelog for every Harper release — new features, fixes, and breaking changes',
 		},
 		{
 			type: 'link',
-			href: '/reference/v4/replication/overview',
-			label: 'Clustering & Replication',
-			description:
-				'The process of connecting multiple Harper databases together to create a database mesh network that enables users to define data replication patterns.',
+			href: '/fabric',
+			label: 'Fabric',
+			description: 'Harper\'s managed cloud platform — deploy, scale, and operate Harper without the infrastructure',
 		},
 	]}
 />

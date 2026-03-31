@@ -5,8 +5,8 @@ export default function ReferenceRedirect() {
 	const history = useHistory();
 
 	useEffect(() => {
-		// Redirect to the v4 reference docs
-		history.replace('/reference/v4');
+		// Redirect to the latest reference docs
+		history.replace('/reference/v5');
 	}, [history]);
 
 	return null;

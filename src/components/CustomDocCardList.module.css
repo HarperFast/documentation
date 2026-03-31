@@ -34,6 +34,25 @@
 	margin-bottom: 0;
 }
 
+.cardBadge {
+	display: inline-block;
+	align-self: flex-start;
+	margin-bottom: 0.5rem;
+	padding: 0.2em 0.6em;
+	font-size: 0.6rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	border-radius: 999px;
+	background-color: var(--ifm-color-primary);
+	color: #fff;
+}
+
+[data-theme='dark'] .cardBadge {
+	background-color: var(--ifm-color-primary);
+	color: #1a1a2e;
+}
+
 /* Responsive breakpoints */
 @media (max-width: 996px) {
 	.cardGrid {

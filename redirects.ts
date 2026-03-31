@@ -23,7 +23,6 @@ type RedirectRule = {
 // ─── Static redirect rules ────────────────────────────────────────────────────
 // All paths sourced from GA pageview data (Oct 2025–Feb 2026).
 // Non-versioned /docs/* paths → /reference/v5/ (current version)
-// Paths with <10 views are marked LOW TRAFFIC.
 
 const currentRedirects: RedirectRule[] = [
 	// ── Docs root ──────────────────────────────────────────────────────────────
