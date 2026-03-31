@@ -83,17 +83,17 @@ const config: Config = {
 				path: 'reference',
 				routeBasePath: 'reference',
 				sidebarPath: './sidebarsReference.ts',
-				editUrl: ({ versionDocsDirPath, docPath }) => {
-					// For versioned docs: versionDocsDirPath is like 'versioned_docs/version-4'
-					// For current docs: versionDocsDirPath is 'docs'
-					if (versionDocsDirPath.startsWith('versioned_docs')) {
-						// Versioned docs are in versioned_docs/version-X.X/
-						return `https://github.com/HarperFast/documentation/blob/main/${versionDocsDirPath}/${docPath}`;
-					} else {
-						// Current docs are in the root docs/ directory
-						return `https://github.com/HarperFast/documentation/blob/main/docs/${docPath}`;
-					}
-				},
+				// editUrl: ({ versionDocsDirPath, docPath }) => {
+				// 	// For versioned docs: versionDocsDirPath is like 'versioned_docs/version-4'
+				// 	// For current docs: versionDocsDirPath is 'docs'
+				// 	if (versionDocsDirPath.startsWith('versioned_docs')) {
+				// 		// Versioned docs are in versioned_docs/version-X.X/
+				// 		return `https://github.com/HarperFast/documentation/blob/main/${versionDocsDirPath}/${docPath}`;
+				// 	} else {
+				// 		// Current docs are in the root docs/ directory
+				// 		return `https://github.com/HarperFast/documentation/blob/main/docs/${docPath}`;
+				// 	}
+				// },
 				lastVersion: 'current',
 				includeCurrentVersion: false,
 				versions: {
