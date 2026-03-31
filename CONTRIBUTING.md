@@ -141,24 +141,34 @@ Deprecated or discouraged features belong in `reference/legacy/` (current) or `r
 
 ### Version Annotations
 
-Because the Reference section consolidates all minor versions of a major into one document, features are annotated inline to indicate when they were introduced or changed. Follow the Node.js documentation convention:
+Because the Reference section consolidates all minor versions of a major into one document, features are annotated inline to indicate when they were introduced or changed.
+
+Use the `<VersionBadge>` component. It is registered globally and requires no import in `.md` or `.mdx` files.
+
+```mdx
+<VersionBadge version="v4.3.0" />
+<VersionBadge type="changed" version="v4.5.0" />
+<VersionBadge type="deprecated" version="v4.2.0" />
+```
+
+The `type` prop defaults to `"added"`, so the most common case is just `version`. Place the badge on its own line directly below the heading it describes:
 
 **New feature:**
 
-```markdown
+```mdx
 ## Relationships
 
-Added in: v4.3.0
+<VersionBadge version="v4.3.0" />
 
 The `@relation` directive allows you to define relationships between tables...
 ```
 
 **Changed behavior:**
 
-```markdown
+```mdx
 ### Default Port
 
-Changed in: v4.5.0
+<VersionBadge type="changed" version="v4.5.0" />
 
 The default MQTT port changed from 9925 to 9933.
 In previous versions of v4, the default was 9925.
@@ -166,28 +176,26 @@ In previous versions of v4, the default was 9925.
 
 **Deprecated feature:**
 
-```markdown
+```mdx
 ## SQL Querying
 
-Deprecated in: v4.2.0
+<VersionBadge type="deprecated" version="v4.2.0" />
 
 SQL is still supported but discouraged. See [Database](../database/overview.md) for modern alternatives.
 ```
 
-**Configuration option:**
+**Configuration option** (inline in a list):
 
-```markdown
-### `logger.level`
-
-- Type: `string`
-- Default: `"info"`
-- Added in: v4.1.0
+```mdx
+- `logger.level` — Log level; _Default_: `"info"` (Added in: v4.1.0)
 ```
 
-If the introduction version is inferred from version comparison rather than confirmed by release notes, note it:
+For inline config option annotations inside list items, plain text `(Added in: vX.Y.Z)` is fine — using the component mid-sentence is awkward. Reserve `<VersionBadge>` for standalone placement after headings.
 
-```markdown
-Added in: v4.3.0 (inferred from version comparison, needs verification)
+If the introduction version is inferred rather than confirmed by release notes, append a note:
+
+```mdx
+<VersionBadge version="v4.3.0" /> (inferred from version comparison, needs verification)
 ```
 
 ## Known Issues
