@@ -32,17 +32,163 @@ npm run format
 
 ## Site Organization
 
-This site is powered by Docusaurus and leverages the file-system based versioning capabilities of the framework.
+This site is powered by Docusaurus. The documentation is split into four distinct sections, each serving a different purpose and configured as its own Docusaurus plugin instance.
 
-There are two directories where actual documentation content lives.
+### The Four Sections
 
-The first, `docs/` contains the "latest" or "next" version of the documentation. We do not publish or render this directory, and the content here is meant to represent on-going development.
+| Section           | URL              | Purpose                                                                                                                      |
+| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Learn**         | `/learn`         | Guides, tutorials, and conceptual introductions. How-to content that walks users through a goal.                             |
+| **Reference**     | `/reference/vN`  | Complete technical reference for every feature, API, configuration option, and operation. Versioned by major Harper version. |
+| **Release Notes** | `/release-notes` | Changelog for every Harper release. Organized by major version codename (e.g. `v4-tucker`).                                  |
+| **Fabric**        | `/fabric`        | Documentation for Harper's managed cloud platform. Separate from the core Harper product docs.                               |
 
-The second, `versioned_docs` contains all of the specific Harper version documentation organized by minor version. The latest version within this directory maps to the default path on the site. For example, if the latest version is `versioned_docs/version-4.6/` then the page https://docs.harperdb.io/docs/getting-started/first-harper-app maps to the file `site/versioned_docs/version-4.6/getting-started/first-harper-app.md`. And for the previous 4.5 version the page http://localhost:3000/docs/4.5/getting-started/first-harper-app can be found at `site/versioned_docs/version-4.5/getting-started/first-harper-app.md`.
+**Rule of thumb**: if it explains _how something works_ or _what something does_, it belongs in Reference. If it explains _how to accomplish something_, it belongs in Learn. New feature documentation always goes in Reference first; Learn guides can link to it.
 
-Depending on the specific change, you may need to make updates to similar files across multiple version directories as well as the root `docs/`.
+### Section Configuration Map
 
-The site organization is ever evolving so make sure to revisit this file over time to stay up to date with the latest structure.
+Each section maps to specific source directories and config files:
+
+#### Learn
+
+| Item          | Location                                   |
+| ------------- | ------------------------------------------ |
+| Content       | `learn/`                                   |
+| Sidebar       | `sidebarsLearn.ts`                         |
+| Plugin config | `docusaurus.config.ts` → plugin id `learn` |
+
+Learn is non-versioned. All content lives directly in `learn/` organized into categories that match the sidebar.
+
+#### Reference
+
+| Item                  | Location                                                |
+| --------------------- | ------------------------------------------------------- |
+| Current (v5) content  | `reference/`                                            |
+| Archived (v4) content | `reference_versioned_docs/version-v4/`                  |
+| Current sidebar       | `sidebarsReference.ts`                                  |
+| v4 sidebar            | `reference_versioned_sidebars/version-v4-sidebars.json` |
+| Version list          | `reference_versions.json`                               |
+| Plugin config         | `docusaurus.config.ts` → plugin id `reference`          |
+
+Reference is versioned by major Harper version. The `reference_versions.json` file lists all archived versions — currently `["current", "v4"]`. The `current` version maps to `v5` (the in-progress next major) and is not published; `v4` is the default displayed version.
+
+To cut a new version snapshot (e.g. when v5 ships), run:
+
+```bash
+node scripts/cut-version.js
+```
+
+#### Release Notes
+
+| Item          | Location                                           |
+| ------------- | -------------------------------------------------- |
+| Content       | `release-notes/`                                   |
+| Sidebar       | `sidebarsReleaseNotes.ts`                          |
+| Plugin config | `docusaurus.config.ts` → plugin id `release-notes` |
+
+Release notes are non-versioned in the Docusaurus sense — major version organization is handled manually via subdirectories (`v4-tucker/`, `v3-monkey/`, etc.). The sidebar uses `autogenerated` directives so new files are picked up automatically. See the [Release Notes Process](#release-notes-process) section for the full workflow.
+
+#### Fabric
+
+| Item          | Location                                    |
+| ------------- | ------------------------------------------- |
+| Content       | `fabric/`                                   |
+| Sidebar       | `sidebarsFabric.ts`                         |
+| Plugin config | `docusaurus.config.ts` → plugin id `fabric` |
+
+Fabric is non-versioned. It documents the managed cloud platform independently of the Harper core product.
+
+---
+
+### Reference Section Structure
+
+The Reference section is organized as a flat list of feature-based sections — no deep nesting. Each top-level section corresponds to one Harper feature or subsystem.
+
+#### Section Layout
+
+Every section follows this pattern:
+
+```
+reference/
+└── {feature}/
+    ├── overview.md        # General introduction, architecture, concepts
+    ├── configuration.md   # Config options specific to this feature (if applicable)
+    ├── api.md             # JS/programmatic API reference (if applicable)
+    └── operations.md      # Operations API operations for this feature (if applicable)
+```
+
+Not every section needs all four files — some features only warrant an `overview.md`. The filenames above are conventions, not requirements.
+
+#### Section Order
+
+Sections are ordered in the sidebar by who needs them first:
+
+1. **Data & Application** — Database, Resources, Components
+2. **Access & Security** — REST, HTTP, Security, Users & Roles
+3. **Setup & Operation** — CLI, Configuration, Operations API
+4. **Features** — Logging, Analytics, MQTT, Static Files, Environment Variables, Replication, GraphQL Querying, Studio, Fastify Routes
+5. **Legacy** — Deprecated or discouraged features
+
+#### Sidebar Headers
+
+Reference sidebar headers use `className: "reference-category-header"` for compact styling. This is set on each category entry in the sidebar config. Do not use `learn-category-header` in reference sidebars.
+
+#### Legacy Section
+
+Deprecated or discouraged features belong in `reference/legacy/` (current) or `reference_versioned_docs/version-v4/legacy/` (v4). Each legacy page should briefly explain what the feature was and direct users to the modern alternative.
+
+---
+
+### Version Annotations
+
+Because the Reference section consolidates all minor versions of a major into one document, features are annotated inline to indicate when they were introduced or changed. Follow the Node.js documentation convention:
+
+**New feature:**
+
+```markdown
+## Relationships
+
+Added in: v4.3.0
+
+The `@relation` directive allows you to define relationships between tables...
+```
+
+**Changed behavior:**
+
+```markdown
+### Default Port
+
+Changed in: v4.5.0
+
+The default MQTT port changed from 9925 to 9933.
+In previous versions of v4, the default was 9925.
+```
+
+**Deprecated feature:**
+
+```markdown
+## SQL Querying
+
+Deprecated in: v4.2.0
+
+SQL is still supported but discouraged. See [Database](../database/overview.md) for modern alternatives.
+```
+
+**Configuration option:**
+
+```markdown
+### `logger.level`
+
+- Type: `string`
+- Default: `"info"`
+- Added in: v4.1.0
+```
+
+If the introduction version is inferred from version comparison rather than confirmed by release notes, note it:
+
+```markdown
+Added in: v4.3.0 (inferred from version comparison, needs verification)
+```
 
 ## Known Issues
 
