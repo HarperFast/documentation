@@ -232,7 +232,7 @@ const sidebars: SidebarsConfig = {
 				{
 					type: 'doc',
 					id: 'security/impersonation',
-					label: 'Impersonation'
+					label: 'Impersonation',
 				},
 			],
 		},
