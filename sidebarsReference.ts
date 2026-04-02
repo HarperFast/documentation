@@ -1,0 +1,509 @@
+import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
+
+const sidebars: SidebarsConfig = {
+	referenceSidebar: [
+		{
+			type: 'doc',
+			id: 'index',
+			label: 'Reference',
+			className: 'reference-index-item',
+		},
+		{
+			type: 'category',
+			label: 'Database',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'database/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'database/schema',
+					label: 'Schema',
+				},
+				{
+					type: 'doc',
+					id: 'database/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'database/data-loader',
+					label: 'Data Loader',
+				},
+				{
+					type: 'doc',
+					id: 'database/storage-algorithm',
+					label: 'Storage Algorithm',
+				},
+				{
+					type: 'doc',
+					id: 'database/jobs',
+					label: 'Jobs',
+				},
+				{
+					type: 'doc',
+					id: 'database/system-tables',
+					label: 'System Tables',
+				},
+				{
+					type: 'doc',
+					id: 'database/compaction',
+					label: 'Compaction',
+				},
+				{
+					type: 'doc',
+					id: 'database/transaction',
+					label: 'Transaction Logging',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Resources',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'resources/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'resources/resource-api',
+					label: 'Resource API',
+				},
+				{
+					type: 'doc',
+					id: 'resources/query-optimization',
+					label: 'Query Optimization',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Components',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'components/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'components/applications',
+					label: 'Applications',
+				},
+				{
+					type: 'doc',
+					id: 'components/extension-api',
+					label: 'Extension API',
+				},
+				{
+					type: 'doc',
+					id: 'components/plugin-api',
+					label: 'Plugin API',
+				},
+				{
+					type: 'doc',
+					id: 'components/javascript-environment',
+					label: 'JavaScript Environment',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'REST',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'rest/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'rest/querying',
+					label: 'Querying',
+				},
+				{
+					type: 'doc',
+					id: 'rest/content-types',
+					label: 'Content Types',
+				},
+				{
+					type: 'doc',
+					id: 'rest/headers',
+					label: 'Headers',
+				},
+				{
+					type: 'doc',
+					id: 'rest/websockets',
+					label: 'WebSockets',
+				},
+				{
+					type: 'doc',
+					id: 'rest/server-sent-events',
+					label: 'Server Sent Events',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'HTTP',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'http/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'http/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'http/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'http/tls',
+					label: 'TLS',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Security',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'security/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'security/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'security/basic-authentication',
+					label: 'Basic Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/jwt-authentication',
+					label: 'JWT Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/mtls-authentication',
+					label: 'mTLS Authentication',
+				},
+				{
+					type: 'doc',
+					id: 'security/certificate-management',
+					label: 'Certificate Management',
+				},
+				{
+					type: 'doc',
+					id: 'security/certificate-verification',
+					label: 'Certificate Verification',
+				},
+				{
+					type: 'doc',
+					id: 'security/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'security/impersonation',
+					label: 'Impersonation'
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Users & Roles',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'users-and-roles/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'users-and-roles/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'users-and-roles/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'CLI',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'cli/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'cli/commands',
+					label: 'Commands',
+				},
+				{
+					type: 'doc',
+					id: 'cli/operations-api-commands',
+					label: 'Operations API Commands',
+				},
+				{
+					type: 'doc',
+					id: 'cli/authentication',
+					label: 'Authentication',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Configuration',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'configuration/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'configuration/options',
+					label: 'Options',
+				},
+				{
+					type: 'doc',
+					id: 'configuration/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Operations API',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'operations-api/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'operations-api/operations',
+					label: 'Operations',
+				},
+				{
+					type: 'doc',
+					id: 'operations-api/sql',
+					label: 'SQL',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Logging',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'logging/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'logging/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'logging/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'logging/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Analytics',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'analytics/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'analytics/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'MQTT',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'mqtt/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'mqtt/configuration',
+					label: 'Configuration',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Static Files',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'static-files/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Environment Variables',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'environment-variables/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Replication',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'replication/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'replication/clustering',
+					label: 'Clustering',
+				},
+				{
+					type: 'doc',
+					id: 'replication/sharding',
+					label: 'Sharding',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'GraphQL Querying',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'graphql-querying/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Studio',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'studio/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Fastify Routes',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'fastify-routes/overview',
+					label: 'Overview',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Legacy',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'legacy/cloud',
+					label: 'Harper Cloud',
+				},
+				{
+					type: 'doc',
+					id: 'legacy/custom-functions',
+					label: 'Custom Functions',
+				},
+			],
+		},
+	],
+};
+
+export default sidebars;

@@ -14,6 +14,7 @@ interface CustomDocCardListProps {
 function CustomDocCard({ item }: { item: any }) {
 	return (
 		<Link href={item.href} className={clsx('card padding--lg', styles.customCard)}>
+			{item.badge && <span className={styles.cardBadge}>{item.badge}</span>}
 			<Heading as="h2" className={styles.cardTitle}>
 				{item.label}
 			</Heading>
