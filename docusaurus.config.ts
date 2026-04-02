@@ -266,7 +266,7 @@ const config: Config = {
 					// Link directly to v4 (current version) instead of overview page
 					type: 'doc',
 					docsPluginId: 'release-notes',
-					docId: 'v4-tucker/index',
+					docId: 'v5-lincoln/index',
 					position: 'left',
 					label: 'Release Notes',
 				},
@@ -306,7 +306,7 @@ const config: Config = {
 						},
 						{
 							label: 'Release Notes',
-							to: '/release-notes/v4-tucker',
+							to: '/release-notes/v5-lincoln',
 						},
 						{
 							label: 'Fabric',
