@@ -59,11 +59,6 @@ const sidebars: SidebarsConfig = {
 					id: 'database/transaction',
 					label: 'Transaction Logging',
 				},
-				{
-					type: 'doc',
-					id: 'database/sql',
-					label: 'SQL',
-				},
 			],
 		},
 		{
@@ -325,6 +320,11 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'operations-api/operations',
 					label: 'Operations',
+				},
+				{
+					type: 'doc',
+					id: 'operations-api/sql',
+					label: 'SQL',
 				},
 			],
 		},

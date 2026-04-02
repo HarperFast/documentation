@@ -56,11 +56,6 @@
 					"type": "doc",
 					"id": "database/transaction",
 					"label": "Transaction Logging"
-				},
-				{
-					"type": "doc",
-					"id": "database/sql",
-					"label": "SQL"
 				}
 			]
 		},
@@ -323,6 +318,11 @@
 					"type": "doc",
 					"id": "operations-api/operations",
 					"label": "Operations"
+				},
+				{
+					"type": "doc",
+					"id": "operations-api/sql",
+					"label": "SQL"
 				}
 			]
 		},

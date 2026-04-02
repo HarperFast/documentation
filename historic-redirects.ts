@@ -156,7 +156,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.5/developers/operations-api/sql-operations',
 			'/docs/4.6/developers/operations-api/sql-operations',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -667,7 +667,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.5/developers/sql-guide',
 			'/docs/4.6/developers/sql-guide',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -677,7 +677,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.4/developers/sql-guide/date-functions',
 			'/docs/4.5/developers/sql-guide/date-functions',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -687,7 +687,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.4/developers/sql-guide/features-matrix',
 			'/docs/4.5/developers/sql-guide/features-matrix',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -698,7 +698,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.5/developers/sql-guide/functions',
 			'/docs/4.6/developers/sql-guide/functions',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -711,7 +711,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.3/sql-guide/sql-geospatial-functions/geoequal',
 			'/docs/4.2/sql-guide/sql-geospatial-functions/geoconvert',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -719,7 +719,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.3/developers/sql-guide/json-search',
 			'/docs/4.5/reference/sql-guide/json-search',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -729,7 +729,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.5/reference/sql-guide/reserved-word',
 			'/docs/4.6/reference/sql-guide/reserved-word',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -763,7 +763,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.3/reference/sql-guide/date-functions',
 			'/docs/4.3/reference/sql-guide/sql-geospatial-functions',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 	{
 		from: [
@@ -778,7 +778,7 @@ export const historicRedirects: RedirectRule[] = [
 			'/docs/4.1/sql-guide/sql-geospatial-functions/geolength',
 			'/docs/4.1/sql-guide/sql-geospatial-functions/geonear',
 		],
-		to: '/reference/v4/database/sql',
+		to: '/reference/v4/operations-api/sql',
 	},
 
 	// ── Configuration / Deployments ───────────────────────────────────────────
@@ -1801,7 +1801,7 @@ export const historicRedirects: RedirectRule[] = [
 	},
 
 	// ── SQL (additional 4.2 path) ──────────────────────────────────────────────
-	{ from: ['/docs/4.2/developers/sql-guide/reserved-word'], to: '/reference/v4/database/sql' },
+	{ from: ['/docs/4.2/developers/sql-guide/reserved-word'], to: '/reference/v4/operations-api/sql' },
 
 	// ── Release notes (additional versioned paths) ────────────────────────────
 	{
