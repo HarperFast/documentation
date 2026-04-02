@@ -6,7 +6,7 @@ export default function ReferenceRedirect() {
 
 	useEffect(() => {
 		// Redirect to the latest reference docs
-		history.replace('/reference/v5');
+		history.replace('/reference/v4');
 	}, [history]);
 
 	return null;
