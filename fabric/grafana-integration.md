@@ -40,4 +40,4 @@ Once the Harper data source is configured, you can start building dashboards in 
 
 1. Click on the `Explore` navigation link in the left sidebar.
 2. You can now create queries using the Harper data source to visualize your Harper Fabric cluster metrics and logs.
-   Reference the [Harper Analytics Operations](../docs/developers/operations-api/analytics) for more details on available metrics and query options.
+   Reference the [Harper Analytics Operations](/reference/v4/analytics/overview) for more details on available metrics and query options.
