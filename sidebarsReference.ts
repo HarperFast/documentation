@@ -135,6 +135,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'rest/querying',
+					label: 'Querying',
+				},
+				{
+					type: 'doc',
 					id: 'rest/content-types',
 					label: 'Content Types',
 				},
@@ -142,11 +147,6 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'rest/headers',
 					label: 'Headers',
-				},
-				{
-					type: 'doc',
-					id: 'rest/querying',
-					label: 'Querying',
 				},
 				{
 					type: 'doc',
