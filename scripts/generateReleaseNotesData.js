@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const pupNames = {
+	5: 'Lincoln',
 	4: 'Tucker',
 	3: 'Monkey',
 	2: 'Penny',

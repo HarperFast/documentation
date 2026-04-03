@@ -5,6 +5,7 @@
 	"scripts": {
 		"docusaurus": "docusaurus",
 		"start": "docusaurus start",
+		"predev": "node scripts/prebuild.js",
 		"dev": "docusaurus start",
 		"prebuild": "node scripts/prebuild.js",
 		"build": "docusaurus build",
