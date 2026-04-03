@@ -58,3 +58,40 @@ code,
 	color: #adb5bd !important; /* Lighter grey for dark mode */
 	border-bottom-color: #495057; /* Darker underline for dark mode */
 }
+
+/* Reference sidebar index/welcome item */
+.reference-index-item > .menu__link {
+	font-size: 0.875rem;
+}
+
+/* Compact reference sidebar category headers */
+.reference-category-header > .menu__list-item-collapsible:hover {
+	background: none;
+}
+
+.reference-category-header > .menu__list-item-collapsible > .menu__link {
+	color: #6c757d !important;
+	border-radius: 0;
+	border-bottom: 1px solid #dee2e6;
+	padding-bottom: 0.1rem;
+	margin-bottom: 0.2rem;
+	cursor: default;
+	font-weight: 600;
+	pointer-events: none;
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+/* Compact item links inside reference categories */
+.reference-category-header > .menu__list .menu__link {
+	font-size: 0.875rem;
+	padding-top: 0.2rem;
+	padding-bottom: 0.2rem;
+}
+
+/* Dark mode for reference category headers */
+[data-theme='dark'] .reference-category-header > .menu__list-item-collapsible > .menu__link {
+	color: #adb5bd !important;
+	border-bottom-color: #495057;
+}
