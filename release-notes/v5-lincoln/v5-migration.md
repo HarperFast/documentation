@@ -14,6 +14,10 @@ Application code should import from the `harper` package instead of `harperdb`:
 import { tables } from 'harper';
 ```
 
+## Package Installation Install Scripts
+
+By default, Harper now uses the `--ignore-scripts` flag when installing packages to prevent against accidental execution of scripts, which can be a significant security risk. If you are installing applications that require installation scripts to be executed (sometimes necessary for installing additional binaries for execution), use the `allowInstallScripts` option when deploying.
+
 ## `Table.get` return value
 
 The return value of `Table.get` has been changed to return a record object instead of an instance of the table class (previously this behavior only occured in classes that had set `static loadAsInstance=false`). This means that the returned object will not have all the table instance methods available. Most functionality is still available through the `Table` class. One notable method that had been commonly used is `wasLoadedFromSource`. Information about whether the request was fulfilled from cache or origin is now available on the request `target` object. For example, if you have existing code like:
