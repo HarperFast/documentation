@@ -120,5 +120,6 @@ In Harper version 5, Harper now uses a VM module loader to load modules. This al
 
 The migration information above highlights necessary changes to make to existing applications, if they have used any of these patterns or features. However, we also have new recommended best practices for applications. These are not necessary, but can help to ensure that your application is using the best patterns.
 
-- We recommend using the `static` methods on Resources/Tables to implement endpoints. See the Resources API for more information.
+- We recommend using the `static` methods on Resources/Tables to implement endpoints. This should be used in conjunction with accessing request information from the request `target` argument (or the request itself via `getContext`). See the Resources API for more information.
 - Context does not need to be explicitly passed to every call, and can be accessed through the `getContext` function available as an export from the `harper` package.
+- Harper functions/APIs should be accessed through the `harper` package rather than through the global variables.
