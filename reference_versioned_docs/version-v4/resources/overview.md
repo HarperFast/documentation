@@ -56,10 +56,10 @@ Then, in a `resources.js` extend from the `tables.MyTable` global:
 export class MyTable extends tables.MyTable {
 	static loadAsInstance = false; // use V2 API
 
-	get(target) {
+	async get(target) {
 		// add a computed property before returning
 
-		const record = await super.get(target)
+		const record = await super.get(target);
 
 		return { ...record, computedField: 'value' };
 	}

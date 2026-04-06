@@ -263,7 +263,7 @@ const config: Config = {
 					label: 'Reference',
 				},
 				{
-					// Link directly to v4 (current version) instead of overview page
+					// Link directly to v5 (current version) instead of overview page
 					type: 'doc',
 					docsPluginId: 'release-notes',
 					docId: 'v5-lincoln/index',
