@@ -229,6 +229,11 @@ const sidebars: SidebarsConfig = {
 					id: 'security/api',
 					label: 'API',
 				},
+				{
+					type: 'doc',
+					id: 'security/impersonation',
+					label: 'Impersonation',
+				},
 			],
 		},
 		{
