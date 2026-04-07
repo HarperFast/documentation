@@ -36,7 +36,7 @@ Harper makes this straightforward:
 1. A `ProductDescription` cache table stores generated descriptions with a long TTL (24 hours).
 2. A `DescriptionGenerator` Resource class calls the LLM and returns the generated text.
 3. `sourcedFrom` connects the generator to the cache — Harper handles all the caching logic.
-4. An invalidation endpoint lets you mark individual descriptions as stale when product data changes.
+4. An exported `ProductDescription` Resource class provides the REST endpoint and handles invalidation requests.
 
 ## Setting Up the Application
 
@@ -75,41 +75,71 @@ type ProductDescription @table(expiration: 86400) @export {
 	id: ID @primaryKey
 	description: String
 	generatedAt: Long
+	product: Product @relationship(from: id)
 }
 ```
+
+The `product` field on `ProductDescription` uses `@relationship(from: id)` to declare that its own primary key (`id`) is a foreign key pointing to `Product`. Since `ProductDescription` records share the same ID as the product they describe, this gives consumers a way to fetch the full product details alongside the description in a single request.
+
+Both tables use `@export` — Harper's auto-generated REST endpoints are sufficient for reading and writing. Invalidation will be handled automatically inside a custom `Product` Resource class rather than through a separate endpoint.
 
 `ProductDescription` has a 24-hour TTL (`expiration: 86400`). A one-day window is reasonable for marketing copy — it's long enough to avoid redundant generation, and short enough that descriptions stay reasonably current even without explicit invalidation.
 
+## Configuring the Application
+
+Open `config.yaml` and enable the required plugins:
+
+```yaml
+graphqlSchema:
+  files: 'schema.graphql'
+rest: true
+jsResource:
+  files: 'resources.js'
+```
+
+- `graphqlSchema` loads `schema.graphql` and creates both tables.
+- `rest` enables Harper's REST API on port `9926`.
+- `jsResource` loads `resources.js`, registering the generator source, the `sourcedFrom` connection, and the exported `ProductDescription` endpoint.
+
 ## Seeding the Product Catalog
 
-The `resources.js` file seeds a few sample products on startup:
+Rather than seeding data from `resources.js`, this application uses Harper's built-in [Data Loader](/reference/v5/database/data-loader) to populate the `Product` table from a JSON file on startup. Add `dataLoader` to `config.yaml`:
 
-```javascript
-// resources.js — seed data (runs once on startup)
+```yaml
+graphqlSchema:
+  files: 'schema.graphql'
+rest: true
+jsResource:
+  files: 'resources.js'
+dataLoader:
+  files: 'data/products.json'
+```
 
-const sampleProducts = [
-	{
-		id: 'prod-001',
-		name: 'Titanium Water Bottle',
-		category: 'Outdoors',
-		price: 39.99,
-		features: ['BPA-free', 'Keeps cold 24h', 'Lightweight 200g'],
-	},
-	{
-		id: 'prod-002',
-		name: 'Noise-Cancelling Headphones',
-		category: 'Electronics',
-		price: 199.99,
-		features: ['40h battery', 'Foldable', 'USB-C charging'],
-	},
-];
+Then create `data/products.json`:
 
-for (const product of sampleProducts) {
-	if (!(await tables.Product.get(product.id))) {
-		await tables.Product.put(product);
-	}
+```json
+{
+	"table": "Product",
+	"records": [
+		{
+			"id": "prod-001",
+			"name": "Titanium Water Bottle",
+			"category": "Outdoors",
+			"price": 39.99,
+			"features": ["BPA-free", "Keeps cold 24h", "Lightweight 200g"]
+		},
+		{
+			"id": "prod-002",
+			"name": "Noise-Cancelling Headphones",
+			"category": "Electronics",
+			"price": 199.99,
+			"features": ["40h battery", "Foldable", "USB-C charging"]
+		}
+	]
 }
 ```
+
+The Data Loader runs on every startup and deployment. It uses content hashing to skip records that haven't changed, so it's safe to redeploy without duplicating data or overwriting any manual edits.
 
 ## Building the Description Generator
 
@@ -165,8 +195,7 @@ Keep the tone enthusiastic but professional.`;
 	}
 }
 
-const { ProductDescription } = tables;
-ProductDescription.sourcedFrom(DescriptionGenerator);
+tables.ProductDescription.sourcedFrom(DescriptionGenerator);
 ```
 
 With `sourcedFrom` in place, Harper now handles all caching behavior automatically:
@@ -174,6 +203,35 @@ With `sourcedFrom` in place, Harper now handles all caching behavior automatical
 - **Cache miss**: the first request for `/ProductDescription/prod-001` calls `DescriptionGenerator.get()`, stores the result, and returns it.
 - **Cache hit**: subsequent requests within 24 hours return the stored description instantly — no LLM call.
 - **Cache expiry**: after 24 hours, the next request regenerates the description.
+
+## Auto-Invalidating on Product Updates
+
+Rather than requiring a separate manual invalidation request, we can hook into writes to the `Product` table and invalidate the cached description automatically whenever description-relevant fields change.
+
+Export a custom `Product` class that overrides `patch` and `put`. Both methods inspect the incoming data, delegate to `super` to perform the actual write, then call `tables.ProductDescription.invalidate` if any of the fields that feed into the AI prompt have changed:
+
+```javascript
+export class Product extends tables.Product {
+	static async patch(target, data) {
+		const body = await data;
+		const result = await super.patch(target, body);
+		if (body.features !== undefined || body.name !== undefined ||
+		    body.price !== undefined || body.category !== undefined) {
+			tables.ProductDescription.invalidate(target.id ?? target);
+		}
+		return result;
+	}
+
+	static async put(target, data) {
+		const body = await data;
+		const result = await super.put(target, body);
+		tables.ProductDescription.invalidate(target.id ?? target);
+		return result;
+	}
+}
+```
+
+`patch` only invalidates when one of the prompt-relevant fields is present in the payload — a `PATCH` that touches only unrelated fields (like an internal `updatedBy` field) won't trigger a regeneration. `put` always invalidates because a full replacement always changes the record.
 
 ## Requesting a Generated Description
 
@@ -202,13 +260,32 @@ console.log('ETag:', etag);
 
 The first request will take a moment — Harper is calling the OpenAI API. You will get back something like:
 
-```json
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 200 OK
+content-type: application/json
+etag: "abCDefGHij"
+...
+
 {
-	"id": "prod-001",
-	"description": "Stay hydrated on every adventure with this ultralight titanium bottle that keeps your drinks cold for a full 24 hours. BPA-free and weighing just 200g, it's built for those who refuse to compromise between performance and sustainability.",
-	"generatedAt": 1712500000000
+  "id": "prod-001",
+  "description": "Stay hydrated on every adventure with this ultralight titanium bottle that keeps your drinks cold for a full 24 hours. BPA-free and weighing just 200g, it's built for those who refuse to compromise between performance and sustainability.",
+  "generatedAt": 1712500000000
 }
 ```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+Stay hydrated on every adventure with this ultralight titanium bottle...
+ETag: "abCDefGHij"
+```
+
+  </TabItem>
+</Tabs>
 
 Make the same request again immediately:
 
@@ -224,7 +301,30 @@ curl -i 'http://localhost:9926/ProductDescription/prod-001'
 
 ```typescript
 const second = await fetch('http://localhost:9926/ProductDescription/prod-001');
-console.log(second.status); // 200, but served from cache — much faster
+console.log(second.status);
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 200 OK
+content-type: application/json
+etag: "abCDefGHij"
+server-timing: db;dur=1.2
+...
+
+{ ... same description ... }
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+200
 ```
 
   </TabItem>
@@ -240,9 +340,9 @@ Harper automatically includes an `ETag` header with every record response. You c
   <TabItem value="curl">
 
 ```bash
-# Replace <etag-value> with the etag from the previous response
+# Use the etag value from the previous response, double quotes included
 curl -i 'http://localhost:9926/ProductDescription/prod-001' \
-  -H 'If-None-Match: <etag-value>'
+  -H 'If-None-Match: "abCDefGHij"'
 ```
 
   </TabItem>
@@ -250,12 +350,30 @@ curl -i 'http://localhost:9926/ProductDescription/prod-001' \
 
 ```typescript
 const first = await fetch('http://localhost:9926/ProductDescription/prod-001');
-const etag = first.headers.get('etag');
+const etag = first.headers.get('etag'); // e.g. "abCDefGHij"
 
 const second = await fetch('http://localhost:9926/ProductDescription/prod-001', {
 	headers: { 'If-None-Match': etag },
 });
-console.log(second.status); // 304 Not Modified — no body transferred
+console.log(second.status);
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 304 Not Modified
+etag: "abCDefGHij"
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+304
 ```
 
   </TabItem>
@@ -263,69 +381,107 @@ console.log(second.status); // 304 Not Modified — no body transferred
 
 A `304 Not Modified` response means the cached description your client holds is still current. No data is serialized or transmitted. This layering — Harper's internal cache plus HTTP conditional requests for downstream caches — means a regeneration event only propagates to clients when their cached copy actually becomes stale.
 
-## Invalidating Descriptions When Products Change
+## Querying a Description with Its Product
 
-If someone updates a product's name, features, or price, the cached AI description is now outdated. Rather than waiting 24 hours for the TTL to expire, you can invalidate the cached description immediately.
-
-Add an invalidation handler to `resources.js`:
-
-```javascript
-export class ProductDescriptionEndpoint extends tables.ProductDescription {
-	static async post(target, data) {
-		const body = await data;
-		if (body?.action === 'invalidate') {
-			this.invalidate(target);
-			return { status: 200, data: { message: 'Description invalidated. It will be regenerated on next access.' } };
-		}
-	}
-}
-```
-
-Now call the invalidation endpoint after updating a product:
+Because `ProductDescription` declares a `@relationship` to `Product`, you can fetch the description and the full product record together using the `select` query parameter:
 
 <Tabs groupId="http-client">
   <TabItem value="curl">
 
 ```bash
-# Update the product
-curl -X PATCH 'http://localhost:9926/Product/prod-001' \
-  -H 'Content-Type: application/json' \
-  -d '{"features": ["BPA-free", "Keeps cold 48h", "Lightweight 180g"]}'
-
-# Invalidate the cached description
-curl -X POST 'http://localhost:9926/ProductDescription/prod-001' \
-  -H 'Content-Type: application/json' \
-  -d '{"action": "invalidate"}'
+curl -s 'http://localhost:9926/ProductDescription/prod-001?select(description,generatedAt,product(name,price,features))'
 ```
 
   </TabItem>
   <TabItem value="fetch">
 
 ```typescript
-// Update the product
-await fetch('http://localhost:9926/Product/prod-001', {
-	method: 'PATCH',
-	headers: { 'Content-Type': 'application/json' },
-	body: JSON.stringify({ features: ['BPA-free', 'Keeps cold 48h', 'Lightweight 180g'] }),
-});
-
-// Invalidate the cached description
-await fetch('http://localhost:9926/ProductDescription/prod-001', {
-	method: 'POST',
-	headers: { 'Content-Type': 'application/json' },
-	body: JSON.stringify({ action: 'invalidate' }),
-});
-
-// The next GET will trigger a fresh generation
-const fresh = await fetch('http://localhost:9926/ProductDescription/prod-001');
-const data = await fresh.json();
-console.log(data.description); // Updated copy mentioning "48h" cold
+const response = await fetch(
+	'http://localhost:9926/ProductDescription/prod-001?select(description,generatedAt,product(name,price,features))'
+);
+const data = await response.json();
+console.log(data);
 ```
 
   </TabItem>
 </Tabs>
 
-The `GET` after invalidation triggers a new LLM call with the updated product features. Every subsequent request serves the new cached description instantly.
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```json
+{
+  "description": "Stay hydrated on every adventure...",
+  "generatedAt": 1712500000000,
+  "product": {
+    "name": "Titanium Water Bottle",
+    "price": 39.99,
+    "features": ["BPA-free", "Keeps cold 24h", "Lightweight 200g"]
+  }
+}
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+{
+  description: 'Stay hydrated on every adventure...',
+  generatedAt: 1712500000000,
+  product: { name: 'Titanium Water Bottle', price: 39.99, features: [ ... ] }
+}
+```
+
+  </TabItem>
+</Tabs>
+
+Harper resolves the relationship and joins the `Product` record in a single database read — no extra round-trips.
+
+## Invalidating Descriptions When Products Change
+
+With the custom `Product` class in place, a single `PATCH` to the product is all it takes. Harper calls your `patch` override, saves the update, and invalidates the cached description in the same operation — no second request needed.
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -X PATCH 'http://localhost:9926/Product/prod-001' \
+  -H 'Content-Type: application/json' \
+  -d '{"features": ["BPA-free", "Keeps cold 48h", "Lightweight 180g"]}'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+await fetch('http://localhost:9926/Product/prod-001', {
+	method: 'PATCH',
+	headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify({ features: ['BPA-free', 'Keeps cold 48h', 'Lightweight 180g'] }),
+});
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 204 No Content
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+204
+```
+
+  </TabItem>
+</Tabs>
+
+The next `GET /ProductDescription/prod-001` triggers a new LLM call with the updated features. Every subsequent request serves the new cached description instantly.
 
 ## Handling Errors Gracefully
 
@@ -361,31 +517,6 @@ Here is the full `resources.js` for this guide:
 
 ```javascript
 // resources.js
-
-// --- Seed data ---
-
-const sampleProducts = [
-	{
-		id: 'prod-001',
-		name: 'Titanium Water Bottle',
-		category: 'Outdoors',
-		price: 39.99,
-		features: ['BPA-free', 'Keeps cold 24h', 'Lightweight 200g'],
-	},
-	{
-		id: 'prod-002',
-		name: 'Noise-Cancelling Headphones',
-		category: 'Electronics',
-		price: 199.99,
-		features: ['40h battery', 'Foldable', 'USB-C charging'],
-	},
-];
-
-for (const product of sampleProducts) {
-	if (!(await tables.Product.get(product.id))) {
-		await tables.Product.put(product);
-	}
-}
 
 // --- Description Generator (upstream source) ---
 
@@ -433,18 +564,26 @@ Keep the tone enthusiastic but professional.`;
 	}
 }
 
-const { ProductDescription } = tables;
-ProductDescription.sourcedFrom(DescriptionGenerator);
+tables.ProductDescription.sourcedFrom(DescriptionGenerator);
 
-// --- Cache endpoint with invalidation ---
+// --- Auto-invalidation on product updates ---
 
-export class ProductDescriptionEndpoint extends tables.ProductDescription {
-	static async post(target, data) {
+export class Product extends tables.Product {
+	static async patch(target, data) {
 		const body = await data;
-		if (body?.action === 'invalidate') {
-			this.invalidate(target);
-			return { status: 200, data: { message: 'Description invalidated. It will be regenerated on next access.' } };
+		const result = await super.patch(target, body);
+		if (body.features !== undefined || body.name !== undefined ||
+		    body.price !== undefined || body.category !== undefined) {
+			tables.ProductDescription.invalidate(target.id ?? target);
 		}
+		return result;
+	}
+
+	static async put(target, data) {
+		const body = await data;
+		const result = await super.put(target, body);
+		tables.ProductDescription.invalidate(target.id ?? target);
+		return result;
 	}
 }
 ```
@@ -455,7 +594,7 @@ This guide used the _passive_ caching pattern: Harper fetches from the source on
 
 You might also consider:
 
-- **Bulk invalidation**: iterate over `tables.ProductDescription` and call `invalidate` for each matching record when a category-wide update occurs.
+- **Category-wide invalidation**: extend the `patch` handler to iterate `tables.ProductDescription` and call `invalidate` on each record when a category-level change affects many products at once.
 - **Version-aware ETags**: include a version field in `DescriptionGenerator.get()` so clients can detect stale descriptions proactively rather than waiting for a server-side invalidation.
 - **Cost tracking**: log `generatedAt` changes to measure how often you are actually hitting the LLM versus serving from cache.
 
