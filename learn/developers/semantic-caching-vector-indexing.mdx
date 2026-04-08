@@ -1,0 +1,378 @@
+---
+title: Semantic Caching with Vector Indexing
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Caching LLM responses by exact prompt text catches almost nothing useful. "What shoes are good for hiking?" and "Which shoes work best for hiking?" are semantically identical but would be cache misses for each other with a string key. The result is that you pay for every generation even when a good answer already exists in the cache.
+
+Semantic caching solves this by storing a vector embedding alongside each cached response. When a new question arrives, Harper computes its embedding, searches the cache for a response that is _close enough_ in meaning, and returns it if the similarity exceeds a threshold. Only questions with no sufficiently similar answer in the cache hit the LLM.
+
+In this guide you will build a product assistant that answers customer questions using OpenAI. Semantically equivalent questions share a single cached answer — you only pay for a generation once, regardless of how the question is phrased.
+
+## What You Will Learn
+
+- How to store vector embeddings alongside text in a Harper table
+- How to define a vector index using `@indexed(type: "HNSW")`
+- How to query by cosine similarity using `table.search({ sort: { attribute, target } })`
+- How to implement a semantic cache lookup before calling the LLM
+- How to set a similarity threshold to control cache hit quality
+
+## Prerequisites
+
+- Completed [Caching with Harper](./caching-with-harper)
+- An OpenAI API key (`OPENAI_API_KEY` environment variable)
+- Familiarity with the concept of embeddings (vectors of floats representing meaning)
+
+## The Architecture
+
+This guide uses a deliberate architecture that separates concerns cleanly:
+
+```
+Client → /QuestionAnswer/<question-id>
+           ↓
+     Harper checks semantic cache
+           ↓ near miss?             ↓ no similar cached answer?
+     Return cached answer      Call LLM → store answer + embedding
+```
+
+The cache is keyed by a content-addressed ID (hash of the normalized question text). On each request, Harper:
+
+1. Embeds the incoming question
+2. Searches the HNSW index for any cached answer with cosine similarity above the threshold
+3. If found, returns the cached answer immediately
+4. If not, generates a new answer, stores it with its embedding, and returns it
+
+Subsequent questions that are phrased differently but mean the same thing will land within the similarity threshold and return the cached answer — no LLM call needed.
+
+## Defining the Schema
+
+Open `schema.graphql`:
+
+```graphql
+type QuestionAnswer @table(expiration: 604800) @export {
+	id: ID @primaryKey # SHA-256 of normalized question text
+	question: String
+	answer: String
+	embedding: [Float] @indexed(type: "HNSW", distance: "cosine")
+	generatedAt: Long
+}
+```
+
+The key field is `embedding: [Float] @indexed(type: "HNSW", distance: "cosine")`. This creates an HNSW vector index on the embedding vectors, enabling approximate nearest-neighbor search by cosine similarity.
+
+`expiration: 604800` sets a 7-day TTL. LLM answers are not infinitely fresh — product details change, pricing shifts — so a week is a reasonable window. After 7 days the record is evicted and the next identical question generates a fresh answer.
+
+## Configuring the Application
+
+Open `config.yaml`:
+
+```yaml
+graphqlSchema:
+  files: 'schema.graphql'
+rest: true
+jsResource:
+  files: 'resources.js'
+```
+
+## Building the Semantic Cache Resource
+
+The core logic lives in `resources.js`. The `ProductAssistant` class overrides `get` to implement the semantic cache lookup and generation pipeline.
+
+```javascript
+// resources.js
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const SIMILARITY_THRESHOLD = 0.92; // cosine similarity; tune for your use case
+
+// --- Embedding helper ---
+
+async function embed(text) {
+	const response = await fetch('https://api.openai.com/v1/embeddings', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${OPENAI_API_KEY}`,
+		},
+		body: JSON.stringify({
+			model: 'text-embedding-3-small',
+			input: text,
+		}),
+	});
+	const result = await response.json();
+	return result.data[0].embedding; // [Float] array
+}
+
+// --- Answer generation helper ---
+
+async function generateAnswer(question) {
+	const response = await fetch('https://api.openai.com/v1/chat/completions', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${OPENAI_API_KEY}`,
+		},
+		body: JSON.stringify({
+			model: 'gpt-4o-mini',
+			messages: [
+				{
+					role: 'system',
+					content: 'You are a helpful product assistant. Answer customer questions clearly and concisely.',
+				},
+				{ role: 'user', content: question },
+			],
+			max_tokens: 200,
+		}),
+	});
+	const result = await response.json();
+	return result.choices[0].message.content.trim();
+}
+
+// --- Content-addressed ID ---
+
+async function questionId(text) {
+	const normalized = text.trim().toLowerCase();
+	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+	return Array.from(new Uint8Array(buf))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('')
+		.slice(0, 16);
+}
+
+// --- Semantic cache resource ---
+
+export class QuestionAnswer extends Resource {
+	static async get(target) {
+		const rawQuestion = target.get('q');
+		if (!rawQuestion) {
+			const error = new Error('Missing required query parameter: q');
+			error.statusCode = 400;
+			throw error;
+		}
+
+		const question = rawQuestion.trim();
+
+		// 1. Embed the incoming question
+		const queryEmbedding = await embed(question);
+
+		// 2. Search the HNSW index for the nearest cached answer
+		const results = tables.QuestionAnswer.search({
+			sort: { attribute: 'embedding', target: queryEmbedding },
+			limit: 1,
+			select: ['id', 'question', 'answer', 'generatedAt', 'embedding'],
+		});
+
+		for await (const cached of results) {
+			const similarity = cosineSimilarity(queryEmbedding, cached.embedding);
+			if (similarity >= SIMILARITY_THRESHOLD) {
+				// Cache hit — return the stored answer
+				return {
+					answer: cached.answer,
+					cachedQuestion: cached.question,
+					generatedAt: cached.generatedAt,
+					cacheHit: true,
+					similarity: Math.round(similarity * 1000) / 1000,
+				};
+			}
+		}
+
+		// 3. Cache miss — generate a new answer
+		const answer = await generateAnswer(question);
+		const id = await questionId(question);
+
+		await tables.QuestionAnswer.put({
+			id,
+			question,
+			answer,
+			embedding: queryEmbedding,
+			generatedAt: Date.now(),
+		});
+
+		return {
+			answer,
+			question,
+			generatedAt: Date.now(),
+			cacheHit: false,
+		};
+	}
+}
+
+// --- Cosine similarity ---
+
+function cosineSimilarity(a, b) {
+	let dot = 0,
+		normA = 0,
+		normB = 0;
+	for (let i = 0; i < a.length; i++) {
+		dot += a[i] * b[i];
+		normA += a[i] * a[i];
+		normB += b[i] * b[i];
+	}
+	return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+```
+
+### The semantic cache flow
+
+The `get` handler implements the full pipeline in sequence:
+
+1. **Embed** the incoming question using OpenAI's `text-embedding-3-small` model.
+2. **Search** the HNSW index for the nearest stored embedding. HNSW returns approximate nearest neighbors extremely quickly — even with thousands of cached answers, the search takes microseconds.
+3. **Check similarity** against `SIMILARITY_THRESHOLD`. A score of `1.0` is a perfect semantic match; `0.92` is a reasonable default for product Q&A (questions that mean the same thing typically score above `0.95`; genuinely different questions typically score below `0.85`).
+4. **Return the cached answer** if above threshold — no LLM call needed.
+5. **Generate and cache** a new answer if below threshold, storing the embedding for future lookups.
+
+:::note
+The similarity threshold is the most important tuning knob. Set it too high and you miss cache hits for slight rephrasing. Set it too low and you return irrelevant cached answers. Start at `0.92` and adjust based on your domain.
+:::
+
+## Querying the Assistant
+
+With Harper running, ask a question:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/QuestionAnswer?q=What+shoes+are+best+for+hiking'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch(
+	'http://localhost:9926/QuestionAnswer?' + new URLSearchParams({ q: 'What shoes are best for hiking' })
+);
+const data = await response.json();
+console.log(data);
+```
+
+  </TabItem>
+</Tabs>
+
+First request — cache miss, LLM called:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```json
+{
+	"answer": "For hiking, look for boots with ankle support, a grippy rubber sole...",
+	"question": "what shoes are best for hiking",
+	"generatedAt": 1712500000000,
+	"cacheHit": false
+}
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+{
+  answer: 'For hiking, look for boots with ankle support, a grippy rubber sole...',
+  question: 'what shoes are best for hiking',
+  generatedAt: 1712500000000,
+  cacheHit: false
+}
+```
+
+  </TabItem>
+</Tabs>
+
+Now ask a semantically equivalent question phrased differently:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/QuestionAnswer?q=Which+footwear+is+recommended+for+trail+hiking'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch(
+	'http://localhost:9926/QuestionAnswer?' + new URLSearchParams({ q: 'Which footwear is recommended for trail hiking' })
+);
+const data = await response.json();
+console.log(data);
+```
+
+  </TabItem>
+</Tabs>
+
+Cache hit — same answer returned instantly:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```json
+{
+	"answer": "For hiking, look for boots with ankle support, a grippy rubber sole...",
+	"cachedQuestion": "what shoes are best for hiking",
+	"generatedAt": 1712500000000,
+	"cacheHit": true,
+	"similarity": 0.961
+}
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+{
+  answer: 'For hiking, look for boots with ankle support, a grippy rubber sole...',
+  cachedQuestion: 'what shoes are best for hiking',
+  generatedAt: 1712500000000,
+  cacheHit: true,
+  similarity: 0.961
+}
+```
+
+  </TabItem>
+</Tabs>
+
+The second question scored `0.961` cosine similarity — above the `0.92` threshold — so it returned the cached answer without calling the LLM.
+
+## Cache Expiration and Freshness
+
+The `QuestionAnswer` table has a 7-day TTL (`expiration: 604800`). After 7 days, a record is evicted and the next request for a similar question generates a fresh answer.
+
+You can bypass the TTL and force a fresh generation by passing `Cache-Control: no-cache`:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/QuestionAnswer?q=What+shoes+are+best+for+hiking' \
+  -H 'Cache-Control: no-cache'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch(
+	'http://localhost:9926/QuestionAnswer?' + new URLSearchParams({ q: 'What shoes are best for hiking' }),
+	{ headers: { 'Cache-Control': 'no-cache' } }
+);
+```
+
+  </TabItem>
+</Tabs>
+
+## Going Further
+
+- **Domain-specific system prompts**: pass product catalog context in the system prompt so answers are grounded in your actual inventory.
+- **Fine-tuning the threshold**: log `similarity` values for hits and misses to find the ideal threshold for your query distribution.
+- **Multi-table semantic caches**: maintain separate caches for different question domains (support, sales, returns) with different system prompts and TTLs.
+- **Embedding model selection**: `text-embedding-3-small` is fast and cheap; `text-embedding-3-large` offers higher accuracy for ambiguous queries.
+
+## Additional Resources
+
+- [Caching with Harper](./caching-with-harper) — foundational passive caching guide
+- [Database Schema](/reference/v5/database/schema) — `@indexed(type: "HNSW")` vector index configuration and parameters
+- [Resource API](/reference/v5/resources/resource-api) — `search`, `sort`, Query object
