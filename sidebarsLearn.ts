@@ -43,8 +43,18 @@ const sidebarsLearn: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
-					id: 'developers/caching-ai-generations',
-					label: 'Caching AI Generations',
+					id: 'developers/active-caching-subscriptions',
+					label: 'Active Caching with Subscriptions',
+				},
+				{
+					type: 'doc',
+					id: 'developers/semantic-caching-vector-indexing',
+					label: 'Semantic Caching with Vector Indexing',
+				},
+				{
+					type: 'doc',
+					id: 'developers/write-through-caching',
+					label: 'Write-Through Caching',
 				},
 			],
 		},

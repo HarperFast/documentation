@@ -215,8 +215,12 @@ export class Product extends tables.Product {
 	static async patch(target, data) {
 		const body = await data;
 		const result = await super.patch(target, body);
-		if (body.features !== undefined || body.name !== undefined ||
-		    body.price !== undefined || body.category !== undefined) {
+		if (
+			body.features !== undefined ||
+			body.name !== undefined ||
+			body.price !== undefined ||
+			body.category !== undefined
+		) {
 			tables.ProductDescription.invalidate(target.id ?? target);
 		}
 		return result;
@@ -411,13 +415,13 @@ console.log(data);
 
 ```json
 {
-  "description": "Stay hydrated on every adventure...",
-  "generatedAt": 1712500000000,
-  "product": {
-    "name": "Titanium Water Bottle",
-    "price": 39.99,
-    "features": ["BPA-free", "Keeps cold 24h", "Lightweight 200g"]
-  }
+	"description": "Stay hydrated on every adventure...",
+	"generatedAt": 1712500000000,
+	"product": {
+		"name": "Titanium Water Bottle",
+		"price": 39.99,
+		"features": ["BPA-free", "Keeps cold 24h", "Lightweight 200g"]
+	}
 }
 ```
 
@@ -572,8 +576,12 @@ export class Product extends tables.Product {
 	static async patch(target, data) {
 		const body = await data;
 		const result = await super.patch(target, body);
-		if (body.features !== undefined || body.name !== undefined ||
-		    body.price !== undefined || body.category !== undefined) {
+		if (
+			body.features !== undefined ||
+			body.name !== undefined ||
+			body.price !== undefined ||
+			body.category !== undefined
+		) {
 			tables.ProductDescription.invalidate(target.id ?? target);
 		}
 		return result;
