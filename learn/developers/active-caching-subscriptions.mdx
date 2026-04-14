@@ -102,10 +102,9 @@ Open `resources.js`. The `ScoreboardFeed` class connects to an imaginary streami
 
 const SCORES_API_BASE = process.env.SCORES_API_BASE ?? 'https://scores.example.com';
 
-class ScoreboardFeed extends Resource {
-	async get() {
+const scoreboardFeed = {
+	async get(id) {
 		// Called on cache miss — fetch the initial state for a specific game
-		const id = this.getId();
 		const response = await fetch(`${SCORES_API_BASE}/games/${id}`);
 		if (!response.ok) {
 			const error = new Error('Game not found');
@@ -113,7 +112,7 @@ class ScoreboardFeed extends Resource {
 			throw error;
 		}
 		return response.json();
-	}
+	},
 
 	async *subscribe() {
 		// Called once to stream all ongoing updates into the cache
@@ -135,9 +134,9 @@ class ScoreboardFeed extends Resource {
 			}
 		}
 	}
-}
+};
 
-tables.GameScore.sourcedFrom(ScoreboardFeed);
+tables.GameScore.sourcedFrom(scoreboardFeed);
 ```
 
 `get()` and `subscribe()` have distinct roles:
@@ -172,7 +171,7 @@ Use `put` when the event stream includes full record values — this is the most
 Not all sources use async iterables. If your upstream uses a callback or event-emitter API, use the default subscription stream instead of an async generator:
 
 ```javascript
-class ScoreboardFeed extends Resource {
+const scoreboardFeed = {
 	subscribe() {
 		const subscription = super.subscribe(); // default stream
 
@@ -277,8 +276,8 @@ Harper runs multiple worker threads. By default, `subscribe()` runs on exactly o
 In rare cases you may want subscriptions on multiple threads — for example, if your source shards data and each thread should subscribe to a different shard. Use `subscribeOnThisThread` to control this:
 
 ```javascript
-class ScoreboardFeed extends Resource {
-	static subscribeOnThisThread(threadIndex) {
+const scoreboardFeed = {
+	subscribeOnThisThread(threadIndex) {
 		return threadIndex === 0; // default: only thread 0
 	}
 	async *subscribe() { ... }
@@ -307,9 +306,8 @@ Here is the complete `resources.js`:
 
 const SCORES_API_BASE = process.env.SCORES_API_BASE ?? 'https://scores.example.com';
 
-class ScoreboardFeed extends Resource {
-	async get() {
-		const id = this.getId();
+const scoreboardFeed = {
+	async get(id) {
 		const response = await fetch(`${SCORES_API_BASE}/games/${id}`);
 		if (!response.ok) {
 			const error = new Error('Game not found');
@@ -317,7 +315,7 @@ class ScoreboardFeed extends Resource {
 			throw error;
 		}
 		return response.json();
-	}
+	},
 
 	async *subscribe() {
 		const response = await fetch(`${SCORES_API_BASE}/stream`, {
@@ -338,9 +336,9 @@ class ScoreboardFeed extends Resource {
 			}
 		}
 	}
-}
+};
 
-tables.GameScore.sourcedFrom(ScoreboardFeed);
+tables.GameScore.sourcedFrom(scoreboardFeed);
 ```
 
 ## What Comes Next

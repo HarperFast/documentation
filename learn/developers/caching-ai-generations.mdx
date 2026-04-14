@@ -143,19 +143,17 @@ The Data Loader runs on every startup and deployment. It uses content hashing to
 
 ## Building the Description Generator
 
-The `DescriptionGenerator` Resource class is the upstream source for the `ProductDescription` cache. Its `get` method fetches the product from the `Product` table, builds a prompt, and calls the OpenAI API.
+The `GeneratedDescriptionFromProduct` class is the upstream source for the `ProductDescription` cache. Its `get` method fetches the product from the `Product` table (which it extends), builds a prompt, and calls the OpenAI API.
 
 ```javascript
 // resources.js
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-class DescriptionGenerator extends Resource {
-	async get() {
-		const productId = this.getId();
-
+class GeneratedDescriptionFromProduct extends tables.Product {
+	static async get(productId) {
 		// Load the product data from the Product table
-		const product = await tables.Product.get(productId);
+		const product = await super.get(productId);
 		if (!product) {
 			const error = new Error('Product not found');
 			error.statusCode = 404;
@@ -195,7 +193,7 @@ Keep the tone enthusiastic but professional.`;
 	}
 }
 
-tables.ProductDescription.sourcedFrom(DescriptionGenerator);
+tables.ProductDescription.sourcedFrom(GeneratedDescriptionFromProduct);
 ```
 
 With `sourcedFrom` in place, Harper now handles all caching behavior automatically:
