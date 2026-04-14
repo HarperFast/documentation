@@ -143,16 +143,16 @@ The Data Loader runs on every startup and deployment. It uses content hashing to
 
 ## Building the Description Generator
 
-The `GeneratedDescriptionFromProduct` class is the upstream source for the `ProductDescription` cache. Its `get` method fetches the product from the `Product` table (which it extends), builds a prompt, and calls the OpenAI API.
+The `DescriptionGenerator` class is the upstream source for the `ProductDescription` cache. Its `get` method fetches the product from the `Product` table (which it extends), builds a prompt, and calls the OpenAI API.
 
 ```javascript
 // resources.js
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-class GeneratedDescriptionFromProduct extends tables.Product {
+class DescriptionGenerator extends tables.Product {
 	static async get(productId) {
-		// Load the product data from the Product table
+		// Load the product data from our base class, the Product table
 		const product = await super.get(productId);
 		if (!product) {
 			const error = new Error('Product not found');
@@ -193,7 +193,7 @@ Keep the tone enthusiastic but professional.`;
 	}
 }
 
-tables.ProductDescription.sourcedFrom(GeneratedDescriptionFromProduct);
+tables.ProductDescription.sourcedFrom(DescriptionGenerator);
 ```
 
 With `sourcedFrom` in place, Harper now handles all caching behavior automatically:
@@ -201,39 +201,7 @@ With `sourcedFrom` in place, Harper now handles all caching behavior automatical
 - **Cache miss**: the first request for `/ProductDescription/prod-001` calls `DescriptionGenerator.get()`, stores the result, and returns it.
 - **Cache hit**: subsequent requests within 24 hours return the stored description instantly — no LLM call.
 - **Cache expiry**: after 24 hours, the next request regenerates the description.
-
-## Auto-Invalidating on Product Updates
-
-Rather than requiring a separate manual invalidation request, we can hook into writes to the `Product` table and invalidate the cached description automatically whenever description-relevant fields change.
-
-Export a custom `Product` class that overrides `patch` and `put`. Both methods inspect the incoming data, delegate to `super` to perform the actual write, then call `tables.ProductDescription.invalidate` if any of the fields that feed into the AI prompt have changed:
-
-```javascript
-export class Product extends tables.Product {
-	static async patch(target, data) {
-		const body = await data;
-		const result = await super.patch(target, body);
-		if (
-			body.features !== undefined ||
-			body.name !== undefined ||
-			body.price !== undefined ||
-			body.category !== undefined
-		) {
-			tables.ProductDescription.invalidate(target.id ?? target);
-		}
-		return result;
-	}
-
-	static async put(target, data) {
-		const body = await data;
-		const result = await super.put(target, body);
-		tables.ProductDescription.invalidate(target.id ?? target);
-		return result;
-	}
-}
-```
-
-`patch` only invalidates when one of the prompt-relevant fields is present in the payload — a `PATCH` that touches only unrelated fields (like an internal `updatedBy` field) won't trigger a regeneration. `put` always invalidates because a full replacement always changes the record.
+- **Cache invalidation**: Because we are extending a table, Harper automatically invalidates the cache when the source table is updated.
 
 ## Requesting a Generated Description
 
@@ -512,87 +480,6 @@ const response = await fetch('http://localhost:9926/ProductDescription/prod-001'
 </Tabs>
 
 With `stale-if-error`, Harper returns the most recently cached description rather than propagating the upstream error — a sensible default for AI-generated marketing copy where slightly stale content is better than a broken page.
-
-## Complete resources.js
-
-Here is the full `resources.js` for this guide:
-
-```javascript
-// resources.js
-
-// --- Description Generator (upstream source) ---
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-class DescriptionGenerator extends Resource {
-	async get() {
-		const productId = this.getId();
-
-		const product = await tables.Product.get(productId);
-		if (!product) {
-			const error = new Error('Product not found');
-			error.statusCode = 404;
-			throw error;
-		}
-
-		const prompt = `Write a compelling, two-sentence product description for the following item.
-Product name: ${product.name}
-Category: ${product.category}
-Price: $${product.price}
-Features: ${product.features.join(', ')}
-Keep the tone enthusiastic but professional.`;
-
-		const response = await fetch('https://api.openai.com/v1/chat/completions', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${OPENAI_API_KEY}`,
-			},
-			body: JSON.stringify({
-				model: 'gpt-4o-mini',
-				messages: [{ role: 'user', content: prompt }],
-				max_tokens: 120,
-			}),
-		});
-
-		const result = await response.json();
-		const description = result.choices[0].message.content.trim();
-
-		return {
-			id: productId,
-			description,
-			generatedAt: Date.now(),
-		};
-	}
-}
-
-tables.ProductDescription.sourcedFrom(DescriptionGenerator);
-
-// --- Auto-invalidation on product updates ---
-
-export class Product extends tables.Product {
-	static async patch(target, data) {
-		const body = await data;
-		const result = await super.patch(target, body);
-		if (
-			body.features !== undefined ||
-			body.name !== undefined ||
-			body.price !== undefined ||
-			body.category !== undefined
-		) {
-			tables.ProductDescription.invalidate(target.id ?? target);
-		}
-		return result;
-	}
-
-	static async put(target, data) {
-		const body = await data;
-		const result = await super.put(target, body);
-		tables.ProductDescription.invalidate(target.id ?? target);
-		return result;
-	}
-}
-```
 
 ## Going Further
 
