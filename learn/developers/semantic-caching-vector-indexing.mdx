@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 Caching LLM responses by exact prompt text catches almost nothing useful. "What shoes are good for hiking?" and "Which shoes work best for hiking?" are semantically identical but would be cache misses for each other with a string key. The result is that you pay for every generation even when a good answer already exists in the cache.
 
-Semantic caching solves this by storing a vector embedding alongside each cached response. When a new question arrives, Harper computes its embedding, searches the cache for a response that is _close enough_ in meaning, and returns it if the similarity exceeds a threshold. Only questions with no sufficiently similar answer in the cache hit the LLM.
+Semantic caching solves this by storing a vector embedding alongside each cached response. When a new question arrives, Harper computes its embedding, searches the cache for a response that is _close enough_ in meaning, and returns it if the similarity distance is below a threshold. Only questions with no sufficiently similar answer in the cache hit the LLM.
 
 In this guide you will build a product assistant that answers customer questions using OpenAI. Semantically equivalent questions share a single cached answer — you only pay for a generation once, regardless of how the question is phrased.
 
@@ -17,7 +17,7 @@ In this guide you will build a product assistant that answers customer questions
 - How to define a vector index using `@indexed(type: "HNSW")`
 - How to query by cosine similarity using `table.search({ sort: { attribute, target } })`
 - How to implement a semantic cache lookup before calling the LLM
-- How to set a similarity threshold to control cache hit quality
+- How to set a similarity/distance threshold to control cache hit quality
 
 ## Prerequisites
 
@@ -160,11 +160,11 @@ export class QuestionAnswer extends Resource {
 		const results = tables.QuestionAnswer.search({
 			sort: { attribute: 'embedding', target: queryEmbedding },
 			limit: 1,
-			select: ['id', 'question', 'answer', 'generatedAt', 'embedding'],
+			select: ['id', 'question', 'answer', 'generatedAt', 'embedding', '$distance'],
 		});
 
 		for await (const cached of results) {
-			const similarity = cosineSimilarity(queryEmbedding, cached.embedding);
+			const similarity = 1 - cached.$distance;
 			if (similarity >= SIMILARITY_THRESHOLD) {
 				// Cache hit — return the stored answer
 				return {
@@ -197,20 +197,6 @@ export class QuestionAnswer extends Resource {
 		};
 	}
 }
-
-// --- Cosine similarity ---
-
-function cosineSimilarity(a, b) {
-	let dot = 0,
-		normA = 0,
-		normB = 0;
-	for (let i = 0; i < a.length; i++) {
-		dot += a[i] * b[i];
-		normA += a[i] * a[i];
-		normB += b[i] * b[i];
-	}
-	return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 ```
 
 ### The semantic cache flow
@@ -219,7 +205,7 @@ The `get` handler implements the full pipeline in sequence:
 
 1. **Embed** the incoming question using OpenAI's `text-embedding-3-small` model.
 2. **Search** the HNSW index for the nearest stored embedding. HNSW returns approximate nearest neighbors extremely quickly — even with thousands of cached answers, the search takes microseconds.
-3. **Check similarity** against `SIMILARITY_THRESHOLD`. A score of `1.0` is a perfect semantic match; `0.92` is a reasonable default for product Q&A (questions that mean the same thing typically score above `0.95`; genuinely different questions typically score below `0.85`).
+3. **Check similarity** against `SIMILARITY_THRESHOLD` (similarity is 1 - distance). A score of `1.0` is a perfect semantic match; `0.92` is a reasonable default for product Q&A (questions that mean the same thing typically score above `0.95`; genuinely different questions typically score below `0.85`).
 4. **Return the cached answer** if above threshold — no LLM call needed.
 5. **Generate and cache** a new answer if below threshold, storing the embedding for future lookups.
 
