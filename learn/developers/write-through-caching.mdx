@@ -103,8 +103,8 @@ const inventoryAPI = {
 			error.statusCode = response.status;
 			throw error;
 		}
-	}
-}
+	},
+};
 
 tables.InventoryItem.sourcedFrom(inventoryAPI);
 ```
@@ -158,8 +158,8 @@ const inventoryAPI = {
 		});
 		return response.json();
 	},
-	get
-}
+	get,
+};
 ```
 
 ## Configuring the Application
