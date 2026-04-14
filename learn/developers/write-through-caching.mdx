@@ -49,7 +49,7 @@ A 5-minute TTL (`expiration: 300`) ensures items don't stay stale forever if som
 
 ## Implementing the Source Resource
 
-The `InventoryAPI` class implements `get`, `put`, and `delete`. When write-through is active, Harper calls these methods in the appropriate order.
+The `inventoryAPI` implements `get`, `put`, and `delete` methods. When write-through is active, Harper calls these methods in the appropriate order.
 
 ```javascript
 // resources.js
@@ -57,16 +57,16 @@ The `InventoryAPI` class implements `get`, `put`, and `delete`. When write-throu
 const INVENTORY_API = process.env.INVENTORY_API ?? 'https://inventory.example.com';
 const API_KEY = process.env.INVENTORY_API_KEY;
 
-class InventoryAPI extends Resource {
+const inventoryAPI = {
 	get headers() {
 		return {
 			'Content-Type': 'application/json',
 			'Authorization': `Bearer ${API_KEY}`,
 		};
-	}
+	},
 
-	async get() {
-		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+	async get(id) {
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
 			headers: this.headers,
 		});
 		if (response.status === 404) {
@@ -75,11 +75,11 @@ class InventoryAPI extends Resource {
 			throw error;
 		}
 		return response.json();
-	}
+	},
 
-	async put(data) {
+	async put(id, data) {
 		const body = await data;
-		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
 			method: 'PUT',
 			headers: this.headers,
 			body: JSON.stringify(body),
@@ -91,10 +91,10 @@ class InventoryAPI extends Resource {
 		}
 		// Return the confirmed record from the origin (may include server-generated fields)
 		return response.json();
-	}
+	},
 
-	async delete() {
-		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+	async delete(id) {
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
 			method: 'DELETE',
 			headers: this.headers,
 		});
@@ -106,12 +106,12 @@ class InventoryAPI extends Resource {
 	}
 }
 
-tables.InventoryItem.sourcedFrom(InventoryAPI);
+tables.InventoryItem.sourcedFrom(inventoryAPI);
 ```
 
 With `put` and `delete` implemented on the source, Harper's write-through behavior activates automatically:
 
-- A `PUT /InventoryItem/item-001` request calls `InventoryAPI.put()` first
+- A `PUT /InventoryItem/item-001` request calls `inventoryAPI.put()` first
 - If the upstream call succeeds, Harper commits the result to the local cache
 - If the upstream call throws, Harper does not write to the cache — the local and remote data remain consistent
 - The updated record is immediately available for reads from Harper, no invalidation needed
@@ -123,7 +123,7 @@ Write-through uses a two-phase commit to keep the cache and origin in sync:
 ```
 Client → PUT /InventoryItem/item-001
             ↓
-    Harper calls InventoryAPI.put()
+    Harper calls inventoryAPI.put()
             ↓ success            ↓ error
     Harper commits to local    Harper does not write;
     cache; 200 returned        error propagated to client
@@ -133,13 +133,13 @@ Harper waits for the upstream `put()` to resolve before writing locally. This me
 
 ## Loading Existing Data in Write Methods
 
-By default, `put` and `delete` methods do not automatically load the existing cached record. If you need the current record value inside a write method — for example, to validate a field transition or merge partial data — call `ensureLoaded()` first:
+By default, `put` and `delete` methods do not automatically load the existing cached record. If you need the current record value inside a write method — for example, to validate a field transition or merge partial data — call `get()` first:
 
 ```javascript
-class InventoryAPI extends Resource {
+const inventoryAPI = {
 	async put(data) {
 		// Load the existing record from cache or origin before writing
-		await this.ensureLoaded();
+		const existing = await this.get(target);
 
 		const incoming = await data;
 
@@ -157,11 +157,10 @@ class InventoryAPI extends Resource {
 			body: JSON.stringify(incoming),
 		});
 		return response.json();
-	}
+	},
+	get
 }
 ```
-
-`ensureLoaded()` checks the local cache first; if the record is absent or stale, it calls `get()` to fetch it from the origin. After `ensureLoaded()`, `this` has the full record properties accessible.
 
 ## Configuring the Application
 
@@ -225,7 +224,7 @@ HTTP/1.1 200 OK
   </TabItem>
 </Tabs>
 
-The write went to `InventoryAPI.put()` first, was confirmed by the origin, and is now cached in Harper. A subsequent read comes directly from Harper without an upstream call:
+The write went to `inventoryAPI.put()` first, was confirmed by the origin, and is now cached in Harper. A subsequent read comes directly from Harper without an upstream call:
 
 <Tabs groupId="http-client">
   <TabItem value="curl">
@@ -306,7 +305,7 @@ HTTP/1.1 204 No Content
   </TabItem>
 </Tabs>
 
-Harper calls `InventoryAPI.delete()`, waits for confirmation, then removes the record from the local cache. A subsequent read triggers a `get()` call to the origin (or returns 404 if it's gone).
+Harper calls `inventoryAPI.delete()`, waits for confirmation, then removes the record from the local cache. A subsequent read triggers a `get()` call to the origin (or returns 404 if it's gone).
 
 ## Putting It All Together
 
@@ -318,7 +317,7 @@ Complete `resources.js`:
 const INVENTORY_API = process.env.INVENTORY_API ?? 'https://inventory.example.com';
 const API_KEY = process.env.INVENTORY_API_KEY;
 
-class InventoryAPI extends Resource {
+const inventoryAPI = {
 	get headers() {
 		return {
 			'Content-Type': 'application/json',
@@ -365,7 +364,7 @@ class InventoryAPI extends Resource {
 	}
 }
 
-tables.InventoryItem.sourcedFrom(InventoryAPI);
+tables.InventoryItem.sourcedFrom(inventoryAPI);
 ```
 
 ## Additional Resources

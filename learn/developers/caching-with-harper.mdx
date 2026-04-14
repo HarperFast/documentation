@@ -67,36 +67,35 @@ A table's `expiration` is measured in seconds. Harper also supports separate `ev
 
 ## Wrapping an External Data Source
 
-The source for the cache is a plain `Resource` class in `resources.js`. The [public JokeAPI](https://official-joke-api.appspot.com/) returns a joke by ID as a JSON object — a perfect stand-in for any real external API.
+The source for the cache is a simple object in `resources.js`. The [public jokeAPI](https://official-joke-api.appspot.com/) returns a joke by ID as a JSON object — a perfect stand-in for any real external API.
 
 ```javascript
 // resources.js
 
-class JokeAPI extends Resource {
-	async get() {
-		const id = this.getId();
+const jokeAPI= {
+	async get(id) {
 		const response = await fetch(`https://official-joke-api.appspot.com/jokes/${id}`);
 		return response.json();
 	}
 }
 
-tables.JokeCache.sourcedFrom(JokeAPI);
+tables.JokeCache.sourcedFrom(jokeAPI);
 ```
 
-`sourcedFrom` registers `JokeAPI` as the upstream source for `JokeCache`. Harper's caching behavior now works as follows:
+`sourcedFrom` registers `jokeAPI` as the upstream source for `JokeCache`. Harper's caching behavior now works as follows:
 
 1. A request arrives for `/JokeCache/1`.
 2. Harper checks if the record with id `1` exists in `JokeCache` and is not stale.
 3. If it is fresh, Harper returns it immediately.
-4. If it is missing or stale, Harper calls `JokeAPI.get()` to fetch the data, stores it in `JokeCache`, and returns the result.
+4. If it is missing or stale, Harper calls `jokeAPI.get()` to fetch the data, stores it in `JokeCache`, and returns the result.
 
 Multiple simultaneous requests for the same missing or stale record will all wait on a single upstream call — Harper prevents cache stampedes automatically.
 
 ```mermaid
 flowchart LR
     Client --> JokeCache
-    JokeCache -->|cache miss or stale| JokeAPI
-    JokeAPI -->|fetch + store| JokeCache
+    JokeCache -->|cache miss or stale| jokeAPI
+    jokeAPI -->|fetch + store| JokeCache
     JokeCache -->|cached response| Client
 ```
 
@@ -114,7 +113,7 @@ jsResource:
 
 - `graphqlSchema` loads `schema.graphql` and creates the `JokeCache` table.
 - `rest` enables Harper's REST API on port `9926`, exposing any `@export`-ed tables and resources as HTTP endpoints.
-- `jsResource` loads `resources.js`, registering the `JokeAPI` source and the `sourcedFrom` connection — as well as any exported Resource classes as endpoints.
+- `jsResource` loads `resources.js`, registering the `jokeAPI` source and the `sourcedFrom` connection — as well as any exported Resource classes as endpoints.
 
 Restart Harper (or let `harper dev` pick up the change automatically), then continue.
 
@@ -241,7 +240,7 @@ The `ETag` / `If-None-Match` pattern is documented in detail in the [REST Header
 
 ## Watching Cache Expiration
 
-The `JokeCache` table has a 60-second expiration. After 60 seconds, the cached record becomes stale and the next request will fetch a fresh copy from `JokeAPI`.
+The `JokeCache` table has a 60-second expiration. After 60 seconds, the cached record becomes stale and the next request will fetch a fresh copy from `jokeAPI`.
 
 You can force this behavior immediately by passing the `no-cache` directive in the `Cache-Control` request header, which tells Harper to bypass the local cache and always go to the source:
 
@@ -265,7 +264,7 @@ const response = await fetch('http://localhost:9926/JokeCache/1', {
   </TabItem>
 </Tabs>
 
-You will see a `200` response, and if you check the Harper logs you will see an outbound request to `JokeAPI`.
+You will see a `200` response, and if you check the Harper logs you will see an outbound request to `jokeAPI`.
 
 ## Invalidating a Cache Entry
 
@@ -322,7 +321,7 @@ await fetch('http://localhost:9926/JokeCache/1', {
   </TabItem>
 </Tabs>
 
-The next `GET /JokeCache/1` will trigger a fresh fetch from `JokeAPI` regardless of whether the TTL has expired.
+The next `GET /JokeCache/1` will trigger a fresh fetch from `jokeAPI` regardless of whether the TTL has expired.
 
 :::note
 If you need to check your work, checkout the [`02-invalidate-example`](https://github.com/HarperFast/caching-guide-example/tree/02-invalidate-example) branch.
@@ -335,7 +334,7 @@ Here is the complete `resources.js` for this guide:
 ```javascript
 // resources.js
 
-class JokeAPI extends Resource {
+const jokeAPI = {
 	async get() {
 		const id = this.getId();
 		const response = await fetch(`https://official-joke-api.appspot.com/jokes/${id}`);
@@ -343,7 +342,7 @@ class JokeAPI extends Resource {
 	}
 }
 
-tables.JokeCache.sourcedFrom(JokeAPI);
+tables.JokeCache.sourcedFrom(jokeAPI);
 
 export class JokeCache extends tables.JokeCache {
 	static async post(target, data) {
