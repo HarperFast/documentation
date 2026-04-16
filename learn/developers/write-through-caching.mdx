@@ -1,0 +1,374 @@
+---
+title: Write-Through Caching
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Read-through caches — where Harper fetches from the source on cache misses — only cover half the story. When clients write data, those writes still go directly to the origin. The cache only learns about the change the next time the TTL expires or someone calls `invalidate`.
+
+Write-through caching closes this loop. Writes to a Harper cache table are forwarded to the origin source before being committed locally. The cache stays consistent with the origin at all times: reads come from Harper (fast), writes go through Harper to the origin (transactional), and Harper stores the result.
+
+In this guide you will build a write-through cache for a product inventory API. Reads are served from Harper. Writes go through Harper to the upstream REST API, and the updated value is immediately available in the local cache — no invalidation step needed.
+
+## What You Will Learn
+
+- How to implement `put` and `delete` on a source Resource to enable write-through
+- How write-through works transactionally (two-phase commit)
+- How to load existing record data inside a write method using `ensureLoaded`
+- When write-through caching is the right pattern
+
+## Prerequisites
+
+- Completed [Caching with Harper](./caching-with-harper)
+
+## When to Use Write-Through Caching
+
+Write-through is a good fit when:
+
+- Clients write data that must be durably stored in an external system
+- You want reads to always come from Harper (fast) without a separate invalidation step
+- The origin supports idempotent `PUT`/`DELETE` operations
+- Consistency between the cache and origin is more important than write latency
+
+Write-through adds latency to writes because Harper waits for the origin to confirm before committing. If write throughput is a priority and brief inconsistency is acceptable, consider using invalidation-based caching instead.
+
+## Defining the Schema
+
+```graphql
+type InventoryItem @table(expiration: 300) @export {
+	id: ID @primaryKey
+	sku: String @indexed
+	name: String
+	quantity: Int
+	warehouseId: String @indexed
+}
+```
+
+A 5-minute TTL (`expiration: 300`) ensures items don't stay stale forever if something goes wrong with the write-through path. In normal operation, writes keep the cache current and the TTL is rarely relevant.
+
+## Implementing the Source Resource
+
+The `inventoryAPI` implements `get`, `put`, and `delete` methods. When write-through is active, Harper calls these methods in the appropriate order.
+
+```javascript
+// resources.js
+
+const INVENTORY_API = process.env.INVENTORY_API ?? 'https://inventory.example.com';
+const API_KEY = process.env.INVENTORY_API_KEY;
+
+const inventoryAPI = {
+	get headers() {
+		return {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${API_KEY}`,
+		};
+	},
+
+	async get(id) {
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
+			headers: this.headers,
+		});
+		if (response.status === 404) {
+			const error = new Error('Item not found');
+			error.statusCode = 404;
+			throw error;
+		}
+		return response.json();
+	},
+
+	async put(id, data) {
+		const body = await data;
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
+			method: 'PUT',
+			headers: this.headers,
+			body: JSON.stringify(body),
+		});
+		if (!response.ok) {
+			const error = new Error(`Upstream PUT failed: ${response.status}`);
+			error.statusCode = response.status;
+			throw error;
+		}
+		// Return the confirmed record from the origin (may include server-generated fields)
+		return response.json();
+	},
+
+	async delete(id) {
+		const response = await fetch(`${INVENTORY_API}/items/${id}`, {
+			method: 'DELETE',
+			headers: this.headers,
+		});
+		if (!response.ok) {
+			const error = new Error(`Upstream DELETE failed: ${response.status}`);
+			error.statusCode = response.status;
+			throw error;
+		}
+	},
+};
+
+tables.InventoryItem.sourcedFrom(inventoryAPI);
+```
+
+With `put` and `delete` implemented on the source, Harper's write-through behavior activates automatically:
+
+- A `PUT /InventoryItem/item-001` request calls `inventoryAPI.put()` first
+- If the upstream call succeeds, Harper commits the result to the local cache
+- If the upstream call throws, Harper does not write to the cache — the local and remote data remain consistent
+- The updated record is immediately available for reads from Harper, no invalidation needed
+
+## How the Two-Phase Write Works
+
+Write-through uses a two-phase commit to keep the cache and origin in sync:
+
+```
+Client → PUT /InventoryItem/item-001
+            ↓
+    Harper calls inventoryAPI.put()
+            ↓ success            ↓ error
+    Harper commits to local    Harper does not write;
+    cache; 200 returned        error propagated to client
+```
+
+Harper waits for the upstream `put()` to resolve before writing locally. This means write latency includes the round-trip to the origin, but reads from the local cache are always authoritative.
+
+## Loading Existing Data in Write Methods
+
+By default, `put` and `delete` methods do not automatically load the existing cached record. If you need the current record value inside a write method — for example, to validate a field transition or merge partial data — call `get()` first:
+
+```javascript
+const inventoryAPI = {
+	async put(data) {
+		// Load the existing record from cache or origin before writing
+		const existing = await this.get(target);
+
+		const incoming = await data;
+
+		// Example: prevent setting quantity below zero
+		const current = this.quantity ?? 0;
+		if (incoming.quantity !== undefined && incoming.quantity < 0) {
+			const error = new Error('Quantity cannot be negative');
+			error.statusCode = 400;
+			throw error;
+		}
+
+		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+			method: 'PUT',
+			headers: this.headers,
+			body: JSON.stringify(incoming),
+		});
+		return response.json();
+	},
+	get,
+};
+```
+
+## Configuring the Application
+
+Open `config.yaml`:
+
+```yaml
+graphqlSchema:
+  files: 'schema.graphql'
+rest: true
+jsResource:
+  files: 'resources.js'
+```
+
+## Making Writes
+
+With Harper running, write an inventory item:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -i -X PUT 'http://localhost:9926/InventoryItem/item-001' \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"WB-100","name":"Titanium Water Bottle","quantity":150,"warehouseId":"WH-A"}'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const response = await fetch('http://localhost:9926/InventoryItem/item-001', {
+	method: 'PUT',
+	headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify({
+		sku: 'WB-100',
+		name: 'Titanium Water Bottle',
+		quantity: 150,
+		warehouseId: 'WH-A',
+	}),
+});
+console.log(response.status);
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 200 OK
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+200
+```
+
+  </TabItem>
+</Tabs>
+
+The write went to `inventoryAPI.put()` first, was confirmed by the origin, and is now cached in Harper. A subsequent read comes directly from Harper without an upstream call:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -s 'http://localhost:9926/InventoryItem/item-001'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+const item = await fetch('http://localhost:9926/InventoryItem/item-001').then((r) => r.json());
+console.log(item.quantity); // 150
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```json
+{
+	"id": "item-001",
+	"sku": "WB-100",
+	"name": "Titanium Water Bottle",
+	"quantity": 150,
+	"warehouseId": "WH-A"
+}
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+150
+```
+
+  </TabItem>
+</Tabs>
+
+## Deleting a Record
+
+Deletes also flow through the source:
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```bash
+curl -i -X DELETE 'http://localhost:9926/InventoryItem/item-001'
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```typescript
+await fetch('http://localhost:9926/InventoryItem/item-001', { method: 'DELETE' });
+```
+
+  </TabItem>
+</Tabs>
+
+<Tabs groupId="http-client">
+  <TabItem value="curl">
+
+```
+HTTP/1.1 204 No Content
+```
+
+  </TabItem>
+  <TabItem value="fetch">
+
+```
+204
+```
+
+  </TabItem>
+</Tabs>
+
+Harper calls `inventoryAPI.delete()`, waits for confirmation, then removes the record from the local cache. A subsequent read triggers a `get()` call to the origin (or returns 404 if it's gone).
+
+## Putting It All Together
+
+Complete `resources.js`:
+
+```javascript
+// resources.js
+
+const INVENTORY_API = process.env.INVENTORY_API ?? 'https://inventory.example.com';
+const API_KEY = process.env.INVENTORY_API_KEY;
+
+const inventoryAPI = {
+	get headers() {
+		return {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${API_KEY}`,
+		};
+	}
+
+	async get() {
+		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+			headers: this.headers,
+		});
+		if (response.status === 404) {
+			const error = new Error('Item not found');
+			error.statusCode = 404;
+			throw error;
+		}
+		return response.json();
+	}
+
+	async put(data) {
+		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+			method: 'PUT',
+			headers: this.headers,
+			body: JSON.stringify(await data),
+		});
+		if (!response.ok) {
+			const error = new Error(`Upstream PUT failed: ${response.status}`);
+			error.statusCode = response.status;
+			throw error;
+		}
+		return response.json();
+	}
+
+	async delete() {
+		const response = await fetch(`${INVENTORY_API}/items/${this.getId()}`, {
+			method: 'DELETE',
+			headers: this.headers,
+		});
+		if (!response.ok) {
+			const error = new Error(`Upstream DELETE failed: ${response.status}`);
+			error.statusCode = response.status;
+			throw error;
+		}
+	}
+}
+
+tables.InventoryItem.sourcedFrom(inventoryAPI);
+```
+
+## Additional Resources
+
+- [Caching with Harper](./caching-with-harper) — foundational passive caching guide
+- [Resource API](/reference/v5/resources/resource-api) — `sourcedFrom`, `put`, `delete`, `ensureLoaded`
+- [Database Schema](/reference/v5/database/schema) — `@table(expiration:)` directive reference
