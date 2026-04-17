@@ -80,7 +80,7 @@ Optional arguments:
 | `expiration`   | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)               |
 | `eviction`     | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed |
 | `scanInterval` | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                              |
-| `audit`        | `Boolean` | config default                | Enable audit log for this table                                             |
+| `replicate`    | `Boolean` | true                          | Enable replication of this table                                            |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
@@ -145,8 +145,8 @@ type Session @table(expiration: 3600) {
 	userId: String
 }
 
-# Enable audit log for this table explicitly
-type AuditedRecord @table(audit: true) {
+# Disable replication for this table explicitly
+type LocalRecord @table(replicate: false) {
 	id: Long @primaryKey
 	value: String
 }
@@ -159,6 +159,8 @@ type Event @table(database: "analytics", expiration: 86400) {
 ```
 
 **Database naming:** Since all tables default to the `data` database, when designing plugins or applications, consider using unique database names to avoid table naming collisions.
+
+**Replication:** Replication is enabled by default for all tables. Note that if you disable replication on a table and re-enable it later, it will not catch-up on previous writes during when the replication was disabled.
 
 ### `@export`
 
