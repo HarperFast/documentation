@@ -1,9 +1,16 @@
 ---
-title: Harper Lincol (Version 5)
+title: Harper Lincoln (Version 5)
 ---
 
-import LatestPatchLink from '@site/src/components/LatestPatchLink';
+# Harper Lincoln (Version 5)
 
-# Harper Tucker (Version 5)
+All specific full patch version release notes for 5.x.x are available on the [releases page](https://github.com/HarperFast/harper/releases?q=v5&expanded=true).
 
-## <LatestPatchLink major={5} minor={0} />
+## [5.0](./5.0.md)
+
+- **Open Source & Pro Editions** — Harper v5.0 ships as two editions: a free Apache 2.0 open source edition (`npm i -g harper`) and a Pro edition with replication and certificate management (`npm i -g @harperfast/harper-pro`).
+- **RocksDB Storage Engine** — RocksDB replaces LMDB as the default storage engine, bringing more robust transactions, a native write-ahead log for ACID compliance, and powerful background compaction. LMDB remains supported for existing databases.
+- **Application Context Isolation** — Each application now runs in its own JavaScript context with isolated globals and module imports, protecting against prototype pollution and enabling per-application logging and configuration.
+- **Transitive Replication** — An exclusion-based subscription model lets nodes replicate through intermediaries, enabling complex cluster topologies without requiring direct connections between all nodes.
+- **Resource API Upgrades** — Static REST methods are now first-class, `getContext()` enables async request access anywhere, and a new `save()` method makes in-transaction writes visible to subsequent reads.
+- **Granular Role Permissions & Impersonation** — Roles can now be scoped to specific operations, and super users can impersonate other users with configurable identity and role bindings.
