@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 import GeneralPrerequisites from '../../src/components/learn/general-prerequisites.mdx';
 
-One of Harper's primary goals since day one was to be easy to install and get started with. The core Harper application itself is just a Node.js application with some native module dependencies. The simplest and easiest way to get started using Harper is by installing it using npm (or any npm compatible Node.js package manager). In addition to installing Harper directly to your local development environment, the Harper team provides a Docker image ([`harperdb/harperdb`](https://hub.docker.com/r/harperdb/harperdb)), and most recently a platform service called [Harper Fabric](https://fabric.harper.fast).
+One of Harper's primary goals since day one was to be easy to install and get started with. The core Harper application itself is just a Node.js application with some native module dependencies. The simplest and easiest way to get started using Harper is by installing it using npm (or any npm compatible Node.js package manager). In addition to installing Harper directly to your local development environment, the Harper team provides a Docker image ([`harperfast/harper`](https://hub.docker.com/r/harper/harper)), and most recently a platform service called [Harper Fabric](https://fabric.harper.fast).
 
 This guide will demonstrate all three ways to get started as well as introduce some basic Harper features such as the CLI and our built in health endpoint.
 
@@ -33,12 +33,12 @@ If you want to use the cloud-hosted, platform service Harper Fabric instead of a
 <Tabs groupId="local-install">
   <TabItem value="npm" label="npm">
 
-Harper is published to the npm registry as [`harperdb`](https://www.npmjs.com/package/harperdb) and requires Node.js current, active LTS, or maintenance LTS versions to run.
+Harper is published to the npm registry as [`harper`](https://www.npmjs.com/package/harper) and requires Node.js current, active LTS, or maintenance LTS versions to run.
 
 The fastest way to get started is by installing Harper globally using an npm compatible package manager:
 
 ```bash
-npm install -g harperdb
+npm install -g harper
 ```
 
 Then, execute the Harper CLI:
@@ -47,7 +47,7 @@ Then, execute the Harper CLI:
 harper
 ```
 
-When installing locally on your machine, you can specify any destination for Harper, we recommend using something within your home directory such as `$HOME/hdb`. Keep note of what you specify for the username and password. Make sure you select the `dev` default config and set the hostname to `localhost`.
+When installing locally on your machine, you can specify any destination for Harper, we recommend using something within your home directory such as `$HOME/harper`. Keep note of what you specify for the username and password. Make sure you select the `dev` default config and set the hostname to `localhost`.
 
 :::important
 Do not actually enter `$HOME` in the destination prompt; it should automatically fill in the value of your home directory. Otherwise, specify the absolute path for the Harper installation.
@@ -59,7 +59,7 @@ Starting HarperDB install...
 Terms & Conditions can be found at https://harperdb.io/legal/end-user-license-agreement
 and can be viewed by typing or copying and pasting the URL into your web browser.
 I agree to the HarperDB Terms and Conditions: (yes/no) yes
-Please enter a destination for HarperDB: $HOME/hdb
+Please enter a destination for HarperDB: $HOME/harper
 Please enter a username for the administrative user: HDB_ADMIN
 Please enter a password for the administrative user: [hidden]
 Default Config - dev (easy access/debugging) or prod (security/performance): (dev/prod) dev
@@ -73,7 +73,7 @@ HarperDB installation was successful.
   </TabItem>
   <TabItem value="docker" label="Docker">
 
-Harper is readily available as a Docker image [`harperdb/harperdb`](https://hub.docker.com/r/harperdb/harperdb).
+Harper is readily available as a Docker image [`harperfast/harper`](https://hub.docker.com/r/harper/harper).
 
 The image is based off of a Node.js image and the default tag is always published using the latest Harper version and latest Node.js Active LTS version.
 
@@ -82,19 +82,19 @@ The image uses sensible default environment variables, agreeing to the terms and
 Using a Docker compatible container manager of choice, the simplest way to get started is using:
 
 ```bash
-docker pull harperdb/harperdb
+docker pull harperfast/harper
 docker run -it \
   --name harper \
-  -v $HOME/hdb:/home/harperdb/hdb \
-  -v $HOME/dev:/home/harperdb/dev \
+  -v $HOME/harper:/home/harper/harper \
+  -v $HOME/dev:/home/harper/dev \
   -e DEFAULTS_MODE=dev \
   -e REPLICATION_HOSTNAME=localhost \
   -p 9925:9925 \
   -p 9926:9926 \
-  harperdb/harperdb
+  harperfast/harper
 ```
 
-The `-v` options will mount the Harper installation (`hdb/`) as well as a development directory (`dev/`) to the container host which is useful for development purposes. The `hdb/` path will contain the Harper installation parts, and the `dev/` directory can be used to create projects (which future guides will require).
+The `-v` options will mount the Harper installation (`harper/`) as well as a development directory (`dev/`) to the container host which is useful for development purposes. The `harper/` path will contain the Harper installation parts, and the `dev/` directory can be used to create projects (which future guides will require).
 
 The additional environment variables specified by `-e` options ensures the installation is setup for local development.
 
@@ -140,21 +140,21 @@ Starting HarperDB...
 Debugger listening on ws://127.0.0.1:9229/<inspector-id>
 For help, see: https://nodejs.org/en/docs/inspector
 [main/0] [info]: All root applications loaded
-[http/1] [info]: Domain socket listening on <rootpath>/hdb/operations-server
+[http/1] [info]: Domain socket listening on <rootpath>/harper/operations-server
 HarperDB 4.y.z successfully started
 [main/0] [notify]: HarperDB successfully started.
 
 Hostname:           localhost
 Worker Threads:     1
-Root Path:          <rootpath>/hdb
+Root Path:          <rootpath>/harper
 Debugging:          enabled: true
-Logging:            level: info, location: <rootpath>/hdb/log/hdb.log, stdout/err
+Logging:            level: info, location: <rootpath>/harper/log/hdb.log, stdout/err
 Default:            HTTP (and WS): 9926, CORS: enabled for *
-Operations API:     HTTP: 9925, CORS: enabled for *, unix socket: <rootpath>/hdb/operations-server
+Operations API:     HTTP: 9925, CORS: enabled for *, unix socket: <rootpath>/hdharperb/operations-server
 MQTT:               TCP: 1883, TLS: 8883, WS: 9926
 Replication:        WS: 9925, WSS: 9933
 
-Note that log messages are being sent to the console (stdout and stderr) in addition to the log file <rootpath>/hdb/log/hdb.log. This can be disabled by setting logging.stdStreams to false, and the log file can be directly monitored/tailed.
+Note that log messages are being sent to the console (stdout and stderr) in addition to the log file <rootpath>/harper/log/hdb.log. This can be disabled by setting logging.stdStreams to false, and the log file can be directly monitored/tailed.
 This server does not have valid usage licenses, this should only be used for educational and development purposes.
 ```
 
