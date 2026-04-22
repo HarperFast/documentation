@@ -47,6 +47,13 @@ Then, execute the Harper CLI:
 harper
 ```
 
+Harper also has a "pro" version, which includes full enterprise scale capabilities, such as replication, certificate management, and more advanced analytics. This is also the version running on Fabric. However, this is licensed with Elastic 2.0, and you need a usage license through Harper if you want to use this for a managed service. The oper and pro versions offer the same APIs for development, so the pro version is not necessary to start building applications. If you do want to install, it is available with at `@harperfast/harper-pro`:
+
+```bash
+npm install -g @harperfast/harper-pro
+```
+(Harper pro can be started with the `harper` command as well).
+
 When installing locally on your machine, you can specify any destination for Harper, we recommend using something within your home directory such as `$HOME/harper`. Keep note of what you specify for the username and password. Make sure you select the `dev` default config and set the hostname to `localhost`.
 
 :::important
