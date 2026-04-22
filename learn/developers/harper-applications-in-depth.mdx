@@ -70,7 +70,7 @@ Within every Harper installation are these core files and directories:
   ┠─ keys/
   ┠─ log/
   ┠─ harper-application-lock.json
-  ┠─ harperdb-config.yaml
+  ┠─ harper-config.yaml
   ┠─ hdb.pid
   ┠─ operations-server
   ┗━ README.md
@@ -90,7 +90,7 @@ The directories themselves are fairly self-explanatory:
 
 The `harper-application-lock.json` file is similar to any sort of lockfile. Its purpose is to ensure Harper is installing the correct versions of applications and plugins. This is an internal file and you shouldn't ever have to modify it yourself.
 
-Finally, and most importantly is the `harperdb-config.yaml`. This is the main configuration file for your Harper installation. Lets open this file and inspect its contents. Local users should open it in their editor of choice, Fabric users should navigate to the "Config" tab from their main organization view.
+Finally, and most importantly is the `harper-config.yaml`. This is the main configuration file for your Harper installation. Lets open this file and inspect its contents. Local users should open it in their editor of choice, Fabric users should navigate to the "Config" tab from their main organization view.
 
 You should see a number of top-level properties such as `http`, `threads`, `authentication`, and more. Each of these corresponds to one of Harper's built-in core features. This file is the source of truth for Harper configuration values. You can make changes directly to the file and then restart Harper for them to take affect.
 
@@ -477,7 +477,7 @@ Harper provides the ability to launch a proper debugger as part of the Harper pr
 Harper v4 ships as a built and minified package, so debugging the Harper source may be confusing; you generally will only want to debug your custom code. However, in the near future, as Harper v5 is released using our new open source core, you will be able to debug Harper's core too!
 :::
 
-Before getting started, either open the `harperdb-config.yaml` file or use the Operations API to inspect how Harper is currently configured (using the `get_configuration` operation). We are looking for the `"threads"` part of the configuration object in particular.
+Before getting started, either open the `harper-config.yaml` file or use the Operations API to inspect how Harper is currently configured (using the `get_configuration` operation). We are looking for the `"threads"` part of the configuration object in particular.
 
 <Tabs>
   <TabItem value="CLI">
