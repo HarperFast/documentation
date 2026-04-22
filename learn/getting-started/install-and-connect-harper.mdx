@@ -52,6 +52,7 @@ Harper also has a "pro" version, which includes full enterprise scale capabiliti
 ```bash
 npm install -g @harperfast/harper-pro
 ```
+
 (Harper pro can be started with the `harper` command as well).
 
 When installing locally on your machine, you can specify any destination for Harper, we recommend using something within your home directory such as `$HOME/harper`. Keep note of what you specify for the username and password. Make sure you select the `dev` default config and set the hostname to `localhost`.
@@ -157,7 +158,7 @@ Root Path:          <rootpath>/harper
 Debugging:          enabled: true
 Logging:            level: info, location: <rootpath>/harper/log/hdb.log, stdout/err
 Default:            HTTP (and WS): 9926, CORS: enabled for *
-Operations API:     HTTP: 9925, CORS: enabled for *, unix socket: <rootpath>/hdharperb/operations-server
+Operations API:     HTTP: 9925, CORS: enabled for *, unix socket: <rootpath>/harper/operations-server
 MQTT:               TCP: 1883, TLS: 8883, WS: 9926
 Replication:        WS: 9925, WSS: 9933
 
