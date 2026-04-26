@@ -6,7 +6,7 @@ HarperDB now uses the name Harper, not HarperDB. And this change is reflected in
 The open source edition can be run with:
 `npm i -g harper`
 And the pro edition can be run with:
-`npm i -g @harperfast/harper-pro
+`npm i -g @harperfast/harper-pro`
 
 Application code should import from the `harper` package instead of `harperdb`:
 
@@ -114,7 +114,73 @@ Harper has expanded support for using standard Response-like objects in the API.
 
 ## VM Module Loader
 
-In Harper version 5, Harper now uses a VM module loader to load modules. This allows Harper to load modules with more controlled access and security, and provide application specific functionality, such as custom/configurable logging for each application. Configuration for the module loading is available in the `applications` section of the configuration, and can be disabled in the VM module loader is causing problems for legacy code.
+Harper v5 loads application modules through Node.js's VM module API, giving each application its own module cache and execution context. This provides per-application context: the `logger` global/export is automatically tagged with the application name, and `config` reflects that application's own configuration. Each application's module graph is isolated from other applications and from Harper internals.
+
+All module loading behavior is controlled by the `applications` section in `harperdb-config.yaml`:
+
+```yaml
+applications:
+  lockdown: freeze-after-load  # default; see below
+  moduleLoader: vm             # vm (default) | native | compartment
+  dependencyLoader: auto       # auto (default) | app | native
+  allowedDirectory: app        # app (default) | any
+  allowedSpawnCommands:        # see "Spawning new processes" above
+    - npm
+    - node
+  # allowedBuiltinModules: [] # if omitted, all Node.js built-ins are allowed
+```
+
+### Intrinsic Lockdown
+
+The default lockdown mode (`freeze-after-load`) freezes JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all application code has loaded. This prevents prototype pollution attacks. If application code or a dependency modifies intrinsic prototypes at runtime (after startup), it will throw a TypeError.
+
+Available lockdown modes:
+- `freeze-after-load` — freeze intrinsics after all components have loaded (default)
+- `freeze` — freeze intrinsics before loading any application code
+- `ses` — full SES lockdown via the `ses` package (strictest; most likely to break packages that mutate built-ins)
+- `none` — no lockdown
+
+If a dependency modifies intrinsic prototypes and you need a temporary workaround, set `lockdown: none`.
+
+### Allowed Directory
+
+In production, applications can only load modules from within their own directory tree (`allowedDirectory: app`). Attempting to load a module from outside that directory will throw. Dev mode installs default to `allowedDirectory: any`, so local development is typically unaffected.
+
+If your application legitimately needs to load files from outside its own directory in production, set:
+
+```yaml
+applications:
+  allowedDirectory: any
+```
+
+### Allowed Built-in Modules
+
+By default all Node.js built-in modules are accessible. To restrict which built-ins applications may import, set an explicit allowlist:
+
+```yaml
+applications:
+  allowedBuiltinModules:
+    - fs
+    - path
+    - http
+```
+
+### Dependency Loading
+
+By default (`dependencyLoader: auto`), npm packages that do not declare `harper` as a dependency are loaded with the native Node.js loader. Packages that do depend on `harper` are loaded through the VM loader so they receive application context. Set `dependencyLoader: app` to always use the VM loader for dependencies, or `native` to always use the native loader for packages.
+
+### Disabling the VM Loader
+
+If the VM loader is causing compatibility issues with existing code, it can be disabled entirely:
+
+```yaml
+applications:
+  moduleLoader: native
+```
+
+This restores pre-v5 behavior where modules are loaded with a standard `import()`. Application-specific context (tagged logging, per-app `config`) will not be available in native mode.
+
+If the goal is only to fix package compatibility while keeping application context for first-party code, `dependencyLoader: native` is a narrower option—it uses native loading only for npm packages while keeping the VM loader for application source files.
 
 # Recommend Changes
 
