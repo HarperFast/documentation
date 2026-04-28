@@ -17,7 +17,7 @@ Harper replication uses a peer-to-peer model where every node in your cluster ca
 
 ### Connecting Nodes
 
-To connect nodes to each other, provide hostnames or URLs in the `replication` section of `harperdb-config.yaml`. Each node specifies its own hostname and the routes (other nodes) it should connect to:
+To connect nodes to each other, provide hostnames or URLs in the `replication` section of `harper-config.yaml`. Each node specifies its own hostname and the routes (other nodes) it should connect to:
 
 ```yaml
 replication:
@@ -98,7 +98,7 @@ Ensure the certificate's CN matches the node's hostname.
 There are two ways to configure Harper with your own certificates:
 
 1. Use the `add_certificate` operation to upload them.
-2. Specify certificate paths directly in `harperdb-config.yaml`:
+2. Specify certificate paths directly in `harper-config.yaml`:
 
 ```yaml
 tls:
@@ -149,7 +149,7 @@ Via the operations API:
 }
 ```
 
-Via `harperdb-config.yaml`:
+Via `harper-config.yaml`:
 
 ```yaml
 replication:

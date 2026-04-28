@@ -330,7 +330,7 @@ Metrics are aggregated and available via the [analytics API](../analytics/overvi
 
 ## `server.config`
 
-The parsed `harperdb-config.yaml` configuration object. Read-only access to Harper's current runtime configuration.
+The parsed `harper-config.yaml` configuration object. Read-only access to Harper's current runtime configuration.
 
 ---
 
@@ -371,7 +371,7 @@ A [`Map`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Glob
 Register or replace a handler by setting it on the `contentTypes` map:
 
 ```js
-import { contentTypes } from 'harperdb';
+import { contentTypes } from 'harper';
 
 contentTypes.set('text/xml', {
 	serialize(data) {

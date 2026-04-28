@@ -30,7 +30,7 @@ There are two main approaches:
 
 ### Replication Count
 
-The simplest way to limit replication is to configure a replication count. Set `replicateTo` in the `replication` section of `harperdb-config.yaml` to specify how many additional nodes data should be replicated to:
+The simplest way to limit replication is to configure a replication count. Set `replicateTo` in the `replication` section of `harper-config.yaml` to specify how many additional nodes data should be replicated to:
 
 ```yaml
 replication:
@@ -107,7 +107,7 @@ class MyTable extends tables.MyTable {
 
 ### Basic Static Shard Configuration
 
-Assign a node to a numbered shard in `harperdb-config.yaml`:
+Assign a node to a numbered shard in `harper-config.yaml`:
 
 ```yaml
 replication:
