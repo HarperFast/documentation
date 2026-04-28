@@ -180,7 +180,7 @@ applications:
 
 This restores pre-v5 behavior where modules are loaded with a standard `import()`. Application-specific context (tagged logging, per-app `config`) will not be available in native mode.
 
-If the goal is only to fix package compatibility while keeping application context for first-party code, `dependencyLoader: native` is a narrower option—it uses native loading only for npm packages while keeping the VM loader for application source files.
+If the goal is only to fix package compatibility while keeping application context for first-party code, `dependencyLoader: native` is a narrower option. It uses native loading only for npm packages while keeping the VM loader for application source files.
 
 # Recommend Changes
 
