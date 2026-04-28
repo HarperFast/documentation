@@ -120,11 +120,11 @@ All module loading behavior is controlled by the `applications` section in `harp
 
 ```yaml
 applications:
-  lockdown: freeze-after-load  # default; see below
-  moduleLoader: vm             # vm (default) | native | compartment
-  dependencyLoader: auto       # auto (default) | app | native
-  allowedDirectory: app        # app (default) | any
-  allowedSpawnCommands:        # see "Spawning new processes" above
+  lockdown: freeze-after-load # default; see below
+  moduleLoader: vm # vm (default) | native | compartment
+  dependencyLoader: auto # auto (default) | app | native
+  allowedDirectory: app # app (default) | any
+  allowedSpawnCommands: # see "Spawning new processes" above
     - npm
     - node
   # allowedBuiltinModules: [] # if omitted, all Node.js built-ins are allowed
@@ -135,6 +135,7 @@ applications:
 The default lockdown mode (`freeze-after-load`) freezes JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all application code has loaded. This prevents prototype pollution attacks. If application code or a dependency modifies intrinsic prototypes at runtime (after startup), it will throw a TypeError.
 
 Available lockdown modes:
+
 - `freeze-after-load` — freeze intrinsics after all components have loaded (default)
 - `freeze` — freeze intrinsics before loading any application code
 - `ses` — full SES lockdown via the `ses` package (strictest; most likely to break packages that mutate built-ins)
