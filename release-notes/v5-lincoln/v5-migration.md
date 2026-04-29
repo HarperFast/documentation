@@ -112,6 +112,10 @@ Second, it is common to attempt to use spawn child processes with the expectatio
 
 Harper has expanded support for using standard Response-like objects in the API. In particular, if you return an object from a REST method with a `headers` property, this will be used as the response headers.
 
+## `blob.save()` removed
+
+The `blob.save()` method has been removed. Please use the `saveBeforeCommit` flag in the options to the `Blob` constructor instead.
+
 ## VM Module Loader
 
 Harper v5 loads application modules through Node.js's VM module API, giving each application its own module cache and execution context. This provides per-application context: the `logger` global/export is automatically tagged with the application name, and `config` reflects that application's own configuration. Each application's module graph is isolated from other applications and from Harper internals.
