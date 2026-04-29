@@ -2,7 +2,7 @@
 
 Documentation website for [Harper](https://harper.fast), a fullstack, serverful Node.js application platform.
 
-Powered by [Docusaurus](https://docusaurus.io/).
+Hosted at [docs.harper.fast](https://docs.harper.fast). Powered by [Docusaurus](https://docusaurus.io/).
 
 ## Contributing
 
