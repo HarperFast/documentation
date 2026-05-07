@@ -1,0 +1,80 @@
+---
+title: Using AI Agents
+---
+
+AI-powered development tools can significantly accelerate your workflow when building Harper applications. Whether you want a dedicated assistant or prefer using your favorite LLM, Harper provides the tools and context needed to make AI an effective part of your development process.
+
+## What You Will Learn
+
+- How to install and run `harper-agent`, a purpose-built AI assistant for Harper development
+- How to configure `harper-agent` with your preferred AI provider (Claude, ChatGPT, Gemini, or Ollama)
+- How to use Harper Skills to improve general-purpose AI tools like Claude, ChatGPT, Cursor, or GitHub Copilot
+- How to provide your AI tools with Harper-specific context for better code generation
+
+## Prerequisites
+
+- An API key for your preferred AI provider. See the [harper-agent repository](https://github.com/HarperFast/harper-agent) for a list of supported providers and instructions for obtaining credentials.
+- Node.js and npm installed on your system
+
+## Harper Agent
+
+The `harper-agent` is an open source, purpose-built AI assistant designed specifically for Harper development. It understands the Harper ecosystem and can help you with tasks ranging from project setup to debugging. See its source code in the [`HarperFast/harper-agent`](https://github.com/HarperFast/harper-agent) repository.
+
+### Features
+
+- **Application Creation**: Scaffold full Harper applications from natural language descriptions.
+- **Code Generation**: Write schema definitions, custom functions, and integration code.
+- **Diagnosis and Running**: Run your application and let the agent diagnose and fix errors.
+- **Browser Control**: The agent can even interact with a browser to help you test and manage your applications.
+
+### Installation
+
+Install the Harper Agent globally using npm:
+
+```bash
+npm install -g @harperfast/agent
+```
+
+### Usage
+
+To start the agent, simply run:
+
+```bash
+harper-agent
+```
+
+On first run, it will help you configure your preferred AI model (Gemini, Claude, ChatGPT, or Ollama). Once configured, you can interact with it directly from your terminal.
+
+## Skills: Empowering General-Purpose Agents
+
+If you prefer using general-purpose AI tools like **Claude**, **ChatGPT**, **GitHub Copilot**, or **Cursor**, you can provide them with Harper-specific "Skills" to improve their accuracy and performance.
+
+### What are Skills?
+
+Skills are a collection of Harper-specific context, documentation, and best practices. When an AI agent has access to these skills, it is much more likely to generate high-quality, idiomatic Harper code and follow current best practices.
+
+### Getting Skills
+
+The easiest way to get Harper skills is by using the `create-harper` bootstrapper. When you create a new Harper project, a `skills/` directory is automatically included.
+
+```bash
+npm create harper@latest
+```
+
+You can also browse our ever evolving library of skills in the [`HarperFast/skills`](https://github.com/HarperFast/skills) repository.
+
+### How to use Skills
+
+Once you have a `skills/` directory in your project, you can use it with your favorite AI tools:
+
+- **Chat-based AI (Claude/ChatGPT)**: Reference anything in your `skills/` directory to your conversation to provide the AI with immediate context. Some agents allow you to reference skills with `/` commands, like `/harper-best-practices`.
+- **IDE Extensions (Cursor/Copilot)**: Ensure these tools are indexing your project. They will automatically pick up the context from the `skills/` directory to provide better completions and chat responses.
+- **Custom Agents**: If you are building your own AI-powered workflows, you can point your agent to these skills to give it specialized knowledge of Harper.
+
+By leveraging these AI tools, you can move from idea to a running Harper application faster than ever before.
+
+## Additional Resources
+
+- [`HarperFast/harper-agent`](https://github.com/HarperFast/harper-agent) — Source code, documentation, and supported AI providers for the Harper Agent
+- [`HarperFast/create-harper`](https://github.com/HarperFast/create-harper) — Bootstrap a new Harper project with skills included
+- [`HarperFast/skills`](https://github.com/HarperFast/skills) — Browse the full collection of Harper Skills
