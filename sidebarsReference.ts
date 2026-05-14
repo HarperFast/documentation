@@ -41,6 +41,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'database/storage-tuning',
+					label: 'Storage Tuning',
+				},
+				{
+					type: 'doc',
 					id: 'database/jobs',
 					label: 'Jobs',
 				},
@@ -307,6 +312,11 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'configuration/operations',
 					label: 'Operations',
+				},
+				{
+					type: 'doc',
+					id: 'configuration/debugging',
+					label: 'Worker Thread Debugging',
 				},
 			],
 		},
