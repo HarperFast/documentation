@@ -17,6 +17,28 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 - Format command: `npm run format:write`. Run this after editing any `.ts`, `.md`, or `.mdx` files.
 - The lint script is a no-op (`echo 0`); do not expect `npm run lint` to catch issues.
 
+## Content Style
+
+Prefer plain ASCII characters in Markdown unless a typographic character is genuinely needed for meaning. This keeps content searchable, easy to type, and consistent with the rest of the docs.
+
+- **Separators between fields** — use a regular hyphen with spaces (`-`), not bullet characters (`•`, `·`) or HTML entities (`&nbsp;`). For `Type:` / `Default:` reference blocks, put each on its own line separated by a blank line (the established pattern in `reference/logging/configuration.md`, `reference/http/configuration.md`, etc.):
+
+  ```markdown
+  ### `some.option`
+
+  Type: `boolean`
+
+  Default: `false`
+
+  Description text here.
+  ```
+
+- **Type annotations** — use the form `` `<type>` (<modifier>) `` when a hint is useful, e.g. `` `string` (duration) ``, `` `number` (ratio) ``. Do not invent compound type names like `` `duration string` ``.
+- **Hyphens vs. dashes** — em dashes (`—`) are fine for parenthetical asides and match existing prose; do not use them as field separators. Do not use en dashes (`–`) except for numeric ranges like `9229–9231`.
+- **No HTML entities for whitespace** — let Markdown / Prettier handle spacing; never reach for `&nbsp;` to force layout.
+- **Lists** — use `-` for bullets (Prettier's default) and avoid mixing with `*` or `•`.
+- **Emoji** — only when the user explicitly requests it.
+
 ## Content Structure
 
 - Content lives in four directories: `learn/`, `reference/`, `release-notes/`, and `fabric/`.
