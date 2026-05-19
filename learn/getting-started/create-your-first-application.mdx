@@ -357,13 +357,17 @@ Push-based deployments is powered by the Harper CLI and is where your the user w
 
 For a true production application, Harper recommends using pull-based deployments so that you can deploy tagged versions of your application repository. But for development and experimentation, push-based is perfectly fine. Later guides will explore pull-based deployment workflows in more detail.
 
-To get started with push-based deployments, open a command line and set the current directory to the application directory. Run the `harper deploy` command using the Fabric cluster's URL, username, and password:
+To get started with push-based deployments, open a command line and set the current directory to the application directory. First, log in to your Fabric cluster:
+
+```bash
+harper login <URL>
+```
+
+Type in your cluster's username and password. Then, run the `harper deploy` command:
 
 ```bash
 harper deploy \
   target=<URL> \
-  username=<username> \
-  password=<password> \
   project=first-harper-app \
   restart=true \
   replicated=true

@@ -68,20 +68,23 @@ harper deploy \
 
 ## Remote Management
 
-Managing applications on a remote Harper instance uses the same operations as local management. The key difference is specifying a `target` along with credentials:
+Managing applications on a remote Harper instance uses the same operations as local management. The recommended approach is to log in first using `harper login` to store an authentication token:
 
 ```sh
+# Log in once
+harper login <remote>
+# Provide your username and password when prompted
+
+# Subsequently deploy without credentials
 harper deploy \
   project=<name> \
   package=<package> \
-  username=<username> \
-  password=<password> \
   target=<remote> \
   restart=true \
   replicated=true
 ```
 
-Credentials can also be provided via environment variables:
+Alternatively, credentials can be provided via environment variables (recommended for CI/CD):
 
 ```sh
 export CLI_TARGET_USERNAME=<username>
@@ -89,6 +92,19 @@ export CLI_TARGET_PASSWORD=<password>
 harper deploy \
   project=<name> \
   package=<package> \
+  target=<remote> \
+  restart=true \
+  replicated=true
+```
+
+Or directly via command parameters (not recommended for production):
+
+```sh
+harper deploy \
+  project=<name> \
+  package=<package> \
+  username=<username> \
+  password=<password> \
   target=<remote> \
   restart=true \
   replicated=true

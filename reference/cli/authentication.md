@@ -34,7 +34,35 @@ For remote operations (operations executed on a remote Harper instance via the `
 
 ### Authentication Methods
 
-#### Method 1: Environment Variables (Recommended)
+#### Method 1: Persistent Login (Recommended for Local Development)
+
+Available since: v5.0.0
+
+Use `harper login` to store authentication tokens for a specific target. This is the most convenient method for local development as it removes the need to pass credentials with every command.
+
+```bash
+# Log in once
+harper login https://server.com:9925
+# Provide username and password when prompted
+
+# Subsequently execute operations without credentials
+harper describe_database database=dev target=https://server.com:9925
+harper deploy target=https://server.com:9925
+```
+
+When you are finished, you can log out to remove the stored token:
+
+```bash
+harper logout https://server.com:9925
+```
+
+**Benefits**:
+
+- Credentials are not stored in command history for every operation
+- Simplifies frequent remote operations
+- No need to maintain environment variables in multiple terminal sessions
+
+#### Method 2: Environment Variables (Recommended for CI/CD)
 
 Set the following environment variables to avoid exposing credentials in command history:
 
@@ -71,7 +99,7 @@ harper deploy target=https://prod-server.com:9925 replicated=true
 harper restart target=https://prod-server.com:9925 replicated=true
 ```
 
-#### Method 2: Command Parameters
+#### Method 3: Command Parameters
 
 Provide credentials directly as command parameters:
 
