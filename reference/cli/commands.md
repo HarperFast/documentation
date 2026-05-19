@@ -146,6 +146,8 @@ Available since: v5.0.0
 
 Log in to a Harper instance to store authentication tokens locally. Once logged in, subsequent commands targeting this instance (via `target`) will automatically use the stored token.
 
+The CLI also supports `.env` files. When you log in, the `HARPER_CLI_TARGET` environment variable will be automatically added to a `.env` file in your current directory if it exists. This allows you to omit the `target` parameter in subsequent commands within that directory.
+
 ```bash
 harper login <URL>
 ```

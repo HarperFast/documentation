@@ -156,24 +156,27 @@ The CLI can execute operations on remote Harper instances by passing the `target
 **Authentication**: Provide credentials via:
 
 - **Persistent Login**: `harper login` to store tokens (recommended for local development)
-- **Environment variables**: `CLI_TARGET_USERNAME` and `CLI_TARGET_PASSWORD` (recommended for CI/CD)
+- **Environment variables and `.env` files**: Use `HARPER_CLI_TARGET`, `HARPER_CLI_USERNAME`, and `HARPER_CLI_PASSWORD` (recommended for CI/CD and project-specific configuration)
 - **Parameters**: `username=<user> password=<pass>`
 
 See [CLI Authentication](./authentication.md) for detailed information on authentication methods and best practices.
 
-**Example: Persistent Login**:
+**Example: Persistent Login and `.env`**:
 
 ```bash
+# Log in to a specific target
 harper login https://server.com:9925
-# Type in your username and password when prompted
-harper describe_database database=dev target=https://server.com:9925
+# This automatically sets HARPER_CLI_TARGET in your local .env file
+
+# Subsequently execute operations without target or credentials
+harper describe_database database=dev
 ```
 
 **Example: CLI Target Environment Variables**:
 
 ```bash
-export CLI_TARGET_USERNAME=HDB_ADMIN
-export CLI_TARGET_PASSWORD=password
+export HARPER_CLI_USERNAME=HDB_ADMIN
+export HARPER_CLI_PASSWORD=password
 harper describe_database database=dev target=https://server.com:9925
 ```
 

@@ -87,8 +87,8 @@ harper deploy \
 Alternatively, credentials can be provided via environment variables (recommended for CI/CD):
 
 ```sh
-export CLI_TARGET_USERNAME=<username>
-export CLI_TARGET_PASSWORD=<password>
+export HARPER_CLI_USERNAME=<username>
+export HARPER_CLI_PASSWORD=<password>
 harper deploy \
   project=<name> \
   package=<package> \
