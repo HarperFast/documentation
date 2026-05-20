@@ -36,7 +36,7 @@ For remote operations (operations executed on a remote Harper instance via the `
 
 #### Method 1: Persistent Login (Recommended for Local Development)
 
-Available since: v5.0.0
+Available since: v5.1.0
 
 Use `harper login` to store authentication tokens for a specific target. This is the most convenient method for local development as it removes the need to pass credentials with every command.
 
