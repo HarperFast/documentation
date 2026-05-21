@@ -200,6 +200,24 @@ The Plugin API is the primary way to implement additional functionality in Harpe
 
 For inline config option annotations inside list items, plain text `(Added in: vX.Y.Z)` is fine — using the component mid-sentence is awkward. Reserve `<VersionBadge>` for standalone placement after headings.
 
+## Verifying Redirects
+
+The site has a large set of legacy URLs configured in [redirects.ts](redirects.ts) (non-versioned `/docs/*` paths) and [historic-redirects.ts](historic-redirects.ts) (versioned `/docs/4.X/*` paths). To make sure none of them silently start 404'ing — for example after a Reference page is renamed or removed — there is a verification script that checks every `from` path against the live docs site.
+
+```bash
+node scripts/verify-redirects.mjs
+```
+
+The script parses both redirect files, extracts every unique `from` path, then issues a `GET` against the live site with `redirect: 'follow'` and asserts the final response is not 404. Any path that returns 404 (or a non-recoverable 5xx / network error after one retry) is printed in the failure summary, and the script exits non-zero.
+
+Common flags:
+
+- `--host=<url>` — target a different host. Defaults to `https://docs.harperdb.io`. Useful for testing a staging or preview deployment.
+- `--concurrency=<N>` — number of parallel requests. Defaults to `20`.
+- `--timeout=<ms>` — per-request timeout. Defaults to `15000`.
+
+Run it after editing either redirect file, after large Reference reorganizations, or as part of a periodic check.
+
 ## Known Issues
 
 ### `docusaurus serve` 404s on `/docs/4.X` paths
