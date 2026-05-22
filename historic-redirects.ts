@@ -20,8 +20,16 @@ type RedirectRule = {
 
 // Paths that are junk/artifacts we intentionally skip (no redirect):
 //   /~gitbook/pdf            — GitBook PDF export URL, not a real page
+//   /docs/v/4.X/~gitbook/pdf — same, GitBook /v/ form
 //   /docs/4.X/4.X/...        — malformed double-version paths
 //   /docs/4.4./getting-started/ — typo path with extra dot
+
+// GitBook /v/ URL pattern:
+// When Harper docs were hosted on GitBook, the version selector produced URLs
+// of the form /docs/v/4.X/<path>. After migrating off GitBook these became
+// dead links, so they are redirected to the same targets as their prefix-less
+// /docs/4.X/<path> siblings. See the "GitBook /v/ versioned URL prefix"
+// section at the bottom of this file.
 
 export const historicRedirects: RedirectRule[] = [
 	// ── Version roots ──────────────────────────────────────────────────────────
@@ -1808,4 +1816,162 @@ export const historicRedirects: RedirectRule[] = [
 		from: ['/docs/4.1/release-notes/1.alby', '/docs/4.3/technical-details/release-notes/4.tucker/3.2.1'],
 		to: '/release-notes',
 	},
+
+	// ── GitBook /v/ versioned URL prefix ──────────────────────────────────────
+	// Legacy URL pattern from when Harper docs were hosted on GitBook. Every
+	// `/docs/v/4.X/<path>` is the GitBook-equivalent of `/docs/4.X/<path>` and
+	// maps to the same target as its prefix-less sibling above.
+	// Source: GA pageview data (Oct 2025 – Feb 2026), 102 unique paths.
+	// Only `/docs/v/4.1/~gitbook/pdf` is intentionally skipped (PDF export URL).
+	{
+		from: ['/docs/v/4.1/getting-started', '/docs/v/4.2/getting-started'],
+		to: '/learn',
+	},
+	{
+		from: ['/docs/v/4.1/install-harperdb/linux', '/docs/v/4.2/deployments/upgrade-hdb-instance'],
+		to: '/learn/getting-started/install-and-connect-harper',
+	},
+	{
+		from: ['/docs/v/4.1/support', '/docs/v/4.2', '/docs/v/4.2/technical-details/reference/architecture', '/docs/v/4.4'],
+		to: '/reference/v4',
+	},
+	{ from: '/docs/v/4.2/technical-details/reference/analytics', to: '/reference/v4/analytics/overview' },
+	{ from: '/docs/v/4.2/developers/components/writing-extensions', to: '/reference/v4/components/extension-api' },
+	{ from: '/docs/v/4.2/technical-details/reference/globals', to: '/reference/v4/components/javascript-environment' },
+	{
+		from: [
+			'/docs/v/4.1/add-ons-and-sdks',
+			'/docs/v/4.2/developers/applications',
+			'/docs/v/4.2/developers/applications/debugging',
+			'/docs/v/4.2/developers/components/drivers',
+			'/docs/v/4.2/developers/components/sdks',
+		],
+		to: '/reference/v4/components/overview',
+	},
+	{ from: '/docs/v/4.1/configuration', to: '/reference/v4/configuration/overview' },
+	{ from: '/docs/v/4.1/jobs', to: '/reference/v4/database/jobs' },
+	{ from: '/docs/v/4.1/reference/limits', to: '/reference/v4/database/schema' },
+	{ from: '/docs/v/4.1/reference/storage-algorithm', to: '/reference/v4/database/storage-algorithm' },
+	{ from: '/docs/v/4.2/technical-details/reference/transactions', to: '/reference/v4/database/transaction' },
+	{
+		from: [
+			'/docs/v/4.1/harperdb-cloud',
+			'/docs/v/4.1/harperdb-cloud/alarms',
+			'/docs/v/4.1/harperdb-cloud/iops-impact',
+			'/docs/v/4.2/deployments/harperdb-cloud/instance-size-hardware-specs',
+		],
+		to: '/reference/v4/legacy/cloud',
+	},
+	{
+		from: [
+			'/docs/v/4.1/custom-functions/create-project',
+			'/docs/v/4.1/custom-functions/custom-functions-operations',
+			'/docs/v/4.1/custom-functions/define-helpers',
+			'/docs/v/4.1/custom-functions/example-projects',
+			'/docs/v/4.1/custom-functions/host-static',
+			'/docs/v/4.1/custom-functions/requirements-definitions',
+			'/docs/v/4.1/custom-functions/templates',
+			'/docs/v/4.1/custom-functions/using-npm-git',
+		],
+		to: '/reference/v4/legacy/custom-functions',
+	},
+	{
+		from: [
+			'/docs/v/4.1/audit-logging',
+			'/docs/v/4.1/logging',
+			'/docs/v/4.1/transaction-logging',
+			'/docs/v/4.2/administration/logging/transaction-logging',
+		],
+		to: '/reference/v4/logging/overview',
+	},
+	{
+		from: [
+			'/docs/v/4.1/sql-guide/insert',
+			'/docs/v/4.1/sql-guide/reserved-word',
+			'/docs/v/4.1/sql-guide/select',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions/geoarea',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions/geodifference',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions/geodistance',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions/geolength',
+			'/docs/v/4.1/sql-guide/sql-geospatial-functions/geonear',
+			'/docs/v/4.1/sql-guide/update',
+			'/docs/v/4.2/developers/sql-guide/date-functions',
+			'/docs/v/4.2/developers/sql-guide/features-matrix',
+			'/docs/v/4.2/developers/sql-guide/reserved-word',
+			'/docs/v/4.2/developers/sql-guide/sql-geospatial-functions',
+		],
+		to: '/reference/v4/operations-api/sql',
+	},
+	{
+		from: [
+			'/docs/v/4.1/clustering',
+			'/docs/v/4.1/clustering/enabling-clustering',
+			'/docs/v/4.1/clustering/managing-subscriptions',
+			'/docs/v/4.1/clustering/naming-a-node',
+			'/docs/v/4.1/clustering/requirements-and-definitions',
+			'/docs/v/4.2/developers/clustering/creating-a-cluster-user',
+			'/docs/v/4.2/developers/clustering/enabling-clustering',
+			'/docs/v/4.2/developers/clustering/things-worth-knowing',
+			'/docs/v/4.4/developers/clustering/enabling-clustering',
+		],
+		to: '/reference/v4/replication/clustering',
+	},
+	{ from: '/docs/v/4.2/administration/cloning', to: '/reference/v4/replication/overview' },
+	{ from: '/docs/v/4.1/reference/content-types', to: '/reference/v4/rest/content-types' },
+	{ from: '/docs/v/4.2/technical-details/reference/headers', to: '/reference/v4/rest/headers' },
+	{ from: '/docs/v/4.2/developers/real-time', to: '/reference/v4/rest/websockets' },
+	{ from: '/docs/v/4.1/security/basic-auth', to: '/reference/v4/security/basic-authentication' },
+	{
+		from: '/docs/v/4.2/developers/clustering/certificate-management',
+		to: '/reference/v4/security/certificate-management',
+	},
+	{ from: '/docs/v/4.1/security/jwt-auth', to: '/reference/v4/security/jwt-authentication' },
+	{
+		from: [
+			'/docs/v/4.1/harperdb-studio/create-account',
+			'/docs/v/4.1/harperdb-studio/enable-mixed-content',
+			'/docs/v/4.1/harperdb-studio/instance-example-code',
+			'/docs/v/4.1/harperdb-studio/manage-schemas-browse-data',
+			'/docs/v/4.1/harperdb-studio/organizations',
+			'/docs/v/4.1/harperdb-studio/resources',
+			'/docs/v/4.2/administration/harperdb-studio/create-account',
+			'/docs/v/4.2/administration/harperdb-studio/manage-charts',
+			'/docs/v/4.2/administration/harperdb-studio/manage-functions',
+		],
+		to: '/reference/v4/studio/overview',
+	},
+	{ from: '/docs/v/4.2/developers/operations-api/users-and-roles', to: '/reference/v4/users-and-roles/operations' },
+	{
+		from: ['/docs/v/4.1/security/users-and-roles', '/docs/v/4.2/developers/security/users-and-roles'],
+		to: '/reference/v4/users-and-roles/overview',
+	},
+	{
+		from: [
+			'/docs/v/4.1/harperdb-4.2-pre-release/release-notes/2.penny',
+			'/docs/v/4.1/release-notes',
+			'/docs/v/4.1/release-notes/1.alby/1.1.0',
+			'/docs/v/4.1/release-notes/1.alby/1.3.0',
+			'/docs/v/4.1/release-notes/3.monkey/3.1.0',
+			'/docs/v/4.1/release-notes/3.monkey/3.1.1',
+			'/docs/v/4.1/release-notes/3.monkey/3.1.4',
+			'/docs/v/4.1/release-notes/4.tucker/4.0.0',
+			'/docs/v/4.1/release-notes/4.tucker/4.0.1',
+			'/docs/v/4.1/release-notes/4.tucker/4.0.2',
+			'/docs/v/4.1/release-notes/4.tucker/4.1.0',
+			'/docs/v/4.1/technical-details/release-notes/4.tucker/2.2.3',
+			'/docs/v/4.2/technical-details/release-notes/1.alby/1.3.0',
+			'/docs/v/4.2/technical-details/release-notes/2.penny/2.2.3',
+			'/docs/v/4.2/technical-details/release-notes/3.monkey/3.1.5',
+			'/docs/v/4.2/technical-details/release-notes/4.tucker/3.1.4',
+			'/docs/v/4.2/technical-details/release-notes/4.tucker/4.0.2',
+			'/docs/v/4.2/technical-details/release-notes/4.tucker/4.2.4',
+			'/docs/v/4.2/technical-details/release-notes/4.tucker/4.3.17',
+			'/docs/v/4.4/technical-details/release-notes/4.tucker/4.0.7',
+		],
+		to: '/release-notes',
+	},
+	{ from: '/docs/v/4.2/technical-details/release-notes/4.tucker/1.3.1', to: '/release-notes/v1-alby/1.3.1' },
+	{ from: '/docs/v/4.2/release-notes/2.penny/2.1.1', to: '/release-notes/v2-penny/2.1.1' },
+	{ from: '/docs/v/4.1/release-notes/3.monkey/3.0.0', to: '/release-notes/v3-monkey/3.0.0' },
 ];

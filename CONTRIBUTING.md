@@ -200,9 +200,47 @@ The Plugin API is the primary way to implement additional functionality in Harpe
 
 For inline config option annotations inside list items, plain text `(Added in: vX.Y.Z)` is fine — using the component mid-sentence is awkward. Reserve `<VersionBadge>` for standalone placement after headings.
 
-## Verifying Redirects
+## Redirects
 
-The site has a large set of legacy URLs configured in [redirects.ts](redirects.ts) (non-versioned `/docs/*` paths) and [historic-redirects.ts](historic-redirects.ts) (versioned `/docs/4.X/*` paths). To make sure none of them silently start 404'ing — for example after a Reference page is renamed or removed — there is a verification script that checks every `from` path against the live docs site.
+The site is hosted as a static build on GitHub Pages, so there is no server-side router that can rewrite incoming URLs. All redirect handling is therefore done **client-side** by the [`@docusaurus/plugin-client-redirects`](https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-client-redirects) plugin: at build time it emits a small HTML page for every `from` path that immediately navigates the browser to the `to` path. Because the redirect HTML is generated per-path, every redirect must be enumerated explicitly — there is no pattern, prefix, or wildcard support.
+
+### `redirects.ts` vs. `historic-redirects.ts`
+
+The redirect rules are split across two files to keep the two distinct populations of legacy URLs visually and logically separated:
+
+| File                                           | Source paths                                                       | Targets                         | When to edit                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------ | ------------------------------- | -------------------------------------------------------------------- |
+| [redirects.ts](redirects.ts)                   | Non-versioned `/docs/*` paths (e.g. `/docs/developers/rest`)       | Mostly `/reference/v5/*`        | Whenever a current Reference or Learn page is renamed or removed.    |
+| [historic-redirects.ts](historic-redirects.ts) | Versioned `/docs/4.X/*` paths and the GitBook `/docs/v/4.X/*` form | Almost always `/reference/v4/*` | Rarely — only when new analytics data surfaces a missed legacy path. |
+
+The split exists because `historic-redirects.ts` is treated as a frozen, append-only artifact derived from historical analytics, while `redirects.ts` is part of the day-to-day editing surface. Both files export `RedirectRule[]`; `redirects.ts` simply re-exports the concatenation as `redirects` for the plugin config to consume.
+
+### How historic redirects were populated
+
+The full set of versioned and GitBook-era paths in `historic-redirects.ts` was generated from real traffic, not guesswork:
+
+1. Export pageview data from Google Analytics 4 (property `harper.fast - GA4`) for the past several months. The current snapshot is checked in as [scripts/harper-docs-analytics.csv](scripts/harper-docs-analytics.csv) (Oct 2025 – Feb 2026).
+2. Filter to paths under `/docs/4.X/*` and `/docs/v/4.X/*` that the modern site no longer serves.
+3. For each path, hand-map it to the closest equivalent under `/reference/v4/*` (or `/learn`, `/release-notes`, etc. when the page has no direct successor) and group multiple sources onto a single target.
+4. Add the result as a new rule in `historic-redirects.ts`.
+
+To regenerate this list when fresh analytics become available, re-export the CSV, run [scripts/verify-redirects.mjs](scripts/verify-redirects.mjs) to confirm the existing rules still resolve, and then diff the CSV against the configured `from` paths to find the new omissions.
+
+### Paths intentionally not redirected
+
+A small set of paths show up in analytics but are deliberately not given redirects, because they are not real pages the user meant to visit:
+
+- `/docs/4.X/~gitbook/pdf` and `/docs/v/4.X/~gitbook/pdf` — GitBook's PDF export endpoint, not a content page.
+- `/docs/4.X/4.X/...` (double version prefix) — malformed URLs from broken inbound links.
+- `/docs/4.4./getting-started/` — typo path with an extra dot in the version segment.
+- `/robots.txt`, `/404.html`, `/search` — site infrastructure, served directly by Docusaurus.
+- One-off junk in analytics (`/learnjira`, `/view/<id>/<token>/`, etc.) — unrelated to docs traffic.
+
+A handful of very-low-traffic non-versioned strays (e.g. `/docs/developers/`, `/docs/foundations/`, `/docs/administration/edge`, `/docs/5.0/migration-guide`) are also not currently redirected. They are candidates for future cleanup but each accounts for only one or two pageviews per quarter, so the maintenance cost outweighs the win.
+
+### Verifying redirects
+
+To make sure no configured redirect silently starts 404'ing — for example after a Reference page is renamed or removed — there is a verification script that checks every `from` path against the live docs site:
 
 ```bash
 node scripts/verify-redirects.mjs
@@ -217,6 +255,22 @@ Common flags:
 - `--timeout=<ms>` — per-request timeout. Defaults to `15000`.
 
 Run it after editing either redirect file, after large Reference reorganizations, or as part of a periodic check.
+
+### Future work
+
+The current setup is the most we can do under static hosting: every redirect is an enumerated rule that compiles to its own HTML stub. This has two notable limitations:
+
+- **No wildcard or prefix support.** Patterns like "redirect every `/docs/v/4.X/*` URL by stripping the `/v/` segment" cannot be expressed as a single rule — each path must be listed individually. The full `/v/` GitBook rewrite alone took 100+ explicit rules.
+- **Build-time only.** Adding a redirect requires a new build and deploy. There is no way to author a redirect quickly without going through CI.
+
+If the site is eventually re-hosted on a platform with a real request lifecycle — Harper Fabric is the natural candidate, but any Node.js host (or even a CDN edge-rewrite layer) would do — we should migrate the redirect handling to a server-side router with pattern support. At that point we could:
+
+- Replace the entire GitBook `/v/` block with a single regex rule (`/^\/docs\/v\/(.*)$/` → `/docs/$1`).
+- Normalize trailing slashes once in the router instead of as duplicated rules.
+- Author redirects without needing a full Docusaurus rebuild.
+- Optionally emit redirect metrics (which legacy paths still receive traffic) directly from the router rather than relying on GA exports.
+
+Until then, every new redirect goes in `redirects.ts` (or, for historical paths discovered later, `historic-redirects.ts`) as an explicit rule.
 
 ## Known Issues
 
