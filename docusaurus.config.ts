@@ -211,6 +211,37 @@ const config: Config = {
 					],
 				]
 			: []),
+
+		// LLM-friendly flat markdown export.
+		//
+		// Generates a per-page .md file alongside each HTML page (mirroring
+		// the route structure under build/) plus an llms.txt index. The
+		// markdown output is consumed by @harperfast/skills for rule
+		// generation and is also a public artifact for any third-party LLM
+		// tooling that wants to ingest our docs.
+		//
+		// The plugin runs in postBuild against rendered HTML, so multi-
+		// instance docs plugin output (learn, reference, fabric,
+		// release-notes) is captured uniformly without per-instance
+		// configuration. MDX components, theme components, and build-time
+		// data are all already resolved by the time it runs.
+		//
+		// No excludeRoutes: we emit flat markdown for the full site,
+		// including v4 reference docs. Consumers (e.g. the skills repo
+		// manifest) decide which routes to actually use.
+		[
+			'@signalwire/docusaurus-plugin-llms-txt',
+			{
+				content: {
+					// Defaults: enableMarkdownFiles: true, includeDocs: true,
+					// includeVersionedDocs: true. All four docs plugin instances
+					// (learn, reference, fabric, release-notes) are picked up
+					// automatically; v4 reference docs are included so the public
+					// artifacts cover the full site.
+					enableLlmsFullTxt: true,
+				},
+			},
+		],
 	],
 
 	themes: [
