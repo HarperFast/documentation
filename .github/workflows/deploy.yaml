@@ -123,27 +123,32 @@ jobs:
   # Notify the skills repo that docs changed, so it can regenerate its
   # docs-driven rules against the just-deployed content. See the
   # generate.yaml workflow in HarperFast/skills (Phase 2 of the
-  # docs-driven-skills plan). Requires SKILLS_DISPATCH_TOKEN — a PAT or
-  # App token with contents:write on HarperFast/skills (the default
-  # GITHUB_TOKEN is scoped to this repo only and cannot dispatch across
-  # repos). If the secret is absent, the step is skipped (the skills repo
-  # also runs a weekly safety-net cron).
+  # docs-driven-skills plan).
+  #
+  # Authenticates as the org-owned "harper-skills-sync" GitHub App, minting
+  # a token scoped to HarperFast/skills (the default GITHUB_TOKEN is scoped
+  # to this repo only and cannot dispatch cross-repo). The App must be
+  # installed on the skills repo; this repo holds its SKILLS_SYNC_APP_ID /
+  # SKILLS_SYNC_APP_PRIVATE_KEY secrets. If the App is ever removed, the
+  # skills repo's weekly cron is the safety net.
   notify-skills:
     needs: deploy
     name: Notify skills repo
     runs-on: ubuntu-latest
     steps:
+      - name: Mint app token for skills
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.SKILLS_SYNC_APP_ID }}
+          private-key: ${{ secrets.SKILLS_SYNC_APP_PRIVATE_KEY }}
+          owner: HarperFast
+          repositories: skills
+
       - name: Dispatch docs-updated to HarperFast/skills
-        # secrets can't be used in an `if:` expression, so guard inside the
-        # script: if the token is absent, skip cleanly (the skills repo's
-        # weekly cron is the safety net).
         env:
-          GH_TOKEN: ${{ secrets.SKILLS_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "SKILLS_DISPATCH_TOKEN not set — skipping dispatch (skills repo cron will pick up docs changes)."
-            exit 0
-          fi
           gh api repos/HarperFast/skills/dispatches \
             -f event_type=docs-updated \
             -F client_payload[sha]=${{ github.sha }}
