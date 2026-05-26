@@ -152,4 +152,3 @@ jobs:
           gh api repos/HarperFast/skills/dispatches \
             -f event_type=docs-updated \
             -F client_payload[sha]=${{ github.sha }}
-
