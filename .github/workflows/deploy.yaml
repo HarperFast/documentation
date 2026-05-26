@@ -119,3 +119,32 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Notify the skills repo that docs changed, so it can regenerate its
+  # docs-driven rules against the just-deployed content. See the
+  # generate.yaml workflow in HarperFast/skills (Phase 2 of the
+  # docs-driven-skills plan). Requires SKILLS_DISPATCH_TOKEN — a PAT or
+  # App token with contents:write on HarperFast/skills (the default
+  # GITHUB_TOKEN is scoped to this repo only and cannot dispatch across
+  # repos). If the secret is absent, the step is skipped (the skills repo
+  # also runs a weekly safety-net cron).
+  notify-skills:
+    needs: deploy
+    name: Notify skills repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch docs-updated to HarperFast/skills
+        # secrets can't be used in an `if:` expression, so guard inside the
+        # script: if the token is absent, skip cleanly (the skills repo's
+        # weekly cron is the safety net).
+        env:
+          GH_TOKEN: ${{ secrets.SKILLS_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "SKILLS_DISPATCH_TOKEN not set — skipping dispatch (skills repo cron will pick up docs changes)."
+            exit 0
+          fi
+          gh api repos/HarperFast/skills/dispatches \
+            -f event_type=docs-updated \
+            -F client_payload[sha]=${{ github.sha }}
+
