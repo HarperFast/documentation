@@ -239,6 +239,11 @@ const config: Config = {
 					// automatically; v4 reference docs are included so the public
 					// artifacts cover the full site.
 					enableLlmsFullTxt: true,
+					// Run our Docusaurus-aware cleanup transforms before the
+					// plugin's default rehype pipeline so the HTML→Markdown
+					// conversion sees clean structure. See the script header
+					// for details on what gets transformed.
+					beforeDefaultRehypePlugins: [require('./scripts/rehype-docusaurus-to-llms.mjs').default],
 				},
 			},
 		],
