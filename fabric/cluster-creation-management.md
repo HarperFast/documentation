@@ -56,3 +56,14 @@ Clusters are provisioned in real time, as soon as selections are complete
 
 - Cannot guarantee any provisioning time for self-hosted. (**Note**: All performance metrics are estimates unless otherwise noted.)
 - Once a cluster is created, you will be prompted to set a username and password for each cluster.
+
+## Connecting the Harper CLI to a Cluster
+
+The cluster's **Config → Overview** page exposes its **Application URL** — the hostname the Harper CLI and SDKs target. Pass it to `harper login` to authenticate; the CLI stores the token (and writes `HARPER_CLI_TARGET` to a local `.env`) so subsequent commands don't need credentials repeated.
+
+```bash
+harper login <Application URL>
+# Provide cluster username and password when prompted
+```
+
+See [CLI Authentication](/reference/v5/cli/authentication) for the full set of authentication methods — including environment variables for CI/CD pipelines.
