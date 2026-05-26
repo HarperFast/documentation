@@ -61,6 +61,34 @@ jobs:
           echo "Using DOCUSAURUS_URL: $DOCUSAURUS_URL"
           npm run build || (echo "Site build failed" && exit 1)
 
+      - name: Verify flat-markdown export
+        run: |
+          # @signalwire/docusaurus-plugin-llms-txt should have produced one
+          # .md file per HTML page plus an llms.txt index. This artifact is
+          # consumed by @harperfast/skills (and any third-party LLM tooling).
+          # Fail the build loudly if it didn't run or produced no output.
+          set -euo pipefail
+          failures=0
+          for dir in learn reference fabric release-notes; do
+            count=$(find "build/$dir" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$count" -lt 1 ]; then
+              echo "::error::No .md files generated under build/$dir/ — llms-txt plugin failed for this docs instance"
+              failures=$((failures + 1))
+            else
+              echo "build/$dir: $count .md files"
+            fi
+          done
+          for f in build/llms.txt build/llms-full.txt; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Expected artifact $f is missing"
+              failures=$((failures + 1))
+            fi
+          done
+          if [ "$failures" -gt 0 ]; then
+            exit 1
+          fi
+          echo "✓ Flat-markdown export verified"
+
       - name: Upload npm logs on failure
         if: failure()
         uses: actions/upload-artifact@v6
