@@ -244,6 +244,12 @@ const config: Config = {
 					// conversion sees clean structure. See the script header
 					// for details on what gets transformed.
 					beforeDefaultRehypePlugins: [require('./scripts/rehype-docusaurus-to-llms.mjs').default],
+					// Explicit exclusions for routes that are not real content.
+					// /reference is a client-side redirect React component
+					// (src/pages/reference/index.tsx) that returns null; without
+					// this entry the plugin tries to process its empty HTML
+					// shell and emits a warning.
+					excludeRoutes: ['/reference'],
 				},
 			},
 		],
