@@ -15,10 +15,10 @@ If you are looking for information on how to configure your Harper installation 
 
 ## Configuration
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `files` | `string \| string[]` | **Yes** | Path(s) or glob pattern(s) to the env file(s) to load. |
-| `override` | `boolean` | No | If `true`, loaded values override existing environment variables. Defaults to `false`. |
+| Option     | Type                 | Required | Description                                                                            |
+| ---------- | -------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `files`    | `string \| string[]` | **Yes**  | Path(s) or glob pattern(s) to the env file(s) to load.                                 |
+| `override` | `boolean`            | No       | If `true`, loaded values override existing environment variables. Defaults to `false`. |
 
 ## Basic Usage
 
