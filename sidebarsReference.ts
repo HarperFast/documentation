@@ -120,6 +120,11 @@ const sidebars: SidebarsConfig = {
 					id: 'components/javascript-environment',
 					label: 'JavaScript Environment',
 				},
+				{
+					type: 'doc',
+					id: 'components/nextjs',
+					label: 'Next.js Plugin',
+				},
 			],
 		},
 		{
