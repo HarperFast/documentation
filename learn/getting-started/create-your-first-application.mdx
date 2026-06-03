@@ -157,6 +157,24 @@ Click "Restart Cluster" to apply the new file changes.
 
 </Tabs>
 
+## Verifying the Table Was Created
+
+Once Harper has started, confirm your `Dog` table was picked up from `schema.graphql` by running:
+
+```bash
+harper describe_data
+```
+
+You should see output like:
+
+```
+Connecting to local Harper instance
+Schema: data
+  Dog  [id*, name, breed, age]
+```
+
+The asterisk marks the primary key. If the table is missing, double-check that `config.yaml` references the correct schema file and that Harper restarted after the file was saved.
+
 ## Enabling the REST API
 
 Navigate back to the `schema.graphql` file and add `@export` directive to the table schema:
