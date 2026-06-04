@@ -6,6 +6,7 @@ import { redirects, createRedirects } from './redirects';
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const scripts = [];
+const headTags = [];
 
 // `npm run build` sets this to 'production'
 // `npm start` and `npm run dev` sets it to 'development'
@@ -15,7 +16,19 @@ if (process.env.NODE_ENV === 'production') {
 		src: 'https://tluma.ai/widget.js',
 		async: true,
 	});
+	headTags.push({
+			tagName: 'script',
+			attributes: {},
+			innerHTML: `window.tlumaConfig = {
+			source: 'harperfast/documentation',
+			theme: 'auto',
+			button: 'bottom-right',
+		};`,
+	});
 }
+
+
+
 
 // Determine base URL from environment variable or use defaults
 // For GitHub Pages deployment: DOCUSAURUS_BASE_URL=/documentation/
@@ -410,16 +423,7 @@ const config: Config = {
 			darkTheme: prismThemes.dracula,
 		},
 	} satisfies Preset.ThemeConfig,
-	headTags: [
-		{
-			tagName: 'script',
-			innerHTML: `window.tlumaConfig = {
-			source: 'harperfast/documentation',
-			theme: 'auto',
-			button: 'bottom-right',
-		};`,
-		},
-	],
+	headTags,
 	scripts,
 };
 
