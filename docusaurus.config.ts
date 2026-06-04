@@ -11,6 +11,10 @@ const scripts = [];
 // `npm start` and `npm run dev` sets it to 'development'
 if (process.env.NODE_ENV === 'production') {
 	scripts.push({ src: '/js/reo.js' });
+	scripts.push({
+		src: 'https://tluma.ai/widget.js',
+		async: true,
+	});
 }
 
 // Determine base URL from environment variable or use defaults
@@ -406,6 +410,16 @@ const config: Config = {
 			darkTheme: prismThemes.dracula,
 		},
 	} satisfies Preset.ThemeConfig,
+	headTags: [
+		{
+			tagName: 'script',
+			innerHTML: `window.tlumaConfig = {
+			source: 'harperfast/documentation',
+			theme: 'auto',
+			button: 'bottom-right',
+		};`,
+		},
+	],
 	scripts,
 };
 
