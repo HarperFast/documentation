@@ -52,16 +52,24 @@ Product catalog row — what shows up in the storefront listing,
 search, and inventory feeds. One row per SKU.
 """
 type Product @table @export {
-	"""Stock keeping unit — globally unique across catalogs."""
+	"""
+	Stock keeping unit — globally unique across catalogs.
+	"""
 	sku: String! @primaryKey
 
-	"""Display name shown in the storefront. 100 chars max."""
+	"""
+	Display name shown in the storefront. 100 chars max.
+	"""
 	name: String!
 
-	"""Retail price in cents (USD)."""
+	"""
+	Retail price in cents (USD).
+	"""
 	priceCents: Int!
 
-	"""Current inventory level. Decremented by orders; reconciled nightly."""
+	"""
+	Current inventory level. Decremented by orders; reconciled nightly.
+	"""
 	inStock: Int!
 }
 ```
@@ -85,7 +93,10 @@ MCP `tools/list` now returns:
 			"sku": { "type": "string", "description": "Stock keeping unit — globally unique across catalogs." },
 			"name": { "type": "string", "description": "Display name shown in the storefront. 100 chars max." },
 			"priceCents": { "type": "integer", "description": "Retail price in cents (USD)." },
-			"inStock": { "type": "integer", "description": "Current inventory level. Decremented by orders; reconciled nightly." }
+			"inStock": {
+				"type": "integer",
+				"description": "Current inventory level. Decremented by orders; reconciled nightly."
+			}
 		},
 		"required": ["sku", "name", "priceCents", "inStock"],
 		"additionalProperties": false
@@ -119,18 +130,22 @@ export class ProductInventory extends Resource {
 		'Read-only; the underlying Product table is the system of record.';
 
 	static properties = {
-		sku: { type: 'string', primaryKey: true,
-			description: 'Stock keeping unit; matches Product.sku.' },
-		onHand: { type: 'integer',
-			description: 'Current warehouse count.' },
-		reserved: { type: 'integer',
-			description: 'Units allocated to open orders but not yet shipped.' },
-		stockStatus: { type: 'string', enum: ['in_stock', 'out_of_stock', 'backorder'],
-			description: 'Derived from onHand vs reserved.' },
+		sku: { type: 'string', primaryKey: true, description: 'Stock keeping unit; matches Product.sku.' },
+		onHand: { type: 'integer', description: 'Current warehouse count.' },
+		reserved: { type: 'integer', description: 'Units allocated to open orders but not yet shipped.' },
+		stockStatus: {
+			type: 'string',
+			enum: ['in_stock', 'out_of_stock', 'backorder'],
+			description: 'Derived from onHand vs reserved.',
+		},
 	};
 
-	async get(id) { /* returns { sku, onHand, reserved, stockStatus } */ }
-	async search(query) { /* ... */ }
+	async get(id) {
+		/* returns { sku, onHand, reserved, stockStatus } */
+	}
+	async search(query) {
+		/* ... */
+	}
 }
 ```
 
@@ -165,7 +180,9 @@ type Customer @table @export {
 	id: Long @primaryKey
 	name: String
 
-	"""Internal — used by the pricing engine; not for external consumers."""
+	"""
+	Internal — used by the pricing engine; not for external consumers.
+	"""
 	creditScore: Int @hidden
 }
 ```
