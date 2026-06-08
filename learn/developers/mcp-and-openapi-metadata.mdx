@@ -2,9 +2,6 @@
 title: Writing quality MCP and OpenAPI descriptions
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 When an MCP client connects to Harper, the LLM on the other side sees your application as a list of tools. The text it reads to pick the right tool — the tool description, the per-attribute property descriptions, the output schema shape — is the dominant signal for tool selection. The same metadata also drives Harper's OpenAPI document, which any HTTP API consumer (Swagger UI, Redoc, generated SDKs, machine clients) reads.
 
 This guide shows how to author that metadata once and have it flow to both surfaces — via GraphQL docstrings for `@table @export` Resources, and via class-level statics for programmatic Resource subclasses.
