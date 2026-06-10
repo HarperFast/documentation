@@ -232,6 +232,23 @@ const config: Config = {
 		[
 			'@signalwire/docusaurus-plugin-llms-txt',
 			{
+				// Positioning blockquote rendered under the `# Harper Docs`
+				// header of llms.txt. Mirrors the framing on harper.fast so a
+				// crawler that only fetches the docs file (more likely for
+				// technical queries) still gets the product context.
+				siteDescription:
+					'Harper is a single in-process runtime that unifies your database, application logic, APIs, caching, real-time messaging, and agent loops, replicated across a multi-region data application fabric. This site is the official technical documentation: guides, API and configuration reference, and Fabric operations.',
+				// Cross-reference to the marketing site so any agent that lands
+				// on the docs llms.txt can discover the companion file at
+				// harper.fast/llms.txt (and vice-versa).
+				optionalLinks: [
+					{
+						title: 'Harper product overview (harper.fast)',
+						url: 'https://www.harper.fast',
+						description:
+							'Marketing site with positioning and use cases; companion llms.txt at https://www.harper.fast/llms.txt',
+					},
+				],
 				content: {
 					// Defaults: enableMarkdownFiles: true, includeDocs: true,
 					// includeVersionedDocs: true. All four docs plugin instances
