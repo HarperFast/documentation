@@ -91,6 +91,39 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'AI & Models',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'models/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'models/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'models/tool-calling',
+					label: 'Tool Calling',
+				},
+				{
+					type: 'doc',
+					id: 'models/backends',
+					label: 'Backends',
+				},
+				{
+					type: 'doc',
+					id: 'models/analytics',
+					label: 'Analytics',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Components',
 			collapsible: false,
 			className: 'reference-category-header',
