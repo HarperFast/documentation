@@ -30,6 +30,20 @@ npm run format:write
 
 5. Push changes to a branch and create a pull request
 
+## Formatting
+
+**Every contribution must be formatted before it is committed.** This applies to _all_ files in the repository — content (`.md`/`.mdx`), TypeScript, config, and anything else under `plans/`, `scripts/`, etc. — not just docs content.
+
+```bash
+# Format everything (run before committing):
+npm run format:write
+
+# Check formatting without writing (what CI runs):
+npm run format:check
+```
+
+CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperdb/code-guidelines/prettier` (see `package.json`).
+
 ## Site Organization
 
 This site is powered by Docusaurus. The documentation is split into four distinct sections, each serving a different purpose and configured as its own Docusaurus plugin instance.
