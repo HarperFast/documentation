@@ -577,26 +577,26 @@ Operations for deploying and managing Harper components (applications, plugins).
 
 Detailed documentation: [Components Overview](../components/overview.md)
 
-| Operation                    | Description                                                             | Role Required |
-| ---------------------------- | ----------------------------------------------------------------------- | ------------- |
-| `add_component`              | Creates a new component project from a template                         | super_user    |
-| `deploy_component`           | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
-| `package_component`          | Packages a component project into a base64-encoded tar                  | super_user    |
-| `drop_component`             | Deletes a component or a file within a component                        | super_user    |
-| `get_components`             | Lists all component files and config                                    | super_user    |
-| `get_component_file`         | Returns the contents of a file within a component                       | super_user    |
-| `set_component_file`         | Creates or updates a file within a component                            | super_user    |
-| `list_deployments`           | Lists deployment records with optional filters                          | super_user    |
-| `get_deployment`             | Fetches a single deployment record by ID; supports SSE streaming        | super_user    |
-| `get_deployment_payload`     | Returns the tarball stored for a deployment                             | super_user    |
-| `delete_deployment_payload`  | Removes the stored tarball to free space                                | super_user    |
-| `add_ssh_key`                | Adds an SSH key for deploying from private repositories                 | super_user    |
-| `update_ssh_key`             | Updates an existing SSH key                                             | super_user    |
-| `delete_ssh_key`             | Deletes an SSH key                                                      | super_user    |
-| `list_ssh_keys`              | Lists all configured SSH key names                                      | super_user    |
-| `set_ssh_known_hosts`        | Overwrites the SSH known_hosts file                                     | super_user    |
-| `get_ssh_known_hosts`        | Returns the contents of the SSH known_hosts file                        | super_user    |
-| `install_node_modules`       | _(Deprecated)_ Run npm install on component projects                    | super_user    |
+| Operation                   | Description                                                             | Role Required |
+| --------------------------- | ----------------------------------------------------------------------- | ------------- |
+| `add_component`             | Creates a new component project from a template                         | super_user    |
+| `deploy_component`          | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
+| `package_component`         | Packages a component project into a base64-encoded tar                  | super_user    |
+| `drop_component`            | Deletes a component or a file within a component                        | super_user    |
+| `get_components`            | Lists all component files and config                                    | super_user    |
+| `get_component_file`        | Returns the contents of a file within a component                       | super_user    |
+| `set_component_file`        | Creates or updates a file within a component                            | super_user    |
+| `list_deployments`          | Lists deployment records with optional filters                          | super_user    |
+| `get_deployment`            | Fetches a single deployment record by ID; supports SSE streaming        | super_user    |
+| `get_deployment_payload`    | Returns the tarball stored for a deployment                             | super_user    |
+| `delete_deployment_payload` | Removes the stored tarball to free space                                | super_user    |
+| `add_ssh_key`               | Adds an SSH key for deploying from private repositories                 | super_user    |
+| `update_ssh_key`            | Updates an existing SSH key                                             | super_user    |
+| `delete_ssh_key`            | Deletes an SSH key                                                      | super_user    |
+| `list_ssh_keys`             | Lists all configured SSH key names                                      | super_user    |
+| `set_ssh_known_hosts`       | Overwrites the SSH known_hosts file                                     | super_user    |
+| `get_ssh_known_hosts`       | Returns the contents of the SSH known_hosts file                        | super_user    |
+| `install_node_modules`      | _(Deprecated)_ Run npm install on component projects                    | super_user    |
 
 ### `deploy_component`
 
@@ -636,14 +636,14 @@ Harper records every `deploy_component` call in the `system.hdb_deployment` tabl
 
 Returns a list of deployment records, newest first. All filter parameters are optional.
 
-| Parameter  | Type     | Description                                        |
-| ---------- | -------- | -------------------------------------------------- |
-| `project`  | string   | Filter to a specific component project             |
-| `status`   | string   | Filter by status: `pending`, `success`, `failed`   |
-| `since`    | number   | Start of time range (Unix timestamp ms)            |
-| `until`    | number   | End of time range (Unix timestamp ms)              |
-| `limit`    | number   | Maximum number of results (default: 100)           |
-| `offset`   | number   | Pagination offset                                  |
+| Parameter | Type   | Description                                      |
+| --------- | ------ | ------------------------------------------------ |
+| `project` | string | Filter to a specific component project           |
+| `status`  | string | Filter by status: `pending`, `success`, `failed` |
+| `since`   | number | Start of time range (Unix timestamp ms)          |
+| `until`   | number | End of time range (Unix timestamp ms)            |
+| `limit`   | number | Maximum number of results (default: 100)         |
+| `offset`  | number | Pagination offset                                |
 
 ```json
 {
@@ -669,22 +669,22 @@ Returns a single deployment record by `deployment_id`. When called on an in-prog
 
 The deployment record includes:
 
-| Field              | Description                                                              |
-| ------------------ | ------------------------------------------------------------------------ |
-| `deployment_id`    | Unique identifier (content hash)                                         |
-| `project`          | Component project name                                                   |
-| `package_identifier` | Package reference or `payload` for tar uploads                         |
-| `status`           | `pending`, `success`, `failed`, or `rolled_back`                        |
-| `phase`            | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`      |
-| `event_log`        | Bounded log of install output and phase transitions (up to 200 entries) |
-| `peer_results`     | Per-node outcome map for replicated deployments                          |
-| `payload_hash`     | SHA-256 hash of the deployment tarball                                   |
-| `payload_size`     | Byte size of the deployment tarball                                      |
-| `started_at`       | Timestamp when deployment began                                          |
-| `completed_at`     | Timestamp when deployment finished                                       |
-| `user`             | User who initiated the deployment                                        |
-| `rollback_of`      | `deployment_id` of the deployment this rolls back, if applicable         |
-| `error`            | Error message for failed deployments                                     |
+| Field                | Description                                                             |
+| -------------------- | ----------------------------------------------------------------------- |
+| `deployment_id`      | Unique identifier (content hash)                                        |
+| `project`            | Component project name                                                  |
+| `package_identifier` | Package reference or `payload` for tar uploads                          |
+| `status`             | `pending`, `success`, `failed`, or `rolled_back`                        |
+| `phase`              | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`      |
+| `event_log`          | Bounded log of install output and phase transitions (up to 200 entries) |
+| `peer_results`       | Per-node outcome map for replicated deployments                         |
+| `payload_hash`       | SHA-256 hash of the deployment tarball                                  |
+| `payload_size`       | Byte size of the deployment tarball                                     |
+| `started_at`         | Timestamp when deployment began                                         |
+| `completed_at`       | Timestamp when deployment finished                                      |
+| `user`               | User who initiated the deployment                                       |
+| `rollback_of`        | `deployment_id` of the deployment this rolls back, if applicable        |
+| `error`              | Error message for failed deployments                                    |
 
 ### `get_deployment_payload`
 
