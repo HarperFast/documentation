@@ -49,6 +49,14 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 - The `<VersionBadge>` component is globally registered — no import needed in `.md`/`.mdx` files.
 - See the complete repository organization in `CONTRIBUTING.md`
 
+## Versioning Content
+
+- Tag minor-version availability inline: `<VersionBadge version="vX.Y.0" />` for new surface, `<VersionBadge type="changed" version="vX.Y.0" />` for behavior changes to existing surface.
+- Derive the version from the core release the change ships in, stripping prerelease suffixes (`5.1.0-beta.1` → `v5.1.0`).
+- Each minor release gets a file under `release-notes/<major-codename>/` (e.g. `release-notes/v5-lincoln/5.1.md`); the sidebar picks it up automatically.
+- Absolute links from `release-notes/` (or `learn/`) into current reference docs use the versioned path `/reference/v5/...` — the reference plugin maps the current version to the `v5` URL path.
+- When documenting a change from a core/pro PR, cross-link the feature PR and the docs PR in both descriptions.
+
 ## Testing
 
 - There is no automated test suite. Verification is done by running the dev server or build.
