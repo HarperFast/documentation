@@ -45,7 +45,7 @@ learn/
 ```
 
 **The entire caching series shipped ahead of plan.** But **Custom Resources** —
-declared a *prerequisite* for caching in the original outline — does **not** exist
+declared a _prerequisite_ for caching in the original outline — does **not** exist
 yet. The dependency is currently inverted; Custom Resources (guide #9 below) should
 be prioritized and the shipped caching guides back-linked to it once it lands.
 
@@ -56,33 +56,34 @@ truth. The deleted legacy `/docs/` page is available for narrative/tutorial fram
 that may not have survived the reference rewrite.
 
 > **Legacy content** lives at git ref **`0f754c5f`** (parent of `01c78b8e`):
+>
 > ```bash
 > git show 0f754c5f:docs/<path>
 > git ls-tree -r --name-only 0f754c5f | grep '^docs/'
 > ```
 
-| Topic | Legacy `/docs/` path | Current `reference/` source |
-|---|---|---|
-| Architecture / core concepts | `foundations/harper-architecture`, `foundations/core-concepts` | `components/overview.md`, `index.md` |
-| Applications | `developers/applications/index` | `components/applications.md` |
-| Debugging | `developers/applications/debugging` | `configuration/debugging.md` |
-| Schema | `developers/applications/defining-schemas` | `database/schema.md` |
-| Data Loader | `developers/applications/data-loader` | `database/data-loader.md` |
-| Roles | `developers/applications/defining-roles` | `users-and-roles/configuration.md` |
-| Users & roles | `developers/security/users-and-roles` | `users-and-roles/overview.md` |
-| Custom resources | `developers/applications/index` | `resources/resource-api.md`, `resources/overview.md` |
-| Query optimization | `reference/resources/query-optimization` | `resources/query-optimization.md` |
-| REST | `developers/rest` | `rest/overview.md`, `rest/querying.md` |
-| Real-time | `developers/real-time` | `rest/websockets.md`, `rest/server-sent-events.md` |
-| Web apps / routes | `developers/applications/web-applications`, `.../define-routes` | `static-files/overview.md`, `components/nextjs.md`, `fastify-routes/overview.md` |
-| Plugins / extensions | `reference/components/plugins`, `.../extensions` | `components/plugin-api.md`, `components/extension-api.md` |
-| Replication / sharding | `developers/replication/sharding`, `.../index` | `replication/sharding.md`, `replication/overview.md`, `replication/clustering.md` |
-| Logging | `administration/logging/*` | `logging/overview.md`, `logging/configuration.md`, `logging/api.md`, `logging/operations.md` |
-| Analytics | `developers/operations-api/analytics` | `analytics/overview.md`, `analytics/operations.md` |
-| Certificates | `developers/security/certificate-management`, `.../certificate-verification` | `security/certificate-management.md`, `security/certificate-verification.md` |
-| Security config | `developers/security/configuration` | `security/configuration.md`, `http/configuration.md`, `http/tls.md` |
-| Compaction | `administration/compact` _(named `compact`)_ | `database/compaction.md` |
-| Jobs | `administration/jobs` | `database/jobs.md`, `operations-api/operations.md` |
+| Topic                        | Legacy `/docs/` path                                                         | Current `reference/` source                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Architecture / core concepts | `foundations/harper-architecture`, `foundations/core-concepts`               | `components/overview.md`, `index.md`                                                         |
+| Applications                 | `developers/applications/index`                                              | `components/applications.md`                                                                 |
+| Debugging                    | `developers/applications/debugging`                                          | `configuration/debugging.md`                                                                 |
+| Schema                       | `developers/applications/defining-schemas`                                   | `database/schema.md`                                                                         |
+| Data Loader                  | `developers/applications/data-loader`                                        | `database/data-loader.md`                                                                    |
+| Roles                        | `developers/applications/defining-roles`                                     | `users-and-roles/configuration.md`                                                           |
+| Users & roles                | `developers/security/users-and-roles`                                        | `users-and-roles/overview.md`                                                                |
+| Custom resources             | `developers/applications/index`                                              | `resources/resource-api.md`, `resources/overview.md`                                         |
+| Query optimization           | `reference/resources/query-optimization`                                     | `resources/query-optimization.md`                                                            |
+| REST                         | `developers/rest`                                                            | `rest/overview.md`, `rest/querying.md`                                                       |
+| Real-time                    | `developers/real-time`                                                       | `rest/websockets.md`, `rest/server-sent-events.md`                                           |
+| Web apps / routes            | `developers/applications/web-applications`, `.../define-routes`              | `static-files/overview.md`, `components/nextjs.md`, `fastify-routes/overview.md`             |
+| Plugins / extensions         | `reference/components/plugins`, `.../extensions`                             | `components/plugin-api.md`, `components/extension-api.md`                                    |
+| Replication / sharding       | `developers/replication/sharding`, `.../index`                               | `replication/sharding.md`, `replication/overview.md`, `replication/clustering.md`            |
+| Logging                      | `administration/logging/*`                                                   | `logging/overview.md`, `logging/configuration.md`, `logging/api.md`, `logging/operations.md` |
+| Analytics                    | `developers/operations-api/analytics`                                        | `analytics/overview.md`, `analytics/operations.md`                                           |
+| Certificates                 | `developers/security/certificate-management`, `.../certificate-verification` | `security/certificate-management.md`, `security/certificate-verification.md`                 |
+| Security config              | `developers/security/configuration`                                          | `security/configuration.md`, `http/configuration.md`, `http/tls.md`                          |
+| Compaction                   | `administration/compact` _(named `compact`)_                                 | `database/compaction.md`                                                                     |
+| Jobs                         | `administration/jobs`                                                        | `database/jobs.md`, `operations-api/operations.md`                                           |
 
 > **In-guide links** should use the published doc URL form `/reference/v5/...`
 > (the current docs version), not raw repo paths. Repo paths above are for the
@@ -94,24 +95,13 @@ that may not have survived the reference rewrite.
 intended authoring sequence; the Developers track is a dependency chain.
 
 **Getting Started**
+
 1. Deploy to Fabric
 
-**Developers** (author roughly in order — each builds on the previous)
-4. Defining Databases and Tables
-5. Loading Data
-6. Users & Roles
-7. Querying and Interacting with Data
-8. Real-Time Data Access Introduction
-9. **Custom Resources** — _prioritize; prerequisite for the already-shipped caching guides_
-10. Web Apps
-12. Data with Replication
-13. Plugin Development
+**Developers** (author roughly in order — each builds on the previous) 4. Defining Databases and Tables 5. Loading Data 6. Users & Roles 7. Querying and Interacting with Data 8. Real-Time Data Access Introduction 9. **Custom Resources** — _prioritize; prerequisite for the already-shipped caching guides_ 10. Web Apps 12. Data with Replication 13. Plugin Development
 
-**Administration**
-14. Running Harper Locally · 15. Running Harper in a Container · 16. Fabric
-Deployment Guide · 17. Manual / Local Replication Setup · 18. Logging ·
-19. Analytics & Grafana Plugin · 20. Certificate Management & Verification ·
-21. Security Configuration · 22. Compaction · 23. Jobs
+**Administration** 14. Running Harper Locally · 15. Running Harper in a Container · 16. Fabric
+Deployment Guide · 17. Manual / Local Replication Setup · 18. Logging · 19. Analytics & Grafana Plugin · 20. Certificate Management & Verification · 21. Security Configuration · 22. Compaction · 23. Jobs
 
 _(Numbers 2, 3, 11 intentionally absent — already shipped.)_
 
@@ -119,7 +109,9 @@ Full per-guide scope is in [`issues/`](./issues) — one Markdown file per guide
 used verbatim as the GitHub issue body in Phase 1.
 
 ### Overlaps with existing open issues
+
 Dedupe before/at issue creation — cross-link, and close pure duplicates:
+
 - #16 Fabric Deployment ↔ **#502** (CI/CD Fabric deploy) — strongest overlap; merge.
 - #1 Deploy to Fabric ↔ #478, #502.
 - #5 Loading Data / #13 Plugin Dev ↔ **#513** (restart behavior).
@@ -129,7 +121,7 @@ Dedupe before/at issue creation — cross-link, and close pure duplicates:
 ## 5. Conventions
 
 - **Template:** every guide follows `learn/_guide-template.mdx` — intro,
-  *What You Will Learn*, *Prerequisites*, body sections, *Additional Resources*.
+  _What You Will Learn_, _Prerequisites_, body sections, _Additional Resources_.
 - **Location:** `learn/<section>/<slug>.mdx` (`getting-started` | `developers` |
   `administration`).
 - **Sidebar:** register the new doc in `sidebarsLearn.ts`. Getting Started and
@@ -202,6 +194,7 @@ Do them one or a few at a time; respect the §4 ordering (Custom Resources early
    `git worktree remove "$PWD/.claude/worktrees/learn-<slug>"`.
 
 ### Guardrails for the agent
+
 - One guide per PR — keep diffs reviewable.
 - Never invent APIs/behavior: every claim traces to a `reference/` doc or verified
   example. When unsure, flag it in the PR description rather than guessing.
@@ -211,6 +204,7 @@ Do them one or a few at a time; respect the §4 ordering (Custom Resources early
   the §4 order.
 
 ## 8. Open decisions (for maintainers)
+
 - Whether to close/merge #502 into guide #16.
 - Whether to add a dedicated `learn` label for track-wide filtering (currently
   `content` only).
