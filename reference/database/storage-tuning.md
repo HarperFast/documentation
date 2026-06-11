@@ -138,6 +138,109 @@ Default: `true`
 
 In-memory record caching of decoded records. Disable to reduce heap usage when records are large and unlikely to be re-read in the same process.
 
+## RocksDB Memory
+
+RocksDB exposes two large native memory pools that Harper makes tunable: a shared **block cache** for hot SST blocks, and an optional **WriteBufferManager** that caps total memtable memory across every database in the process. These options apply only when `storage.engine` is `rocksdb`.
+
+### How RocksDB reads are cached
+
+A read of a record that isn't in the memtable goes through three tiers before reaching disk:
+
+1. **Block cache** (in-process, decompressed) — sized by `storage.rocks.blockCacheSize`. A hit returns in roughly a microsecond with no syscall and no decompression cost.
+2. **OS page cache** (kernel, compressed SST file pages) — sized dynamically by the kernel from whatever memory isn't claimed by the process. A block-cache miss that hits the page cache costs a `read` syscall plus decompression — still on the order of microseconds, just an order of magnitude slower than the block cache.
+3. **Disk** — if neither cache holds the page, RocksDB reads from the SST file directly.
+
+Harper uses buffered I/O, so the OS page cache is always in play. The implication for sizing: shrinking the block cache doesn't directly translate to more disk reads — it shifts hits from the block cache (decompressed) to the OS page cache (compressed). The OS page cache also adjusts dynamically to host-wide memory pressure, which the block cache does not. Reserving less memory for the block cache leaves more for the page cache and for unrelated allocations on the host.
+
+The trade-off favors a larger block cache when read latency matters and the working set fits; it favors a smaller block cache when memory pressure or noisy neighbors are the dominant concern.
+
+### `storage.rocks.blockCacheSize`
+
+<VersionBadge version="v5.1.0" />
+
+Type: `number` (bytes)
+
+Default: 25% of constrained (cgroup) or total memory
+
+The shared LRU cache for decompressed SST blocks. Every RocksDB database in the process draws from this single pool.
+
+The cache fills as blocks are read; it does **not** shrink on idle. Once the cache reaches its high-water mark for a workload, entries persist until LRU eviction or a manual capacity change. A long-running instance with a brief burst of activity will hold the cached blocks for the lifetime of the process.
+
+```yaml
+storage:
+  rocks:
+    blockCacheSize: 268435456 # 256 MB
+```
+
+Lower the cache size when:
+
+- The host has limited memory headroom and the OS page cache is a meaningful second tier.
+- Read access patterns favor a warm working set far smaller than 25% of memory.
+- The instance runs under a strict cgroup limit and the headroom is needed for memtables or application heap.
+
+Raise it (or leave at the default) when reads dominate and the working set comfortably fits at 25%.
+
+### `storage.rocks.writeBufferManagerSize`
+
+<VersionBadge version="v5.1.0" />
+
+Type: `number` (bytes)
+
+Default: `0` (disabled)
+
+When set, Harper attaches a single RocksDB `WriteBufferManager` to every opened database in the process. Total memtable memory — including active memtables, immutable memtables awaiting flush, and the maintain-window history that RocksDB's OptimisticTransactionDB retains for conflict checking — is capped at this size across the entire process.
+
+Without a `WriteBufferManager`, each column family (table) manages its own memtable budget. The total grows with the number of column families: each one retains roughly `max_write_buffer_size_to_maintain` worth of recently-flushed memtables for snapshot reads and conflict detection. A database with many tables can accumulate hundreds of megabytes to a few gigabytes of resident anonymous memory before any cap is reached.
+
+Enabling the manager bounds that growth at a single configurable limit:
+
+```yaml
+storage:
+  rocks:
+    writeBufferManagerSize: 268435456 # 256 MB total memtable budget
+```
+
+The manager affects new databases opened after it is configured; existing open databases retain whatever budget they were attached with.
+
+### `storage.rocks.writeBufferManagerCostToCache`
+
+<VersionBadge version="v5.1.0" />
+
+Type: `boolean`
+
+Default: `false`
+
+When `true`, memtable memory tracked by the `WriteBufferManager` is **charged against the block cache** as pinned cache entries. The block cache and write buffers then share a single accounting pool, visible through one operational metric (`rocksdb.block-cache-usage`).
+
+This does not let the cache "shrink" to make room for writes — pinned entries cannot be evicted by LRU — but it unifies observability and bounds the combined memory footprint when `writeBufferManagerSize` is at or below `blockCacheSize`.
+
+Has no effect when `storage.rocks.writeBufferManagerSize` is `0` or when the block cache is disabled.
+
+```yaml
+storage:
+  rocks:
+    blockCacheSize: 536870912 # 512 MB
+    writeBufferManagerSize: 268435456 # 256 MB
+    writeBufferManagerCostToCache: true
+```
+
+### `storage.rocks.writeBufferManagerAllowStall`
+
+<VersionBadge version="v5.1.0" />
+
+Type: `boolean`
+
+Default: `false`
+
+Controls behavior when memtable memory reaches `writeBufferManagerSize`:
+
+- `false` (soft cap) — Memtables may briefly exceed the limit. RocksDB compensates by flushing more aggressively. Writes proceed without latency spikes; total memory may temporarily overshoot during bursts.
+- `true` (hard cap) — Writes are stalled until flushes free up memory. Total memtable memory is strictly bounded; write latency can spike during bursts.
+
+Use the default (`false`) for most workloads. Enable stalling only when a strict OOM-prevention guarantee is required and the application can tolerate occasional write-latency spikes.
+
+This option is the only `WriteBufferManager` setting that can be changed at runtime — `costToCache` is fixed at first creation.
+
 ## Storage Reclamation
 
 `storage.reclamation` controls how Harper evicts data from caching tables (tables with [`sourcedFrom`](../resources/resource-api.md#sourcedfromresource-options)) when disk usage runs high. Reclamation does **not** affect non-caching tables — those rely on explicit deletion, TTL expiration, or [compaction](./compaction.md).
