@@ -81,7 +81,7 @@ Performs a query on the resource or table. This is called by `get()` on collecti
 
 ---
 
-### `put(target: RequestTarget | Id, data: Promise<object>, context?: Resource | Context): Promise<void> | Response`
+### `put(target: RequestTarget | Id, data: object, context?: Resource | Context): Promise<void> | Response`
 
 ### `put(record: object, context?): Promise<void>`
 
@@ -105,7 +105,7 @@ class MyResource extends Resource {
 
 ---
 
-### `patch(target: RequestTarget | Id, data: Promise<object>, context?: Resource | Context): Promise<void> | Response`
+### `patch(target: RequestTarget | Id, data: object, context?: Resource | Context): Promise<void> | Response`
 
 Writes a partial record to the table, merging `data` into the existing record.
 
@@ -127,14 +127,15 @@ class MyResource extends Resource {
 
 ---
 
-### `post(target: RequestTarget, data: Promise<object>, context?: Resource | Context): Promise<void> | Response`
+### `post(target: RequestTarget, data: object, context?: Resource | Context): Promise<void> | Response`
 
 Called for HTTP POST requests. The default behavior creates a new record, but it can be overridden to implement custom actions. Prefer more explicit methods like `create()` or `update()` over calling `post` directly.
 
+`data` is the already-deserialized request body. For an `application/json` request body it is the parsed JSON value (typically an object), so you can read fields directly — `await` is not required:
+
 ```javascript
 class MyResource extends Resource {
-	static async post(target, promisedData) {
-		let data = await promisedData;
+	static async post(target, data) {
 		if (data.action === 'create') {
 			return this.create(target, data.content);
 		} else if (data.action === 'update') {
@@ -145,6 +146,17 @@ class MyResource extends Resource {
 	}
 }
 ```
+
+The exact shape of `data` depends on the request's `Content-Type`. The built-in deserializers produce:
+
+| `Content-Type` | `data` |
+|---|---|
+| `application/json` | parsed JSON value |
+| `application/cbor`, `application/msgpack` | decoded value |
+| `application/x-ndjson` | array of parsed lines |
+| `text/plain` | string |
+
+Custom content types registered through `contentTypes.set(...)` receive whatever value the deserializer returns.
 
 ---
 
@@ -708,6 +720,21 @@ Sort order object:
 | `attribute`  | Property name (or array for chained relationship property) |
 | `descending` | Sort descending if `true` (default: `false`)               |
 | `next`       | Secondary sort to resolve ties (same structure)            |
+
+The sort `attribute` must be `@indexed` **and** narrowed by a `conditions` entry on the same attribute — Harper's query optimizer uses indexes to provide order, and refuses an unconditional ordered scan even on `@primaryKey`. A query with `sort` but no matching condition will throw:
+
+> `HdbError: <attribute> is not indexed and not combined with any other conditions`
+
+To iterate a whole table in primary-key order, combine `sort` with an open-ended range condition on the same attribute:
+
+```javascript
+Product.search({
+	conditions: [{ attribute: 'id', comparator: 'greater_than', value: '' }],
+	sort: { attribute: 'id' },
+});
+```
+
+If you just need to walk every record and order doesn't matter, omit `sort` entirely — `search({})` will iterate without an index requirement.
 
 ### `explain`
 
