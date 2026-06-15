@@ -426,7 +426,7 @@ const sidebars: SidebarsConfig = {
 				{
 					type: 'doc',
 					id: 'mcp/tool-metadata',
-					label: 'Tool Payload Sourcing',
+					label: 'Tool Metadata',
 				},
 			],
 		},
