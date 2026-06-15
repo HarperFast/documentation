@@ -414,6 +414,24 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'MCP',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'mcp/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/tool-metadata',
+					label: 'Tool Payload Sourcing',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Static Files',
 			collapsible: false,
 			className: 'reference-category-header',
