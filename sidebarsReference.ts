@@ -257,6 +257,11 @@ const sidebars: SidebarsConfig = {
 					id: 'mcp/migration',
 					label: 'Migration',
 				},
+				{
+					type: 'doc',
+					id: 'mcp/tool-metadata',
+					label: 'Tool Metadata',
+				},
 			],
 		},
 		{

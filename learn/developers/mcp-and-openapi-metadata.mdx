@@ -1,0 +1,202 @@
+---
+title: Writing quality MCP and OpenAPI descriptions
+---
+
+When an MCP client connects to Harper, the LLM on the other side sees your application as a list of tools. The text it reads to pick the right tool — the tool description, the per-attribute property descriptions, the output schema shape — is the dominant signal for tool selection. The same metadata also drives Harper's OpenAPI document, which any HTTP API consumer (Swagger UI, Redoc, generated SDKs, machine clients) reads.
+
+This guide shows how to author that metadata once and have it flow to both surfaces — via GraphQL docstrings for `@table @export` Resources, and via class-level statics for programmatic Resource subclasses.
+
+## Why descriptions matter
+
+Harper auto-generates MCP tools for every exported Resource. Without descriptions, every tool gets a generic template: `"get on resource '/Product' (table Product). Runtime RBAC enforces per-record access at call time."` An LLM picking between `get_Product`, `get_Order`, `get_Customer` sees three near-identical descriptions. Tool selection becomes guesswork.
+
+Add a one-line docstring to your `@table @export` type and the picture changes: each tool's description includes a sentence about what the resource actually represents, and every searchable attribute has a per-attribute description the LLM can use to form queries.
+
+## Path A: `@table @export` Resources via GraphQL docstrings
+
+For table-backed Resources, the natural authoring locus is the GraphQL schema. Triple-quoted docstrings on types and fields are picked up by Harper's parser and flow through to both MCP and OpenAPI automatically — no JavaScript code changes required.
+
+### Before
+
+```graphql
+type Product @table @export {
+	sku: String! @primaryKey
+	name: String!
+	priceCents: Int!
+	inStock: Int!
+}
+```
+
+MCP `tools/list` returns:
+
+```json
+{
+	"name": "get_Product",
+	"description": "get on resource '/Product' (table Product). Runtime RBAC (allowGet) enforces per-record access at call time.",
+	"inputSchema": {
+		"type": "object",
+		"properties": { "id": { "type": "string", "description": "Primary key (sku)." } },
+		"required": ["id"]
+	}
+}
+```
+
+### After
+
+```graphql
+"""
+Product catalog row — what shows up in the storefront listing,
+search, and inventory feeds. One row per SKU.
+"""
+type Product @table @export {
+	"""
+	Stock keeping unit — globally unique across catalogs.
+	"""
+	sku: String! @primaryKey
+
+	"""
+	Display name shown in the storefront. 100 chars max.
+	"""
+	name: String!
+
+	"""
+	Retail price in cents (USD).
+	"""
+	priceCents: Int!
+
+	"""
+	Current inventory level. Decremented by orders; reconciled nightly.
+	"""
+	inStock: Int!
+}
+```
+
+MCP `tools/list` now returns:
+
+```json
+{
+	"name": "get_Product",
+	"description": "Product catalog row — what shows up in the storefront listing, search, and inventory feeds. One row per SKU.\n\nFetches a single Product record by sku. Runtime RBAC (allowGet) enforces per-record access at call time.",
+	"inputSchema": {
+		"type": "object",
+		"properties": {
+			"id": { "type": "string", "description": "Primary key (sku)." }
+		},
+		"required": ["id"]
+	},
+	"outputSchema": {
+		"type": "object",
+		"properties": {
+			"sku": { "type": "string", "description": "Stock keeping unit — globally unique across catalogs." },
+			"name": { "type": "string", "description": "Display name shown in the storefront. 100 chars max." },
+			"priceCents": { "type": "integer", "description": "Retail price in cents (USD)." },
+			"inStock": {
+				"type": "integer",
+				"description": "Current inventory level. Decremented by orders; reconciled nightly."
+			}
+		},
+		"required": ["sku", "name", "priceCents", "inStock"],
+		"additionalProperties": false
+	}
+}
+```
+
+And `/openapi.json` picks up the same data: schema-level `description`, per-property `description`, and prepended path-level descriptions for every verb on `/Product`.
+
+### `search_*` gets typed and described too
+
+For `search_Product`, the `conditions[].attribute` field becomes a closed `enum` of the readable attributes, and each per-property description threads through. The LLM goes from "an attribute name (string)" to "one of these specific attribute names, with this meaning each."
+
+### Authoring rubric
+
+- **Lead with a verb-led sentence on the type:** "Product catalog row…", "Customer profile and order history…". Skip the trivia ("This is the Product table"); the LLM already knows it's a table.
+- **Field docstrings should explain meaning, not type.** Saying "Integer." adds nothing — the schema already says `Int!`. Saying "Retail price in cents (USD)" lets the LLM construct sensible queries.
+- **Mention units, formats, and edge cases.** "ISO 8601 timestamp", "cents not dollars", "null for SKUs that have never been counted".
+- **Keep docstrings short.** Long descriptions waste LLM context and clutter the OpenAPI UI.
+
+## Path B: Programmatic Resources via class-level statics
+
+For Resources without `@table @export` backing — Resource subclasses that override `get`/`post`/`put`/`delete` directly, or that aggregate across multiple tables — there's no GraphQL schema to derive from. Declare the same metadata directly on the class as JSON-Schema-shaped statics. The MCP and OpenAPI layers read both surfaces uniformly.
+
+```typescript
+import { Resource } from 'harperdb';
+
+export class ProductInventory extends Resource {
+	static description =
+		'Aggregate inventory analytics computed over the Product catalog. ' +
+		'Read-only; the underlying Product table is the system of record.';
+
+	static properties = {
+		sku: { type: 'string', primaryKey: true, description: 'Stock keeping unit; matches Product.sku.' },
+		onHand: { type: 'integer', description: 'Current warehouse count.' },
+		reserved: { type: 'integer', description: 'Units allocated to open orders but not yet shipped.' },
+		stockStatus: {
+			type: 'string',
+			enum: ['in_stock', 'out_of_stock', 'backorder'],
+			description: 'Derived from onHand vs reserved.',
+		},
+	};
+
+	async get(id) {
+		/* returns { sku, onHand, reserved, stockStatus } */
+	}
+	async search(query) {
+		/* ... */
+	}
+}
+```
+
+See the [Resource API reference](/reference/v5/resources/resource-api#class-level-metadata-for-mcp-and-openapi) for the full surface, including `static outputSchemas` for per-verb projection overrides, `static hidden` for full suppression, and `static mcp` for narrow MCP-only annotation overrides.
+
+## Inheritance: extending a table
+
+Resources extending a `@table @export` Resource inherit the auto-derived metadata. Override individual entries with spread:
+
+```typescript
+const { Product } = tables;
+
+class CustomProduct extends Product {
+	static properties = {
+		...Product.properties,
+		priceCents: {
+			...Product.properties.priceCents,
+			description: 'Retail price in cents, including any per-customer adjustments.',
+		},
+	};
+}
+```
+
+The author writes against the canonical `properties` API. Internal code paths that need ordered iteration continue to read `Class.attributes` (the Array form), preserved through inheritance.
+
+## Hiding sensitive fields with `@hidden`
+
+OpenAPI is typically exposed to anyone reachable on the HTTP port — there's no per-user filtering on `/openapi.json`. A docstring on a sensitive field publishes that text to anyone who can hit the endpoint. The `@hidden` directive suppresses a field (or an entire type) from both MCP and OpenAPI without affecting data access:
+
+```graphql
+type Customer @table @export {
+	id: Long @primaryKey
+	name: String
+
+	"""
+	Internal — used by the pricing engine; not for external consumers.
+	"""
+	creditScore: Int @hidden
+}
+```
+
+`creditScore` is still queryable via direct Harper interfaces under the caller's `attribute_permissions` — `@hidden` is a metadata-visibility directive, not access control. For programmatic Resources, the equivalent is `static hidden = true` on the class (or `hidden: true` on a per-property entry in `static properties`).
+
+> **Trust model.** Docstrings reach LLMs and public OpenAPI consumers verbatim. Treat them as code: don't put secrets, internal-only commentary, or speculative prose in them. Use `@hidden` to suppress fields that shouldn't surface publicly.
+
+## RBAC and per-user filtering
+
+For MCP tool descriptors, `attribute_permissions` already filters the schema per-user — an attribute the caller cannot read is dropped from that user's view of the tool descriptor, along with its description. The new metadata flows through the existing pipeline.
+
+For OpenAPI, the document is global and not per-user filtered. Use `@hidden` (or `static hidden`) to control what surfaces there.
+
+## Verifying the end-to-end flow
+
+1. Add `"""docstrings"""` to a `@table @export` type and save your component.
+2. Hit MCP `tools/list` for the application profile — confirm `get_*`, `search_*`, etc. descriptions include the type docstring and per-attribute descriptions are present in the `inputSchema` and `outputSchema`.
+3. Hit `/openapi.json` on the application HTTP port — confirm the path-level descriptions and per-property descriptions show up in Swagger UI / Redoc.
+4. Add `@hidden` to an attribute — confirm it disappears from both surfaces while remaining queryable via direct REST/SQL.
