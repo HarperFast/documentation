@@ -130,6 +130,19 @@ Default: `false`
 
 When `true`, Harper accepts client-issued `DELETE /mcp` requests that explicitly terminate a session. When `false` (the default), `DELETE` returns 405 with an `Allow` header — sessions only end via idle eviction or explicit server-side cleanup.
 
+## Security: Origin validation
+
+The MCP endpoint validates the request `Origin` header to defend against DNS-rebinding attacks (a requirement of the MCP Streamable HTTP transport). Validation reuses each profile's existing CORS configuration rather than introducing a separate MCP setting:
+
+- When CORS is **disabled** (the default), any `Origin` is accepted. This is appropriate for localhost-only or non-browser clients, where no DNS-rebinding vector exists.
+- When CORS is **enabled** with an allow-list, a request whose `Origin` is not in the list is rejected with `403 Forbidden`. A `*` entry allows any origin.
+- A request with no `Origin` header at all (for example `curl` or server-to-server traffic) is always accepted — DNS rebinding only applies to browser-initiated requests.
+
+**Secure default:** any deployment that exposes the MCP endpoint to browsers beyond loopback should enable CORS with an explicit allow-list — that is what activates Origin-based DNS-rebinding protection.
+
+- Application profile (HTTP port): `http.cors` + `http.corsAccessList`.
+- Operations profile (operations port): `operationsApi.network.cors` + `operationsApi.network.corsAccessList`.
+
 ## Example
 
 A common deployment pattern that locks down the operations profile to a small explicit set, enables MCP DELETE for graceful client logout, and raises per-tool throughput for the application profile:
