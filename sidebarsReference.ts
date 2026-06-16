@@ -228,6 +228,39 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'MCP',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'mcp/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/cli',
+					label: 'CLI',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/tools-and-resources',
+					label: 'Tools and Resources',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/migration',
+					label: 'Migration',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Security',
 			collapsible: false,
 			className: 'reference-category-header',
