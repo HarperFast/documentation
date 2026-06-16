@@ -14,7 +14,8 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 
 - TypeScript (config files and scripts), MDX/Markdown (content).
 - Prettier is configured via `@harperdb/code-guidelines/prettier` (see `package.json`).
-- Format command: `npm run format:write`. Run this after editing any `.ts`, `.md`, or `.mdx` files.
+- **Required before every commit/PR:** run `npm run format:write`, then confirm `npm run format:check` is clean. This is a hard gate, not advisory — CI fails any unformatted PR (see [CI](#ci)).
+- Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `plans/`, `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
 - The lint script is a no-op (`echo 0`); do not expect `npm run lint` to catch issues.
 
 ## Content Style
@@ -47,6 +48,14 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 - Do not modify `reference_versioned_docs/` for current (v5) work; edit `reference/` instead.
 - The `<VersionBadge>` component is globally registered — no import needed in `.md`/`.mdx` files.
 - See the complete repository organization in `CONTRIBUTING.md`
+
+## Versioning Content
+
+- Tag minor-version availability inline: `<VersionBadge version="vX.Y.0" />` for new surface, `<VersionBadge type="changed" version="vX.Y.0" />` for behavior changes to existing surface.
+- Derive the version from the core release the change ships in, stripping prerelease suffixes (`5.1.0-beta.1` → `v5.1.0`).
+- Each minor release gets a file under `release-notes/<major-codename>/` (e.g. `release-notes/v5-lincoln/5.1.md`); the sidebar picks it up automatically.
+- Absolute links from `release-notes/` (or `learn/`) into current reference docs use the versioned path `/reference/v5/...` — the reference plugin maps the current version to the `v5` URL path.
+- When documenting a change from a core/pro PR, cross-link the feature PR and the docs PR in both descriptions.
 
 ## Testing
 

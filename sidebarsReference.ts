@@ -91,6 +91,39 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'AI & Models',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'models/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'models/api',
+					label: 'API',
+				},
+				{
+					type: 'doc',
+					id: 'models/tool-calling',
+					label: 'Tool Calling',
+				},
+				{
+					type: 'doc',
+					id: 'models/backends',
+					label: 'Backends',
+				},
+				{
+					type: 'doc',
+					id: 'models/analytics',
+					label: 'Analytics',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Components',
 			collapsible: false,
 			className: 'reference-category-header',
@@ -190,6 +223,44 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'http/tls',
 					label: 'TLS',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'MCP',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'mcp/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/cli',
+					label: 'CLI',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/tools-and-resources',
+					label: 'Tools and Resources',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/migration',
+					label: 'Migration',
+				},
+				{
+					type: 'doc',
+					id: 'mcp/tool-metadata',
+					label: 'Tool Metadata',
 				},
 			],
 		},
@@ -409,24 +480,6 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'mqtt/configuration',
 					label: 'Configuration',
-				},
-			],
-		},
-		{
-			type: 'category',
-			label: 'MCP',
-			collapsible: false,
-			className: 'reference-category-header',
-			items: [
-				{
-					type: 'doc',
-					id: 'mcp/overview',
-					label: 'Overview',
-				},
-				{
-					type: 'doc',
-					id: 'mcp/tool-metadata',
-					label: 'Tool Metadata',
 				},
 			],
 		},

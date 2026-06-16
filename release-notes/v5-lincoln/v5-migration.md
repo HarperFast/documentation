@@ -118,14 +118,14 @@ The `blob.save()` method has been removed. Please use the `saveBeforeCommit` fla
 
 ## VM Module Loader
 
-Harper v5 loads application modules through Node.js's VM module API, giving each application its own module cache and execution context. This provides per-application context: the `logger` global/export is automatically tagged with the application name, and `config` reflects that application's own configuration. Each application's module graph is isolated from other applications and from Harper internals.
+Harper v5 loads application modules through Node.js's VM module API, giving each application its own module cache and a `harper` module scoped to that application — the `logger` it exports is tagged with the application name, and `config` reflects that application's own configuration. By default (`vm-current-context`), applications share JavaScript intrinsics (`Object`, `Array`, `Promise`, and so on) with Harper. Sharing intrinsics avoids the compatibility problems that separate per-application intrinsics can cause — most commonly `instanceof` and other identity checks failing for values that cross the application/Harper boundary.
 
 All module loading behavior is controlled by the `applications` section in `harperdb-config.yaml`:
 
 ```yaml
 applications:
   lockdown: freeze-after-load # default; see below
-  moduleLoader: vm # vm (default) | native | compartment
+  moduleLoader: vm-current-context # vm-current-context (default) | vm | native | compartment
   dependencyLoader: auto # auto (default) | app | native
   allowedDirectory: app # app (default) | any
   allowedSpawnCommands: # see "Spawning new processes" above
@@ -133,6 +133,19 @@ applications:
     - node
   # allowedBuiltinModules: [] # if omitted, all Node.js built-ins are allowed
 ```
+
+### Module Loader Modes
+
+The `moduleLoader` setting selects how application modules are loaded:
+
+- `vm-current-context` (default) — the VM module loader running in Harper's own context. Applications share intrinsics with Harper, which gives the best compatibility with packages that perform `instanceof` or other identity checks across the boundary. Application-specific values (`logger`, `config`, `server`, and the rest of the `harper` API) are provided through `import ... from 'harper'` (or `require('harper')` in CommonJS).
+- `vm` — the VM module loader running in a separate context per application, with its own intrinsics and a custom global object. This provides stronger isolation between applications, but the separate intrinsics are a common source of subtle incompatibilities (cross-context `instanceof`, frozen-prototype mismatches, and similar).
+- `native` — standard Node.js `import()` with no VM loader. Application-specific context (tagged logging, per-app `config`) is not available.
+- `compartment` — SES Compartment-based loading. Advanced and considerably heavier; only needed for specialized sandboxing requirements.
+
+For most applications the default is the right choice. Choose `vm` only if you specifically need separate per-application intrinsics, and `native` if the VM loader causes compatibility problems you cannot otherwise resolve.
+
+> Under `lockdown: ses`, the constrained (https-only) `fetch` is applied only in `vm` mode, which gives each application its own globals. In `vm-current-context` and `native` modes application code uses the standard global `fetch`; choose `vm` mode if you require the constrained `fetch`.
 
 ### Intrinsic Lockdown
 
