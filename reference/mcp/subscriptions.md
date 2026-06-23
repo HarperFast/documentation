@@ -107,7 +107,7 @@ Send `resources/unsubscribe` with the same URI:
 }
 ```
 
-- `params.uri` is required (`-32602` otherwise).
+- `params.uri` is required and must be a string — otherwise `-32602` (`resources/unsubscribe requires params.uri`).
 - Unsubscribing a URI that was never subscribed is a no-op and still returns `{}`.
 
 Subscriptions are also torn down automatically when the session's GET-SSE stream closes — via explicit `DELETE /mcp`, idle-timeout eviction from `system.mcp_session`, a dropped TCP connection, or an idle-prune sweep.
@@ -130,7 +130,7 @@ Harper replays every buffered frame with a higher id (exclusive) before live fra
 
 Caveats, all best-effort by design:
 
-- **Buffer bound.** Only the last 100 frames are retained; a client that was disconnected long enough to miss more than 100 frames will not get the older ones. A non-numeric `Last-Event-ID` replays whatever is in the buffer.
+- **Buffer bound.** Only the last 100 frames are retained; a client that was disconnected long enough to miss more than 100 frames will not get the older ones. A non-numeric `Last-Event-ID` replays the entire buffer.
 - **Per-worker.** The replay buffer and event-id sequence live on the worker that served the original stream. If the reconnecting `GET` lands on a different worker (one that never held the prior stream), its buffer is empty and there is nothing to replay. This is the same per-worker binding that scopes sessions and subscriptions.
 
 ## Not yet supported
