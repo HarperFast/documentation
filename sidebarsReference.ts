@@ -254,6 +254,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'mcp/subscriptions',
+					label: 'Resource Subscriptions',
+				},
+				{
+					type: 'doc',
 					id: 'mcp/migration',
 					label: 'Migration',
 				},
