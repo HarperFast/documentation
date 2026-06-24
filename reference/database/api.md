@@ -14,6 +14,12 @@ Harper exposes a set of global variables and functions that JavaScript code (in 
 
 `tables` is an object whose properties are the tables in the default database (`data`). Each table defined in your `schema.graphql` file is available as a property, and the value is the table class that implements the [Resource API](../resources/resource-api.md).
 
+`tables` and `databases` are **live, process-wide** objects: the same instance is shared by every module Harper loads — resources, scripts, plugins, and a framework's server-side render (SSR) entry alike. You can use `tables` as a bare global, or import it from the `harper` package; both resolve to the same object. Importing is preferred for clarity and types (see [Module Loading](../components/javascript-environment.md#module-loading)):
+
+```javascript
+import { tables } from 'harper';
+```
+
 ```graphql
 # schema.graphql
 type Product @table {
