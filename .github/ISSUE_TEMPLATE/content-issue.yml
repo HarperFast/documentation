@@ -1,6 +1,7 @@
 name: 📝 Content Issue
 description: Report problems with existing documentation content (typos, errors, confusing sections, outdated information)
-labels: ['content', 'bug']
+type: Bug
+labels: ['content']
 body:
   - type: markdown
     attributes:

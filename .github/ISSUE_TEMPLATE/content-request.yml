@@ -1,6 +1,7 @@
 name: 📚 Content Request
 description: Request new documentation or coverage for undocumented features, APIs, or functionality
-labels: ['content', 'enhancement']
+type: Feature
+labels: ['content']
 body:
   - type: markdown
     attributes:

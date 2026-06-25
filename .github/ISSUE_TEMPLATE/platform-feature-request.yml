@@ -1,6 +1,7 @@
 name: ⚡️ Platform Feature Request
 description: Suggest new functionality or improvements for the documentation site itself
-labels: ['platform', 'enhancement']
+type: Feature
+labels: ['platform']
 body:
   - type: markdown
     attributes:
