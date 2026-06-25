@@ -116,6 +116,10 @@ Content-Type: application/json
 { "status": "active" }
 ```
 
+:::warning
+The merge is **shallow** (top-level only). Preserving "unspecified properties" applies to top-level attributes — if the body includes a nested object, that whole sub-object is **replaced**, not deep-merged, so any nested properties you didn't include are dropped. For example, `PATCH { "settings": { "theme": "dark" } }` against a record whose `settings` is `{ "theme": "light", "notifications": { ... } }` results in `settings` being just `{ "theme": "dark" }` — `notifications` is gone. To update a single nested field, read-modify-write the parent object (or send the full nested object). Dot-path keys (`"settings.theme"`) are stored literally, not interpreted as paths.
+:::
+
 ### DELETE
 
 Delete a specific record or all records matching a query.
