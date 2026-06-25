@@ -8,6 +8,6 @@ Hosted at [docs.harper.fast](https://docs.harper.fast). Powered by [Docusaurus](
 
 This documentation site is open source!
 
-If you notice something out-of-place or have suggestions for improvement, please feel free to submit an issue and/or a pull request. Make sure to follow the relevant bug report and content/feature request templates.
+If you notice something out-of-place or have suggestions for improvement, please feel free to submit an issue and/or a pull request. Issues are filed through templates and organized by **type** (Bug / Feature / Task), **area** (`content` / `platform`), and **release milestone** (`v5.x`).
 
-For more information on contributing, follow the [contribution guide](CONTRIBUTING.md).
+For more information on contributing — including issue conventions — follow the [contribution guide](CONTRIBUTING.md#reporting-issues).

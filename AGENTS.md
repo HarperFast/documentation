@@ -68,3 +68,11 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 
 - CI runs `npm run build` and `npm run format:check` on pull requests.
 - If CI fails on formatting, run `npm run format:write` locally and commit the result.
+
+## Issues & Project Management
+
+- Issues are filed via the issue forms (blank issues are disabled). Each form sets an issue **type**: **Bug** (documented content is wrong/broken, or a site defect), **Feature** (new or expanded docs/site capability), or **Task** (smaller edits/cleanup, usually applied during triage).
+- **Area labels:** `content` (documentation text/examples) vs `platform` (the docs site itself — build, search, navigation, styling). These are the only area labels; there are no per-subsystem labels.
+- Kind is captured by the issue **type**, not labels — do not reintroduce `bug`/`enhancement` labels.
+- **Milestones:** `v5.x` release milestones, named to match the `harper`/`harper-pro` repos. Tag an issue with the milestone of the release whose docs it must ship with, so docs work is tracked per release. Do not delete the empty release milestones — they are the canonical per-release buckets.
+- See `CONTRIBUTING.md` (Reporting Issues) for the contributor-facing version.
