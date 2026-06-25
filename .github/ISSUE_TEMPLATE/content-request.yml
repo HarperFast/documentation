@@ -1,93 +1,22 @@
 name: 📚 Content Request
-description: Request new documentation or coverage for undocumented features, APIs, or functionality
+description: Request new or expanded documentation
 type: Feature
 labels: ['content']
 body:
   - type: markdown
     attributes:
-      value: |
-        Thanks for helping us identify documentation gaps! Use this template to request new documentation for undocumented features, missing API coverage, or other content needs.
-
-        For platform/site feature requests, please use the "Platform Feature Request" template instead.
-
-  - type: dropdown
-    id: request-type
+      value: 'For a docs-site feature (search, navigation, tooling), use the **Platform Feature Request** template instead.'
+  - type: textarea
+    id: details
     attributes:
-      label: Request Type
-      description: What kind of documentation is needed?
-      options:
-        - Undocumented existing feature
-        - New feature documentation
-        - API/method documentation
-        - Tutorial or guide
-        - Code examples
-        - Missing section coverage
-        - Other
+      label: What needs documenting?
+      description: Describe the feature, API, or topic that needs documentation.
     validations:
       required: true
-
   - type: textarea
-    id: what-needs-documenting
+    id: context
     attributes:
-      label: What needs to be documented?
-      description: Describe what functionality, feature, or topic needs documentation
-      placeholder: "Be specific about what's missing or undocumented"
+      label: Why / context
+      description: What are you trying to do, and anything that would help us write it? (optional)
     validations:
-      required: true
-
-  - type: textarea
-    id: suggested-location
-    attributes:
-      label: Where should this be documented?
-      description: Suggest where in the docs this content should live
-      placeholder: 'New section, existing page URL, or general area'
-
-  - type: textarea
-    id: use-case
-    attributes:
-      label: Why is this needed?
-      description: What use case or problem would this documentation solve?
-      placeholder: 'How would this help users? What are people trying to accomplish?'
-
-  - type: textarea
-    id: existing-information
-    attributes:
-      label: Existing information
-      description: Do you have any information, examples, or resources that could help?
-      placeholder: 'Code snippets, API responses, screenshots, links to related features, etc.'
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority/Impact
-      description: How important is this documentation gap?
-      options:
-        - 'High - critical for user success'
-        - 'Medium - important but not urgent'
-        - 'Low - nice to have'
-    validations:
-      required: true
-
-  - type: dropdown
-    id: contribution-intent
-    attributes:
-      label: Are you planning to fix this issue?
-      description: Let us know if you'd like to contribute the fix!
-      options:
-        - 'No, just reporting the issue'
-        - 'Maybe, depending on complexity'
-        - "Yes, I'll submit a PR to fix this"
-        - "Yes, but I'm a first-time contributor and could use guidance"
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: first-time-contributor
-    attributes:
-      label: First-time contributor support
-      description: Check any that apply (only if you're planning to contribute)
-      options:
-        - label: I'm new to contributing and would appreciate guidance on the process
-        - label: I'd like help understanding the project structure
-        - label: I need assistance with setting up the development environment
-        - label: I'm comfortable contributing but new to this project specifically
+      required: false
