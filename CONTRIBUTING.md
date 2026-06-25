@@ -1,5 +1,22 @@
 # Contributing
 
+Thanks for helping improve the Harper documentation. You can contribute by [reporting an issue](#reporting-issues) or opening a pull request.
+
+## Reporting Issues
+
+Issues are filed through the issue forms (the blank issue box is disabled, so choose the form that fits):
+
+- **📝 Content Issue** / **📚 Content Request** — for the documentation itself (errors, gaps, new or expanded pages).
+- **🐛 Platform Bug** / **⚡️ Platform Feature Request** — for the docs _site_ (search, navigation, build, styling).
+
+Issues are organized along three axes:
+
+- **Type** (set automatically by the form): **Bug** — something documented is wrong or broken, or a site defect; **Feature** — new or substantially expanded documentation or site capability; **Task** — smaller content edits and cleanup (usually applied by maintainers during triage). Kind is tracked by issue type, not by labels.
+- **Area label**: **`content`** (documentation text and examples) or **`platform`** (the docs site — Docusaurus, build, search, navigation, styling). These are the only area labels — there are intentionally no per-subsystem labels. A few flags also appear: `from-jira` (provenance), `good first issue`, `help wanted`.
+- **Milestone**: the **`v5.x` release** the work should ship with. Milestone names mirror the `harper` / `harper-pro` repos, so documentation work is tracked per release alongside the product. Maintainers set a milestone on issues that must land in a given release; issues that aren't tied to a release are left without one.
+
+You don't need to get type, area, or milestone exactly right when filing — maintainers confirm them during triage.
+
 ## Prerequisites
 
 Before contributing, please ensure you have the following installed:
