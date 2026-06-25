@@ -1,81 +1,23 @@
 name: 📝 Content Issue
-description: Report problems with existing documentation content (typos, errors, confusing sections, outdated information)
-labels: ['content', 'bug']
+description: Report a problem with existing documentation (error, confusing, or outdated content)
+type: Bug
+labels: ['content']
 body:
   - type: markdown
     attributes:
-      value: |
-        Thanks for helping us improve our documentation! Use this template to report issues with existing content such as typos, errors, confusing sections, or outdated information.
-
-        For platform/site functionality issues, please use the "Platform Bug" template instead.
-
-  - type: dropdown
-    id: issue-type
-    attributes:
-      label: Issue Type
-      description: What kind of content issue is this?
-      options:
-        - Incorrect information
-        - Missing information
-        - Confusing/unclear content
-        - Typo or formatting error
-        - Outdated information
-        - Other
-    validations:
-      required: true
-
+      value: 'For a problem with the site itself (search, navigation, build), use the **Platform Bug** template instead.'
   - type: input
-    id: content-location
+    id: location
     attributes:
-      label: Content Location
-      description: URL or section where the issue is located. Make sure to include the version number too.
-      placeholder: "https://docs.harperdb.io/docs/getting-started/#harper-basics or '(4.6) Getting Started > Harper Basics'"
+      label: Page or URL
+      description: Where is the problem? (optional, but it helps a lot)
+      placeholder: https://docs.harperdb.io/... or the page title
     validations:
-      required: true
-
+      required: false
   - type: textarea
-    id: issue-description
+    id: details
     attributes:
       label: What's wrong?
-      description: Describe the issue with the current content
-      placeholder: "Be as specific as possible about what's incorrect, missing, or confusing"
+      description: Describe the error, confusion, or outdated content — and what would be correct, if you know.
     validations:
       required: true
-
-  - type: textarea
-    id: suggested-improvement
-    attributes:
-      label: Suggested improvement
-      description: How would you improve this content? (optional)
-      placeholder: 'What would make this clearer or more accurate?'
-
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: Additional context
-      description: Any other context that might be helpful
-      placeholder: 'Screenshots, related issues, etc.'
-
-  - type: dropdown
-    id: contribution-intent
-    attributes:
-      label: Are you planning to fix this issue?
-      description: Let us know if you'd like to contribute the fix!
-      options:
-        - 'No, just reporting the issue'
-        - 'Maybe, depending on complexity'
-        - "Yes, I'll submit a PR to fix this"
-        - "Yes, but I'm a first-time contributor and could use guidance"
-    validations:
-      required: true
-
-  - type: checkboxes
-    id: first-time-contributor
-    attributes:
-      label: First-time contributor support
-      description: Check any that apply (only if you're planning to contribute)
-      options:
-        - label: I'm new to contributing and would appreciate guidance on the process
-        - label: I'd like help understanding the project structure
-        - label: I need assistance with setting up the development environment
-        - label: I'm comfortable contributing but new to this project specifically

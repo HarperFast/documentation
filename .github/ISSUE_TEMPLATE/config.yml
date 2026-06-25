@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Harper Discussions
+    url: https://github.com/HarperFast/documentation/discussions
+    about: Questions about using Harper or the docs? Start a discussion — issues here are for documentation work (content and site).
+  - name: 📖 Harper Documentation
+    url: https://docs.harperdb.io/
+    about: Looking for how to use a Harper feature? Search the docs first.
