@@ -152,12 +152,12 @@ class MyResource extends Resource {
 
 The shape of the resolved value depends on the request's `Content-Type`. The built-in deserializers produce:
 
-| `Content-Type` | resolved `data` |
-|---|---|
-| `application/json` | parsed JSON value |
-| `application/cbor`, `application/x-msgpack` | decoded value |
+| `Content-Type`                               | resolved `data`       |
+| -------------------------------------------- | --------------------- |
+| `application/json`                           | parsed JSON value     |
+| `application/cbor`, `application/x-msgpack`  | decoded value         |
 | `application/x-ndjson`, `application/ndjson` | array of parsed lines |
-| `text/plain` | string |
+| `text/plain`                                 | string                |
 
 Custom content types registered through `contentTypes.set(...)` receive whatever value the deserializer returns.
 
