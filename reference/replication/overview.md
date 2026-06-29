@@ -186,11 +186,11 @@ replication:
   databases:
     - data
   routes:
-    - host: node-two
+    - hostname: node-two
       replicates:
         sends: false
         receives: true
-    - host: node-three
+    - hostname: node-three
       replicates:
         sends: true
         receives: false
