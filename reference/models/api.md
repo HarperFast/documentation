@@ -101,7 +101,7 @@ Errors detected before the call starts (unknown model name, missing capability) 
 
 ## registerBackend()
 
-<VersionBadge version="v5.1.12" />
+<VersionBadge version="v5.1.15" />
 
 ```typescript
 models.registerBackend(kind: 'embedding' | 'generative', id: string, backend: ModelBackend): void

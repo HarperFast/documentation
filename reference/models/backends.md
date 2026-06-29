@@ -137,7 +137,7 @@ The model identifier's vendor prefix (`anthropic.`, `meta.`, `amazon.titan-`, `c
 
 ## Custom backends
 
-<VersionBadge version="v5.1.12" />
+<VersionBadge version="v5.1.15" />
 
 Beyond the four built-ins, a component or application can register its own backend — including an in-process one that runs inference locally instead of calling an HTTP service. A registered backend is selected by its logical name through the same `model` option as a configured backend.
 
@@ -160,7 +160,7 @@ Builds a `ModelBackend` from the methods it implements. `capabilities()` is deri
 | `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                               |
 | `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection              |
 
-`embed` and `generate` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed` and `{ content, finishReason }` for `generate`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied.
+`embed` and `generate` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed` and `{ content, finishReason }` for `generate`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied. A backend that supplies only `generateStream` still satisfies `generate()`: Harper drains the stream into a single result.
 
 ### registerBackend()
 
