@@ -160,7 +160,7 @@ Builds a `ModelBackend` from the methods it implements. `capabilities()` is deri
 | `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                               |
 | `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection              |
 
-Each method returns the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed` and `{ content, finishReason }` for `generate`. At least one method must be supplied.
+`embed` and `generate` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed` and `{ content, finishReason }` for `generate`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied.
 
 ### registerBackend()
 
@@ -173,7 +173,7 @@ Registers `backend` under the logical name `id` for the given `kind`. Also avail
 Use a provider-namespaced `id` (e.g. `local:bge-small`) to avoid collisions when more than one component registers backends.
 
 ```javascript
-import { registerBackend, defineBackend } from 'harper';
+import { models, registerBackend, defineBackend } from 'harper';
 import { init, embed } from 'some-local-embedding-library';
 
 await init();
