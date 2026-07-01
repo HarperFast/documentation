@@ -117,6 +117,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'models/routing',
+					label: 'Routing & Fallback',
+				},
+				{
+					type: 'doc',
 					id: 'models/analytics',
 					label: 'Analytics',
 				},
