@@ -264,7 +264,7 @@ Within a resource method, the same value is available on the active context via 
 - `false` — the record was served from the cache: fresh hits, `onlyIfCached` requests, stale-while-revalidate responses (the source fetch continues in the background), and requests that waited on another request's in-flight fetch of the same record. This last case means a cache hit can still take as long as an upstream fetch.
 - Each get on a caching table in the same context overwrites the value, so read it after the `get` you are measuring.
 
-Resource instances also expose this as [`wasLoadedFromSource()`](#wasloadedfromsource-boolean). Prior to Harper 5.1.16, the flag was only observable via an explicitly passed `RequestTarget`; `context.loadedFromSource` was never assigned.
+Note that `get()` returns a plain `RecordObject`, not a resource instance — the record itself does not carry cache disposition; read it from the context (or an explicitly passed `RequestTarget`). Prior to Harper 5.1.16, the flag was only observable via an explicitly passed `RequestTarget`; `context.loadedFromSource` was never assigned.
 
 #### Source `get` — controlling timestamp and expiration
 
