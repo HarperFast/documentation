@@ -86,7 +86,7 @@ The three configuration env vars — `HARPER_DEFAULT_CONFIG`, `HARPER_CONFIG`, a
 
 Notes and limitations:
 
-- A real process environment variable still takes precedence over the `.env` value, unless the component declares `override: true`.
+- A real process environment variable still takes precedence over the `.env` value, unless `loadEnv` is configured with `override: true`.
 - Encrypted (`enc:v1:`) values cannot shape configuration — secret decryptors are not registered until components load. Such values are skipped with an error log.
 - `componentsRoot` cannot be redirected this way: Harper discovers the `.env` files by scanning the components root from the config file, so a `componentsRoot` override delivered via env var or `.env` cannot change where that scan looks.
 - Only these three variables are applied early. All other `.env` keys load at component-load time as usual.
