@@ -1,0 +1,17 @@
+# Harper docs-site application
+# NOTE: providing config.yaml replaces Harper's defaults entirely — list everything.
+
+loadEnv:
+  files: '.env*'
+
+graphqlSchema:
+  files: 'schemas/*.graphql'
+
+jsResource:
+  files: 'resources/*.js'
+
+rest: true
+
+static:
+  files: 'web/**'
+  urlPath: 'assets'

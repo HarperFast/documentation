@@ -1,0 +1,49 @@
+# Content tables for the docs site. All content tables are release-scoped:
+# a ContentRelease is staged, validated whole, then atomically activated.
+# See plans/harper-replatform/README.md §5–6.
+
+type ContentRelease @table {
+	id: ID @primaryKey # "<git-sha>-<timestamp>"
+	status: String @indexed # staging | active | archived | failed
+	gitSha: String
+	pageCount: Int
+	notes: String
+	createdAt: Date @createdTime
+	activatedAt: Date
+}
+
+type Page @table {
+	id: ID @primaryKey # "<release>:<path>"
+	release: String @indexed
+	path: String @indexed # canonical route, '' for the homepage
+	section: String @indexed # learn | reference | release-notes | fabric | root
+	version: String # v5 | v4 (reference only)
+	title: String
+	description: String
+	html: String # rendered article body (no layout shell)
+	toc: Any # [{depth, text, id}]
+	sourceMarkdown: String
+	renderedMarkdown: String # clean markdown projection → .md routes, llms.txt
+	frontmatter: Any
+	editUrl: String
+	sourcePath: String
+	contentHash: String @indexed
+	updatedAt: Date @updatedTime
+}
+
+type Navigation @table {
+	id: ID @primaryKey # "<release>:<section>" or "<release>:<section>:<version>"
+	release: String @indexed
+	section: String @indexed
+	version: String
+	tree: Any # ordered nested [{label, path?, items?[]}]
+}
+
+type Redirect @table {
+	id: ID @primaryKey # "<release>:<from>"
+	release: String @indexed
+	from: String @indexed
+	to: String
+	status: Int
+	source: String # current | historic | tombstone
+}
