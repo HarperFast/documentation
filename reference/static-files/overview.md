@@ -108,7 +108,7 @@ GET /assets/app.js  -> 200 text/javascript    (static file)
 GET /app/settings   -> 200 text/html          (index.html - client-side route)
 ```
 
-Ordering is applied when the component loads; changing `before` or `after` requires a restart.
+Ordering is applied when the component loads; changing `before` or `after` in `config.yaml` automatically restarts the component so the new ordering takes effect.
 
 ## Auto-Updates
 
