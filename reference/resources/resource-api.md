@@ -264,7 +264,7 @@ Within a resource method, the same value is available on the active context via 
 - `false` — the record was served from the cache: fresh hits, `onlyIfCached` requests, stale-while-revalidate responses (the source fetch continues in the background), and requests that waited on another request's in-flight fetch of the same record. This last case means a cache hit can still take as long as an upstream fetch.
 - Each get on a caching table in the same context overwrites the value, so read it after the `get` you are measuring.
 
-Note that `get()` returns a plain `RecordObject`, not a resource instance — the record itself does not carry cache disposition; read it from the context (or an explicitly passed `RequestTarget`). In custom resource methods, where `this` is the loaded resource instance, the same value is available as [`this.wasLoadedFromSource()`](#wasloadedfromsource-boolean) (5.1.16+). Prior to Harper 5.1.16, the flag was only observable via an explicitly passed `RequestTarget`; `context.loadedFromSource` was never assigned and `wasLoadedFromSource()` always returned `undefined`.
+Note that `get()` returns a plain `RecordObject`, not a resource instance — the record itself does not carry cache disposition; read it from the context (or an explicitly passed `RequestTarget`). Prior to Harper 5.1.16, `context.loadedFromSource` was never assigned and the flag was only observable via an explicitly passed `RequestTarget`.
 
 #### Source `get` — controlling timestamp and expiration
 
@@ -428,12 +428,6 @@ class BlogSource extends Resource {
 }
 Post.sourcedFrom(BlogSource);
 ```
-
----
-
-### `wasLoadedFromSource(): boolean`
-
-For caching tables (5.1.16+), reports whether this resource's record was loaded from the source — the same settled semantics as [`context.loadedFromSource`](#observing-cache-disposition). Returns `undefined` until a load resolves, on tables without a source `get`, and on all Harper versions before 5.1.16 (the method previously existed but was never assigned a value).
 
 ---
 
