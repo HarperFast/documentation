@@ -70,10 +70,15 @@ threads:
 ```yaml
 threads:
   preload: dd-trace/init
-  # or several:
-  # preload:
-  #   - dd-trace/init
-  #   - /opt/instrumentation/agent.js
+```
+
+Or several modules:
+
+```yaml
+threads:
+  preload:
+    - dd-trace/init
+    - /opt/instrumentation/agent.js
 ```
 
 ---
