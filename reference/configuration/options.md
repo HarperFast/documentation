@@ -65,6 +65,16 @@ threads:
 - `maxHeapMemory` — Heap limit per thread (MB)
 - `heapSnapshotNearLimit` — Write a `.heapsnapshot` file when a thread nears its heap limit (loadable in Chrome DevTools Memory tab); _Default_: `false`. See [Worker Thread Debugging](./debugging.md#heap-snapshots-near-the-limit)
 - `debug` — Enable Node.js inspector; sub-options: `port`, `startingPort`, `host`, `waitForDebugger`. See [Worker Thread Debugging](./debugging.md)
+- `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load (via Node's `--require`) before any Harper or application module on each worker thread. Intended for instrumentation/APM agents (e.g. `dd-trace`) that must load first to instrument subsequent module loads. Bare specifiers (e.g. `dd-trace/init`) resolve against the `node_modules` of your installed [components](../components/overview.md) — so the agent can be shipped as a dependency of a deployed component — and absolute paths are also accepted. Applies to worker threads only (not under Bun).
+
+```yaml
+threads:
+  preload: dd-trace/init
+  # or several:
+  # preload:
+  #   - dd-trace/init
+  #   - /opt/instrumentation/agent.js
+```
 
 ---
 
