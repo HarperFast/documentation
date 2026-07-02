@@ -255,12 +255,12 @@ Each `get` on a caching table records whether the record came from the cache or 
 ```javascript
 const context = {};
 const record = await MyCache.get(recordId, context);
-console.log(context.loadedFromSource); // true = fetched from source, false = served from cache
+console.log(context.loadedFromSource); // true = went to the source, false = served from cache
 ```
 
 Within a resource method, the same value is available on the active context via `getContext().loadedFromSource` after the `get` resolves. The flag settles as follows:
 
-- `true` — the get fetched the record from the source, including when a source error fell back to a stale record (`staleIfError`).
+- `true` — the get went to the source: either it fetched the record, or the source errored and a stale cached record was served as a fallback (`staleIfError`). `true` means a source request was made, not necessarily that the returned data is fresh.
 - `false` — the record was served from the cache: fresh hits, `onlyIfCached` requests, stale-while-revalidate responses (the source fetch continues in the background), and requests that waited on another request's in-flight fetch of the same record. This last case means a cache hit can still take as long as an upstream fetch.
 - Each get on a caching table in the same context overwrites the value, so read it after the `get` you are measuring.
 
@@ -659,7 +659,7 @@ Returns the current context, which includes:
 
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
-- `loadedFromSource` — For caching tables, cache disposition of the most recent `get` in this context: `true` if it fetched from the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
+- `loadedFromSource` — For caching tables (5.1.16+), cache disposition of the most recent `get` in this context: `true` if it went to the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
 
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 
@@ -1165,7 +1165,7 @@ getContext is availabe as export from the `harper` module, or as a global variab
 
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
-- `loadedFromSource` — For caching tables, cache disposition of the most recent `get` in this context: `true` if it fetched from the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
+- `loadedFromSource` — For caching tables (5.1.16+), cache disposition of the most recent `get` in this context: `true` if it went to the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
 
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 
