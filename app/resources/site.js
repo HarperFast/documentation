@@ -22,7 +22,12 @@ async function findOne(table, conditions, select) {
 }
 
 function normalizePath(pathname) {
-	let p = decodeURIComponent(pathname);
+	let p;
+	try {
+		p = decodeURIComponent(pathname);
+	} catch {
+		return null; // malformed percent-encoding — treat as no match, not a 500
+	}
 	if (p.endsWith('/')) p = p.slice(0, -1);
 	if (p.startsWith('/')) p = p.slice(1);
 	return p; // '' = homepage
@@ -80,6 +85,7 @@ server.http(async (request, next) => {
 
 	// HTML page
 	const path = normalizePath(request.pathname);
+	if (path === null) return next(request);
 	const page = await findOne(Page, [
 		{ attribute: 'release', value: release },
 		{ attribute: 'path', value: path },
