@@ -95,3 +95,4 @@ This is not recommended for production use — prefer the `Accept` header for cl
 - [REST Overview](./overview.md) — HTTP methods and URL structure
 - [Content Types](./content-types.md) — Supported encoding formats
 - [Security Overview](../security/overview.md) — Authentication headers and mechanisms
+- [HTTP Response Header Hardening](../security/configuration.md#http-response-header-hardening) — Setting browser security headers and cache-control at your edge
