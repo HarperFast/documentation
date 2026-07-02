@@ -292,6 +292,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'security/response-headers',
+					label: 'Response Header Hardening',
+				},
+				{
+					type: 'doc',
 					id: 'security/basic-authentication',
 					label: 'Basic Authentication',
 				},
