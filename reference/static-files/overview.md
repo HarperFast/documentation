@@ -85,7 +85,7 @@ In addition to the standard `files`, `urlPath`, and `timeout` options, `static` 
 
 By default, `static` handles GET requests **before** authentication — and therefore before the [REST](../rest/overview.md) handler, which runs after authentication. This keeps plain file requests fast, and with the default `fallthrough: true` it is invisible: requests that do not match a file simply pass to the next handler.
 
-It matters as soon as you set `fallthrough: false`: the static handler then answers every unmatched GET itself — including GETs for your exported REST resources, which never get a chance to run. Harper logs a startup warning when it detects this combination.
+It matters as soon as you set `fallthrough: false`: the static handler then responds to every unmatched GET itself — including GETs for your exported REST resources, which never get a chance to run. Harper logs a startup warning when it detects this combination.
 
 If your application serves both static files and an API, order the static handler after REST:
 
@@ -114,7 +114,7 @@ Ordering is applied when the component loads; changing `before` or `after` in `c
 
 <VersionBadge version="v4.7.0" />
 
-Because `static` uses the Plugin API, it automatically responds to changes without requiring a Harper restart. Adding, removing, or modifying files — or updating `config.yaml` — takes effect immediately.
+Because `static` uses the Plugin API, it automatically responds to changes without requiring a Harper restart. Adding, removing, or modifying files — or updating `config.yaml` — takes effect immediately. The one exception is [handler ordering](#handler-ordering): changing `before` or `after` automatically restarts the component to rebuild the middleware chain, rather than taking effect in place.
 
 ## Examples
 
@@ -192,7 +192,7 @@ A request to `/non-existent` returns the contents of `static/404.html` with a `4
 
 ### SPA client-side routing
 
-For SPAs that handle routing in the browser with the History API, return the main application file for any path that neither the API nor the file set matches:
+For SPAs that handle routing in the browser with the History API, return the main application file for any path that does not match an API route or a static file:
 
 ```yaml
 rest: true
@@ -206,7 +206,7 @@ static:
     statusCode: 200
 ```
 
-A request to any unmatched path returns `static/index.html` with a `200` status code, allowing the client-side router to handle navigation. The `after: 'rest'` ordering (added in v5.2.0) lets REST resources answer first; without it, the fallback would intercept API GETs too — see [Handler Ordering](#handler-ordering).
+A request to any unmatched path returns `static/index.html` with a `200` status code, allowing the client-side router to handle navigation. The `after: 'rest'` ordering (added in v5.2.0) allows REST resources to be matched first; without it, the fallback would intercept API GETs too — see [Handler Ordering](#handler-ordering).
 
 Alternatively, SPAs that use hash-based routing (e.g. React Router's `createHashRouter` or Vue Router's `createWebHashHistory`) need no fallback at all: every page loads from `/`, which also keeps `index.html` cacheable at a single URL. This works on every Harper version.
 
