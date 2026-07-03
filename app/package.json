@@ -27,6 +27,7 @@
 		"unist-util-visit": "^5.0.0"
 	},
 	"devDependencies": {
-		"node-html-parser": "^8.0.4"
+		"node-html-parser": "^8.0.4",
+		"playwright": "^1.61.1"
 	}
 }
