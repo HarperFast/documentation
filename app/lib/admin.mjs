@@ -1,6 +1,6 @@
 // Server-rendered admin dashboard for ingest observability. Pure HTML + inline
-// SVG (no client JS) so it works under the site's strict CSP. Auth is enforced
-// by the caller (Basic auth via server.authenticateUser).
+// SVG (no client JS) so it works under the site's strict CSP. Auth (Google
+// OAuth + domain allowlist) is enforced by the caller in resources/site.js.
 
 const STATUS = {
 	activated: { color: '#128a6c', bg: '#e4f5ef', label: 'activated' },
