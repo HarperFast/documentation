@@ -27,6 +27,7 @@ import { visit } from 'unist-util-visit';
 const ADMONITION_TYPES = new Set(['note', 'tip', 'info', 'warning', 'caution', 'danger']);
 
 // :::note[Title] ... ::: → <aside class="admonition admonition-note">
+// (Docusaurus-style `:::note Title` is normalized to `[Title]` in preprocess.)
 function remarkAdmonitions() {
 	return (tree) => {
 		visit(tree, 'containerDirective', (node) => {
@@ -34,13 +35,22 @@ function remarkAdmonitions() {
 			const data = node.data || (node.data = {});
 			data.hName = 'aside';
 			data.hProperties = { className: ['admonition', `admonition-${node.name}`] };
+			let title = node.name.toUpperCase();
+			if (node.children[0]?.data?.directiveLabel) {
+				title = mdastText(node.children.shift());
+			}
 			node.children.unshift({
 				type: 'paragraph',
 				data: { hName: 'p', hProperties: { className: ['admonition-title'] } },
-				children: [{ type: 'text', value: node.name.toUpperCase() }],
+				children: [{ type: 'text', value: title }],
 			});
 		});
 	};
+}
+
+function mdastText(node) {
+	if (node.value) return node.value;
+	return (node.children ?? []).map(mdastText).join('');
 }
 
 // Map raw-HTML component tags (lowercased by the HTML parser) to plain HTML.
@@ -96,6 +106,52 @@ function stripMdx(markdown) {
 		.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 }
 
+// Indented <Tabs>/<TabItem> tags parse as code/text in CommonMark — dedent
+// them to column 0 so they form proper HTML blocks.
+function dedentTabTags(markdown) {
+	return markdown.replace(/^[ \t]+(<\/?Tab(?:s|Item)\b)/gm, '$1');
+}
+
+// Docusaurus admonition titles (`:::info Join us`) → remark-directive labels
+// (`:::info[Join us]`), which strict directive syntax requires.
+function normalizeAdmonitionTitles(markdown) {
+	return markdown.replace(/^(:{3,})(note|tip|info|warning|caution|danger)[ \t]+([^\[\n{].*)$/gm, '$1$2[$3]');
+}
+
+// Data-driven MDX components. Multi-line JSX with {…} props is not a valid
+// CommonMark HTML block (remark escapes it to text), so these are rendered to
+// plain HTML before parsing. Content is trusted (our own repo).
+function renderDataComponents(markdown) {
+	markdown = markdown.replace(/<CustomDocCardList[\s\S]*?\/>/g, (block) => {
+		const columns = /columns=\{(\d+)\}/.exec(block)?.[1] ?? '2';
+		const itemsSrc = /items=\{(\[[\s\S]*\])\}/.exec(block)?.[1];
+		if (!itemsSrc) return '';
+		let items;
+		try {
+			items = new Function(`return (${itemsSrc})`)();
+		} catch {
+			return '';
+		}
+		const cards = items
+			.map(
+				(item) =>
+					`<a class="card" href="${item.href}"><span class="card-title">${escapeHtml(item.label ?? '')}` +
+					(item.badge ? `<span class="card-badge">${escapeHtml(item.badge)}</span>` : '') +
+					`</span><span class="card-desc">${escapeHtml(item.description ?? '')}</span></a>`
+			)
+			.join('\n');
+		return `<div class="card-grid card-grid-${columns}">\n${cards}\n</div>`;
+	});
+	// TODO(M1): server-render these from the release-notes tables (design doc §6)
+	markdown = markdown.replace(/<ReleaseNotesList[\s\S]*?\/>/g, '<div class="todo-component">Release notes index (table-driven render pending)</div>');
+	markdown = markdown.replace(/<LatestPatchLink[\s\S]*?\/>/g, '<span class="todo-component">latest patch</span>');
+	return markdown;
+}
+
+function escapeHtml(s) {
+	return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 const pipeline = unified()
 	.use(remarkParse)
 	.use(remarkGfm)
@@ -110,7 +166,7 @@ const pipeline = unified()
 
 export async function renderDoc(source) {
 	const { data: frontmatter, content } = matter(source);
-	const body = stripMdx(content);
+	const body = renderDataComponents(normalizeAdmonitionTitles(dedentTabTags(stripMdx(content))));
 	const file = await pipeline.process(body);
 	const html = String(file);
 	const toc = file.data.toc ?? [];

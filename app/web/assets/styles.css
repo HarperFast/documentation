@@ -47,3 +47,13 @@ a:hover { text-decoration: underline; }
 .toc-depth-3 { padding-left: 0.9rem; }
 
 .page-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: 0.85rem; }
+
+.card-grid { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.card-grid-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 700px) { .card-grid-2 { grid-template-columns: 1fr; } }
+.card { display: flex; flex-direction: column; gap: 0.3rem; border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.2rem; text-decoration: none; }
+.card:hover { border-color: var(--brand); text-decoration: none; }
+.card-title { font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 0.5rem; }
+.card-badge { background: var(--brand); color: #fff; border-radius: 999px; font-size: 0.68rem; font-weight: 600; padding: 0.1em 0.7em; }
+.card-desc { color: var(--soft); font-size: 0.88rem; }
+.todo-component { border: 1px dashed var(--line); color: var(--soft); border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.85rem; }
