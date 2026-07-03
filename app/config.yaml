@@ -12,6 +12,9 @@ jsResource:
 
 rest: true
 
+# NOTE: `urlPath` on the static plugin is broken in Harper 5.1.15 (files never
+# serve at the derived path — bisected in a minimal component; file as platform
+# feedback). Workaround: nest under web/assets/ so the glob-base strip yields
+# the /assets/... URLs the layout links to.
 static:
   files: 'web/**'
-  urlPath: 'assets'

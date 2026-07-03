@@ -34,6 +34,11 @@ Auth for ingest comes from `~/hdb-docs-replatform/.admin-credentials` or
 - `harper dev` file-watch restarts sometimes fail to rebind the HTTP port (macOS,
   Harper 5.1.15) — kill and relaunch `npm run dev` after editing resources.
   TODO: file as platform feedback.
+- The static plugin's `urlPath` option is broken in Harper 5.1.15: with
+  `static: {files: 'web/**', urlPath: 'assets'}` files never serve (404 at every
+  candidate path). Bisected in a minimal component — defaults work, adding
+  `urlPath` breaks it. Workaround: nest files under `web/assets/` so the
+  glob-base strip produces the same URLs. TODO: file as platform feedback.
 - Table records are lazy proxies: `{...record}` does not copy fields. Write explicit
   objects (see `resources/ingest.js` activate handler).
 
