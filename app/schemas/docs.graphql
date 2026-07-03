@@ -16,6 +16,8 @@ type ContentRelease @table {
 	status: String @indexed # staging | active | archived | failed
 	gitSha: String
 	pageCount: Int
+	chunkCount: Int # total SearchChunks — BM25 corpus size N
+	avgChunkLength: Float # mean chunk token count — BM25 length normalization
 	notes: String
 	createdAt: Date @createdTime
 	activatedAt: Date
@@ -55,4 +57,48 @@ type Redirect @table {
 	to: String
 	status: Int
 	source: String # current | historic | tombstone
+}
+
+# Retrieval unit for search (M2). One per h2/h3 section (+ page intro).
+# Carries the per-chunk statistics BM25 needs so query-time scoring is
+# arithmetic over stored values — no standing in-memory index.
+type SearchChunk @table {
+	id: ID @primaryKey # "<release>:<path>#<anchor>:<position>"
+	release: String @indexed
+	pageId: String
+	path: String
+	section: String @indexed
+	version: String @indexed
+	title: String # page title — ranking boost
+	heading: String # nearest heading — ranking boost, result display
+	anchor: String # in-page anchor for deep-linked results
+	breadcrumb: [String] # nav path, shown under each result
+	position: Int # chunk order within the page
+	text: String # plain text — snippet + tokenization source
+	tokens: [String] @indexed # normalized terms — indexed per-element retrieval
+	termCounts: Any # { term: occurrences } — BM25 term frequency
+	length: Int # token count — BM25 length normalization
+}
+
+# Term dictionary per release: document frequency (BM25 rarity signal) and
+# indexed trigrams for typo/fuzzy resolution. All lookups by index; no
+# standing in-memory structures.
+type Term @table {
+	id: ID @primaryKey # "<release>:<term>"
+	release: String @indexed
+	term: String @indexed
+	docFreq: Int # chunks containing the term
+	trigrams: [String] @indexed # for fuzzy matching of unknown query terms
+}
+
+# Every query from the search UI (and later the agent/MCP). Zero-result rows
+# are the content-gap report. Expires after 90 days.
+type SearchQueryLog @table(expiration: 7776000) {
+	id: ID @primaryKey
+	query: String
+	querySource: String @indexed # ui | agent | mcp
+	section: String
+	version: String
+	resultCount: Int @indexed
+	createdAt: Date @createdTime
 }

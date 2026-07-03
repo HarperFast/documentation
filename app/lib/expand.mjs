@@ -51,7 +51,10 @@ function releaseNotesListMarkdown(releaseData) {
 	const lines = [];
 
 	lines.push(`## Current Release - Version ${current} (${cur.pupName})`, '');
-	lines.push(`[Meet ${cur.pupName}](${slug(current, cur.pupName)}/${cur.pupName.toLowerCase()}) Our ${ordinal(current)} Release Pup`, '');
+	lines.push(
+		`[Meet ${cur.pupName}](${slug(current, cur.pupName)}/${cur.pupName.toLowerCase()}) Our ${ordinal(current)} Release Pup`,
+		''
+	);
 	for (const v of cur.versions) lines.push(`- [${v} ${cur.pupName}](${slug(current, cur.pupName)}/${v})`);
 	lines.push('');
 

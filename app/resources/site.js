@@ -3,6 +3,7 @@
 
 import { server, tables } from 'harper';
 import { layout } from '../lib/layout.mjs';
+import { runSearch } from '../lib/search.mjs';
 
 const { Page, Navigation, Redirect, SitePointer } = tables;
 
@@ -56,7 +57,23 @@ function navSectionFor(path) {
 }
 
 server.http(async (request, next) => {
-	if ((request.method !== 'GET' && request.method !== 'HEAD') || PASSTHROUGH.test(request.pathname)) return next(request);
+	if ((request.method !== 'GET' && request.method !== 'HEAD') || PASSTHROUGH.test(request.pathname))
+		return next(request);
+
+	// Search API: /api/search?q=…&section=…&version=…&limit=…
+	if (request.pathname === '/api/search') {
+		const p = new URL(request.url, 'http://x').searchParams;
+		const data = await runSearch({
+			q: p.get('q'),
+			section: p.get('section'),
+			version: p.get('version'),
+			limit: p.get('limit'),
+		});
+		return new Response(JSON.stringify(data), {
+			status: 200,
+			headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+		});
+	}
 
 	const release = await activeReleaseId();
 	if (!release) return next(request);
@@ -76,7 +93,10 @@ server.http(async (request, next) => {
 	}
 	if (request.pathname === '/sitemap.xml') {
 		const urls = [];
-		for await (const page of Page.search({ conditions: [{ attribute: 'release', value: release }], select: ['path'] })) {
+		for await (const page of Page.search({
+			conditions: [{ attribute: 'release', value: release }],
+			select: ['path'],
+		})) {
 			urls.push(`<url><loc>${SITE_ORIGIN}/${page.path}</loc></url>`);
 		}
 		return textResponse(

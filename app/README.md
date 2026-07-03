@@ -3,6 +3,32 @@
 The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-replatform/README.md`
 (in Kyle's main working copy, untracked) / https://claude.ai/code/artifact/d6526d21-c7be-4593-8106-22997dba354d
 
+## M2 (search) — keyword lane
+
+Hybrid search per design §8; the **keyword lane** is built:
+
+- **Table-backed inverted index, no standing in-memory structures.** At ingest each page is
+  chunked by h2/h3 section (`collectChunks` in the render pass); every chunk stores its
+  `tokens` (indexed), `termCounts`, and `length`. A `buildIndex` pass writes the `Term`
+  dictionary (per-term `docFreq` + indexed `trigrams`) and the corpus stats
+  (`chunkCount`, `avgChunkLength`) on the release. 2,578 chunks / 7,778 terms currently.
+- **BM25 scoring** (`lib/search.mjs`) computed at query time from the stored stats — term
+  frequency saturation (k1) × inverse document frequency × length normalization (b) — plus
+  title/heading field boosts and a multi-term coverage bonus. Per-query memory is bounded to
+  a capped candidate set; nothing is held resident.
+- **Typo tolerance at launch** via `pg_trgm`-style trigram resolution: an unknown query term
+  is matched to dictionary terms by indexed trigram overlap + Dice similarity (e.g.
+  `authentcation` → `authentication`).
+- **Contextual scoping** (`?section=&version=`), **best-section-per-page** dedup, snippets, and
+  `SearchQueryLog` (zero-result rows = the content-gap report).
+- **UI**: a framework-free modal (`web/assets/search.js`) — ⌘K / click, debounced, scoped to
+  the reader's section with an "all docs" toggle, keyboard-navigable.
+- `GET /api/search?q=…&section=…&version=…&limit=…` → JSON.
+
+Tokenizer/trigram helpers live in `lib/tokenize.mjs`, shared byte-identically between index
+time and query time. **Deferred**: ranking tuning against a golden query set, and the
+**vector/semantic lane** (HNSW + `@embed`) which needs a hosted embedding model configured.
+
 ## Current state: M1 (render/serve) at parity
 
 Working end-to-end: repo markdown → ingest (rendered **inside Harper**) → release-scoped tables →

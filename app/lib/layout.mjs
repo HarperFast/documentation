@@ -26,6 +26,9 @@ ${page.description ? `<meta name="description" content="${esc(page.description)}
 	<nav class="sections">
 		${SECTIONS.map((s) => `<a href="/${s.path}"${page.path.startsWith(s.path.split('/')[0]) ? ' class="active"' : ''}>${s.label}</a>`).join('\n\t\t')}
 	</nav>
+	<button type="button" id="search-trigger" class="search-trigger" aria-label="Search">
+		<span>Search</span><kbd>⌘K</kbd>
+	</button>
 </header>
 <div class="page-grid">
 	<nav class="sidebar">${renderNav(navTree, page.path)}</nav>
@@ -37,6 +40,7 @@ ${page.description ? `<meta name="description" content="${esc(page.description)}
 	</main>
 	<aside class="toc">${renderToc(page.toc)}</aside>
 </div>
+<script src="/assets/search.js" defer></script>
 </body>
 </html>`;
 }
@@ -45,7 +49,10 @@ function renderNav(tree, currentPath) {
 	if (!tree?.length) return '';
 	return `<ul>${tree
 		.map((item) => {
-			const link = item.path != null ? `<a href="/${esc(item.path)}"${item.path === currentPath ? ' class="active"' : ''}>${esc(item.label)}</a>` : `<span class="nav-category">${esc(item.label)}</span>`;
+			const link =
+				item.path != null
+					? `<a href="/${esc(item.path)}"${item.path === currentPath ? ' class="active"' : ''}>${esc(item.label)}</a>`
+					: `<span class="nav-category">${esc(item.label)}</span>`;
 			const children = item.items?.length ? renderNav(item.items, currentPath) : '';
 			return `<li>${link}${children}</li>`;
 		})

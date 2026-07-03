@@ -50,7 +50,8 @@ for (const { dir, route, section, version } of SECTIONS) {
 		if (!/\.(md|mdx)$/.test(rel)) continue;
 		if (rel.split('/').some((seg) => seg.startsWith('_'))) continue; // Docusaurus partials are not pages
 		const noExt = rel.replace(/\.(md|mdx)$/, '');
-		const routePath = noExt === 'index' ? route : noExt.endsWith('/index') ? `${route}/${noExt.slice(0, -6)}` : `${route}/${noExt}`;
+		const routePath =
+			noExt === 'index' ? route : noExt.endsWith('/index') ? `${route}/${noExt.slice(0, -6)}` : `${route}/${noExt}`;
 		docs.push({
 			path: routePath,
 			section,
@@ -77,7 +78,11 @@ if (existsSync(homepageFile)) {
 // ── Navigation trees ─────────────────────────────────────────────────────────
 
 const navEntries = [];
-navEntries.push({ section: 'reference', version: 'v5', tree: await sidebarTree('sidebarsReference.ts', 'reference/v5') });
+navEntries.push({
+	section: 'reference',
+	version: 'v5',
+	tree: await sidebarTree('sidebarsReference.ts', 'reference/v5'),
+});
 navEntries.push({ section: 'learn', tree: await sidebarTree('sidebarsLearn.ts', 'learn') });
 navEntries.push({ section: 'fabric', tree: await sidebarTree('sidebarsFabric.ts', 'fabric') });
 navEntries.push({ section: 'release-notes', tree: fallbackTree('release-notes') });
@@ -116,7 +121,8 @@ function transformItems(items, base) {
 	return items
 		.map((item) => {
 			if (typeof item === 'string') return { label: item.split('/').pop(), path: docIdToPath(item, base) };
-			if (item.type === 'doc' || (item.id && !item.type)) return { label: item.label ?? item.id, path: docIdToPath(item.id, base) };
+			if (item.type === 'doc' || (item.id && !item.type))
+				return { label: item.label ?? item.id, path: docIdToPath(item.id, base) };
 			if (item.type === 'category') {
 				const node = { label: item.label, items: transformItems(item.items, base) };
 				if (item.link?.type === 'doc') node.path = docIdToPath(item.link.id, base);
@@ -172,7 +178,9 @@ try {
 
 // ── Ship it ──────────────────────────────────────────────────────────────────
 
-console.log(`release ${release}: ${docs.length} pages, ${navEntries.length} nav trees, ${redirectEntries.length} redirects → ${TARGET}`);
+console.log(
+	`release ${release}: ${docs.length} pages, ${navEntries.length} nav trees, ${redirectEntries.length} redirects → ${TARGET}`
+);
 
 await post({ action: 'begin', release, gitSha });
 for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -185,6 +193,8 @@ await post({ action: 'nav', release, entries: navEntries });
 for (let i = 0; i < redirectEntries.length; i += 200) {
 	await post({ action: 'redirects', release, entries: redirectEntries.slice(i, i + 200) });
 }
+const index = await post({ action: 'buildIndex', release });
+console.log(`indexed: ${index.terms} terms, ${index.chunks} chunks, avg length ${index.avgChunkLength?.toFixed(1)}`);
 const result = await post({ action: 'activate', release });
 console.log('activated:', JSON.stringify(result));
 
@@ -203,7 +213,7 @@ function walk(dir) {
 async function post(body) {
 	const res = await fetch(`${TARGET}/Ingest`, {
 		method: 'POST',
-		headers: { 'content-type': 'application/json', authorization: `Basic ${auth}` },
+		headers: { 'content-type': 'application/json', 'authorization': `Basic ${auth}` },
 		body: JSON.stringify(body),
 	});
 	if (!res.ok) throw new Error(`Ingest ${body.action} failed: ${res.status} ${await res.text()}`);

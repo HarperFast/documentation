@@ -134,7 +134,10 @@ const canonicalMiss = results.filter((r) => !r.fail && !r.canonicalMatch);
 const anchorMiss = results.filter((r) => !r.fail && r.anchorMissing.length > 0);
 const totalAnchors = results.reduce((n, r) => n + (r.anchorTotal ?? 0), 0);
 const totalAnchorsMissing = results.reduce((n, r) => n + (r.anchorMissing?.length ?? 0), 0);
-const sims = results.filter((r) => !r.fail).map((r) => r.similarity).sort((a, b) => a - b);
+const sims = results
+	.filter((r) => !r.fail)
+	.map((r) => r.similarity)
+	.sort((a, b) => a - b);
 const simWarn = results.filter((r) => !r.fail && r.similarity < WARN_SIMILARITY && r.similarity >= FAIL_SIMILARITY);
 const simFail = results.filter((r) => !r.fail && r.similarity < FAIL_SIMILARITY);
 const redirectFail = redirectResults.filter((r) => !r.ok);
@@ -163,7 +166,20 @@ console.log(`
 
 writeFileSync(
 	REPORT_PATH,
-	JSON.stringify({ target: TARGET, buildDir: BUILD_DIR, generatedAt: null, results, redirectResults, mdResults, onlyInBuild, onlyInHarper }, null, '\t')
+	JSON.stringify(
+		{
+			target: TARGET,
+			buildDir: BUILD_DIR,
+			generatedAt: null,
+			results,
+			redirectResults,
+			mdResults,
+			onlyInBuild,
+			onlyInHarper,
+		},
+		null,
+		'\t'
+	)
 );
 console.log(`report: ${REPORT_PATH}`);
 
@@ -205,11 +221,15 @@ function extract(html, kind) {
 	const canonical = canonicalHref ? normalize(canonicalHref.replace(/^https?:\/\/[^/]+/, '')) : undefined;
 	// Docusaurus: .theme-doc-markdown is exactly the rendered markdown (no
 	// breadcrumbs/pagination/edit-footer). Harper skeleton: <article>.
-	const article = kind === 'build' ? (root.querySelector('.theme-doc-markdown') ?? root.querySelector('article')) : root.querySelector('article');
+	const article =
+		kind === 'build'
+			? (root.querySelector('.theme-doc-markdown') ?? root.querySelector('article'))
+			: root.querySelector('article');
 	let text = '';
 	const anchors = [];
 	if (article) {
-		for (const el of article.querySelectorAll('nav, aside.theme-doc-toc-mobile, script, style, .page-footer')) el.remove();
+		for (const el of article.querySelectorAll('nav, aside.theme-doc-toc-mobile, script, style, .page-footer'))
+			el.remove();
 		for (const h of article.querySelectorAll('h2[id], h3[id]')) anchors.push(h.getAttribute('id'));
 		// Extract from innerHTML, not `.text`: node-html-parser's `.text`
 		// concatenates adjacent elements with no separator ("Tucker4.7.32") and
@@ -282,7 +302,10 @@ function sitemapPaths(xml) {
 async function loadRedirects() {
 	const { writeFileSync: write, unlinkSync } = await import('node:fs');
 	const shimPath = path.join(REPO_ROOT, '.redirects-shim.ts');
-	const source = readFileSync(path.join(REPO_ROOT, 'redirects.ts'), 'utf8').replace("'./historic-redirects'", "'./historic-redirects.ts'");
+	const source = readFileSync(path.join(REPO_ROOT, 'redirects.ts'), 'utf8').replace(
+		"'./historic-redirects'",
+		"'./historic-redirects.ts'"
+	);
 	write(shimPath, source);
 	let mod;
 	try {
