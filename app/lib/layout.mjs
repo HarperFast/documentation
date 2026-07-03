@@ -32,7 +32,7 @@ ${page.description ? `<meta name="description" content="${esc(page.description)}
 	<main class="content">
 		<article>${page.html}</article>
 		<footer class="page-footer">
-			${page.editUrl ? `<a href="${esc(page.editUrl)}">Edit this page</a>` : ''}
+			${safeUrl(page.editUrl) ? `<a href="${esc(page.editUrl)}">Edit this page</a>` : ''}
 		</footer>
 	</main>
 	<aside class="toc">${renderToc(page.toc)}</aside>
@@ -61,4 +61,11 @@ function renderToc(toc) {
 
 function esc(s) {
 	return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Only emit http(s) and site-relative hrefs — blocks javascript:/data: URLs
+// from reaching an href even though content is trusted (defense in depth).
+function safeUrl(url) {
+	if (!url) return false;
+	return /^https?:\/\//i.test(url) || url.startsWith('/');
 }

@@ -5,6 +5,8 @@
 	"type": "module",
 	"description": "Harper-native documentation site: ingest, serving, search, chat (replatform of docs.harperdb.io)",
 	"scripts": {
+		"sync-static": "rm -rf web/img web/js && cp -R ../static/img web/img && cp -R ../static/js web/js",
+		"predev": "npm run sync-static",
 		"dev": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper dev .",
 		"local:start": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper start",
 		"local:stop": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper stop",

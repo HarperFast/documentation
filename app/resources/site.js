@@ -6,8 +6,14 @@ import { layout } from '../lib/layout.mjs';
 
 const { Page, Navigation, Redirect, SitePointer } = tables;
 
+// Canonical origin for absolute URLs (sitemap). Matches the current production
+// host; override via env for staging/preview.
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? 'https://docs.harper.fast';
+
 // Paths handled elsewhere (REST resources, static assets) — pass through.
-const PASSTHROUGH = /^\/(Ingest|assets\/|favicon)/;
+// Anchored to a path-segment boundary so a real doc page named e.g.
+// /favicon-guide is not shadowed.
+const PASSTHROUGH = /^\/(Ingest(?:$|\/)|assets\/|favicon(?:$|[./]))/;
 
 async function activeReleaseId() {
 	const pointer = await SitePointer.get('active');
@@ -29,6 +35,15 @@ function normalizePath(pathname) {
 	if (p.endsWith('/')) p = p.slice(0, -1);
 	if (p.startsWith('/')) p = p.slice(1);
 	return p; // '' = homepage
+}
+
+// If-None-Match may arrive weak-prefixed (W/"…") or as a comma list; a doc
+// page's representation is byte-identical regardless of transport weakening,
+// so compare ignoring the W/ prefix.
+function etagMatches(ifNoneMatch, etag) {
+	if (!ifNoneMatch) return false;
+	const bare = etag.replace(/^W\//, '');
+	return ifNoneMatch.split(',').some((t) => t.trim().replace(/^W\//, '') === bare);
 }
 
 function navSectionFor(path) {
@@ -62,7 +77,7 @@ server.http(async (request, next) => {
 	if (request.pathname === '/sitemap.xml') {
 		const urls = [];
 		for await (const page of Page.search({ conditions: [{ attribute: 'release', value: release }], select: ['path'] })) {
-			urls.push(`<url><loc>https://docs.harperdb.io/${page.path}</loc></url>`);
+			urls.push(`<url><loc>${SITE_ORIGIN}/${page.path}</loc></url>`);
 		}
 		return textResponse(
 			`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`,
@@ -89,8 +104,11 @@ server.http(async (request, next) => {
 		{ attribute: 'path', value: path },
 	]);
 	if (page) {
-		const etag = `"${page.contentHash}"`;
-		if (request.headers.get('if-none-match') === etag) {
+		// ETag keys on release + source hash: the composed response also depends
+		// on layout/nav, and every layout/nav/content change ships as a new
+		// release, so folding the release id in prevents stale 304s.
+		const etag = `"${release}-${page.contentHash}"`;
+		if (etagMatches(request.headers.get('if-none-match'), etag)) {
 			return new Response(null, { status: 304, headers: { etag } });
 		}
 		const { section, version } = navSectionFor(path);
@@ -105,11 +123,8 @@ server.http(async (request, next) => {
 		});
 	}
 
-	// Redirects
-	const redirect = await findOne(Redirect, [
-		{ attribute: 'release', value: release },
-		{ attribute: 'from', value: `/${path}` },
-	]);
+	// Redirects — O(1) primary-key lookup ("<release>:<from>").
+	const redirect = await Redirect.get(`${release}:/${path}`);
 	if (redirect) {
 		return new Response(null, { status: redirect.status ?? 301, headers: { location: redirect.to } });
 	}
