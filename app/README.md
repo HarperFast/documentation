@@ -3,6 +3,26 @@
 The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-replatform/README.md`
 (in Kyle's main working copy, untracked) / https://claude.ai/code/artifact/d6526d21-c7be-4593-8106-22997dba354d
 
+## Admin area — ingest observability
+
+`/admin/ingest` is a server-rendered dashboard (CSP-safe: inline SVG charts, no client JS)
+over the `IngestRun` table — one row per ingest, created at `begin` (`status: running`, so a
+stuck row flags a crashed/hung ingest) and finalized at `activate` with pages/chunks/terms/nav/
+redirects, the activation-guard result, prune count, and duration. 90-day TTL via
+`@table(expiration:)`. Summary cards, a duration-by-run bar chart (colored by status), and a
+runs table.
+
+**Auth**: Google OAuth via the `@harperfast/oauth` plugin (configured in `config.yaml`;
+`OAUTH_GOOGLE_CLIENT_ID`/`_SECRET` from `.env`, gitignored). Unauthenticated hits redirect to
+`/oauth/google/login`; access is restricted to `ADMIN_ALLOWED_DOMAINS` (default
+`harperdb.io,harper.fast`). Register the callback `https://<host>/oauth/google/callback` in the
+Google Cloud OAuth client. **Dev/verification bypass**: set `ADMIN_DEV_KEY` in the env and pass
+a matching `x-admin-dev-key` header to reach the dashboard without the OAuth round-trip — a local
+tool only, inert unless the env var is set (never set it in production).
+
+Deploy note: the plugin derives its callback from the request host; the local instance runs on
+:9936 while the plugin logged Harper's default :9926 — reconcile the callback host per environment.
+
 ## M2 (search) — hybrid: keyword-primary + semantic recall
 
 Both lanes are built (design §8). **Keyword-primary fusion**: the BM25 keyword lane owns the

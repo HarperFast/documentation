@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { renderDoc } from '../lib/render.mjs';
 import { tokenize, termCounts, trigrams } from '../lib/tokenize.mjs';
 
-const { ContentRelease, Page, Navigation, Redirect, SitePointer, SearchChunk, Term } = tables;
+const { ContentRelease, Page, Navigation, Redirect, SitePointer, SearchChunk, Term, IngestRun } = tables;
 
 export class Ingest extends Resource {
 	static async post(_target, data) {
@@ -22,6 +22,7 @@ export class Ingest extends Resource {
 		switch (body.action) {
 			case 'begin': {
 				await ContentRelease.put({ id: body.release, status: 'staging', gitSha: body.gitSha ?? '', pageCount: 0 });
+				await IngestRun.put({ id: body.release, gitSha: body.gitSha ?? '', status: 'running' });
 				return { ok: true, release: body.release };
 			}
 			case 'pages': {
@@ -110,22 +111,21 @@ export class Ingest extends Resource {
 				const entries = [...df];
 				for (let i = 0; i < entries.length; i += TERM_WRITE_BATCH) {
 					await Promise.all(
-						entries
-							.slice(i, i + TERM_WRITE_BATCH)
-							.map(([term, docFreq]) =>
-								Term.put({
-									id: `${body.release}:${term}`,
-									release: body.release,
-									term,
-									docFreq,
-									trigrams: trigrams(term),
-								})
-							)
+						entries.slice(i, i + TERM_WRITE_BATCH).map(([term, docFreq]) =>
+							Term.put({
+								id: `${body.release}:${term}`,
+								release: body.release,
+								term,
+								docFreq,
+								trigrams: trigrams(term),
+							})
+						)
 					);
 				}
 				const staged = await ContentRelease.get(body.release);
 				const avgChunkLength = chunkCount ? totalLength / chunkCount : 0;
 				await ContentRelease.put({ ...plainRelease(staged, body.release), chunkCount, avgChunkLength });
+				await updateRun(body.release, { terms: df.size, chunks: chunkCount, avgChunkLength });
 				return { ok: true, terms: df.size, chunks: chunkCount, avgChunkLength };
 			}
 			case 'activate': {
@@ -158,6 +158,14 @@ export class Ingest extends Resource {
 				if (mismatch.length) {
 					const failed = await ContentRelease.get(body.release);
 					await ContentRelease.put({ ...plainRelease(failed, body.release), status: 'failed' });
+					await finishRun(body.release, {
+						status: 'rejected',
+						pages: actual.pages,
+						nav: actual.nav,
+						redirects: actual.redirects,
+						guard: { expected: expect, actual, mismatch },
+						error: `incomplete: ${mismatch.join(', ')}`,
+					});
 					throw new Error(`release ${body.release} incomplete, refusing to activate: ${mismatch.join(', ')}`);
 				}
 				// Activate: one pointer write. Serving reads the pointer by primary key.
@@ -178,6 +186,14 @@ export class Ingest extends Resource {
 				for (const rel of toArchive) await ContentRelease.put(rel);
 				// Prune old releases so the DB doesn't grow unbounded across ingests.
 				const pruned = await pruneReleases(body.release);
+				await finishRun(body.release, {
+					status: 'activated',
+					pages: actual.pages,
+					nav: actual.nav,
+					redirects: actual.redirects,
+					pruned,
+					guard: { expected: expect, actual, mismatch: [] },
+				});
 				return { ok: true, release: body.release, pageCount: actual.pages, active: true, pruned };
 			}
 			default:
@@ -239,6 +255,55 @@ async function pruneReleases(currentRelease) {
 		if (ids.length) await bulkDelete(name, ids);
 	}
 	return removed.size;
+}
+
+// Ingest observability. Records are lazy proxies (spread drops fields), so
+// merge explicitly onto a plain snapshot. Best-effort — never fail an ingest
+// on a telemetry write.
+function plainRun(r, id) {
+	return {
+		id,
+		gitSha: r?.gitSha ?? '',
+		status: r?.status ?? 'running',
+		pages: r?.pages ?? null,
+		chunks: r?.chunks ?? null,
+		terms: r?.terms ?? null,
+		nav: r?.nav ?? null,
+		redirects: r?.redirects ?? null,
+		avgChunkLength: r?.avgChunkLength ?? null,
+		pruned: r?.pruned ?? null,
+		guard: r?.guard ?? null,
+		error: r?.error ?? null,
+		startedAt: r?.startedAt ?? null,
+		finishedAt: r?.finishedAt ?? null,
+		durationMs: r?.durationMs ?? null,
+	};
+}
+
+async function updateRun(id, fields) {
+	try {
+		const run = await IngestRun.get(id);
+		await IngestRun.put({ ...plainRun(run, id), ...fields });
+	} catch {
+		/* telemetry is best-effort */
+	}
+}
+
+// Finalize a run: set terminal status + finishedAt + durationMs from startedAt.
+async function finishRun(id, fields) {
+	try {
+		const run = await IngestRun.get(id);
+		const finishedAt = new Date();
+		const startedAt = run?.startedAt ? new Date(run.startedAt) : finishedAt;
+		await IngestRun.put({
+			...plainRun(run, id),
+			...fields,
+			finishedAt,
+			durationMs: finishedAt.getTime() - startedAt.getTime(),
+		});
+	} catch {
+		/* telemetry is best-effort */
+	}
 }
 
 // Table records are lazy proxies — spread does not copy fields. Build a plain

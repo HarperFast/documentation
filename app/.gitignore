@@ -1,3 +1,5 @@
 parity-report.json
 web/img/
 web/js/
+.env
+.env.*

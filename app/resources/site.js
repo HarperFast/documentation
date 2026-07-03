@@ -4,8 +4,38 @@
 import { server, tables } from 'harper';
 import { layout } from '../lib/layout.mjs';
 import { runSearch } from '../lib/search.mjs';
+import { renderAdminDashboard } from '../lib/admin.mjs';
 
-const { Page, Navigation, Redirect, SitePointer } = tables;
+const { Page, Navigation, Redirect, SitePointer, IngestRun } = tables;
+
+// Admin area is gated by Google OAuth (via the @harperfast/oauth plugin, which
+// populates request.session after /oauth/google/login) and restricted to an
+// allowlist of email domains. Returns the signed-in email if permitted, else a
+// reason: 'login' (not signed in) or 'forbidden' (signed in, wrong domain).
+const ADMIN_DOMAINS = (process.env.ADMIN_ALLOWED_DOMAINS ?? 'harperdb.io,harper.fast')
+	.split(',')
+	.map((s) => s.trim().toLowerCase())
+	.filter(Boolean);
+
+// Dev/verification bypass: ONLY active when ADMIN_DEV_KEY is set in the env
+// (never in production). A request carrying the matching `x-admin-dev-key`
+// header is treated as a signed-in admin, so the dashboard can be exercised
+// without the full Google OAuth round-trip. The OAuth path below is the real
+// mechanism; this sits above it purely as a local test affordance.
+const ADMIN_DEV_KEY = process.env.ADMIN_DEV_KEY || null;
+const ADMIN_DEV_EMAIL = process.env.ADMIN_DEV_EMAIL || 'dev@harperdb.io';
+
+function adminAuth(request) {
+	if (ADMIN_DEV_KEY && request.headers.get('x-admin-dev-key') === ADMIN_DEV_KEY) {
+		return { email: ADMIN_DEV_EMAIL, dev: true };
+	}
+	const email = request.session?.oauthUser?.email ?? null;
+	if (!email) return { reason: 'login' };
+	if (ADMIN_DOMAINS.length && !ADMIN_DOMAINS.some((d) => email.toLowerCase().endsWith(`@${d}`))) {
+		return { reason: 'forbidden', email };
+	}
+	return { email };
+}
 
 // Canonical origin for absolute URLs (sitemap). Matches the current production
 // host; override via env for staging/preview.
@@ -30,7 +60,7 @@ const CSP = [
 // Paths handled elsewhere (REST resources, static assets) — pass through.
 // Anchored to a path-segment boundary so a real doc page named e.g.
 // /favicon-guide is not shadowed.
-const PASSTHROUGH = /^\/(Ingest(?:$|\/)|assets\/|favicon(?:$|[./]))/;
+const PASSTHROUGH = /^\/(Ingest(?:$|\/)|assets\/|favicon(?:$|[./])|oauth\/)/;
 
 async function activeReleaseId() {
 	const pointer = await SitePointer.get('active');
@@ -88,6 +118,32 @@ server.http(async (request, next) => {
 		return new Response(JSON.stringify(data), {
 			status: 200,
 			headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+		});
+	}
+
+	// Admin area (Google-OAuth gated): ingest observability dashboard.
+	if (request.pathname === '/admin' || request.pathname === '/admin/ingest') {
+		const auth = adminAuth(request);
+		if (auth.reason === 'login') {
+			// Not signed in → kick off the Google OAuth flow, returning here after.
+			return new Response(null, { status: 302, headers: { location: '/oauth/google/login?redirect=/admin/ingest' } });
+		}
+		if (auth.reason === 'forbidden') {
+			return new Response(`Forbidden: ${auth.email} is not an authorized admin account.`, {
+				status: 403,
+				headers: { 'content-type': 'text/plain; charset=utf-8' },
+			});
+		}
+		const runs = [];
+		for await (const run of IngestRun.search({})) runs.push(run);
+		runs.sort((a, b) => new Date(b.startedAt ?? 0) - new Date(a.startedAt ?? 0));
+		return new Response(renderAdminDashboard(runs.slice(0, 100)), {
+			status: 200,
+			headers: {
+				'content-type': 'text/html; charset=utf-8',
+				'cache-control': 'no-store',
+				'content-security-policy': CSP,
+			},
 		});
 	}
 

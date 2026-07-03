@@ -12,6 +12,16 @@ jsResource:
 
 rest: true
 
+# Google OAuth for the admin area (@harperfast/oauth). Credentials come from
+# the environment (loadEnv, above) — never commit them. Register the callback
+# https://<host>/oauth/google/callback in the Google Cloud OAuth client.
+'@harperfast/oauth':
+  package: '@harperfast/oauth'
+  providers:
+    google:
+      clientId: ${OAUTH_GOOGLE_CLIENT_ID}
+      clientSecret: ${OAUTH_GOOGLE_CLIENT_SECRET}
+
 # NOTE: `urlPath` on the static plugin is broken in Harper 5.1.15 (files never
 # serve at the derived path — bisected in a minimal component; file as platform
 # feedback). Workaround: nest under web/assets/ so the glob-base strip yields

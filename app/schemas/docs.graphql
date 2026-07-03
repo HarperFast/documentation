@@ -23,6 +23,27 @@ type ContentRelease @table {
 	activatedAt: Date
 }
 
+# Ingest/build observability: one row per ingest run, created at `begin` and
+# finalized at `activate`. A row stuck on status=running signals a crashed or
+# hung ingest. 90-day TTL via table expiration. Surfaced in the admin dashboard.
+type IngestRun @table(expiration: 7776000) {
+	id: ID @primaryKey # the release id
+	gitSha: String
+	status: String @indexed # running | activated | rejected | failed
+	pages: Int
+	chunks: Int
+	terms: Int
+	nav: Int
+	redirects: Int
+	avgChunkLength: Float
+	pruned: Int # old releases removed this run
+	guard: Any # activation guard result: { expected, actual, mismatch[] }
+	error: String # failure/rejection reason, if any
+	startedAt: Date @createdTime
+	finishedAt: Date
+	durationMs: Int
+}
+
 type Page @table {
 	id: ID @primaryKey # "<release>:<path>"
 	release: String @indexed

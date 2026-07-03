@@ -1,0 +1,139 @@
+/* Admin dashboard — layered on the site's styles.css palette. */
+body.admin {
+	max-width: 1080px;
+	margin: 0 auto;
+	padding: 1.5rem;
+	background: #fbfbfd;
+}
+.admin-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--line, #dadde1);
+	padding-bottom: 1rem;
+	margin-bottom: 1.5rem;
+}
+.admin-eyebrow {
+	font-size: 0.72rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--brand, #403b8a);
+	font-weight: 700;
+}
+.admin-header h1 {
+	margin: 0.2rem 0 0;
+	font-size: 1.7rem;
+	color: #1c1e21;
+}
+.admin-home {
+	font-size: 0.85rem;
+	color: var(--brand, #403b8a);
+	text-decoration: none;
+}
+.admin-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 0.8rem;
+	margin-bottom: 1.5rem;
+}
+.admin-card {
+	border: 1px solid var(--line, #dadde1);
+	border-radius: 10px;
+	background: #fff;
+	padding: 0.9rem 1.1rem;
+}
+.admin-card-value {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: #1c1e21;
+	font-variant-numeric: tabular-nums;
+}
+.admin-card-label {
+	font-size: 0.78rem;
+	color: #606770;
+	margin-top: 0.15rem;
+}
+.admin-panel {
+	border: 1px solid var(--line, #dadde1);
+	border-radius: 10px;
+	background: #fff;
+	padding: 1.1rem 1.2rem;
+	margin-bottom: 1.4rem;
+}
+.admin-panel h2 {
+	margin: 0 0 0.9rem;
+	font-size: 1.05rem;
+	color: #1c1e21;
+}
+.admin-sub {
+	font-weight: 400;
+	font-size: 0.78rem;
+	color: #909098;
+	margin-left: 0.4rem;
+}
+.admin-chart .c-label {
+	font-size: 11px;
+	fill: #606770;
+	font-family: ui-monospace, Menlo, monospace;
+}
+.admin-chart .c-val {
+	font-size: 11px;
+	fill: #1c1e21;
+	font-variant-numeric: tabular-nums;
+}
+.admin-table-scroll {
+	overflow-x: auto;
+}
+.admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.86rem;
+}
+.admin-table th {
+	text-align: left;
+	font-size: 0.72rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: #606770;
+	border-bottom: 2px solid var(--line, #dadde1);
+	padding: 0.4rem 0.7rem 0.4rem 0;
+}
+.admin-table td {
+	border-bottom: 1px solid #eceef1;
+	padding: 0.5rem 0.7rem 0.5rem 0;
+	vertical-align: middle;
+}
+.admin-table .num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.admin-mono {
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 0.8rem;
+}
+.admin-pill {
+	display: inline-block;
+	border-radius: 999px;
+	padding: 0.1em 0.7em;
+	font-size: 0.72rem;
+	font-weight: 600;
+}
+.admin-when {
+	color: #909098;
+	font-size: 0.78rem;
+	white-space: nowrap;
+}
+.admin-note {
+	color: #909098;
+	font-size: 0.78rem;
+	font-family: ui-monospace, Menlo, monospace;
+}
+.admin-note-err {
+	color: #b3261e;
+	font-size: 0.78rem;
+}
+.admin-empty {
+	color: #909098;
+	text-align: center;
+	padding: 1.5rem;
+}
