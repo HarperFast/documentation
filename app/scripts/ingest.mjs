@@ -168,13 +168,18 @@ try {
 	} finally {
 		unlinkSync(shimPath);
 	}
+	// Dedup by `from`: entries share the Redirect primary key "<release>:<from>",
+	// so duplicates collapse server-side. Deduping here keeps the client's
+	// expected count exact for the activation guard (last mapping wins).
+	const byFrom = new Map();
 	for (const rule of mod.redirects) {
 		const froms = Array.isArray(rule.from) ? rule.from : [rule.from];
 		for (let from of froms) {
 			if (from.length > 1 && from.endsWith('/')) from = from.slice(0, -1); // match the serving path normalization
-			redirectEntries.push({ from, to: rule.to, status: 301, source: 'current' });
+			byFrom.set(from, { from, to: rule.to, status: 301, source: 'current' });
 		}
 	}
+	redirectEntries.push(...byFrom.values());
 } catch (err) {
 	console.warn(`redirects.ts import failed (${err.message}); skipping redirects`);
 }
@@ -198,7 +203,12 @@ for (let i = 0; i < redirectEntries.length; i += 200) {
 }
 const index = await post({ action: 'buildIndex', release });
 console.log(`indexed: ${index.terms} terms, ${index.chunks} chunks, avg length ${index.avgChunkLength?.toFixed(1)}`);
-const result = await post({ action: 'activate', release });
+const result = await post({
+	action: 'activate',
+	release,
+	expect: { pages: docs.length, nav: navEntries.length, redirects: redirectEntries.length },
+});
+if (result.pruned) console.log(`pruned: ${result.pruned} old release(s)`);
 console.log('activated:', JSON.stringify(result));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

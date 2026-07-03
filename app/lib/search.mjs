@@ -15,6 +15,7 @@ const HEADING_BOOST = 1.6;
 const CANDIDATE_CAP = 400; // max chunks scored per query
 const FUZZY_MIN = 0.4; // min trigram similarity to accept a correction outright
 const SEMANTIC_K = 30; // chunks pulled from the vector lane before fusion
+const SEMANTIC_EF = 400; // HNSW search budget per query (recall vs latency)
 const RRF_K = 60; // reciprocal-rank-fusion constant (standard default)
 const EMBED_MODEL = 'gemini-embedding-001'; // logical name == wire model id (see @embed note)
 const MAX_QUERY_CHARS = 200; // hard cap on query length (DoS guard)
@@ -86,6 +87,14 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	// Cap distinct terms so a synthetic many-word query can't fan out into
 	// hundreds of trigram lookups + edit-distance passes (DoS).
 	const queryTerms = [...new Set(tokenize(q))].slice(0, MAX_QUERY_TERMS);
+
+	// A query that tokenizes to nothing (only stopwords/punctuation) has no
+	// search intent — return empty rather than embed it and surface arbitrary
+	// nearest-neighbors (and skip the wasted embedding call).
+	if (queryTerms.length === 0) {
+		await logQuery(q, section, version, 0);
+		return { query: q, results: [], total: 0, lanes: { keyword: 0, semantic: 0 } };
+	}
 
 	// Both lanes return ranked chunk arrays. The vector lane degrades to [] if
 	// no model is configured — keyword search never depends on it.
@@ -211,7 +220,10 @@ async function semanticLane(release, q, scope) {
 	try {
 		for await (const chunk of SearchChunk.search({
 			conditions: scope,
-			sort: { attribute: 'embedding', target: Array.from(vector) },
+			// High ef: raises the HNSW exploration budget so recall is strong and
+			// stable across index rebuilds — 3072-dim vectors need a generous
+			// budget or the approximate search misses the right chunk.
+			sort: { attribute: 'embedding', target: Array.from(vector), ef: SEMANTIC_EF },
 			limit: SEMANTIC_K,
 		})) {
 			out.push(chunk);

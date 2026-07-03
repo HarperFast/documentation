@@ -11,6 +11,22 @@ const { Page, Navigation, Redirect, SitePointer } = tables;
 // host; override via env for staging/preview.
 const SITE_ORIGIN = process.env.SITE_ORIGIN ?? 'https://docs.harper.fast';
 
+// Content-Security-Policy for pages. script-src 'self' (no unsafe-inline)
+// blocks injected inline scripts AND inline event handlers (onerror/onclick) —
+// the main XSS vector through ingested content — while our own /assets scripts
+// still run. style-src allows inline for the shiki dual-theme CSS variables.
+const CSP = [
+	"default-src 'self'",
+	"script-src 'self'",
+	"style-src 'self' 'unsafe-inline'",
+	"img-src 'self' data:",
+	"font-src 'self'",
+	"connect-src 'self'",
+	"frame-ancestors 'none'",
+	"base-uri 'self'",
+	"object-src 'none'",
+].join('; ');
+
 // Paths handled elsewhere (REST resources, static assets) — pass through.
 // Anchored to a path-segment boundary so a real doc page named e.g.
 // /favicon-guide is not shadowed.
@@ -78,18 +94,31 @@ server.http(async (request, next) => {
 	const release = await activeReleaseId();
 	if (!release) return next(request);
 
-	// llms.txt / llms-full.txt / sitemap.xml
+	// llms.txt / llms-full.txt — streamed from the page cursor so the whole
+	// corpus (llms-full is ~1.4MB) is never materialized in memory at once.
 	if (request.pathname === '/llms.txt' || request.pathname === '/llms-full.txt') {
 		const full = request.pathname === '/llms-full.txt';
-		const lines = ['# Harper Documentation', ''];
-		for await (const page of Page.search({
-			conditions: [{ attribute: 'release', value: release }],
-			select: full ? ['path', 'title', 'renderedMarkdown'] : ['path', 'title', 'description'],
-		})) {
-			if (full) lines.push(`# ${page.title}`, '', page.renderedMarkdown, '');
-			else lines.push(`- [${page.title}](/${page.path}.md)${page.description ? `: ${page.description}` : ''}`);
-		}
-		return textResponse(lines.join('\n'), 'text/plain; charset=utf-8');
+		const encoder = new TextEncoder();
+		const stream = new ReadableStream({
+			async start(controller) {
+				try {
+					controller.enqueue(encoder.encode('# Harper Documentation\n\n'));
+					for await (const page of Page.search({
+						conditions: [{ attribute: 'release', value: release }],
+						select: full ? ['path', 'title', 'renderedMarkdown'] : ['path', 'title', 'description'],
+					})) {
+						const line = full
+							? `# ${page.title}\n\n${page.renderedMarkdown}\n\n`
+							: `- [${page.title}](/${page.path}.md)${page.description ? `: ${page.description}` : ''}\n`;
+						controller.enqueue(encoder.encode(line));
+					}
+					controller.close();
+				} catch (err) {
+					controller.error(err);
+				}
+			},
+		});
+		return new Response(stream, { status: 200, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 	}
 	if (request.pathname === '/sitemap.xml') {
 		const urls = [];
@@ -139,7 +168,14 @@ server.http(async (request, next) => {
 			status: 200,
 			// no-cache = store but revalidate every request; ETag makes that a cheap 304.
 			// Real caching strategy (composed-page cache, longer TTLs) comes with M4.
-			headers: { 'content-type': 'text/html; charset=utf-8', etag, 'cache-control': 'public, no-cache' },
+			headers: {
+				'content-type': 'text/html; charset=utf-8',
+				etag,
+				'cache-control': 'public, no-cache',
+				'content-security-policy': CSP,
+				'x-content-type-options': 'nosniff',
+				'referrer-policy': 'strict-origin-when-cross-origin',
+			},
 		});
 	}
 

@@ -42,6 +42,15 @@ jobs:
           ROOTPATH: ${{ runner.temp }}/hdb
           HTTP_PORT: '9936'
           OPERATIONSAPI_NETWORK_PORT: '9935'
+          # Embedding model for @embed / the semantic lane. Requires the
+          # GEMINI_API_KEY repo secret; HARPER_CONFIG merges the models section
+          # into the instance config at startup. Without it, @embed writes fail
+          # and ingest aborts (the @embed ingest-time coupling — see #1594).
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HARPER_CONFIG: >-
+            {"models":{"embedding":{"gemini-embedding-001":{"backend":"openai",
+            "baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai/",
+            "apiKey":"${GEMINI_API_KEY}","model":"gemini-embedding-001"}}}}
         run: |
           harper install --TC_AGREEMENT=yes --HDB_ADMIN_USERNAME="$HDB_ADMIN_USERNAME" \
             --HDB_ADMIN_PASSWORD="$HDB_ADMIN_PASSWORD" --ROOTPATH="$ROOTPATH" \
@@ -59,6 +68,14 @@ jobs:
 
       - name: Parity gate (strict)
         run: node app/scripts/parity.mjs --strict --target http://127.0.0.1:9936
+
+      - name: Search relevance gate
+        # Floor set conservatively: the semantic (HNSW) lane's contribution to
+        # RRF varies across @embed ingests, so MRR ranges ~0.72–0.88 build to
+        # build. 0.65 catches a catastrophic break without flaking on that
+        # variance. Tightening it needs semantic-lane stabilization (RRF
+        # weighting / lower embedding dims) — tracked as a follow-up.
+        run: node app/scripts/search-eval.mjs --min-mrr 0.65 --target http://127.0.0.1:9936
 
       - name: Upload parity report
         if: always()
