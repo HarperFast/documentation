@@ -101,7 +101,9 @@ server.http(async (request, next) => {
 		const html = layout({ page, navTree: nav?.tree ?? [] });
 		return new Response(html, {
 			status: 200,
-			headers: { 'content-type': 'text/html; charset=utf-8', etag, 'cache-control': 'public, max-age=60' },
+			// no-cache = store but revalidate every request; ETag makes that a cheap 304.
+			// Real caching strategy (composed-page cache, longer TTLs) comes with M4.
+			headers: { 'content-type': 'text/html; charset=utf-8', etag, 'cache-control': 'public, no-cache' },
 		});
 	}
 
