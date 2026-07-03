@@ -16,6 +16,7 @@ const CANDIDATE_CAP = 400; // max chunks scored per query
 const FUZZY_MIN = 0.4; // min trigram similarity to accept a correction outright
 const SEMANTIC_K = 30; // chunks pulled from the vector lane before fusion
 const RRF_K = 60; // reciprocal-rank-fusion constant (standard default)
+const EMBED_MODEL = 'gemini-embedding-001'; // logical name == wire model id (see @embed note)
 // Max edit distance for a typo correction, scaled to query-term length so a
 // single substitution in a short word (vektor→vector) is accepted while long
 // words tolerate two (replciation→replication).
@@ -184,7 +185,9 @@ async function keywordLane(release, q, queryTerms, scope) {
 async function semanticLane(release, q, scope) {
 	let vector;
 	try {
-		[vector] = await models.embed(q, { inputType: 'query' });
+		// Logical name must equal the wire model id (see schema note on @embed);
+		// query embeddings must use the same model that produced the index.
+		[vector] = await models.embed(q, { model: EMBED_MODEL, inputType: 'query' });
 	} catch {
 		return []; // no/failed embedding model — degrade to keyword-only
 	}

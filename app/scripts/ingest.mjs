@@ -17,7 +17,10 @@ const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(APP_DIR);
 const TARGET = argValue('--target') ?? process.env.HARPER_TARGET ?? 'http://localhost:9936';
 const EDIT_BASE = 'https://github.com/HarperFast/documentation/blob/main';
-const BATCH_SIZE = 40;
+// Smaller batches keep each `pages` POST short — with @embed, every chunk in a
+// batch is embedded inline, so 40 pages (~260 embeds) would make one very long
+// request. ~8 pages keeps a POST to a handful of seconds.
+const BATCH_SIZE = 8;
 
 // Release data drives ReleaseNotesList / LatestPatchLink expansion. Generated
 // by the same script Docusaurus prebuild uses, so the two stay in lockstep.
@@ -210,14 +213,25 @@ function walk(dir) {
 	return out;
 }
 
-async function post(body) {
+// POST with retry + exponential backoff. `pages` batches embed inline via
+// @embed, so a transient provider rate spike surfaces as a 500 — retry rather
+// than abort the whole ingest. Backoff also throttles the sustained embed rate.
+async function post(body, attempt = 0) {
 	const res = await fetch(`${TARGET}/Ingest`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', 'authorization': `Basic ${auth}` },
 		body: JSON.stringify(body),
 	});
-	if (!res.ok) throw new Error(`Ingest ${body.action} failed: ${res.status} ${await res.text()}`);
-	return res.json();
+	if (res.ok) return res.json();
+	const text = await res.text();
+	const retriable = res.status >= 500 || res.status === 429;
+	if (retriable && attempt < 5) {
+		const waitMs = Math.min(2 ** attempt * 1000, 15000);
+		process.stdout.write(`\n  ${body.action} ${res.status}, retry ${attempt + 1}/5 in ${waitMs}ms…`);
+		await new Promise((r) => setTimeout(r, waitMs));
+		return post(body, attempt + 1);
+	}
+	throw new Error(`Ingest ${body.action} failed: ${res.status} ${text}`);
 }
 
 function resolveAuth() {
