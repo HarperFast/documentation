@@ -1,9 +1,9 @@
-// Keyword search lane: a table-backed inverted index scored with the BM25
-// formula, with trigram fuzzy resolution for typos. No standing in-memory
-// index — every structure is a table read, memory is bounded to the candidate
-// set of one query. Exposed at /api/search. (Vector/semantic lane is M2b.)
+// Hybrid search: a table-backed BM25 keyword lane (with trigram + edit-distance
+// typo tolerance) fused with an HNSW vector lane, both scoped and released
+// through /api/search. No standing in-memory index — every structure is a
+// table read; per-query memory is bounded to the candidate set.
 
-import { tables } from 'harper';
+import { tables, models } from 'harper';
 import { tokenize, trigrams, trigramSimilarity, editDistance } from './tokenize.mjs';
 
 const { SitePointer, ContentRelease, SearchChunk, Term } = tables;
@@ -14,6 +14,8 @@ const TITLE_BOOST = 2.5;
 const HEADING_BOOST = 1.6;
 const CANDIDATE_CAP = 400; // max chunks scored per query
 const FUZZY_MIN = 0.4; // min trigram similarity to accept a correction outright
+const SEMANTIC_K = 30; // chunks pulled from the vector lane before fusion
+const RRF_K = 60; // reciprocal-rank-fusion constant (standard default)
 // Max edit distance for a typo correction, scaled to query-term length so a
 // single substitution in a short word (vektor→vector) is accepted while long
 // words tolerate two (replciation→replication).
@@ -61,40 +63,78 @@ async function resolveTerm(release, term) {
 	}));
 }
 
-// Run a keyword search. { q, section, version, limit } → { query, results, total }.
+// Hybrid search. { q, section, version, limit } → { query, results, total }.
+// Runs the keyword lane (always) and the vector lane (when an embedding model
+// is configured and reachable), then fuses them with reciprocal-rank fusion.
 export async function runSearch({ q = '', section = null, version = null, limit = 10 } = {}) {
 	q = q.trim();
 	limit = Math.min(Number(limit) || 10, 30);
-
 	if (!q) return { query: q, results: [], total: 0 };
 
 	const release = await activeRelease();
 	if (!release) return { query: q, results: [], total: 0 };
 
+	const scope = [{ attribute: 'release', value: release }];
+	if (section) scope.push({ attribute: 'section', value: section });
+	if (version) scope.push({ attribute: 'version', value: version });
+	const queryTerms = [...new Set(tokenize(q))];
+
+	// Both lanes return ranked chunk arrays. The vector lane degrades to [] if
+	// no model is configured — keyword search never depends on it.
+	const [keyword, semantic] = await Promise.all([
+		keywordLane(release, q, queryTerms, scope),
+		semanticLane(release, q, scope),
+	]);
+
+	// Reciprocal-rank fusion: a chunk's fused score is Σ 1/(RRF_K + rank) across
+	// the lanes it appears in, then reduced to the best chunk per page.
+	const fused = new Map();
+	for (const lane of [keyword, semantic]) {
+		lane.forEach((chunk, i) => {
+			const prev = fused.get(chunk.id);
+			const rr = 1 / (RRF_K + i + 1);
+			if (prev) prev.score += rr;
+			else fused.set(chunk.id, { chunk, score: rr });
+		});
+	}
+	const ranked = [...fused.values()].sort((a, b) => b.score - a.score);
+	const byPage = new Map();
+	for (const s of ranked) if (!byPage.has(s.chunk.pageId)) byPage.set(s.chunk.pageId, s);
+
+	const results = [...byPage.values()].slice(0, limit).map(({ chunk, score }) => ({
+		path: chunk.path,
+		anchor: chunk.anchor,
+		url: chunk.anchor ? `/${chunk.path}#${chunk.anchor}` : `/${chunk.path}`,
+		title: chunk.title,
+		heading: chunk.heading,
+		breadcrumb: chunk.breadcrumb,
+		section: chunk.section,
+		version: chunk.version,
+		snippet: snippet(chunk.text, queryTerms),
+		score: Number(score.toFixed(5)),
+	}));
+
+	await logQuery(q, section, version, byPage.size);
+	return { query: q, results, total: byPage.size, lanes: { keyword: keyword.length, semantic: semantic.length } };
+}
+
+// Keyword lane: BM25 over the table-backed inverted index. Returns chunks
+// ranked best-first.
+async function keywordLane(release, q, queryTerms, scope) {
 	const rel = await ContentRelease.get(release);
 	const N = rel?.chunkCount || 1;
 	const avgLen = rel?.avgChunkLength || 1;
 
-	const queryTerms = [...new Set(tokenize(q))];
 	const resolved = [];
 	for (const qt of queryTerms) {
 		const matches = await resolveTerm(release, qt);
 		if (matches.length) resolved.push({ query: qt, matches });
 	}
-	if (resolved.length === 0) {
-		await logQuery(q, section, version, 0);
-		return { query: q, results: [], total: 0 };
-	}
+	if (resolved.length === 0) return [];
 
-	// Retrieve candidate chunks: union of chunks containing any resolved
-	// term, scoped to section/version, rarest terms first (smaller sets).
-	const flat = resolved
-		.flatMap((r) => r.matches.map((m) => ({ ...m, queryWeight: m.weight })))
-		.sort((a, b) => a.docFreq - b.docFreq);
-	const scope = [{ attribute: 'release', value: release }];
-	if (section) scope.push({ attribute: 'section', value: section });
-	if (version) scope.push({ attribute: 'version', value: version });
-
+	// Candidate chunks: union of chunks containing any resolved term, rarest
+	// terms first (smaller sets), capped.
+	const flat = resolved.flatMap((r) => r.matches).sort((a, b) => a.docFreq - b.docFreq);
 	const candidates = new Map();
 	for (const { term } of flat) {
 		if (candidates.size >= CANDIDATE_CAP) break;
@@ -106,7 +146,6 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		}
 	}
 
-	// Score each candidate with BM25 over the resolved query terms.
 	const idf = (docFreq) => Math.log(1 + (N - docFreq + 0.5) / (docFreq + 0.5));
 	const scored = [];
 	for (const chunk of candidates.values()) {
@@ -126,9 +165,7 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 			score += best;
 		}
 		if (score === 0) continue;
-		// Coverage bonus: reward chunks matching more distinct query terms.
-		score *= 1 + 0.35 * (matchedQueryTerms - 1);
-		// Field boosts: query term appearing in title / heading.
+		score *= 1 + 0.35 * (matchedQueryTerms - 1); // coverage bonus
 		const titleTokens = new Set(tokenize(chunk.title));
 		const headingTokens = new Set(tokenize(chunk.heading));
 		for (const r of resolved) {
@@ -137,27 +174,34 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		}
 		scored.push({ chunk, score });
 	}
-
 	scored.sort((a, b) => b.score - a.score);
-	// One result per page: keep the best-scoring section. Standard
-	// docs-search UX; avoids a single well-titled page flooding the list.
-	const byPage = new Map();
-	for (const s of scored) if (!byPage.has(s.chunk.pageId)) byPage.set(s.chunk.pageId, s);
-	const results = [...byPage.values()].slice(0, limit).map(({ chunk, score }) => ({
-		path: chunk.path,
-		anchor: chunk.anchor,
-		url: chunk.anchor ? `/${chunk.path}#${chunk.anchor}` : `/${chunk.path}`,
-		title: chunk.title,
-		heading: chunk.heading,
-		breadcrumb: chunk.breadcrumb,
-		section: chunk.section,
-		version: chunk.version,
-		snippet: snippet(chunk.text, queryTerms),
-		score: Number(score.toFixed(4)),
-	}));
+	return scored.map((s) => s.chunk);
+}
 
-	await logQuery(q, section, version, byPage.size);
-	return { query: q, results, total: byPage.size };
+// Vector lane: embed the query, HNSW nearest-neighbor over the chunk vectors,
+// scoped to the same section/version. Returns chunks ranked by similarity, or
+// [] if no embedding model is configured/reachable (keyword lane stands alone).
+async function semanticLane(release, q, scope) {
+	let vector;
+	try {
+		[vector] = await models.embed(q, { inputType: 'query' });
+	} catch {
+		return []; // no/failed embedding model — degrade to keyword-only
+	}
+	if (!vector) return [];
+	const out = [];
+	try {
+		for await (const chunk of SearchChunk.search({
+			conditions: scope,
+			sort: { attribute: 'embedding', target: Array.from(vector) },
+			limit: SEMANTIC_K,
+		})) {
+			out.push(chunk);
+		}
+	} catch {
+		return [];
+	}
+	return out;
 }
 
 // Build a short snippet around the first query-term hit.

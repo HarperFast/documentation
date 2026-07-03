@@ -78,6 +78,11 @@ type SearchChunk @table {
 	tokens: [String] @indexed # normalized terms — indexed per-element retrieval
 	termCounts: Any # { term: occurrences } — BM25 term frequency
 	length: Int # token count — BM25 length normalization
+	# Semantic lane (M2b): heading-prefixed text embedded at write time. @embed
+	# auto-computes the vector via the configured `default` embedding model and
+	# builds the HNSW index implicitly (Harper v5.1). Fused with the keyword lane.
+	embedText: String # embedding source: "<heading>. <text>"
+	embedding: [Float] @embed(source: "embedText", model: "default")
 }
 
 # Term dictionary per release: document frequency (BM25 rarity signal) and

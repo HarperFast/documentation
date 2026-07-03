@@ -187,6 +187,9 @@ async function writeChunks(release, doc, title, chunks) {
 			tokens: [...new Set(tokens)],
 			termCounts: termCounts(tokens),
 			length: tokens.length,
+			// heading-prefixed text is the @embed source (carries section context
+			// into the vector); capped to keep well under the model's token limit.
+			embedText: `${title}. ${text}`.slice(0, 4000),
 		});
 		written++;
 	}
