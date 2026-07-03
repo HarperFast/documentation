@@ -2,6 +2,15 @@
 # a ContentRelease is staged, validated whole, then atomically activated.
 # See plans/harper-replatform/README.md §5–6.
 
+# Singleton pointer: which ContentRelease is live. Activation is one
+# primary-key write; serving is one primary-key read. The status field on
+# ContentRelease is bookkeeping only — nothing on the serving path scans it.
+type SitePointer @table {
+	id: ID @primaryKey # always 'active'
+	release: String
+	updatedAt: Date @updatedTime
+}
+
 type ContentRelease @table {
 	id: ID @primaryKey # "<git-sha>-<timestamp>"
 	status: String @indexed # staging | active | archived | failed

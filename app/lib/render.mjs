@@ -56,12 +56,20 @@ function mdastText(node) {
 // Map raw-HTML component tags (lowercased by the HTML parser) to plain HTML.
 function rehypeComponents() {
 	return (tree) => {
-		visit(tree, 'element', (node) => {
+		visit(tree, 'element', (node, index, parent) => {
 			if (node.tagName === 'versionbadge') {
 				const { version = '', type = 'added' } = node.properties ?? {};
+				// HTML5 has no self-closing unknown elements: parse5 treats
+				// `<VersionBadge/>` as an open tag and nests everything after it
+				// inside. Reparent those swallowed children as siblings before
+				// replacing the node's content, or whole documents disappear.
+				const swallowed = node.children ?? [];
 				node.tagName = 'span';
 				node.properties = { className: ['version-badge', `version-badge-${type}`] };
 				node.children = [{ type: 'text', value: `${type} in ${version}` }];
+				if (swallowed.length && parent) {
+					parent.children.splice(index + 1, 0, ...swallowed);
+				}
 			} else if (node.tagName === 'tabs') {
 				node.tagName = 'div';
 				node.properties = { className: ['tab-group'] };
@@ -175,10 +183,19 @@ export async function renderDoc(source) {
 		html,
 		toc,
 		title,
-		description: frontmatter.description ?? '',
+		description: frontmatter.description ?? firstParagraphText(html),
 		frontmatter,
 		renderedMarkdown: body.trim(),
 	};
+}
+
+// Docusaurus derives a meta description from content when frontmatter has
+// none; approximate with the first paragraph's text.
+function firstParagraphText(html) {
+	const match = html.match(/<p>([\s\S]*?)<\/p>/);
+	if (!match) return '';
+	const text = match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+	return text.length > 210 ? `${text.slice(0, 207)}...` : text;
 }
 
 function firstHeading(markdown) {

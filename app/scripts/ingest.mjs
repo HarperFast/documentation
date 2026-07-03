@@ -39,6 +39,7 @@ for (const { dir, route, section, version } of SECTIONS) {
 	for (const file of walk(abs)) {
 		const rel = path.relative(abs, file).replace(/\\/g, '/');
 		if (!/\.(md|mdx)$/.test(rel)) continue;
+		if (rel.split('/').some((seg) => seg.startsWith('_'))) continue; // Docusaurus partials are not pages
 		const noExt = rel.replace(/\.(md|mdx)$/, '');
 		const routePath = noExt === 'index' ? route : noExt.endsWith('/index') ? `${route}/${noExt.slice(0, -6)}` : `${route}/${noExt}`;
 		docs.push({
@@ -151,7 +152,10 @@ try {
 	}
 	for (const rule of mod.redirects) {
 		const froms = Array.isArray(rule.from) ? rule.from : [rule.from];
-		for (const from of froms) redirectEntries.push({ from, to: rule.to, status: 301, source: 'current' });
+		for (let from of froms) {
+			if (from.length > 1 && from.endsWith('/')) from = from.slice(0, -1); // match the serving path normalization
+			redirectEntries.push({ from, to: rule.to, status: 301, source: 'current' });
+		}
 	}
 } catch (err) {
 	console.warn(`redirects.ts import failed (${err.message}); skipping redirects`);

@@ -9,7 +9,8 @@
 		"local:start": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper start",
 		"local:stop": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper stop",
 		"local:status": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper status",
-		"ingest": "node scripts/ingest.mjs"
+		"ingest": "node scripts/ingest.mjs",
+		"parity": "node scripts/parity.mjs"
 	},
 	"dependencies": {
 		"gray-matter": "^4.0.3",
@@ -22,5 +23,8 @@
 		"remark-rehype": "^11.1.1",
 		"unified": "^11.0.5",
 		"unist-util-visit": "^5.0.0"
+	},
+	"devDependencies": {
+		"node-html-parser": "^8.0.4"
 	}
 }

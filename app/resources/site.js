@@ -4,16 +4,14 @@
 import { server, tables } from 'harper';
 import { layout } from '../lib/layout.mjs';
 
-const { ContentRelease, Page, Navigation, Redirect } = tables;
+const { Page, Navigation, Redirect, SitePointer } = tables;
 
 // Paths handled elsewhere (REST resources, static assets) — pass through.
 const PASSTHROUGH = /^\/(Ingest|assets\/|favicon)/;
 
 async function activeReleaseId() {
-	for await (const rel of ContentRelease.search({ conditions: [{ attribute: 'status', value: 'active' }] })) {
-		return rel.id;
-	}
-	return null;
+	const pointer = await SitePointer.get('active');
+	return pointer?.release ?? null;
 }
 
 async function findOne(table, conditions, select) {

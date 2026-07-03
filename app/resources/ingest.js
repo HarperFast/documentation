@@ -12,7 +12,7 @@ import { Resource, tables } from 'harper';
 import { createHash } from 'node:crypto';
 import { renderDoc } from '../lib/render.mjs';
 
-const { ContentRelease, Page, Navigation, Redirect } = tables;
+const { ContentRelease, Page, Navigation, Redirect, SitePointer } = tables;
 
 export class Ingest extends Resource {
 	static async post(_target, data) {
@@ -32,7 +32,7 @@ export class Ingest extends Resource {
 						path: doc.path,
 						section: doc.section,
 						version: doc.version ?? null,
-						title: rendered.title,
+						title: rendered.title || doc.path.split('/').pop(), // Docusaurus falls back to the doc id
 						description: rendered.description,
 						html: rendered.html,
 						toc: rendered.toc,
@@ -76,6 +76,12 @@ export class Ingest extends Resource {
 				for await (const _page of Page.search({ conditions: [{ attribute: 'release', value: body.release }], select: ['id'] })) pageCount++;
 				if (pageCount === 0) throw new Error(`release ${body.release} has no pages; refusing to activate`);
 				// TODO(M1): whole-release link validation + llms contract assertions before activation
+				// Activation = one primary-key write; serving reads the pointer by
+				// primary key. Status flags below are bookkeeping only.
+				const staged = await ContentRelease.get(body.release);
+				await ContentRelease.put({ id: body.release, status: 'active', gitSha: staged?.gitSha ?? body.gitSha ?? '', pageCount, activatedAt: new Date(), notes: staged?.notes ?? null });
+				await SitePointer.put({ id: 'active', release: body.release });
+				// Best-effort bookkeeping: mark everything else archived.
 				// NOTE: table records are lazy proxies — spread does not copy fields; write explicit objects.
 				const toArchive = [];
 				for await (const rel of ContentRelease.search({ conditions: [{ attribute: 'status', value: 'active' }] })) {
@@ -84,8 +90,6 @@ export class Ingest extends Resource {
 					}
 				}
 				for (const rel of toArchive) await ContentRelease.put(rel);
-				const staged = await ContentRelease.get(body.release);
-				await ContentRelease.put({ id: body.release, status: 'active', gitSha: staged?.gitSha ?? body.gitSha ?? '', pageCount, activatedAt: new Date(), notes: staged?.notes ?? null });
 				return { ok: true, release: body.release, pageCount, active: true };
 			}
 			default:
