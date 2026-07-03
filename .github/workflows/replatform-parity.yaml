@@ -1,0 +1,68 @@
+name: Replatform Parity
+
+# Regression gate for the Harper replatform (app/). Scoped to the replatform
+# branch only — does not run on the team's normal PRs. Builds the Docusaurus
+# site (ground truth), stands up Harper with the app, ingests the corpus, and
+# runs the parity harness in --strict mode.
+
+on:
+  push:
+    branches: [replatform]
+  pull_request:
+    branches: [replatform]
+
+concurrency:
+  group: replatform-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Build Docusaurus (ground truth)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install app deps + Harper
+        run: |
+          npm --prefix app ci
+          npm install -g harper
+
+      - name: Install & start Harper
+        env:
+          TC_AGREEMENT: 'yes'
+          HDB_ADMIN_USERNAME: HDB_ADMIN
+          HDB_ADMIN_PASSWORD: ${{ github.run_id }}-parity
+          ROOTPATH: ${{ runner.temp }}/hdb
+          HTTP_PORT: '9936'
+          OPERATIONSAPI_NETWORK_PORT: '9935'
+        run: |
+          harper install --TC_AGREEMENT=yes --HDB_ADMIN_USERNAME="$HDB_ADMIN_USERNAME" \
+            --HDB_ADMIN_PASSWORD="$HDB_ADMIN_PASSWORD" --ROOTPATH="$ROOTPATH" \
+            --HTTP_PORT=9936 --OPERATIONSAPI_NETWORK_PORT=9935
+          (cd app && ROOTPATH="$ROOTPATH" harper start)
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null "http://127.0.0.1:9936/" && break || sleep 2
+          done
+
+      - name: Ingest corpus
+        env:
+          HARPER_CLI_USERNAME: HDB_ADMIN
+          HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+        run: node app/scripts/ingest.mjs --target http://127.0.0.1:9936
+
+      - name: Parity gate (strict)
+        run: node app/scripts/parity.mjs --strict --target http://127.0.0.1:9936
+
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-report
+          path: app/parity-report.json

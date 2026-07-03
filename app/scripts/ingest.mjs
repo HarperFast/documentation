@@ -11,12 +11,21 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expandComponents } from '../lib/expand.mjs';
 
 const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(APP_DIR);
 const TARGET = argValue('--target') ?? process.env.HARPER_TARGET ?? 'http://localhost:9936';
 const EDIT_BASE = 'https://github.com/HarperFast/documentation/blob/main';
 const BATCH_SIZE = 40;
+
+// Release data drives ReleaseNotesList / LatestPatchLink expansion. Generated
+// by the same script Docusaurus prebuild uses, so the two stay in lockstep.
+const RELEASE_DATA_PATH = path.join(REPO_ROOT, 'release-notes-data.json');
+if (!existsSync(RELEASE_DATA_PATH)) {
+	execSync('node scripts/generateReleaseNotesData.js', { cwd: REPO_ROOT, stdio: 'inherit' });
+}
+const releaseData = existsSync(RELEASE_DATA_PATH) ? JSON.parse(readFileSync(RELEASE_DATA_PATH, 'utf8')) : null;
 
 const auth = resolveAuth();
 const gitSha = execSync('git rev-parse --short HEAD', { cwd: REPO_ROOT }).toString().trim();
@@ -46,7 +55,7 @@ for (const { dir, route, section, version } of SECTIONS) {
 			path: routePath,
 			section,
 			version,
-			markdown: readFileSync(file, 'utf8'),
+			markdown: expandComponents(readFileSync(file, 'utf8'), { sourceFile: file, releaseData }),
 			sourcePath: `${dir}/${rel}`,
 			editUrl: `${EDIT_BASE}/${dir}/${rel}`,
 		});
@@ -59,7 +68,7 @@ if (existsSync(homepageFile)) {
 	docs.push({
 		path: '',
 		section: 'root',
-		markdown: readFileSync(homepageFile, 'utf8'),
+		markdown: expandComponents(readFileSync(homepageFile, 'utf8'), { sourceFile: homepageFile, releaseData }),
 		sourcePath: 'src/pages/index.mdx',
 		editUrl: `${EDIT_BASE}/src/pages/index.mdx`,
 	});

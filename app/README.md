@@ -3,16 +3,30 @@
 The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-replatform/README.md`
 (in Kyle's main working copy, untracked) / https://claude.ai/code/artifact/d6526d21-c7be-4593-8106-22997dba354d
 
-## Current state: M1 walking skeleton
+## Current state: M1 (render/serve) at parity
 
 Working end-to-end: repo markdown → ingest (rendered **inside Harper**) → release-scoped tables →
 served pages with layout/sidebar/TOC, ETag/304, per-page `.md` projections, `llms.txt`,
 `sitemap.xml`, and server-side 301 redirects. Publication is atomic via `ContentRelease`
-(staged → activated in one write; previous release archived for rollback).
+(staged → activated in one write via the `SitePointer` singleton; previous release archived).
+
+MDX-lite compatibility (in `lib/render.mjs` for self-contained components, `lib/expand.mjs`
+for file/data ones): admonitions, tabs, `VersionBadge`, `CustomDocCardList`, npm2yarn,
+explicit `{#id}` heading anchors, `.mdx` partial inlining, and `ReleaseNotesList` /
+`LatestPatchLink` driven by `release-notes-data.json`.
+
+**Parity harness** (`npm run parity`, `--strict` to gate): diffs a Docusaurus build against
+the served site. Current state — 392/392 pages, titles 392/392, redirects 1376/1376, sitemaps
+identical, `.md`/llms present, real anchors complete, text similarity median 99.9% / min 84.2%,
+**zero hard failures**. `--strict` gates status, titles, real anchors, redirects, md/llms,
+sitemap set equality (both directions), similarity floor, and worker errors; description and
+canonical and warn-level similarity stay advisory. Wired into CI on the replatform branch
+(`.github/workflows/replatform-parity.yaml`).
 
 Not yet built (see design doc): whole-release validation before activation, rendered-markdown
-cleanup projection, search (Term/trigram/BM25 + HNSW), chat/MCP, observability, page cache,
-parity harness.
+cleanup projection for the llms contract, search (Term/trigram/BM25 + HNSW), chat/MCP,
+observability, page cache. Remaining advisory parity noise: meta descriptions (Docusaurus's
+excerpt algorithm isn't replicated) and 8 tiny release-note pages at 84–90% similarity.
 
 ## Local development
 

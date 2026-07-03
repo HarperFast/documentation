@@ -29,6 +29,8 @@ const WARN_SIMILARITY = 0.9;
 const FAIL_SIMILARITY = 0.75;
 const SKIP_URLS = new Set(['/404', '/search', '/reference']); // no-content routes: 404 page, search app, client-redirect stub
 
+let workerErrors = 0;
+
 if (!existsSync(BUILD_DIR)) {
 	console.error(`build dir not found: ${BUILD_DIR} — run \`npm run build\` in the repo root first`);
 	process.exit(2);
@@ -62,23 +64,32 @@ console.log(`parity: ${pages.length} pages, ${mdFiles.length} md files from ${BU
 
 const results = [];
 await pool(pages, CONCURRENCY, async ({ url, file }) => {
-	const expected = extract(readFileSync(file, 'utf8'), 'build');
-	const res = await fetch(TARGET + url, { redirect: 'manual' });
-	const result = { url, status: res.status };
-	if (res.status !== 200) {
-		results.push({ ...result, fail: `status ${res.status}` });
-		return;
+	const result = { url };
+	try {
+		const expected = extract(readFileSync(file, 'utf8'), 'build');
+		const res = await fetch(TARGET + url, { redirect: 'manual' });
+		result.status = res.status;
+		if (res.status !== 200) {
+			results.push({ ...result, fail: `status ${res.status}` });
+			return;
+		}
+		const actual = extract(await res.text(), 'harper');
+		result.titleMatch = coreTitle(expected.title) === coreTitle(actual.title);
+		result.title = result.titleMatch ? undefined : { expected: expected.title, actual: actual.title };
+		result.descriptionMatch = (expected.description ?? '') === (actual.description ?? '');
+		result.canonicalMatch = !expected.canonical || expected.canonical === actual.canonical;
+		// Only real (letter-bearing) anchors gate parity. Docusaurus emits
+		// degenerate ids like "-1".."-5" for headings that slugify to empty
+		// (e.g. version-number-only headings); those are build artifacts.
+		const realAnchors = expected.anchors.filter((a) => /[a-z]/i.test(a));
+		result.anchorTotal = realAnchors.length;
+		result.anchorMissing = realAnchors.filter((a) => !actual.anchors.includes(a));
+		result.similarity = similarity(expected.text, actual.text);
+		results.push(result);
+	} catch (err) {
+		// A worker error is a failure, not an omission — count it as one.
+		results.push({ ...result, fail: `error: ${err.message}` });
 	}
-	const actual = extract(await res.text(), 'harper');
-	result.titleMatch = coreTitle(expected.title) === coreTitle(actual.title);
-	result.title = result.titleMatch ? undefined : { expected: expected.title, actual: actual.title };
-	result.descriptionMatch = (expected.description ?? '') === (actual.description ?? '');
-	result.canonicalMatch = !expected.canonical || expected.canonical === actual.canonical;
-	const missingAnchors = expected.anchors.filter((a) => !actual.anchors.includes(a));
-	result.anchorTotal = expected.anchors.length;
-	result.anchorMissing = missingAnchors;
-	result.similarity = similarity(expected.text, actual.text);
-	results.push(result);
 });
 
 // ── Redirects ────────────────────────────────────────────────────────────────
@@ -86,28 +97,32 @@ await pool(pages, CONCURRENCY, async ({ url, file }) => {
 const redirectResults = [];
 const redirectRules = await loadRedirects();
 await pool(redirectRules, CONCURRENCY, async ({ from, to }) => {
-	const res = await fetch(TARGET + from, { redirect: 'manual' });
-	const location = (res.headers.get('location') ?? '').replace(TARGET, '');
-	const ok = (res.status === 301 || res.status === 302) && normalize(location) === normalize(to);
-	redirectResults.push({ from, to, status: res.status, location, ok });
+	const res = await tryFetch(TARGET + from, { redirect: 'manual' });
+	const location = (res?.headers.get('location') ?? '').replace(TARGET, '');
+	const ok = (res?.status === 301 || res?.status === 302) && normalize(location) === normalize(to);
+	redirectResults.push({ from, to, status: res?.status ?? 0, location, ok });
 });
 
 // ── Sitemap + md routes + llms ───────────────────────────────────────────────
 
 const buildSitemap = sitemapPaths(readFileSync(path.join(BUILD_DIR, 'sitemap.xml'), 'utf8'));
-const harperSitemap = sitemapPaths(await (await fetch(`${TARGET}/sitemap.xml`)).text());
+const harperSitemap = await tryFetch(`${TARGET}/sitemap.xml`)
+	.then((res) => (res?.ok ? res.text() : ''))
+	.then((xml) => sitemapPaths(xml));
+// If Harper's sitemap didn't load, every build URL is "only in build" (a fail).
 const onlyInBuild = [...buildSitemap].filter((p) => !harperSitemap.has(p) && !SKIP_URLS.has(p));
 const onlyInHarper = [...harperSitemap].filter((p) => !buildSitemap.has(p));
 
 const mdResults = [];
 await pool(mdFiles, CONCURRENCY, async (rel) => {
-	const res = await fetch(TARGET + rel, { method: 'HEAD' });
-	mdResults.push({ path: rel, ok: res.status === 200, status: res.status });
+	const res = await tryFetch(TARGET + rel, { method: 'HEAD' });
+	mdResults.push({ path: rel, ok: res?.status === 200, status: res?.status ?? 0 });
 });
 
 const llms = {};
 for (const f of ['/llms.txt', '/llms-full.txt']) {
-	llms[f] = (await fetch(TARGET + f, { method: 'HEAD' })).status === 200 && existsSync(path.join(BUILD_DIR, f.slice(1)));
+	const res = await tryFetch(TARGET + f, { method: 'HEAD' });
+	llms[f] = res?.status === 200 && existsSync(path.join(BUILD_DIR, f.slice(1)));
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────
@@ -152,10 +167,32 @@ writeFileSync(
 );
 console.log(`report: ${REPORT_PATH}`);
 
-const hardFailures = missing.length + redirectFail.length + simFail.length + mdFail.length + onlyInBuild.length;
-if (STRICT && hardFailures > 0) {
-	console.error(`STRICT: ${hardFailures} hard failures`);
-	process.exit(1);
+// ── Strict gate ──────────────────────────────────────────────────────────────
+// Each gate is a hard contract for the migration. Description and canonical
+// and warn-level similarity stay advisory (Docusaurus's excerpt algorithm and
+// small-page word-swings are not worth blocking a deploy over).
+const gates = {
+	'missing/broken pages': missing.length,
+	'title mismatches': titleMiss.length,
+	'anchor gaps (real)': anchorMiss.length,
+	'similarity < fail threshold': simFail.length,
+	'redirect failures': redirectFail.length,
+	'md route failures': mdFail.length,
+	'llms.txt missing': llms['/llms.txt'] ? 0 : 1,
+	'llms-full.txt missing': llms['/llms-full.txt'] ? 0 : 1,
+	'sitemap only-in-build': onlyInBuild.length,
+	'sitemap only-in-harper': onlyInHarper.length,
+	'worker errors': workerErrors,
+};
+const hardFailures = Object.values(gates).reduce((a, b) => a + b, 0);
+if (STRICT) {
+	const breached = Object.entries(gates).filter(([, n]) => n > 0);
+	if (breached.length) {
+		console.error(`\nSTRICT FAIL (${hardFailures}):`);
+		for (const [name, n] of breached) console.error(`  ✗ ${name}: ${n}`);
+		process.exit(1);
+	}
+	console.log('\nSTRICT PASS — all gated dimensions clean.');
 }
 
 // ── Extraction & helpers ─────────────────────────────────────────────────────
@@ -174,11 +211,12 @@ function extract(html, kind) {
 	if (article) {
 		for (const el of article.querySelectorAll('nav, aside.theme-doc-toc-mobile, script, style, .page-footer')) el.remove();
 		for (const h of article.querySelectorAll('h2[id], h3[id]')) anchors.push(h.getAttribute('id'));
-		// node-html-parser treats <pre> as a raw-text block, so `.text` leaks
-		// literal markup for code blocks (Prism token spans on the build side,
-		// plain <code> tags on ours). Strip residual tags and decode entities
-		// identically on both sides so code-heavy pages compare fairly.
-		text = decodeEntities(article.text.replace(/<[^>]*>/g, ' '))
+		// Extract from innerHTML, not `.text`: node-html-parser's `.text`
+		// concatenates adjacent elements with no separator ("Tucker4.7.32") and
+		// leaks raw <pre> markup, and the build vs Harper DOMs differ in
+		// incidental whitespace. Turning every tag into a space boundary makes
+		// tokenization identical on both sides regardless of element structure.
+		text = decodeEntities(article.innerHTML.replace(/<[^>]*>/g, ' '))
 			.toLowerCase()
 			.replace(/[​ ]/g, ' ')
 			.replace(/[^\p{L}\p{N}]+/gu, ' ')
@@ -268,11 +306,25 @@ async function pool(items, size, worker) {
 				try {
 					await worker(item);
 				} catch (err) {
+					// Last-resort guard so one item can't reject the whole batch.
+					// Counted so --strict fails rather than silently under-reporting.
+					workerErrors++;
 					console.error(`worker error on ${JSON.stringify(item).slice(0, 80)}: ${err.message}`);
 				}
 			}
 		})
 	);
+}
+
+// Fetch that never throws — a down target must produce gated failures with a
+// clean breakdown, not an uncaught crash that skips the strict report.
+async function tryFetch(url, opts) {
+	try {
+		return await fetch(url, opts);
+	} catch {
+		workerErrors++;
+		return null;
+	}
 }
 
 function walk(dir) {
