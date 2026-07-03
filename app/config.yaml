@@ -12,15 +12,18 @@ jsResource:
 
 rest: true
 
-# Google OAuth for the admin area (@harperfast/oauth). Credentials come from
-# the environment (loadEnv, above) — never commit them. Register the callback
-# https://<host>/oauth/google/callback in the Google Cloud OAuth client.
+# Google OAuth for the admin area (@harperfast/oauth). Credentials + redirect
+# URI come from the environment (loadEnv, above) — never commit them. Register
+# the OAUTH_REDIRECT_URI as an authorized redirect in the Google Cloud OAuth
+# client (e.g. http://localhost:9936/oauth/google/callback for local dev).
 '@harperfast/oauth':
   package: '@harperfast/oauth'
+  redirectUri: ${OAUTH_REDIRECT_URI}
+  postLoginRedirect: /admin/ingest
   providers:
     google:
-      clientId: ${OAUTH_GOOGLE_CLIENT_ID}
-      clientSecret: ${OAUTH_GOOGLE_CLIENT_SECRET}
+      clientId: ${GOOGLE_CLIENT_ID}
+      clientSecret: ${GOOGLE_CLIENT_SECRET}
 
 # NOTE: `urlPath` on the static plugin is broken in Harper 5.1.15 (files never
 # serve at the derived path — bisected in a minimal component; file as platform
