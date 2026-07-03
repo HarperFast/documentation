@@ -3,9 +3,14 @@
 The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-replatform/README.md`
 (in Kyle's main working copy, untracked) / https://claude.ai/code/artifact/d6526d21-c7be-4593-8106-22997dba354d
 
-## M2 (search) — keyword lane
+## M2 (search) — hybrid: keyword-primary + semantic recall
 
-Hybrid search per design §8; the **keyword lane** is built:
+Both lanes are built (design §8). **Keyword-primary fusion**: the BM25 keyword lane owns the
+ranking (precise, deterministic); the HNSW vector lane is appended below it as pure recall for
+queries keyword can't answer, and its embeddings back M3 chat grounding. A golden-set weight
+sweep drove this — equal-weight RRF monotonically *lowered* MRR (0.91 keyword-only → 0.75 at
+semantic weight 0.5) and made scores vary run-to-run with HNSW rebuilds; keyword-primary is
+**MRR 0.907, Recall@5 100%, deterministic**. (Natural-language search is better served by chat.)
 
 - **Table-backed inverted index, no standing in-memory structures.** At ingest each page is
   chunked by h2/h3 section (`collectChunks` in the render pass); every chunk stores its
@@ -35,8 +40,9 @@ between index time and query time.
 `npm run search-eval` runs a labeled query set (`eval/golden-set.json`) against `/api/search`
 and scores ranking with **MRR / Recall@5 / Recall@10 / zero-result rate** — the tuning loop
 and the pre-cutover relevance gate (sibling to `parity.mjs`, for relevance instead of content).
-`--min-mrr <x>` makes it a CI gate; `--verbose` lists every case. Current baseline on the seed
-set (44 hand-authored cases): **MRR 0.896, Recall@5 97.7%, 0-result 0%**.
+`--min-mrr <x>` makes it a CI gate (wired at 0.85 in the parity workflow); `--verbose` lists
+every case. Current on the seed set (44 hand-authored cases): **MRR 0.907, Recall@5 100%,
+0-result 0%**, and now deterministic run-to-run.
 
 Tuning workflow: change a knob in `lib/search.mjs` (boosts, `k1`/`b`, `maxEdits`, coverage
 bonus), re-run `search-eval`, keep the change only if MRR rises and nothing regresses. The seed
@@ -44,10 +50,11 @@ set is hand-authored; **replace/augment it with real queries** from `SearchQuery
 Algolia's analytics export) once traffic exists — that, plus curating labels and signing off the
 MRR floor for cutover, is a docs-team task (design open-question #5).
 
-**Deferred**: the **vector/semantic lane** (HNSW + `@embed`) — needs a hosted embedding model
-configured — which fuses with this keyword lane and backs M3 chat. Known weak case tracked by
-the golden set: `replciation` resolves but the replication *section* pages lose to the
-operations page on term density (a ranking, not resolution, issue).
+**Follow-ups**: expand the golden set with natural-language queries (the current set is
+keyword-shaped, so it under-measures the semantic lane's recall value); a query-adaptive blend
+(lean on semantic when the keyword lane returns few/weak results) if NL search in the box proves
+important. The vector lane uses Gemini `gemini-embedding-001` via `@embed` (see the model-name
+note in the schema and Harper issues #1593/#1594).
 
 ## Current state: M1 (render/serve) at parity
 

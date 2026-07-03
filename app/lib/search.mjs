@@ -103,25 +103,31 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		semanticLane(release, q, scope),
 	]);
 
-	// Reciprocal-rank fusion at the CHUNK level: a chunk's fused score is
-	// Σ 1/(RRF_K + rank) across the lanes it appears in; then keep the best
-	// chunk per page. (Page-level accumulation was tried and measurably lowered
-	// MRR on the golden set — it over-rewards pages with many weak chunks over a
-	// page with one strong chunk — so we keep chunk-level.)
-	const fused = new Map();
-	for (const lane of [keyword, semantic]) {
-		lane.forEach((chunk, i) => {
-			const rr = 1 / (RRF_K + i + 1);
-			const prev = fused.get(chunk.id);
-			if (prev) prev.score += rr;
-			else fused.set(chunk.id, { chunk, score: rr });
-		});
-	}
-	const ranked = [...fused.values()].sort((a, b) => b.score - a.score);
+	// Keyword-primary fusion with semantic recall-append. The keyword lane is
+	// precise and deterministic, so it OWNS the ranking; the semantic lane only
+	// contributes pages keyword didn't find, appended strictly below.
+	//
+	// A golden-set sweep drove this: equal-weight RRF monotonically lowered MRR
+	// (0.91 keyword-only → 0.75 at semantic weight 0.5) because the semantic
+	// lane's generic nearest-neighbors for short keyword queries displaced
+	// keyword-strong results — and it made the score vary run-to-run with HNSW
+	// rebuilds. Keyword-primary is precise, deterministic (0.907, stable across
+	// rebuilds), still adds recall for queries keyword can't answer, and keeps
+	// embeddings available for M3 chat grounding. (Natural-language search is
+	// better served by chat, which does its own semantic retrieval.)
 	const byPage = new Map();
-	for (const s of ranked) if (!byPage.has(s.chunk.pageId)) byPage.set(s.chunk.pageId, s);
+	keyword.forEach((chunk, i) => {
+		if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1) });
+	});
+	semantic.forEach((chunk, i) => {
+		if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1), semanticOnly: true });
+	});
+	const ranked = [...byPage.values()].sort((a, b) => {
+		if (!!a.semanticOnly !== !!b.semanticOnly) return a.semanticOnly ? 1 : -1; // keyword pages first
+		return b.score - a.score;
+	});
 
-	const results = [...byPage.values()].slice(0, limit).map(({ chunk, score }) => ({
+	const results = ranked.slice(0, limit).map(({ chunk, score }) => ({
 		path: chunk.path,
 		anchor: chunk.anchor,
 		url: chunk.anchor ? `/${chunk.path}#${chunk.anchor}` : `/${chunk.path}`,
