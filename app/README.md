@@ -16,18 +16,38 @@ Hybrid search per design §8; the **keyword lane** is built:
   frequency saturation (k1) × inverse document frequency × length normalization (b) — plus
   title/heading field boosts and a multi-term coverage bonus. Per-query memory is bounded to
   a capped candidate set; nothing is held resident.
-- **Typo tolerance at launch** via `pg_trgm`-style trigram resolution: an unknown query term
-  is matched to dictionary terms by indexed trigram overlap + Dice similarity (e.g.
-  `authentcation` → `authentication`).
+- **Typo tolerance at launch**: trigrams *generate* candidate terms (broad recall), then a
+  term is *accepted* if it's within a length-scaled Damerau-Levenshtein edit-distance budget
+  (1 for short words, 2 for long) OR has high trigram overlap. Edit distance catches
+  single-char typos trigrams miss on short words (`vektor`→`vector`, `replciation`→`replication`).
 - **Contextual scoping** (`?section=&version=`), **best-section-per-page** dedup, snippets, and
   `SearchQueryLog` (zero-result rows = the content-gap report).
 - **UI**: a framework-free modal (`web/assets/search.js`) — ⌘K / click, debounced, scoped to
-  the reader's section with an "all docs" toggle, keyboard-navigable.
+  the reader's section with an "all docs" toggle, keyboard-navigable. Browser-verified 9/9
+  (`npm run … scripts/verify-search-ui.mjs`, Playwright).
 - `GET /api/search?q=…&section=…&version=…&limit=…` → JSON.
 
-Tokenizer/trigram helpers live in `lib/tokenize.mjs`, shared byte-identically between index
-time and query time. **Deferred**: ranking tuning against a golden query set, and the
-**vector/semantic lane** (HNSW + `@embed`) which needs a hosted embedding model configured.
+Tokenizer/trigram/edit-distance helpers live in `lib/tokenize.mjs`, shared byte-identically
+between index time and query time.
+
+### Relevance eval (golden set)
+
+`npm run search-eval` runs a labeled query set (`eval/golden-set.json`) against `/api/search`
+and scores ranking with **MRR / Recall@5 / Recall@10 / zero-result rate** — the tuning loop
+and the pre-cutover relevance gate (sibling to `parity.mjs`, for relevance instead of content).
+`--min-mrr <x>` makes it a CI gate; `--verbose` lists every case. Current baseline on the seed
+set (44 hand-authored cases): **MRR 0.896, Recall@5 97.7%, 0-result 0%**.
+
+Tuning workflow: change a knob in `lib/search.mjs` (boosts, `k1`/`b`, `maxEdits`, coverage
+bonus), re-run `search-eval`, keep the change only if MRR rises and nothing regresses. The seed
+set is hand-authored; **replace/augment it with real queries** from `SearchQueryLog` (and
+Algolia's analytics export) once traffic exists — that, plus curating labels and signing off the
+MRR floor for cutover, is a docs-team task (design open-question #5).
+
+**Deferred**: the **vector/semantic lane** (HNSW + `@embed`) — needs a hosted embedding model
+configured — which fuses with this keyword lane and backs M3 chat. Known weak case tracked by
+the golden set: `replciation` resolves but the replication *section* pages lose to the
+operations page on term density (a ranking, not resolution, issue).
 
 ## Current state: M1 (render/serve) at parity
 

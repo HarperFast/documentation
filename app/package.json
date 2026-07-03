@@ -12,7 +12,8 @@
 		"local:stop": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper stop",
 		"local:status": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper status",
 		"ingest": "node scripts/ingest.mjs",
-		"parity": "node scripts/parity.mjs"
+		"parity": "node scripts/parity.mjs",
+		"search-eval": "node scripts/search-eval.mjs"
 	},
 	"dependencies": {
 		"gray-matter": "^4.0.3",

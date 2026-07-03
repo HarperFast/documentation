@@ -4,7 +4,7 @@
 // set of one query. Exposed at /api/search. (Vector/semantic lane is M2b.)
 
 import { tables } from 'harper';
-import { tokenize, trigrams, trigramSimilarity } from './tokenize.mjs';
+import { tokenize, trigrams, trigramSimilarity, editDistance } from './tokenize.mjs';
 
 const { SitePointer, ContentRelease, SearchChunk, Term } = tables;
 
@@ -13,20 +13,26 @@ const B = 0.75; // BM25 length-normalization strength
 const TITLE_BOOST = 2.5;
 const HEADING_BOOST = 1.6;
 const CANDIDATE_CAP = 400; // max chunks scored per query
-const FUZZY_MIN = 0.45; // min trigram similarity to accept a typo correction
+const FUZZY_MIN = 0.4; // min trigram similarity to accept a correction outright
+// Max edit distance for a typo correction, scaled to query-term length so a
+// single substitution in a short word (vektor→vector) is accepted while long
+// words tolerate two (replciation→replication).
+const maxEdits = (len) => (len <= 4 ? 1 : 2);
 
 async function activeRelease() {
 	const pointer = await SitePointer.get('active');
 	return pointer?.release ?? null;
 }
 
-// Resolve a query term to indexed terms: exact if it exists, else the closest
-// dictionary terms by trigram overlap (typo tolerance). Returns [{term, weight}].
+// Resolve a query term to indexed terms: exact if present, else the closest
+// dictionary terms. Trigrams GENERATE candidates (broad recall); a term is
+// ACCEPTED if it is within the edit-distance budget OR has high trigram
+// overlap — edit distance catches single-char typos that trigrams miss on
+// short words. Returns [{term, docFreq, weight}].
 async function resolveTerm(release, term) {
 	const exact = await Term.get(`${release}:${term}`);
 	if (exact) return [{ term, docFreq: exact.docFreq, weight: 1 }];
 
-	// Fuzzy: gather candidates sharing trigrams, rank by trigram similarity.
 	const seen = new Map();
 	for (const g of trigrams(term)) {
 		for await (const t of Term.search({
@@ -35,17 +41,24 @@ async function resolveTerm(release, term) {
 				{ attribute: 'trigrams', value: g },
 			],
 			select: ['term', 'docFreq'],
-			limit: 60,
+			limit: 400, // common trigrams (e.g. "tor") back ~90 terms; cap must clear that
 		})) {
 			if (!seen.has(t.term)) seen.set(t.term, t.docFreq);
 		}
 	}
+	const budget = maxEdits(term.length);
 	const ranked = [...seen.entries()]
-		.map(([t, docFreq]) => ({ term: t, docFreq, sim: trigramSimilarity(term, t) }))
-		.filter((c) => c.sim >= FUZZY_MIN)
-		.sort((a, b) => b.sim - a.sim)
+		.map(([t, docFreq]) => ({ term: t, docFreq, sim: trigramSimilarity(term, t), dist: editDistance(term, t, budget) }))
+		.filter((c) => c.dist <= budget || c.sim >= FUZZY_MIN)
+		// closest edit distance first, then strongest trigram overlap
+		.sort((a, b) => a.dist - b.dist || b.sim - a.sim)
 		.slice(0, 3);
-	return ranked.map((c) => ({ term: c.term, docFreq: c.docFreq, weight: c.sim }));
+	// Weight blends both signals so a near-exact correction outweighs a loose one.
+	return ranked.map((c) => ({
+		term: c.term,
+		docFreq: c.docFreq,
+		weight: Math.max(c.sim, 1 - c.dist / (term.length + 1)),
+	}));
 }
 
 // Run a keyword search. { q, section, version, limit } → { query, results, total }.
