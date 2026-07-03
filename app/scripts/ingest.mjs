@@ -217,20 +217,29 @@ function walk(dir) {
 // @embed, so a transient provider rate spike surfaces as a 500 — retry rather
 // than abort the whole ingest. Backoff also throttles the sustained embed rate.
 async function post(body, attempt = 0) {
-	const res = await fetch(`${TARGET}/Ingest`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json', 'authorization': `Basic ${auth}` },
-		body: JSON.stringify(body),
-	});
-	if (res.ok) return res.json();
-	const text = await res.text();
-	const retriable = res.status >= 500 || res.status === 429;
-	if (retriable && attempt < 5) {
+	const backoff = async (label) => {
+		if (attempt >= 5) throw new Error(`Ingest ${body.action} failed after ${attempt} retries: ${label}`);
 		const waitMs = Math.min(2 ** attempt * 1000, 15000);
-		process.stdout.write(`\n  ${body.action} ${res.status}, retry ${attempt + 1}/5 in ${waitMs}ms…`);
+		process.stdout.write(`\n  ${body.action} ${label}, retry ${attempt + 1}/5 in ${waitMs}ms…`);
 		await new Promise((r) => setTimeout(r, waitMs));
 		return post(body, attempt + 1);
+	};
+	let res;
+	try {
+		// AbortSignal.timeout guards a hung request (e.g. a stuck embed call).
+		res = await fetch(`${TARGET}/Ingest`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'authorization': `Basic ${auth}` },
+			body: JSON.stringify(body),
+			signal: AbortSignal.timeout(120000),
+		});
+	} catch (err) {
+		// Network failure / DNS / reset / timeout — retriable.
+		return backoff(err.name === 'TimeoutError' ? 'timed out' : `network error (${err.message})`);
 	}
+	if (res.ok) return res.json();
+	const text = await res.text();
+	if (res.status >= 500 || res.status === 429) return backoff(String(res.status));
 	throw new Error(`Ingest ${body.action} failed: ${res.status} ${text}`);
 }
 

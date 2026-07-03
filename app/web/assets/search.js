@@ -57,6 +57,9 @@
 	};
 
 	async function run(q) {
+		// Bump seq FIRST so a slow in-flight request from before a clear can't
+		// pass the staleness check below and repopulate the emptied list.
+		const mine = ++seq;
 		if (!q.trim()) {
 			list.innerHTML = '';
 			empty.hidden = true;
@@ -64,7 +67,6 @@
 		}
 		const scope = allScope.checked ? {} : currentScope();
 		const params = new URLSearchParams({ q, limit: '8', ...scope });
-		const mine = ++seq;
 		let data;
 		try {
 			data = await (await fetch(`/api/search?${params}`)).json();
@@ -82,10 +84,10 @@
 		list.innerHTML = results
 			.map(
 				(r, i) => `
-			<li class="search-result${i === active ? ' active' : ''}" role="option" data-url="${r.url}">
-				<a href="${r.url}">
+			<li class="search-result${i === active ? ' active' : ''}" role="option" data-url="${escapeHtml(r.url)}">
+				<a href="${escapeHtml(r.url)}">
 					<div class="search-result-title">${escapeHtml(r.heading || r.title)}
-						${r.version ? `<span class="search-result-badge">${r.version}</span>` : ''}</div>
+						${r.version ? `<span class="search-result-badge">${escapeHtml(r.version)}</span>` : ''}</div>
 					<div class="search-result-crumb">${escapeHtml((r.breadcrumb || []).join(' › ') || r.title)}</div>
 					<div class="search-result-snippet">${escapeHtml(r.snippet || '')}</div>
 				</a>

@@ -17,6 +17,8 @@ const FUZZY_MIN = 0.4; // min trigram similarity to accept a correction outright
 const SEMANTIC_K = 30; // chunks pulled from the vector lane before fusion
 const RRF_K = 60; // reciprocal-rank-fusion constant (standard default)
 const EMBED_MODEL = 'gemini-embedding-001'; // logical name == wire model id (see @embed note)
+const MAX_QUERY_CHARS = 200; // hard cap on query length (DoS guard)
+const MAX_QUERY_TERMS = 12; // hard cap on distinct scored terms (DoS guard)
 // Max edit distance for a typo correction, scaled to query-term length so a
 // single substitution in a short word (vektor→vector) is accepted while long
 // words tolerate two (replciation→replication).
@@ -68,8 +70,11 @@ async function resolveTerm(release, term) {
 // Runs the keyword lane (always) and the vector lane (when an embedding model
 // is configured and reachable), then fuses them with reciprocal-rank fusion.
 export async function runSearch({ q = '', section = null, version = null, limit = 10 } = {}) {
-	q = q.trim();
-	limit = Math.min(Number(limit) || 10, 30);
+	// Bound every input: q may arrive null (missing param), limit negative or huge.
+	q = String(q ?? '')
+		.trim()
+		.slice(0, MAX_QUERY_CHARS);
+	limit = Math.max(1, Math.min(Number(limit) || 10, 30));
 	if (!q) return { query: q, results: [], total: 0 };
 
 	const release = await activeRelease();
@@ -78,7 +83,9 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	const scope = [{ attribute: 'release', value: release }];
 	if (section) scope.push({ attribute: 'section', value: section });
 	if (version) scope.push({ attribute: 'version', value: version });
-	const queryTerms = [...new Set(tokenize(q))];
+	// Cap distinct terms so a synthetic many-word query can't fan out into
+	// hundreds of trigram lookups + edit-distance passes (DoS).
+	const queryTerms = [...new Set(tokenize(q))].slice(0, MAX_QUERY_TERMS);
 
 	// Both lanes return ranked chunk arrays. The vector lane degrades to [] if
 	// no model is configured — keyword search never depends on it.
@@ -87,13 +94,16 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		semanticLane(release, q, scope),
 	]);
 
-	// Reciprocal-rank fusion: a chunk's fused score is Σ 1/(RRF_K + rank) across
-	// the lanes it appears in, then reduced to the best chunk per page.
+	// Reciprocal-rank fusion at the CHUNK level: a chunk's fused score is
+	// Σ 1/(RRF_K + rank) across the lanes it appears in; then keep the best
+	// chunk per page. (Page-level accumulation was tried and measurably lowered
+	// MRR on the golden set — it over-rewards pages with many weak chunks over a
+	// page with one strong chunk — so we keep chunk-level.)
 	const fused = new Map();
 	for (const lane of [keyword, semantic]) {
 		lane.forEach((chunk, i) => {
-			const prev = fused.get(chunk.id);
 			const rr = 1 / (RRF_K + i + 1);
+			const prev = fused.get(chunk.id);
 			if (prev) prev.score += rr;
 			else fused.set(chunk.id, { chunk, score: rr });
 		});
@@ -134,7 +144,9 @@ async function keywordLane(release, q, queryTerms, scope) {
 	if (resolved.length === 0) return [];
 
 	// Candidate chunks: union of chunks containing any resolved term, rarest
-	// terms first (smaller sets), capped.
+	// terms first (smaller sets), capped by total. Retrieving up to the full cap
+	// per term (rarest first) measured better on the golden set than splitting
+	// the cap evenly across terms.
 	const flat = resolved.flatMap((r) => r.matches).sort((a, b) => a.docFreq - b.docFreq);
 	const candidates = new Map();
 	for (const { term } of flat) {
@@ -167,11 +179,14 @@ async function keywordLane(release, q, queryTerms, scope) {
 		}
 		if (score === 0) continue;
 		score *= 1 + 0.35 * (matchedQueryTerms - 1); // coverage bonus
+		// Field boosts test the RESOLVED terms (what actually matched), not the
+		// raw query token — so a typo-corrected query still earns title/heading
+		// boosts (the index holds the correct spelling, not the typo).
 		const titleTokens = new Set(tokenize(chunk.title));
 		const headingTokens = new Set(tokenize(chunk.heading));
 		for (const r of resolved) {
-			if (titleTokens.has(r.query)) score *= TITLE_BOOST ** (1 / resolved.length);
-			if (headingTokens.has(r.query)) score *= HEADING_BOOST ** (1 / resolved.length);
+			if (r.matches.some((m) => titleTokens.has(m.term))) score *= TITLE_BOOST ** (1 / resolved.length);
+			if (r.matches.some((m) => headingTokens.has(m.term))) score *= HEADING_BOOST ** (1 / resolved.length);
 		}
 		scored.push({ chunk, score });
 	}
@@ -228,7 +243,9 @@ async function logQuery(query, section, version, resultCount) {
 		const { SearchQueryLog } = tables;
 		if (SearchQueryLog) {
 			await SearchQueryLog.put({
-				id: `${Date.now()}-${Math.round(query.length)}`,
+				// Random suffix: same-length queries in the same ms must not
+				// collide and overwrite each other (distorts zero-result stats).
+				id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
 				query,
 				querySource: 'ui',
 				section,

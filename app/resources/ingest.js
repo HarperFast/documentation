@@ -169,6 +169,11 @@ async function writeChunks(release, doc, title, chunks) {
 		const chunk = chunks[i];
 		const text = [chunk.heading, chunk.text].filter(Boolean).join('. ');
 		if (!text.trim()) continue;
+		// Tokenize heading + body for retrieval/BM25. (Folding the page title in —
+		// to make title-only terms retrievable — measurably lowered golden-set MRR
+		// and the recall gap it addresses is not represented in the eval, so it's
+		// left out. Title still contributes via TITLE_BOOST at score time and via
+		// the embedText the vector lane uses.)
 		const tokens = tokenize(`${chunk.heading} ${chunk.text}`);
 		if (tokens.length === 0) continue;
 		await SearchChunk.put({

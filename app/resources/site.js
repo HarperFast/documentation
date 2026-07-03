@@ -64,7 +64,7 @@ server.http(async (request, next) => {
 	if (request.pathname === '/api/search') {
 		const p = new URL(request.url, 'http://x').searchParams;
 		const data = await runSearch({
-			q: p.get('q'),
+			q: p.get('q') ?? '',
 			section: p.get('section'),
 			version: p.get('version'),
 			limit: p.get('limit'),
