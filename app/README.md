@@ -132,17 +132,24 @@ streams a cited answer.
   `fetch` + a `ReadableStream` reader, renders inline `[n]` citation links + a sources list.
 - **Observability**: the admin **Chat** tab (above).
 
-**Retrieval tuning**: chat retrieval calls `runSearch` with `blend: true` (equal-weight RRF, so the
-semantic lane counts for NL questions — the search box stays keyword-primary and unchanged) and
-`withText: true` (grounds on the actual matched **section** text, not a page-head truncation). A
-grounding eval measures it: `npm run chat-eval` runs `eval/chat-grounding.json` (NL questions →
-expected doc-page substrings) via the `retrieveOnly` endpoint (no model/quota) and scores Recall@5 /
-MRR — currently **Recall@5 75%, MRR 0.75**; CI gates it at `--min-recall 0.6`. Add cases from real
-`ChatLog` questions to grow it.
+**Retrieval tuning** (all measured by the grounding eval — decisions were data-driven, not guessed):
+chat retrieval calls `runSearch` with three levers, each validated to help:
+- `blend: true` — equal-weight RRF so the semantic lane counts for NL questions (the box stays
+  keyword-primary and unchanged). A/B'd: **58% → 75%** recall. (`CHAT_BLEND=false` to disable.)
+- `withText: true` — grounds on the actual matched **section** text, not a page-head truncation
+  (this is what made "define a table with a primary key" answer correctly).
+- `CHAT_RETRIEVE_K=8` distinct pages — swept 5/8/10: **75% → 92%** at 8, no gain at 10.
 
-**Follow-ups**: the remaining eval misses (blob/binary, Fabric deploy, TypeScript-no-build) are the
-next retrieval targets. Thumbs feedback is modeled (`ChatLog.feedback`) but not yet wired to a UI
-control. MCP server exposure is a later step.
+`npm run chat-eval` runs `eval/chat-grounding.json` (NL questions → expected doc-page substrings)
+via the `retrieveOnly` endpoint (no model/quota) and scores Recall@5 / MRR — currently
+**Recall@5 92%, MRR 0.78**; CI gates it at `--min-recall 0.6`.
+
+**Follow-ups**: grow + curate the eval from real `ChatLog` questions (the seed set is 12 cases and
+some expectations are debatable) — that makes the metric trustworthy and doubles as a content-gap
+report. Then, in impact order: query expansion for true recall gaps (words that don't match any
+page), a keyword-anchored blend to stop strong keyword hits being demoted, and an answer-quality
+(LLM-judge) eval since recall is only a proxy. Thumbs feedback is modeled (`ChatLog.feedback`) but
+not yet wired to a UI control. MCP server exposure is a later step.
 
 ## Current state: M1 (render/serve) at parity
 

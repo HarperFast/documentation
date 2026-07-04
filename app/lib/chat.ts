@@ -13,7 +13,10 @@ const { ChatLog, ChatQuota } = tables;
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5';
 const DAILY_CAP = Number(process.env.CHAT_DAILY_CAP) || 50; // messages / IP / UTC day
-const RETRIEVE_K = 5; // distinct pages used as grounding
+// Distinct pages used as grounding. 8 measured best on the grounding eval
+// (75%→92% recall vs 5; 10 added nothing) — the extra breadth catches sections
+// that rank just outside the top 5. Env-tunable.
+const RETRIEVE_K = Number(process.env.CHAT_RETRIEVE_K) || 8;
 const CTX_CHARS = 1500; // per-page context budget
 const MAX_QUESTION = 1000; // reject longer questions
 const ANSWER_STORE_CAP = 8000; // truncate stored answers
@@ -29,6 +32,10 @@ const IP_SALT = process.env.CHAT_IP_SALT || randomBytes(16).toString('hex');
 // real client IP (CHAT_TRUST_PROXY=true). Off by default so the socket peer —
 // which a client cannot spoof — is used for quota bucketing.
 const TRUST_PROXY = process.env.CHAT_TRUST_PROXY === 'true';
+
+// Fuse both lanes equally for chat retrieval (semantic counts for NL questions).
+// Env-toggleable so it can be A/B'd against keyword-primary via the grounding eval.
+const CHAT_BLEND = process.env.CHAT_BLEND !== 'false';
 
 export interface Source {
 	rank: number;
@@ -112,7 +119,7 @@ export async function retrieve(question: string, section?: string | null, versio
 		section,
 		version,
 		limit: RETRIEVE_K,
-		blend: true,
+		blend: CHAT_BLEND,
 		withText: true,
 	});
 
