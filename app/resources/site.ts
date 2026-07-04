@@ -385,9 +385,10 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 
 	// Retrieval-only mode: return the grounding sources without generating an
 	// answer — no LLM cost, no quota. Powers the grounding preview + chat eval.
+	// `debug: true` also returns the assembled context text (for tuning).
 	if (body.retrieveOnly) {
 		const grounding = await retrieve(question, body.section ?? null, body.version ?? null);
-		return jsonResponse({ sources: grounding.sources }, 200);
+		return jsonResponse(body.debug ? { sources: grounding.sources, context: grounding.context } : { sources: grounding.sources }, 200);
 	}
 
 	const ipHash = hashIp(clientIp(request));

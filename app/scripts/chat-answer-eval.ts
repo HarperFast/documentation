@@ -121,7 +121,7 @@ grounded = are the claims supported by real Harper documentation (per the sectio
 		const res = await fetch('https://api.anthropic.com/v1/messages', {
 			method: 'POST',
 			headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-			body: JSON.stringify({ model: JUDGE_MODEL, max_tokens: 400, system, messages: [{ role: 'user', content: user }] }),
+			body: JSON.stringify({ model: JUDGE_MODEL, max_tokens: 1024, system, messages: [{ role: 'user', content: user }] }),
 		});
 		if (!res.ok) throw new Error(`judge HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
 		const body: any = await res.json();

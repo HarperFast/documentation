@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { tables, type HarperRequest } from './harper.ts';
 import { runSearch } from './search.ts';
 
-const { ChatLog, ChatQuota } = tables;
+const { SitePointer, Page, ChatLog, ChatQuota } = tables;
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5';
 const DAILY_CAP = Number(process.env.CHAT_DAILY_CAP) || 50; // messages / IP / UTC day
@@ -17,7 +17,12 @@ const DAILY_CAP = Number(process.env.CHAT_DAILY_CAP) || 50; // messages / IP / U
 // (75%→92% recall vs 5; 10 added nothing) — the extra breadth catches sections
 // that rank just outside the top 5. Env-tunable.
 const RETRIEVE_K = Number(process.env.CHAT_RETRIEVE_K) || 8;
-const CTX_CHARS = 1500; // per-page context budget
+const CTX_CHARS = 1500; // per-page context budget (matched-chunk text)
+// For the top pages, also include the page's leading content so sibling sections
+// (e.g. a config example under a different heading) are grounded, not just the
+// one matched section — a matched chunk alone often misses the exact syntax.
+const EXPAND_TOP = Number(process.env.CHAT_EXPAND_TOP) || 3;
+const PAGE_CTX = 2500; // per-expanded-page content budget
 const MAX_QUESTION = 1000; // reject longer questions
 const ANSWER_STORE_CAP = 8000; // truncate stored answers
 
@@ -140,17 +145,31 @@ export async function retrieve(question: string, section?: string | null, versio
 		else if (isV5(r.path) && !isV5(existing.path)) byCanon.set(key, { ...existing, path: r.path, url: r.url });
 	}
 	const top = [...byCanon.values()].slice(0, RETRIEVE_K);
+	const release = (await SitePointer.get('active'))?.release ?? null;
 
 	const sources: Source[] = [];
 	const blocks: string[] = [];
-	for (const r of top) {
-		const rank = sources.length + 1;
+	for (let i = 0; i < top.length; i++) {
+		const r = top[i];
+		const rank = i + 1;
 		sources.push({ rank, path: r.path, title: r.title, heading: r.heading ?? '', url: r.url });
+		const chunkText = String(r.text ?? r.snippet ?? '');
+		let text = chunkText;
+		// Top pages: prepend the page's leading content so a sibling section's
+		// example/syntax is grounded too; keep the matched chunk when it's deeper
+		// on the page than the head slice (so we never lose the relevant section).
+		if (i < EXPAND_TOP && release) {
+			try {
+				const page = await Page.get(`${release}:${r.path}`);
+				const head = String(page?.renderedMarkdown ?? '').slice(0, PAGE_CTX);
+				if (head) text = head.includes(chunkText.slice(0, 80)) ? head : `${head}\n\n${chunkText}`;
+			} catch {
+				/* keep chunk text */
+			}
+		}
 		// Strip the context delimiter from doc content so a page can't close the
 		// <context> wrapper and inject instructions (prompt-injection defense).
-		const text = String(r.text ?? r.snippet ?? '')
-			.replace(/<\/?context>/gi, '')
-			.slice(0, CTX_CHARS);
+		text = text.replace(/<\/?context>/gi, '').slice(0, PAGE_CTX + CTX_CHARS);
 		blocks.push(`[${rank}] ${r.title}${r.heading ? ` — ${r.heading}` : ''} (${r.url})\n${text}`);
 	}
 
