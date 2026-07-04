@@ -5,7 +5,7 @@ The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-repl
 
 ## Admin area — observability dashboards
 
-Server-rendered, CSP-safe (inline SVG charts, no client JS), three tabs sharing one shell
+Server-rendered, CSP-safe (inline SVG charts, no client JS), four tabs sharing one shell
 (`lib/admin.ts` renders; `lib/metrics.ts` aggregates; routed in `resources/site.ts`):
 
 - **`/admin/ingest`** — the `IngestRun` table: one row per ingest, created at `begin`
@@ -22,6 +22,9 @@ Server-rendered, CSP-safe (inline SVG charts, no client JS), three tabs sharing 
   `POST /Metrics` (`resources/metrics.ts`, admin-authed like `/Ingest`); the panel charts the
   latest run + a sparkline trend. Best-effort recording — a failure never fails the CLI. Opt out
   with `--no-record`.
+- **`/admin/chat`** — chat analytics over `ChatLog` (see M3 below): total chats, grounded rate,
+  avg latency, top questions, per-day volume, model + feedback breakdowns, and a recent-conversations
+  table.
 
 All observability tables carry a 90-day TTL via `@table(expiration:)`.
 
@@ -104,6 +107,31 @@ keyword-shaped, so it under-measures the semantic lane's recall value); a query-
 (lean on semantic when the keyword lane returns few/weak results) if NL search in the box proves
 important. The vector lane uses Gemini `gemini-embedding-001` via `@embed` (see the model-name
 note in the schema and Harper issues #1593/#1594).
+
+## M3 (chat) — grounded, streamed answers
+
+Retrieval-augmented chat over the docs (`lib/chat.ts`). A question runs through the M2 hybrid
+search; the top distinct pages' rendered markdown becomes numbered grounding context; an LLM
+streams a cited answer.
+
+- **`POST /api/chat`** streams Server-Sent Events — one `sources` event (the citations), then
+  `token` deltas, then `done`/`error`. `resources/site.ts` reads the body (16KB cap), validates,
+  quota-gates, retrieves, streams, and writes a `ChatLog` row on completion.
+- **Generation**: Claude via the Anthropic Messages API (`CHAT_MODEL`, default `claude-sonnet-5`),
+  streaming. With **no `ANTHROPIC_API_KEY`** it falls back to a deterministic **dev stub** that
+  streams a grounded pointer — so the whole pipeline runs keyless. Set `ANTHROPIC_API_KEY` (in
+  `.env`, gitignored, and as a CI secret) for real answers.
+- **Quota**: per-IP daily cap (`CHAT_DAILY_CAP`, default 50) in `ChatQuota` (id `"<ipHash>:<date>"`,
+  2-day TTL, resets each UTC day). IPs are **hashed** (`ChatLog.ipHash`), never stored raw. Over cap
+  → `429`.
+- **UI**: a framework-free, CSP-safe widget injected site-wide via the layout (floating launcher +
+  panel) and a dedicated `/chat` page (`web/assets/chat.{js,css}`, `lib/chat-ui.ts`). Streams via
+  `fetch` + a `ReadableStream` reader, renders inline `[n]` citation links + a sources list.
+- **Observability**: the admin **Chat** tab (above).
+
+**Follow-ups**: NL questions currently lean on the keyword-primary search — if grounding quality
+lags once Claude is live, weight the semantic lane higher for chat retrieval. Thumbs feedback is
+modeled (`ChatLog.feedback`) but not yet wired to a UI control. MCP server exposure is a later step.
 
 ## Current state: M1 (render/serve) at parity
 

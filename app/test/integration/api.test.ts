@@ -50,6 +50,32 @@ test('GET /api/search?log=1 is a commit beacon (204, no search body)', async (t)
 	assert.equal(await res.text(), '', 'commit beacon returns no body');
 });
 
+// Isolated forwarded IP so chat tests don't drain the shared localhost quota.
+const CHAT_HDRS = { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.50' };
+
+test('POST /api/chat streams grounded SSE (sources → token → done)', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	const res = await fetch(`${BASE}/api/chat`, {
+		method: 'POST',
+		headers: CHAT_HDRS,
+		body: JSON.stringify({ question: 'how do I define a table schema?', sessionId: 'itest' }),
+	});
+	assert.equal(res.status, 200);
+	assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/);
+	const body = await res.text(); // resolves once the stream completes
+	assert.match(body, /event: sources/);
+	assert.match(body, /event: token/);
+	assert.match(body, /event: done/);
+});
+
+test('POST /api/chat rejects invalid input with 400 (before quota)', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	for (const bad of ['{"question":""}', '{}', 'not json']) {
+		const res = await fetch(`${BASE}/api/chat`, { method: 'POST', headers: CHAT_HDRS, body: bad });
+		assert.equal(res.status, 400, `body=${bad}`);
+	}
+});
+
 test('GET /admin/ingest requires auth (302 → Google OAuth)', async (t) => {
 	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
 	const res = await fetch(`${BASE}/admin/ingest`, { redirect: 'manual' });
@@ -70,7 +96,7 @@ test('dev-login mints a session cookie that alone authorizes every tab', async (
 	assert.ok(setCookie, 'dev-login issues a Set-Cookie');
 	const cookie = setCookie.split(';')[0]; // "<name>=<id>"
 
-	const expected: Record<string, string> = { ingest: 'Ingest', search: 'Search', validation: 'Validation' };
+	const expected: Record<string, string> = { ingest: 'Ingest', search: 'Search', validation: 'Validation', chat: 'Chat' };
 	for (const [view, label] of Object.entries(expected)) {
 		const r = await fetch(`${BASE}/admin/${view}`, { headers: { cookie } });
 		assert.equal(r.status, 200, `/admin/${view} authorized by session cookie`);

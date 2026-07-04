@@ -49,6 +49,25 @@ export interface ParityTrend {
 	runs: ParityRunRow[]; // newest-first
 }
 
+export interface ChatRecent {
+	question: string;
+	answerPreview: string;
+	sources: number;
+	model: string;
+	latencyMs: number;
+	grounded: boolean;
+	createdAt: string | number;
+}
+
+export interface ChatAnalytics {
+	totals: { chats: number; grounded: number; groundedRate: number; avgLatencyMs: number; windowDays: number };
+	topQuestions: Array<{ question: string; count: number }>; // pre-sorted desc
+	volume: Array<{ day: string; count: number }>; // chronological
+	byModel: Array<{ model: string; count: number }>; // pre-sorted desc
+	feedback: { up: number; down: number; none: number };
+	recent: ChatRecent[]; // newest-first
+}
+
 interface StatusStyle {
 	color: string;
 	bg: string;
@@ -75,13 +94,14 @@ const BRAND = '#403b8a';
 
 // ── Shared shell ──────────────────────────────────────────────────────────
 
-type Tab = 'ingest' | 'search' | 'validation';
+type Tab = 'ingest' | 'search' | 'validation' | 'chat';
 
 function shell(active: Tab, bodyHtml: string, title: string): string {
 	const tabs: Array<{ id: Tab; label: string; href: string }> = [
 		{ id: 'ingest', label: 'Ingest', href: '/admin/ingest' },
 		{ id: 'search', label: 'Search', href: '/admin/search' },
 		{ id: 'validation', label: 'Validation', href: '/admin/validation' },
+		{ id: 'chat', label: 'Chat', href: '/admin/chat' },
 	];
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -305,6 +325,76 @@ ${sparkline(sims, 0, 1, (n) => `${pct(n)}%`, 'Similarity median across parity ru
 </section>`;
 
 	return shell('validation', body, 'Validation');
+}
+
+// ── Chat dashboard ───────────────────────────────────────────────────────────
+
+export function renderChatDashboard(a: ChatAnalytics): string {
+	const t = a.totals;
+	const cards: Card[] = [
+		{ label: 'Total chats', value: num(t.chats) },
+		{ label: 'Grounded', value: `${pct(t.groundedRate)}%`, color: STATUS.activated.color },
+		{ label: 'Avg latency', value: fmtDuration(t.avgLatencyMs) },
+		{ label: 'Window', value: `${t.windowDays} days` },
+	];
+	const models = a.byModel.map((m) => ({ label: m.model, value: m.count }));
+	const feedback = [
+		{ label: 'helpful', value: a.feedback.up },
+		{ label: 'not helpful', value: a.feedback.down, warn: a.feedback.down > 0 },
+		{ label: 'no rating', value: a.feedback.none },
+	];
+	const recentRows = a.recent.length
+		? a.recent.map((r) => rowChat(r)).join('')
+		: '<tr><td colspan="6" class="admin-empty">No chats recorded yet.</td></tr>';
+
+	const body = `<section class="admin-cards">
+	${cardsHtml(cards)}
+</section>
+<section class="admin-panel">
+	<h2>Top questions <span class="admin-sub">most asked</span></h2>
+	${barList(
+		a.topQuestions.map((q) => ({ label: q.question, value: q.count })),
+		'No questions yet.'
+	)}
+</section>
+<section class="admin-panel">
+	<h2>Chat volume <span class="admin-sub">per day</span></h2>
+	${volumeChart(a.volume)}
+</section>
+<section class="admin-panel">
+	<h2>Model</h2>
+	${barList(models, 'No chats yet.')}
+</section>
+<section class="admin-panel">
+	<h2>Feedback</h2>
+	${barList(feedback, 'No feedback yet.')}
+</section>
+<section class="admin-panel">
+	<h2>Recent conversations</h2>
+	<div class="admin-table-scroll">
+	<table class="admin-table">
+		<thead><tr><th>Question</th><th class="num">Sources</th><th>Model</th><th class="num">Latency</th><th>Grounded</th><th>When</th></tr></thead>
+		<tbody>
+		${recentRows}
+		</tbody>
+	</table>
+	</div>
+</section>`;
+
+	return shell('chat', body, 'Chat');
+}
+
+function rowChat(r: ChatRecent): string {
+	const g = r.grounded ? STATUS.activated : STATUS.rejected;
+	const gLabel = r.grounded ? 'grounded' : 'no context';
+	return `<tr>
+		<td>${esc((r.question ?? '').slice(0, 90))}</td>
+		<td class="num">${num(r.sources)}</td>
+		<td class="admin-mono">${esc(r.model)}</td>
+		<td class="num">${r.latencyMs != null ? fmtDuration(r.latencyMs) : '—'}</td>
+		<td><span class="admin-pill" style="color:${g.color};background:${g.bg}">${gLabel}</span></td>
+		<td class="admin-when">${esc(fmtWhen(r.createdAt))}</td>
+	</tr>`;
 }
 
 // ── Pill / card helpers ─────────────────────────────────────────────────────

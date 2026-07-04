@@ -8,9 +8,11 @@ import {
 	renderIngestDashboard,
 	renderSearchDashboard,
 	renderValidationDashboard,
+	renderChatDashboard,
 	type SearchAnalytics,
 	type EvalTrend,
 	type ParityTrend,
+	type ChatAnalytics,
 } from '../../lib/admin.ts';
 
 test('renderIngestDashboard: shell, active Ingest tab, run data', () => {
@@ -113,4 +115,33 @@ test('renderValidationDashboard: empty states when no runs', () => {
 	const html = renderValidationDashboard({ latest: null, runs: [] }, { latest: null, runs: [] });
 	assert.match(html, /class="admin-tab is-active"[^>]*>Validation/);
 	assert.match(html, /No .{0,40}runs/i); // both sections show an empty-state message
+});
+
+const SAMPLE_CHAT: ChatAnalytics = {
+	totals: { chats: 19, grounded: 19, groundedRate: 1, avgLatencyMs: 390, windowDays: 14 },
+	topQuestions: [{ question: 'what is replication?', count: 5 }],
+	volume: [{ day: '2026-07-04', count: 19 }],
+	byModel: [{ model: 'stub', count: 19 }],
+	feedback: { up: 0, down: 0, none: 19 },
+	recent: [
+		{
+			question: 'what is replication?',
+			answerPreview: 'Based on the docs…',
+			sources: 5,
+			model: 'stub',
+			latencyMs: 287,
+			grounded: true,
+			createdAt: '2026-07-04T19:06:00Z',
+		},
+	],
+};
+
+test('renderChatDashboard: active Chat tab, grounded %, recent rows', () => {
+	const html = renderChatDashboard(SAMPLE_CHAT);
+	assert.match(html, /class="admin-tab is-active"[^>]*>Chat/);
+	assert.match(html, /100\.0%/); // groundedRate 1 → 100.0% (regression guard for the missing %)
+	assert.match(html, /Top questions/);
+	assert.match(html, /what is replication\?/);
+	assert.match(html, /Recent conversations/);
+	assert.match(html, /grounded/);
 });

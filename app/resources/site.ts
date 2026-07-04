@@ -4,8 +4,8 @@
 import { server, tables, type HarperRequest, type HarperTable } from '../lib/harper.ts';
 import { layout } from '../lib/layout.ts';
 import { runSearch, logQuery } from '../lib/search.ts';
-import { renderIngestDashboard, renderSearchDashboard, renderValidationDashboard } from '../lib/admin.ts';
-import { searchAnalytics, evalTrend, parityTrend } from '../lib/metrics.ts';
+import { renderIngestDashboard, renderSearchDashboard, renderValidationDashboard, renderChatDashboard } from '../lib/admin.ts';
+import { searchAnalytics, evalTrend, parityTrend, chatAnalytics } from '../lib/metrics.ts';
 import {
 	validateQuestion,
 	clientIp,
@@ -49,7 +49,7 @@ const ADMIN_DEV_LOGIN = process.env.ADMIN_DEV_LOGIN === 'true';
 const ADMIN_DEV_EMAIL = process.env.ADMIN_DEV_EMAIL || 'dev@harperdb.io';
 
 // The gated admin dashboard views (all share the tabbed shell).
-const ADMIN_VIEWS = new Set(['/admin/ingest', '/admin/search', '/admin/validation']);
+const ADMIN_VIEWS = new Set(['/admin/ingest', '/admin/search', '/admin/validation', '/admin/chat']);
 
 interface AdminAuth {
 	reason?: 'login' | 'forbidden';
@@ -220,6 +220,8 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 			html = renderSearchDashboard(await searchAnalytics());
 		} else if (request.pathname === '/admin/validation') {
 			html = renderValidationDashboard(await evalTrend(), await parityTrend());
+		} else if (request.pathname === '/admin/chat') {
+			html = renderChatDashboard(await chatAnalytics());
 		} else {
 			const runs: any[] = [];
 			for await (const run of IngestRun.search({})) runs.push(run);

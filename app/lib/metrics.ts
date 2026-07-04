@@ -4,9 +4,17 @@
 // so the two can be tested independently.
 
 import { tables } from './harper.ts';
-import { type SearchAnalytics, type EvalTrend, type ParityTrend, type EvalRunRow, type ParityRunRow } from './admin.ts';
+import {
+	type SearchAnalytics,
+	type EvalTrend,
+	type ParityTrend,
+	type EvalRunRow,
+	type ParityRunRow,
+	type ChatAnalytics,
+	type ChatRecent,
+} from './admin.ts';
 
-const { SearchQueryLog, EvalRun, ParityRun } = tables;
+const { SearchQueryLog, EvalRun, ParityRun, ChatLog } = tables;
 
 const DAY_MS = 86400000;
 const WINDOW_DAYS = 14;
@@ -131,4 +139,79 @@ export async function parityTrend(limit = 30): Promise<ParityTrend> {
 	runs.sort(byCreatedDesc);
 	const top = runs.slice(0, limit);
 	return { latest: top[0] ?? null, runs: top };
+}
+
+// Aggregate the last WINDOW_DAYS of ChatLog: volume, grounded rate, latency,
+// top questions, model + feedback breakdowns, and the most recent conversations.
+export async function chatAnalytics(): Promise<ChatAnalytics> {
+	const now = Date.now();
+	const windowMs = WINDOW_DAYS * DAY_MS;
+	const byQuestion = new Map<string, number>();
+	const byDay = new Map<string, number>();
+	const byModel = new Map<string, number>();
+	const recent: ChatRecent[] = [];
+	const feedback = { up: 0, down: 0, none: 0 };
+	let chats = 0;
+	let grounded = 0;
+	let latencySum = 0;
+	let latencyN = 0;
+
+	for await (const row of ChatLog.search({})) {
+		const created = new Date(row.createdAt ?? 0).getTime();
+		if (now - created > windowMs) continue;
+		chats++;
+		if (row.grounded) grounded++;
+		if (typeof row.latencyMs === 'number') {
+			latencySum += row.latencyMs;
+			latencyN++;
+		}
+		const q = String(row.question ?? '').trim();
+		if (q) byQuestion.set(q.toLowerCase(), (byQuestion.get(q.toLowerCase()) ?? 0) + 1);
+		const day = new Date(created).toISOString().slice(0, 10);
+		byDay.set(day, (byDay.get(day) ?? 0) + 1);
+		const model = row.model || 'unknown';
+		byModel.set(model, (byModel.get(model) ?? 0) + 1);
+		const fb = row.feedback ?? 0;
+		if (fb > 0) feedback.up++;
+		else if (fb < 0) feedback.down++;
+		else feedback.none++;
+		recent.push({
+			question: row.question ?? '',
+			answerPreview: String(row.answer ?? '').slice(0, 160),
+			sources: Array.isArray(row.sources) ? row.sources.length : 0,
+			model,
+			latencyMs: row.latencyMs ?? 0,
+			grounded: Boolean(row.grounded),
+			createdAt: row.createdAt ?? 0,
+		});
+	}
+
+	recent.sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+	const topQuestions = [...byQuestion.entries()]
+		.map(([question, count]) => ({ question, count }))
+		.sort((a, b) => b.count - a.count)
+		.slice(0, 15);
+	const volume: Array<{ day: string; count: number }> = [];
+	for (let i = WINDOW_DAYS - 1; i >= 0; i--) {
+		const day = new Date(now - i * DAY_MS).toISOString().slice(0, 10);
+		volume.push({ day, count: byDay.get(day) ?? 0 });
+	}
+	const byModelArr = [...byModel.entries()]
+		.map(([model, count]) => ({ model, count }))
+		.sort((a, b) => b.count - a.count);
+
+	return {
+		totals: {
+			chats,
+			grounded,
+			groundedRate: chats ? grounded / chats : 0,
+			avgLatencyMs: latencyN ? latencySum / latencyN : 0,
+			windowDays: WINDOW_DAYS,
+		},
+		topQuestions,
+		volume,
+		byModel: byModelArr,
+		feedback,
+		recent: recent.slice(0, 12),
+	};
 }
