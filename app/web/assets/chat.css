@@ -219,6 +219,32 @@
 .chat-meta[hidden] {
 	display: none;
 }
+.chat-rate {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin-left: 0.6rem;
+}
+.chat-rate-q {
+	color: #909098;
+}
+.chat-rate-btn {
+	border: 1px solid var(--chat-line, #e3e3ea);
+	background: transparent;
+	color: var(--chat-ink, #2b2b33);
+	border-radius: 999px;
+	padding: 0.05rem 0.5rem;
+	font: inherit;
+	font-size: 0.7rem;
+	cursor: pointer;
+}
+.chat-rate-btn:hover {
+	border-color: var(--chat-brand, #403b8a);
+	color: var(--chat-brand, #403b8a);
+}
+.chat-rate-thanks {
+	color: var(--chat-brand, #403b8a);
+}
 .chat-error {
 	color: #b3261e;
 }

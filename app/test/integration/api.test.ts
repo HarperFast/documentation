@@ -76,6 +76,32 @@ test('POST /api/chat rejects invalid input with 400 (before quota)', async (t) =
 	}
 });
 
+test('POST /api/chat-feedback records a rating on a real chat, 404 on unknown id', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	// Get a chat id from the done event of a real /api/chat exchange.
+	const chat = await fetch(`${BASE}/api/chat`, { method: 'POST', headers: CHAT_HDRS, body: JSON.stringify({ question: 'what is a table?' }) });
+	const body = await chat.text();
+	const m = body.match(/event: done\ndata: (\{.*\})/);
+	assert.ok(m, 'done event carries data');
+	const id = JSON.parse(m![1]).id;
+	assert.ok(id, 'done event includes a chat id');
+
+	const ok = await fetch(`${BASE}/api/chat-feedback`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ id, value: 1 }),
+	});
+	assert.equal(ok.status, 200);
+	assert.equal((await ok.json()).ok, true);
+
+	const bad = await fetch(`${BASE}/api/chat-feedback`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ id: 'no-such-id', value: 1 }),
+	});
+	assert.equal(bad.status, 404);
+});
+
 test('GET /admin/ingest requires auth (302 → Google OAuth)', async (t) => {
 	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
 	const res = await fetch(`${BASE}/admin/ingest`, { redirect: 'manual' });

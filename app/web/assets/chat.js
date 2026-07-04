@@ -144,10 +144,12 @@
 				finish(meta) {
 					bubble.classList.remove('chat-streaming');
 					if (!text.trim()) answer.innerHTML = '<span class="chat-error">No answer was returned.</span>';
-					if (meta && meta.model) {
+					if (meta && (meta.model || meta.id)) {
 						metaEl.hidden = false;
 						const lat = meta.latencyMs != null ? ` · ${Math.round(meta.latencyMs)}ms` : '';
-						metaEl.textContent = `${meta.model}${lat}`;
+						metaEl.innerHTML = meta.model ? `<span class="chat-meta-model">${escapeHtml(meta.model + lat)}</span>` : '';
+						// Thumbs rating (only when we have an id and a real answer).
+						if (meta.id && text.trim()) metaEl.appendChild(renderRating(meta.id));
 					}
 				},
 				fail(message) {
@@ -155,6 +157,33 @@
 					answer.innerHTML = `<span class="chat-error">${escapeHtml(message)}</span>`;
 				},
 			};
+		}
+
+		// A small "Helpful? Yes/No" control that records feedback on this answer.
+		function renderRating(id) {
+			const wrap = document.createElement('span');
+			wrap.className = 'chat-rate';
+			wrap.innerHTML =
+				'<span class="chat-rate-q">Helpful?</span>' +
+				'<button type="button" class="chat-rate-btn" data-v="1">Yes</button>' +
+				'<button type="button" class="chat-rate-btn" data-v="-1">No</button>';
+			wrap.addEventListener('click', (e) => {
+				const btn = e.target.closest('.chat-rate-btn');
+				if (!btn) return;
+				const value = Number(btn.dataset.v);
+				try {
+					fetch('/api/chat-feedback', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ id, value }),
+						keepalive: true,
+					}).catch(() => {});
+				} catch {
+					/* best-effort */
+				}
+				wrap.innerHTML = '<span class="chat-rate-thanks">Thanks for the feedback.</span>';
+			});
+			return wrap;
 		}
 
 		function setStreaming(on) {

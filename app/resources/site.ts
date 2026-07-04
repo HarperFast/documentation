@@ -16,6 +16,8 @@ import {
 	streamAnswer,
 	modelId,
 	logChat,
+	newChatId,
+	recordFeedback,
 } from '../lib/chat.ts';
 import { renderChatPage } from '../lib/chat-ui.ts';
 
@@ -141,6 +143,13 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 	// before the GET/HEAD guard below because it is the one POST this owns.
 	if (request.method === 'POST' && request.pathname === '/api/chat') {
 		return handleChat(request);
+	}
+	// Thumbs feedback on a prior answer: POST /api/chat-feedback { id, value }.
+	if (request.method === 'POST' && request.pathname === '/api/chat-feedback') {
+		const body = await readJsonBody(request);
+		if (body === null) return jsonResponse({ error: 'bad request' }, 400);
+		const ok = await recordFeedback(body.id, body.value);
+		return jsonResponse({ ok }, ok ? 200 : 404);
 	}
 	if ((request.method !== 'GET' && request.method !== 'HEAD') || PASSTHROUGH.test(request.pathname))
 		return next(request);
@@ -390,6 +399,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	const { system } = buildMessages(question, grounding.context);
 	const promptChars = system.length + grounding.context.length + question.length;
 
+	const chatId = newChatId(); // sent to the client (done event) so it can rate this answer
 	const encoder = new TextEncoder();
 	// Aborts upstream generation (the Anthropic fetch) when the client disconnects.
 	const ac = new AbortController();
@@ -410,7 +420,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					answer += delta;
 					send('token', delta);
 				}
-				send('done', { model: modelId(), latencyMs: Date.now() - started });
+				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
 			} catch (err: any) {
 				// Log detail server-side; the client only gets a generic message.
 				console.error('[chat] generation error', err?.message ?? err);
@@ -422,6 +432,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					/* already closed */
 				}
 				await logChat({
+					id: chatId,
 					question,
 					answer,
 					sources: grounding.sources,

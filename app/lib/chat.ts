@@ -267,7 +267,14 @@ export function validateQuestion(q: unknown): string | null {
 	return trimmed;
 }
 
+// Stable id for a chat exchange, minted before streaming so it can be sent to
+// the client (in the `done` event) for later thumbs feedback.
+export function newChatId(): string {
+	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export interface ChatLogInput {
+	id: string;
 	question: string;
 	answer: string;
 	sources: Source[];
@@ -281,7 +288,7 @@ export interface ChatLogInput {
 export async function logChat(input: ChatLogInput): Promise<void> {
 	try {
 		await ChatLog.put({
-			id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+			id: input.id,
 			question: input.question.slice(0, MAX_QUESTION),
 			answer: input.answer.slice(0, ANSWER_STORE_CAP),
 			sources: input.sources,
@@ -296,5 +303,20 @@ export async function logChat(input: ChatLogInput): Promise<void> {
 		});
 	} catch {
 		// observability is best-effort; never fail a chat on it
+	}
+}
+
+// Record a thumbs rating on a prior chat exchange: +1 (helpful), -1 (not), 0
+// (cleared). Only updates the `feedback` field of an existing ChatLog row.
+export async function recordFeedback(id: unknown, value: unknown): Promise<boolean> {
+	if (typeof id !== 'string' || !id || id.length > 64) return false;
+	const v = Number(value) > 0 ? 1 : Number(value) < 0 ? -1 : 0;
+	try {
+		const existing = await ChatLog.get(id);
+		if (!existing) return false;
+		await ChatLog.patch({ id, feedback: v });
+		return true;
+	} catch {
+		return false;
 	}
 }
