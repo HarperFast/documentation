@@ -9,7 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { tables, type HarperRequest } from './harper.ts';
 import { runSearch } from './search.ts';
 
-const { SitePointer, Page, ChatLog, ChatQuota } = tables;
+const { ChatLog, ChatQuota } = tables;
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5';
 const DAILY_CAP = Number(process.env.CHAT_DAILY_CAP) || 50; // messages / IP / UTC day
@@ -102,39 +102,27 @@ export interface Grounding {
 	context: string;
 }
 
-// Run the question through hybrid search, dedupe to distinct pages, and build a
-// numbered context block from each page's rendered markdown (truncated).
+// Retrieve grounding for a chat question. Uses `blend` (equal-weight fusion —
+// the semantic lane counts for NL questions) and `withText` (the actual matched
+// section text). runSearch already dedupes to the best chunk per page, so each
+// result is a distinct page's most-relevant section — exactly what to ground on.
 export async function retrieve(question: string, section?: string | null, version?: string | null): Promise<Grounding> {
-	const { results } = await runSearch({ q: question, section, version, limit: 8 });
-	const release = (await SitePointer.get('active'))?.release ?? null;
+	const { results } = await runSearch({
+		q: question,
+		section,
+		version,
+		limit: RETRIEVE_K,
+		blend: true,
+		withText: true,
+	});
 
-	const seen = new Set<string>();
 	const sources: Source[] = [];
-	for (const r of results) {
-		if (seen.has(r.path)) continue;
-		seen.add(r.path);
-		sources.push({
-			rank: sources.length + 1,
-			path: r.path,
-			title: r.title,
-			heading: r.heading ?? '',
-			url: r.url,
-		});
-		if (sources.length >= RETRIEVE_K) break;
-	}
-
 	const blocks: string[] = [];
-	for (const s of sources) {
-		let text = '';
-		if (release) {
-			try {
-				const page = await Page.get(`${release}:${s.path}`);
-				text = (page?.renderedMarkdown ?? '').slice(0, CTX_CHARS);
-			} catch {
-				text = '';
-			}
-		}
-		blocks.push(`[${s.rank}] ${s.title}${s.heading ? ` — ${s.heading}` : ''} (${s.url})\n${text}`);
+	for (const r of results) {
+		const rank = sources.length + 1;
+		sources.push({ rank, path: r.path, title: r.title, heading: r.heading ?? '', url: r.url });
+		const text = String(r.text ?? r.snippet ?? '').slice(0, CTX_CHARS);
+		blocks.push(`[${rank}] ${r.title}${r.heading ? ` — ${r.heading}` : ''} (${r.url})\n${text}`);
 	}
 
 	return { sources, context: blocks.join('\n\n') };

@@ -1,0 +1,17 @@
+{
+	"_comment": "Chat-grounding eval: natural-language questions with expected doc-path substrings. Measures whether chat retrieval (blend + withText) surfaces the right page in the top-K sources. Run: npm run chat-eval. A case is a hit when any top source path contains any `expect` substring.",
+	"cases": [
+		{ "q": "How do I define a table with a primary key?", "expect": ["database/schema", "create-your-first-application", "database/overview"] },
+		{ "q": "How does replication work in Harper?", "expect": ["replication"] },
+		{ "q": "How do I store binary data like images?", "expect": ["blob", "binary"] },
+		{ "q": "How do I subscribe to real-time changes over MQTT?", "expect": ["mqtt", "real-time", "pub"] },
+		{ "q": "How do I write a custom REST endpoint?", "expect": ["custom", "resource", "rest"] },
+		{ "q": "How do I cache data from an external source?", "expect": ["caching", "cache"] },
+		{ "q": "How do I deploy my application to Harper Fabric?", "expect": ["fabric", "deploy"] },
+		{ "q": "How do I add a vector index for similarity search?", "expect": ["vector", "similarity"] },
+		{ "q": "How do I define a relationship between two tables?", "expect": ["schema", "relationship"] },
+		{ "q": "How do I run TypeScript without a build step?", "expect": ["typescript", "javascript-environment"] },
+		{ "q": "How do I query a table with the REST API using filters?", "expect": ["rest", "querying", "query"] },
+		{ "q": "How do I load environment variables from a .env file?", "expect": ["env", "load"] }
+	]
+}

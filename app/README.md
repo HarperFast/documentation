@@ -132,9 +132,17 @@ streams a cited answer.
   `fetch` + a `ReadableStream` reader, renders inline `[n]` citation links + a sources list.
 - **Observability**: the admin **Chat** tab (above).
 
-**Follow-ups**: NL questions currently lean on the keyword-primary search — if grounding quality
-lags once Claude is live, weight the semantic lane higher for chat retrieval. Thumbs feedback is
-modeled (`ChatLog.feedback`) but not yet wired to a UI control. MCP server exposure is a later step.
+**Retrieval tuning**: chat retrieval calls `runSearch` with `blend: true` (equal-weight RRF, so the
+semantic lane counts for NL questions — the search box stays keyword-primary and unchanged) and
+`withText: true` (grounds on the actual matched **section** text, not a page-head truncation). A
+grounding eval measures it: `npm run chat-eval` runs `eval/chat-grounding.json` (NL questions →
+expected doc-page substrings) via the `retrieveOnly` endpoint (no model/quota) and scores Recall@5 /
+MRR — currently **Recall@5 75%, MRR 0.75**; CI gates it at `--min-recall 0.6`. Add cases from real
+`ChatLog` questions to grow it.
+
+**Follow-ups**: the remaining eval misses (blob/binary, Fabric deploy, TypeScript-no-build) are the
+next retrieval targets. Thumbs feedback is modeled (`ChatLog.feedback`) but not yet wired to a UI
+control. MCP server exposure is a later step.
 
 ## Current state: M1 (render/serve) at parity
 

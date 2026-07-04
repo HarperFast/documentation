@@ -374,6 +374,13 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	if (!question) return jsonResponse({ error: 'invalid question' }, 400);
 	const sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
 
+	// Retrieval-only mode: return the grounding sources without generating an
+	// answer — no LLM cost, no quota. Powers the grounding preview + chat eval.
+	if (body.retrieveOnly) {
+		const grounding = await retrieve(question, body.section ?? null, body.version ?? null);
+		return jsonResponse({ sources: grounding.sources }, 200);
+	}
+
 	const ipHash = hashIp(clientIp(request));
 	const quota = await checkAndBumpQuota(ipHash);
 	if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);

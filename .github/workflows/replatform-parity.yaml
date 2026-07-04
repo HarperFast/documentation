@@ -102,6 +102,11 @@ jobs:
           HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
         run: node app/scripts/search-eval.ts --min-mrr 0.85 --target http://127.0.0.1:9936
 
+      - name: Chat grounding eval
+        # Retrieval-only (retrieveOnly) — no model key or quota needed. Gates that
+        # chat retrieval still surfaces the right doc page for NL questions.
+        run: node app/scripts/chat-grounding.ts --min-recall 0.6 --target http://127.0.0.1:9936
+
       - name: Install Playwright browser
         run: npx --prefix app playwright install --with-deps chromium
 

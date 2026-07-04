@@ -18,7 +18,8 @@
 		"test:all": "npm run test && npm run test:integration && npm run test:e2e",
 		"ingest": "node scripts/ingest.ts",
 		"parity": "node scripts/parity.ts",
-		"search-eval": "node scripts/search-eval.ts"
+		"search-eval": "node scripts/search-eval.ts",
+		"chat-eval": "node scripts/chat-grounding.ts"
 	},
 	"dependencies": {
 		"@harperfast/oauth": "^2.1.2",

@@ -26,6 +26,13 @@ interface SearchOptions {
 	// Accepts a raw query-string value (string | null) as well as a number; the
 	// implementation coerces/clamps it.
 	limit?: number | string | null;
+	// blend: fuse the keyword + semantic lanes with equal-weight RRF instead of
+	// the box's keyword-primary ordering — better recall for natural-language
+	// questions (used by M3 chat retrieval, NOT the search box).
+	blend?: boolean;
+	// withText: include each matched chunk's full section `text` in the results
+	// (chat grounds on this; the box doesn't need it).
+	withText?: boolean;
 }
 
 const { SitePointer, ContentRelease, SearchChunk, Term } = tables;
@@ -92,7 +99,14 @@ async function resolveTerm(release: string, term: string): Promise<TermMatch[]> 
 // Hybrid search. { q, section, version, limit } → { query, results, total }.
 // Runs the keyword lane (always) and the vector lane (when an embedding model
 // is configured and reachable), then fuses them with reciprocal-rank fusion.
-export async function runSearch({ q = '', section = null, version = null, limit = 10 }: SearchOptions = {}): Promise<SearchResponse> {
+export async function runSearch({
+	q = '',
+	section = null,
+	version = null,
+	limit = 10,
+	blend = false,
+	withText = false,
+}: SearchOptions = {}): Promise<SearchResponse> {
 	// Bound every input: q may arrive null (missing param), limit negative or huge.
 	q = String(q ?? '')
 		.trim()
@@ -137,16 +151,38 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	// embeddings available for M3 chat grounding. (Natural-language search is
 	// better served by chat, which does its own semantic retrieval.)
 	const byPage = new Map<any, { chunk: any; score: number; semanticOnly?: boolean }>();
-	keyword.forEach((chunk, i) => {
-		if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1) });
-	});
-	semantic.forEach((chunk, i) => {
-		if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1), semanticOnly: true });
-	});
-	const ranked = [...byPage.values()].sort((a, b) => {
-		if (!!a.semanticOnly !== !!b.semanticOnly) return a.semanticOnly ? 1 : -1; // keyword pages first
-		return b.score - a.score;
-	});
+	let ranked: Array<{ chunk: any; score: number; semanticOnly?: boolean }>;
+	if (blend) {
+		// Equal-weight RRF: both lanes contribute; a page in both accumulates score
+		// and sorts purely by fused score. Better for NL questions where the
+		// semantic lane's relevance should count, not just append below keyword.
+		keyword.forEach((chunk, i) => {
+			const e = byPage.get(chunk.pageId);
+			const s = 1 / (RRF_K + i + 1);
+			if (e) e.score += s;
+			else byPage.set(chunk.pageId, { chunk, score: s });
+		});
+		semantic.forEach((chunk, i) => {
+			const e = byPage.get(chunk.pageId);
+			const s = 1 / (RRF_K + i + 1);
+			if (e) e.score += s;
+			else byPage.set(chunk.pageId, { chunk, score: s });
+		});
+		ranked = [...byPage.values()].sort((a, b) => b.score - a.score);
+	} else {
+		// Keyword-primary fusion with semantic recall-append (the search box).
+		keyword.forEach((chunk, i) => {
+			if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1) });
+		});
+		semantic.forEach((chunk, i) => {
+			if (!byPage.has(chunk.pageId))
+				byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1), semanticOnly: true });
+		});
+		ranked = [...byPage.values()].sort((a, b) => {
+			if (!!a.semanticOnly !== !!b.semanticOnly) return a.semanticOnly ? 1 : -1; // keyword pages first
+			return b.score - a.score;
+		});
+	}
 
 	const results = ranked.slice(0, limit).map(({ chunk, score }) => ({
 		path: chunk.path,
@@ -158,6 +194,8 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		section: chunk.section,
 		version: chunk.version,
 		snippet: snippet(chunk.text, queryTerms),
+		// Chat grounds on the full matched section text; the box omits it.
+		...(withText ? { text: chunk.text } : {}),
 		score: Number(score.toFixed(5)),
 	}));
 
