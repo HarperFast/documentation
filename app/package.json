@@ -19,7 +19,8 @@
 		"ingest": "node scripts/ingest.ts",
 		"parity": "node scripts/parity.ts",
 		"search-eval": "node scripts/search-eval.ts",
-		"chat-eval": "node scripts/chat-grounding.ts"
+		"chat-eval": "node scripts/chat-grounding.ts",
+		"answer-eval": "node scripts/chat-answer-eval.ts"
 	},
 	"dependencies": {
 		"@harperfast/oauth": "^2.1.2",

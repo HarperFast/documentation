@@ -1,0 +1,53 @@
+{
+	"_comment": "Answer-quality eval: questions + rubric key-points a correct answer must cover. `npm run answer-eval` runs each question through the real /api/chat pipeline (grounding + Claude), then an LLM judge scores correctness/completeness/grounded against the rubric. Measures ANSWER quality (what users feel), not just retrieval recall. Costs 2 API calls per question — run occasionally, not in the fast test loop.",
+	"cases": [
+		{
+			"q": "How do I define a table with a primary key in Harper?",
+			"key_points": [
+				"tables are defined with a GraphQL schema (SDL) using the @table directive",
+				"the primary key is marked with the @primaryKey directive on an attribute",
+				"a concrete example, e.g. `type Dog @table { id: ID @primaryKey }`"
+			]
+		},
+		{
+			"q": "How do I cache data from an external source in Harper?",
+			"key_points": [
+				"define a cache table (a @table, typically with an expiration/TTL)",
+				"wrap the external source in a custom Resource class (extending Resource)",
+				"connect them so Harper fetches on miss (e.g. sourcedFrom, or overriding get())"
+			]
+		},
+		{
+			"q": "How do I write a custom REST endpoint in Harper?",
+			"key_points": [
+				"define a class that extends Resource in a jsResource file",
+				"implement handler methods like get/post",
+				"the exported resource is served over REST at a path"
+			]
+		},
+		{
+			"q": "How do I subscribe to real-time changes over MQTT?",
+			"key_points": [
+				"Harper supports MQTT (pub/sub) as a protocol",
+				"you subscribe to a topic/table to receive real-time updates",
+				"changes to records are published to subscribers"
+			]
+		},
+		{
+			"q": "How do I run TypeScript in Harper without a build step?",
+			"key_points": [
+				"Harper runs .ts files directly via type stripping (no transpile/build)",
+				"requires a recent Node (22.6+) / the jsResource glob can target .ts",
+				"local imports must use explicit .ts extensions"
+			]
+		},
+		{
+			"q": "How do I load environment variables from a .env file?",
+			"key_points": [
+				"use the loadEnv plugin/config in config.yaml",
+				"point it at your .env file(s)",
+				"the variables become available to the application"
+			]
+		}
+	]
+}

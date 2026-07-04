@@ -148,12 +148,22 @@ chat retrieval calls `runSearch` with three levers, each validated to help:
 via the `retrieveOnly` endpoint (no model/quota) and scores Recall@K / MRR — currently
 **Recall@8 92%, MRR 0.78**; CI gates it at `--min-recall 0.6` (and hard-fails on any endpoint error).
 
-**Follow-ups**: grow + curate the eval from real `ChatLog` questions (the seed set is 12 cases and
-some expectations are debatable) — that makes the metric trustworthy and doubles as a content-gap
-report. Then, in impact order: query expansion for true recall gaps (words that don't match any
-page), a keyword-anchored blend to stop strong keyword hits being demoted, and an answer-quality
-(LLM-judge) eval since recall is only a proxy. Thumbs feedback is modeled (`ChatLog.feedback`) but
-not yet wired to a UI control. MCP server exposure is a later step.
+**Answer-quality eval** (`npm run answer-eval`, `eval/chat-answers.json`): recall only proves "the
+right page was in context" — this measures whether the *answer* is right. Each question runs through
+the real `/api/chat` pipeline, then an **LLM judge** scores correctness/completeness/grounded against
+a rubric of key points. Current: **correctness 4.33/5, 100% grounded** (judge `claude-sonnet-5`,
+override with `JUDGE_MODEL`; note it's self-judging — use Opus for a stricter grade). It costs 2 API
+calls per question (needs `ANTHROPIC_API_KEY`), so it's a manual/periodic check, not a per-push gate.
+It already earned its keep: the "load env vars" answer scored 2/5 completeness — a real answer gap
+(the grounding surfaced the page but not the `config.yaml` `loadEnv` syntax) that recall alone missed.
+
+**Follow-ups**: grow + curate both eval sets from real `ChatLog` questions (the seed sets are small
+and some grounding expectations are debatable) — that makes the metrics trustworthy and doubles as a
+content-gap report. Retrieval refinements, in impact order: version-aware dedup so the K=8 budget
+isn't spent on v4/v5 near-duplicates (seen in verify), query expansion for true recall gaps (words
+that don't match any page), and a keyword-anchored blend to stop strong keyword hits being demoted.
+Thumbs feedback is modeled (`ChatLog.feedback`) but not yet wired to a UI control. MCP server
+exposure is a later step.
 
 ## Current state: M1 (render/serve) at parity
 
