@@ -414,24 +414,8 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					/* stream already closed/cancelled */
 				}
 			};
-			try {
-				send('sources', grounding.sources);
-				for await (const delta of streamAnswer(question, grounding, ac.signal)) {
-					answer += delta;
-					send('token', delta);
-				}
-				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
-			} catch (err: any) {
-				// Log detail server-side; the client only gets a generic message.
-				console.error('[chat] generation error', err?.message ?? err);
-				send('error', { message: 'The answer could not be generated. Please try again.' });
-			} finally {
-				try {
-					controller.close();
-				} catch {
-					/* already closed */
-				}
-				await logChat({
+			const writeLog = () =>
+				logChat({
 					id: chatId,
 					question,
 					answer,
@@ -442,6 +426,27 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					sessionId,
 					ipHash,
 				});
+			try {
+				send('sources', grounding.sources);
+				for await (const delta of streamAnswer(question, grounding, ac.signal)) {
+					answer += delta;
+					send('token', delta);
+				}
+				// Persist the row BEFORE announcing its id, so a fast rating click on
+				// /api/chat-feedback can't arrive before the ChatLog row exists.
+				await writeLog();
+				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
+			} catch (err: any) {
+				// Log detail server-side; the client only gets a generic message.
+				console.error('[chat] generation error', err?.message ?? err);
+				send('error', { message: 'The answer could not be generated. Please try again.' });
+				await writeLog(); // still record the (partial/failed) exchange
+			} finally {
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
 			}
 		},
 		cancel() {

@@ -134,7 +134,10 @@ export async function retrieve(question: string, section?: string | null, versio
 		const key = canon(r.path);
 		const existing = byCanon.get(key);
 		if (!existing) byCanon.set(key, r);
-		else if (isV5(r.path) && !isV5(existing.path)) byCanon.set(key, r); // upgrade slot to v5
+		// If the best-ranked copy is v4 and a v5 copy exists, keep the best-matched
+		// chunk's TEXT/heading (don't downgrade to a possibly-worse-ranked v5 section)
+		// but cite the current v5 url so we never point a reader at deprecated v4.
+		else if (isV5(r.path) && !isV5(existing.path)) byCanon.set(key, { ...existing, path: r.path, url: r.url });
 	}
 	const top = [...byCanon.values()].slice(0, RETRIEVE_K);
 
