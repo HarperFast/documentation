@@ -1,0 +1,348 @@
+/* Docs chat — floating launcher, streaming panel, and full-page (#chat-root)
+   layout. Layered on the site's styles.css palette (--brand #403b8a, etc.).
+   No external assets. */
+
+:root {
+	--chat-brand: var(--brand, #403b8a);
+	--chat-ink: var(--ink, #1c1e21);
+	--chat-soft: var(--soft, #606770);
+	--chat-line: var(--line, #dadde1);
+	--chat-tint: var(--indigo-tint, #ecebf6);
+}
+
+/* ── Launcher ──────────────────────────────────────────────────────────── */
+.chat-launcher {
+	position: fixed;
+	right: 1.25rem;
+	bottom: 1.25rem;
+	z-index: 90;
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.6rem 0.95rem;
+	background: var(--chat-brand);
+	color: #fff;
+	border: 0;
+	border-radius: 999px;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+	box-shadow: 0 6px 20px rgba(20, 18, 40, 0.28);
+}
+.chat-launcher:hover {
+	filter: brightness(1.08);
+}
+.chat-launcher:focus-visible {
+	outline: 2px solid var(--chat-brand);
+	outline-offset: 2px;
+}
+.chat-launcher-icon {
+	display: inline-flex;
+	width: 1.05rem;
+	height: 1.05rem;
+}
+.chat-launcher-icon svg {
+	width: 100%;
+	height: 100%;
+	fill: currentColor;
+}
+
+/* ── Floating panel ────────────────────────────────────────────────────── */
+.chat-panel {
+	position: fixed;
+	right: 1.25rem;
+	bottom: 5rem;
+	z-index: 95;
+	width: min(400px, calc(100vw - 2rem));
+	height: min(620px, calc(100vh - 7rem));
+	background: #fff;
+	border: 1px solid var(--chat-line);
+	border-radius: 14px;
+	box-shadow: 0 20px 60px rgba(20, 18, 40, 0.3);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+.chat-panel[hidden] {
+	display: none;
+}
+.chat-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid var(--chat-line);
+	flex: none;
+}
+.chat-title {
+	font-weight: 700;
+	color: var(--chat-ink);
+	font-size: 0.95rem;
+}
+.chat-close {
+	background: transparent;
+	border: 0;
+	color: var(--chat-soft);
+	font-size: 0.95rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0.25rem 0.4rem;
+	border-radius: 6px;
+}
+.chat-close:hover {
+	color: var(--chat-ink);
+	background: #f0f0f4;
+}
+.chat-body {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+/* ── Shared chat surface (panel body + full page) ──────────────────────── */
+.chat-ui {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+.chat-transcript {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+}
+.chat-hello {
+	color: var(--chat-soft);
+	font-size: 0.88rem;
+	text-align: center;
+	margin: auto 0;
+	padding: 1.5rem 0.5rem;
+}
+
+/* Messages */
+.chat-msg {
+	display: flex;
+	flex-direction: column;
+	max-width: 100%;
+}
+.chat-msg-user {
+	align-items: flex-end;
+}
+.chat-msg-assistant {
+	align-items: stretch;
+}
+.chat-bubble {
+	border-radius: 12px;
+	padding: 0.6rem 0.85rem;
+	font-size: 0.9rem;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	overflow-wrap: anywhere;
+}
+.chat-msg-user .chat-bubble {
+	background: var(--chat-brand);
+	color: #fff;
+	max-width: 85%;
+	border-bottom-right-radius: 4px;
+}
+.chat-msg-assistant .chat-bubble {
+	background: #f6f6f9;
+	color: var(--chat-ink);
+	border-bottom-left-radius: 4px;
+}
+.chat-answer {
+	display: inline;
+}
+
+/* Streaming caret */
+.chat-bubble.chat-streaming .chat-answer::after {
+	content: '';
+	display: inline-block;
+	width: 0.5em;
+	height: 1em;
+	margin-left: 1px;
+	vertical-align: text-bottom;
+	background: var(--chat-brand);
+	border-radius: 1px;
+	animation: chat-blink 1s steps(2, start) infinite;
+}
+@keyframes chat-blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+/* Inline [n] citation links */
+.chat-cite {
+	color: var(--chat-brand);
+	font-weight: 600;
+	text-decoration: none;
+}
+.chat-cite:hover {
+	text-decoration: underline;
+}
+
+/* Citation list */
+.chat-sources {
+	list-style: decimal;
+	margin: 0.5rem 0 0;
+	padding: 0 0 0 1.3rem;
+	font-size: 0.8rem;
+}
+.chat-sources[hidden] {
+	display: none;
+}
+.chat-source {
+	margin: 0.15rem 0;
+}
+.chat-source a {
+	color: var(--chat-brand);
+	text-decoration: none;
+}
+.chat-source a:hover {
+	text-decoration: underline;
+}
+
+.chat-meta {
+	margin-top: 0.35rem;
+	font-size: 0.72rem;
+	color: #909098;
+	font-family: ui-monospace, Menlo, monospace;
+}
+.chat-meta[hidden] {
+	display: none;
+}
+.chat-error {
+	color: #b3261e;
+}
+
+/* Composer */
+.chat-composer {
+	flex: none;
+	display: flex;
+	align-items: flex-end;
+	gap: 0.5rem;
+	padding: 0.75rem;
+	border-top: 1px solid var(--chat-line);
+	background: #fff;
+}
+.chat-input {
+	flex: 1;
+	resize: none;
+	border: 1px solid var(--chat-line);
+	border-radius: 10px;
+	padding: 0.55rem 0.7rem;
+	font: inherit;
+	font-size: 0.9rem;
+	line-height: 1.4;
+	color: var(--chat-ink);
+	background: #fff;
+	max-height: 160px;
+	outline: 0;
+}
+.chat-input:focus {
+	border-color: var(--chat-brand);
+}
+.chat-input:disabled {
+	background: #f6f6f9;
+	color: var(--chat-soft);
+}
+.chat-send {
+	flex: none;
+	border: 0;
+	border-radius: 10px;
+	padding: 0.55rem 1rem;
+	background: var(--chat-brand);
+	color: #fff;
+	font: inherit;
+	font-size: 0.88rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.chat-send:hover {
+	filter: brightness(1.08);
+}
+.chat-send:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+/* ── Full-page shell (/chat) ───────────────────────────────────────────── */
+body.chat-page {
+	max-width: 1080px;
+	margin: 0 auto;
+	padding: 1.25rem;
+	background: #fbfbfd;
+}
+.chat-page-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--chat-line);
+	padding-bottom: 0.9rem;
+	margin-bottom: 1.25rem;
+}
+.chat-page-eyebrow {
+	font-size: 0.72rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--chat-brand);
+	font-weight: 700;
+}
+.chat-page-home {
+	font-size: 0.85rem;
+	color: var(--chat-brand);
+	text-decoration: none;
+}
+/* On the full page there is no floating widget. */
+body.chat-page .chat-launcher,
+body.chat-page .chat-panel {
+	display: none;
+}
+
+/* ── Full-page (#chat-root) layout ─────────────────────────────────────── */
+#chat-root {
+	display: flex;
+	flex-direction: column;
+	width: min(760px, 100%);
+	margin: 0 auto;
+	height: calc(100vh - 4.5rem);
+	border: 1px solid var(--chat-line);
+	border-radius: 12px;
+	background: #fff;
+	overflow: hidden;
+}
+#chat-root .chat-transcript {
+	padding: 1.4rem;
+	gap: 1.1rem;
+}
+#chat-root .chat-bubble {
+	font-size: 0.95rem;
+}
+#chat-root .chat-msg-user .chat-bubble {
+	max-width: 75%;
+}
+
+/* ── Mobile ────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+	.chat-panel {
+		right: 0;
+		bottom: 0;
+		width: 100vw;
+		height: 88vh;
+		border-radius: 14px 14px 0 0;
+	}
+	.chat-launcher-label {
+		display: none;
+	}
+	.chat-launcher {
+		padding: 0.7rem;
+	}
+}

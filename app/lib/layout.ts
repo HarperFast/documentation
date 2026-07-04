@@ -1,6 +1,8 @@
 // Layout shell: composes the full HTML document around a Page record's
 // rendered body. Server-side only — no framework, no client rendering.
 
+import { chatWidgetHtml } from './chat-ui.ts';
+
 const SECTIONS = [
 	{ label: 'Learn', path: 'learn' },
 	{ label: 'Reference', path: 'reference/v5' },
@@ -19,6 +21,7 @@ export function layout({ page, navTree }: { page: any; navTree: any }): string {
 ${page.description ? `<meta name="description" content="${esc(page.description)}">` : ''}
 <link rel="canonical" href="/${esc(page.path)}">
 <link rel="stylesheet" href="/assets/styles.css">
+<link rel="stylesheet" href="/assets/chat.css">
 </head>
 <body>
 <header class="site-header">
@@ -40,7 +43,9 @@ ${page.description ? `<meta name="description" content="${esc(page.description)}
 	</main>
 	<aside class="toc">${renderToc(page.toc)}</aside>
 </div>
+${chatWidgetHtml()}
 <script src="/assets/search.js" defer></script>
+<script src="/assets/chat.js" defer></script>
 </body>
 </html>`;
 }

@@ -6,6 +6,18 @@ import { layout } from '../lib/layout.ts';
 import { runSearch, logQuery } from '../lib/search.ts';
 import { renderIngestDashboard, renderSearchDashboard, renderValidationDashboard } from '../lib/admin.ts';
 import { searchAnalytics, evalTrend, parityTrend } from '../lib/metrics.ts';
+import {
+	validateQuestion,
+	clientIp,
+	hashIp,
+	checkAndBumpQuota,
+	retrieve,
+	buildMessages,
+	streamAnswer,
+	modelId,
+	logChat,
+} from '../lib/chat.ts';
+import { renderChatPage } from '../lib/chat-ui.ts';
 
 const { Page, Navigation, Redirect, SitePointer, IngestRun } = tables;
 
@@ -125,6 +137,11 @@ function navSectionFor(path: string): { section: string; version?: string } {
 }
 
 server.http(async (request: HarperRequest, next: (request: HarperRequest) => Response | Promise<Response>) => {
+	// Chat API (M3): POST /api/chat — grounded, streamed (SSE) answers. Handled
+	// before the GET/HEAD guard below because it is the one POST this owns.
+	if (request.method === 'POST' && request.pathname === '/api/chat') {
+		return handleChat(request);
+	}
 	if ((request.method !== 'GET' && request.method !== 'HEAD') || PASSTHROUGH.test(request.pathname))
 		return next(request);
 
@@ -148,6 +165,14 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 		return new Response(JSON.stringify(data), {
 			status: 200,
 			headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+		});
+	}
+
+	// Dedicated chat page (the widget is injected site-wide via the layout).
+	if (request.pathname === '/chat') {
+		return new Response(renderChatPage(), {
+			status: 200,
+			headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP },
 		});
 	}
 
@@ -310,4 +335,89 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 
 function textResponse(body: any, contentType: string): Response {
 	return new Response(body, { status: 200, headers: { 'content-type': contentType } });
+}
+
+function jsonResponse(obj: unknown, status: number): Response {
+	return new Response(JSON.stringify(obj), {
+		status,
+		headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+	});
+}
+
+const MAX_CHAT_BODY = 16 * 1024; // cap the chat request body (questions are tiny)
+
+// Read + JSON-parse a POST body from the async-iterable request stream (Harper's
+// RequestBody has no .json()). Returns null on oversize or malformed input.
+async function readJsonBody(request: HarperRequest): Promise<any> {
+	try {
+		let raw = '';
+		const decoder = new TextDecoder();
+		for await (const chunk of (request as any).body as AsyncIterable<Uint8Array | string>) {
+			raw += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+			if (raw.length > MAX_CHAT_BODY) return null;
+		}
+		return raw ? JSON.parse(raw) : {};
+	} catch {
+		return null;
+	}
+}
+
+// POST /api/chat: validate + quota-gate, retrieve grounding, then stream the
+// answer as Server-Sent Events (`sources`, then `token`… then `done`/`error`),
+// logging the exchange to ChatLog when the stream finishes.
+async function handleChat(request: HarperRequest): Promise<Response> {
+	const body = await readJsonBody(request);
+	if (body === null) return jsonResponse({ error: 'bad request' }, 400);
+	const question = validateQuestion(body.question);
+	if (!question) return jsonResponse({ error: 'invalid question' }, 400);
+	const sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
+
+	const ipHash = hashIp(clientIp(request));
+	const quota = await checkAndBumpQuota(ipHash);
+	if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);
+
+	const started = Date.now();
+	const grounding = await retrieve(question, body.section ?? null, body.version ?? null);
+	const { system } = buildMessages(question, grounding.context);
+	const promptChars = system.length + grounding.context.length + question.length;
+
+	const encoder = new TextEncoder();
+	let answer = '';
+	const stream = new ReadableStream({
+		async start(controller) {
+			const send = (event: string, data: unknown) =>
+				controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+			try {
+				send('sources', grounding.sources);
+				for await (const delta of streamAnswer(question, grounding)) {
+					answer += delta;
+					send('token', delta);
+				}
+				send('done', { model: modelId(), latencyMs: Date.now() - started });
+			} catch (err: any) {
+				send('error', { message: err?.message ?? 'generation failed' });
+			} finally {
+				controller.close();
+				await logChat({
+					question,
+					answer,
+					sources: grounding.sources,
+					grounded: grounding.sources.length > 0,
+					promptChars,
+					latencyMs: Date.now() - started,
+					sessionId,
+					ipHash,
+				});
+			}
+		},
+	});
+
+	return new Response(stream, {
+		status: 200,
+		headers: {
+			'content-type': 'text/event-stream; charset=utf-8',
+			'cache-control': 'no-store',
+			'x-accel-buffering': 'no', // don't let a proxy buffer the stream
+		},
+	});
 }

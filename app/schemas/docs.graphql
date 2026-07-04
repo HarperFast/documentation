@@ -163,3 +163,29 @@ type ParityRun @table(expiration: 7776000) {
 	passed: Boolean
 	createdAt: Date @createdTime
 }
+
+# M3 chat observability: one row per grounded chat answer. Powers the admin Chat
+# panel (volume, latency, grounded rate, top questions, feedback). 90-day TTL.
+type ChatLog @table(expiration: 7776000) {
+	id: ID @primaryKey # "<timestamp>-<rand>"
+	question: String
+	answer: String # the streamed answer (may be truncated for storage)
+	sources: Any # [{ rank, path, title, url }] the retrieval grounded on
+	grounded: Boolean @indexed # did retrieval return any context?
+	model: String # generation model id (or "stub")
+	promptChars: Int
+	answerChars: Int
+	latencyMs: Int
+	sessionId: String # opaque per-browser id (best-effort)
+	ipHash: String # hashed client IP (never store raw IPs)
+	feedback: Int @indexed # -1 | 0 | +1 (thumbs), 0 = none
+	createdAt: Date @createdTime
+}
+
+# Per-IP daily chat quota counter. id = "<ipHash>:<yyyy-mm-dd>". Short TTL (2
+# days) so counters self-expire; the cap resets each UTC day via the id.
+type ChatQuota @table(expiration: 172800) {
+	id: ID @primaryKey
+	count: Int
+	updatedAt: Date @updatedTime
+}
