@@ -51,6 +51,9 @@ jobs:
           # Enables the /admin/dev-login affordance so the integration + e2e
           # tests can establish an admin session without the Google round-trip.
           ADMIN_DEV_LOGIN: 'true'
+          # Trust X-Forwarded-For so the chat tests can isolate their per-IP quota
+          # (this runner is a trusted environment).
+          CHAT_TRUST_PROXY: 'true'
           # Embedding model for @embed / the semantic lane. Requires the
           # GEMINI_API_KEY repo secret; HARPER_CONFIG merges the models section
           # into the instance config at startup. Without it, @embed writes fail

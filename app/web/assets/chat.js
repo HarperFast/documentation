@@ -45,6 +45,13 @@
 		return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 	}
 
+	// Only allow http(s) or site-relative citation hrefs — blocks javascript:/data:
+	// URIs from reaching an href (defense in depth; source urls are always /-paths).
+	function safeUrl(url) {
+		const u = String(url || '');
+		return /^https?:\/\//i.test(u) || u.startsWith('/') ? u : '#';
+	}
+
 	// Escape the answer, then turn inline [n] markers into citation links when a
 	// matching source exists. Escaping first is safe: it never touches [ ] digits.
 	function renderAnswer(text, sources) {
@@ -52,7 +59,7 @@
 		html = html.replace(/\[(\d+)\]/g, (m, n) => {
 			const src = sources[Number(n) - 1];
 			if (!src || !src.url) return m;
-			return `<a class="chat-cite" href="${escapeHtml(src.url)}">[${escapeHtml(n)}]</a>`;
+			return `<a class="chat-cite" href="${escapeHtml(safeUrl(src.url))}">[${escapeHtml(n)}]</a>`;
 		});
 		return html;
 	}
@@ -120,7 +127,7 @@
 					sourcesEl.innerHTML = sources
 						.map(
 							(s) =>
-								`<li class="chat-source"><a href="${escapeHtml(s.url)}">${escapeHtml(
+								`<li class="chat-source"><a href="${escapeHtml(safeUrl(s.url))}">${escapeHtml(
 									s.heading || s.title || s.path || s.url,
 								)}</a></li>`,
 						)

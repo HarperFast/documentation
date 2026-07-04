@@ -384,22 +384,36 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	const promptChars = system.length + grounding.context.length + question.length;
 
 	const encoder = new TextEncoder();
+	// Aborts upstream generation (the Anthropic fetch) when the client disconnects.
+	const ac = new AbortController();
 	let answer = '';
 	const stream = new ReadableStream({
 		async start(controller) {
-			const send = (event: string, data: unknown) =>
-				controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+			// enqueue can throw once the stream is cancelled — never let that escape.
+			const send = (event: string, data: unknown) => {
+				try {
+					controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+				} catch {
+					/* stream already closed/cancelled */
+				}
+			};
 			try {
 				send('sources', grounding.sources);
-				for await (const delta of streamAnswer(question, grounding)) {
+				for await (const delta of streamAnswer(question, grounding, ac.signal)) {
 					answer += delta;
 					send('token', delta);
 				}
 				send('done', { model: modelId(), latencyMs: Date.now() - started });
 			} catch (err: any) {
-				send('error', { message: err?.message ?? 'generation failed' });
+				// Log detail server-side; the client only gets a generic message.
+				console.error('[chat] generation error', err?.message ?? err);
+				send('error', { message: 'The answer could not be generated. Please try again.' });
 			} finally {
-				controller.close();
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
 				await logChat({
 					question,
 					answer,
@@ -411,6 +425,9 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					ipHash,
 				});
 			}
+		},
+		cancel() {
+			ac.abort(); // client went away — stop generating (and paying for) tokens
 		},
 	});
 

@@ -122,8 +122,11 @@ streams a cited answer.
   streams a grounded pointer — so the whole pipeline runs keyless. Set `ANTHROPIC_API_KEY` (in
   `.env`, gitignored, and as a CI secret) for real answers.
 - **Quota**: per-IP daily cap (`CHAT_DAILY_CAP`, default 50) in `ChatQuota` (id `"<ipHash>:<date>"`,
-  2-day TTL, resets each UTC day). IPs are **hashed** (`ChatLog.ipHash`), never stored raw. Over cap
-  → `429`.
+  2-day TTL, resets each UTC day). Over cap → `429`. The client IP is the **socket peer** by default
+  (unspoofable); set `CHAT_TRUST_PROXY=true` only behind a proxy that appends the real client IP
+  (then the rightmost `X-Forwarded-For` hop is used). IPs are **hashed** (`ChatLog.ipHash`), never
+  stored raw — set `CHAT_IP_SALT` to a stable secret in production so hashes stay private and the
+  quota window survives restarts (otherwise a random per-process salt is used).
 - **UI**: a framework-free, CSP-safe widget injected site-wide via the layout (floating launcher +
   panel) and a dedicated `/chat` page (`web/assets/chat.{js,css}`, `lib/chat-ui.ts`). Streams via
   `fetch` + a `ReadableStream` reader, renders inline `[n]` citation links + a sources list.
