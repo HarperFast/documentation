@@ -114,18 +114,33 @@ export interface Grounding {
 // section text). runSearch already dedupes to the best chunk per page, so each
 // result is a distinct page's most-relevant section — exactly what to ground on.
 export async function retrieve(question: string, section?: string | null, version?: string | null): Promise<Grounding> {
+	// Over-fetch so there's material to dedupe.
 	const { results } = await runSearch({
 		q: question,
 		section,
 		version,
-		limit: RETRIEVE_K,
+		limit: RETRIEVE_K * 2,
 		blend: CHAT_BLEND,
 		withText: true,
 	});
 
+	// Collapse v4/v5 near-duplicates: for an unversioned question both copies of a
+	// doc can rank, wasting grounding slots (and risking citing deprecated v4 to a
+	// v5 reader). Keep the best-ranked slot but prefer the v5 (latest) copy.
+	const canon = (p: string): string => p.replace(/^(reference)\/v\d+\//, '$1/');
+	const isV5 = (p: string): boolean => /(^|\/)v5(\/|$)/.test(p);
+	const byCanon = new Map<string, any>();
+	for (const r of results) {
+		const key = canon(r.path);
+		const existing = byCanon.get(key);
+		if (!existing) byCanon.set(key, r);
+		else if (isV5(r.path) && !isV5(existing.path)) byCanon.set(key, r); // upgrade slot to v5
+	}
+	const top = [...byCanon.values()].slice(0, RETRIEVE_K);
+
 	const sources: Source[] = [];
 	const blocks: string[] = [];
-	for (const r of results) {
+	for (const r of top) {
 		const rank = sources.length + 1;
 		sources.push({ rank, path: r.path, title: r.title, heading: r.heading ?? '', url: r.url });
 		// Strip the context delimiter from doc content so a page can't close the
