@@ -135,14 +135,18 @@ streams a cited answer.
 **Retrieval tuning** (all measured by the grounding eval — decisions were data-driven, not guessed):
 chat retrieval calls `runSearch` with three levers, each validated to help:
 - `blend: true` — equal-weight RRF so the semantic lane counts for NL questions (the box stays
-  keyword-primary and unchanged). A/B'd: **58% → 75%** recall. (`CHAT_BLEND=false` to disable.)
+  keyword-primary and unchanged). A page accumulates a contribution from every matching chunk (a
+  deliberate multi-match boost — a page matching in several sections is more relevant; it measured
+  +9pts over one-contribution-per-lane RRF), and the single best-scoring chunk is kept for grounding.
+  A/B'd `blend` vs keyword-primary at K=5: **58% → 75%**. (`CHAT_BLEND=false` to disable.)
 - `withText: true` — grounds on the actual matched **section** text, not a page-head truncation
   (this is what made "define a table with a primary key" answer correctly).
-- `CHAT_RETRIEVE_K=8` distinct pages — swept 5/8/10: **75% → 92%** at 8, no gain at 10.
+- `CHAT_RETRIEVE_K=8` distinct pages — Recall@K rises with K (chat grounds on all K sources): **75%
+  at 5, 92% at 8**, no gain at 10.
 
 `npm run chat-eval` runs `eval/chat-grounding.json` (NL questions → expected doc-page substrings)
-via the `retrieveOnly` endpoint (no model/quota) and scores Recall@5 / MRR — currently
-**Recall@5 92%, MRR 0.78**; CI gates it at `--min-recall 0.6`.
+via the `retrieveOnly` endpoint (no model/quota) and scores Recall@K / MRR — currently
+**Recall@8 92%, MRR 0.78**; CI gates it at `--min-recall 0.6` (and hard-fails on any endpoint error).
 
 **Follow-ups**: grow + curate the eval from real `ChatLog` questions (the seed set is 12 cases and
 some expectations are debatable) — that makes the metric trustworthy and doubles as a content-gap

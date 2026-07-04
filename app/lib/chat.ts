@@ -128,7 +128,11 @@ export async function retrieve(question: string, section?: string | null, versio
 	for (const r of results) {
 		const rank = sources.length + 1;
 		sources.push({ rank, path: r.path, title: r.title, heading: r.heading ?? '', url: r.url });
-		const text = String(r.text ?? r.snippet ?? '').slice(0, CTX_CHARS);
+		// Strip the context delimiter from doc content so a page can't close the
+		// <context> wrapper and inject instructions (prompt-injection defense).
+		const text = String(r.text ?? r.snippet ?? '')
+			.replace(/<\/?context>/gi, '')
+			.slice(0, CTX_CHARS);
 		blocks.push(`[${rank}] ${r.title}${r.heading ? ` — ${r.heading}` : ''} (${r.url})\n${text}`);
 	}
 

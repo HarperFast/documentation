@@ -47,6 +47,9 @@ for (const c of cases) {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ question: c.q, retrieveOnly: true }),
 		});
+		// A non-2xx (e.g. 429/500) is an endpoint failure, not a content miss —
+		// surface it rather than silently counting it as recall=0.
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		sources = ((await res.json()) as { sources?: Source[] }).sources ?? [];
 	} catch (err: any) {
 		rows.push({ q: c.q, hit: false, rank: 0, top: [], error: err.message });
@@ -64,17 +67,28 @@ for (const c of cases) {
 }
 
 const n = rows.length;
+const errored = rows.filter((r) => r.error);
 const recall = n ? rows.filter((r) => r.hit).length / n : 0;
 const mrr = n ? rows.reduce((a, r) => a + (r.rank ? 1 / r.rank : 0), 0) / n : 0;
 const misses = rows.filter((r) => !r.hit);
+// K = grounding sources returned (chat grounds on ALL of them), so "expected page
+// is anywhere in the K sources" is the meaningful recall — report it honestly.
+const k = Math.max(0, ...rows.map((r) => r.top.length));
 
 console.log(`\nChat grounding — ${n} questions vs ${TARGET}\n`);
-console.log(`  Recall@5:   ${(recall * 100).toFixed(1)}%  (expected page appears in the grounding sources)`);
+console.log(`  Recall@${k}:   ${(recall * 100).toFixed(1)}%  (expected page appears in the K grounding sources)`);
 console.log(`  MRR:        ${mrr.toFixed(3)}`);
 
 if (misses.length) {
 	console.log(`\n  Misses:`);
 	for (const r of misses) console.log(`    ✗ "${r.q}" → ${r.error ? `error: ${r.error}` : JSON.stringify(r.top)}`);
+}
+
+// A broken endpoint (any errored row) is a hard failure regardless of recall —
+// don't let partial failures slip past a lenient --min-recall gate.
+if (errored.length) {
+	console.error(`\nFAIL: ${errored.length}/${n} questions errored (endpoint failure, not a content miss).`);
+	process.exit(1);
 }
 if (VERBOSE) {
 	console.log('\n  All cases:');
