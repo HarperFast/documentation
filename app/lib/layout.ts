@@ -8,7 +8,7 @@ const SECTIONS = [
 	{ label: 'Fabric', path: 'fabric' },
 ];
 
-export function layout({ page, navTree }) {
+export function layout({ page, navTree }: { page: any; navTree: any }): string {
 	const title = page.title ? `${page.title} | Harper Docs` : 'Harper Docs';
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -45,10 +45,10 @@ ${page.description ? `<meta name="description" content="${esc(page.description)}
 </html>`;
 }
 
-function renderNav(tree, currentPath) {
+function renderNav(tree: any, currentPath: string): string {
 	if (!tree?.length) return '';
 	return `<ul>${tree
-		.map((item) => {
+		.map((item: any) => {
 			const link =
 				item.path != null
 					? `<a href="/${esc(item.path)}"${item.path === currentPath ? ' class="active"' : ''}>${esc(item.label)}</a>`
@@ -59,20 +59,20 @@ function renderNav(tree, currentPath) {
 		.join('')}</ul>`;
 }
 
-function renderToc(toc) {
+function renderToc(toc: any): string {
 	if (!toc?.length) return '';
 	return `<div class="toc-title">On this page</div><ul>${toc
-		.map((h) => `<li class="toc-depth-${h.depth}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
+		.map((h: any) => `<li class="toc-depth-${h.depth}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
 		.join('')}</ul>`;
 }
 
-function esc(s) {
+function esc(s: any): string {
 	return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Only emit http(s) and site-relative hrefs — blocks javascript:/data: URLs
 // from reaching an href even though content is trusted (defense in depth).
-function safeUrl(url) {
+function safeUrl(url: any): boolean {
 	if (!url) return false;
 	return /^https?:\/\//i.test(url) || url.startsWith('/');
 }

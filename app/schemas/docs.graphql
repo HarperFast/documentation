@@ -132,3 +132,34 @@ type SearchQueryLog @table(expiration: 7776000) {
 	resultCount: Int @indexed
 	createdAt: Date @createdTime
 }
+
+# Relevance-validation runs: one row per `search-eval` invocation (golden-set
+# MRR/Recall gate). Trend is charted in the admin Validation panel. 90-day TTL.
+type EvalRun @table(expiration: 7776000) {
+	id: ID @primaryKey # "<timestamp>-<rand>"
+	gitSha: String
+	mrr: Float
+	recall5: Float
+	recall10: Float
+	zeroRate: Float
+	cases: Int # number of golden-set queries scored
+	weak: Int # correct-but-ranked-4+ count
+	passed: Boolean # against --min-mrr, when supplied (else null)
+	createdAt: Date @createdTime
+}
+
+# Content-parity runs: one row per `parity` invocation (served site vs the
+# Docusaurus build). Trend is charted in the admin Validation panel. 90-day TTL.
+type ParityRun @table(expiration: 7776000) {
+	id: ID @primaryKey # "<timestamp>-<rand>"
+	gitSha: String
+	pages: Int
+	titlesOk: Int
+	redirectsOk: Int
+	simMedian: Float # median text similarity (%)
+	simMin: Float # minimum text similarity (%)
+	hardFailures: Int
+	strict: Boolean # was --strict gating on
+	passed: Boolean
+	createdAt: Date @createdTime
+}

@@ -11,7 +11,42 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expandComponents } from '../lib/expand.mjs';
+import { expandComponents } from '../lib/expand.ts';
+
+interface Section {
+	dir: string;
+	route: string;
+	section: string;
+	version?: string;
+}
+
+interface Doc {
+	path: string;
+	section: string;
+	version?: string;
+	markdown: string;
+	sourcePath: string;
+	editUrl: string;
+}
+
+interface NavNode {
+	label?: string;
+	path?: string;
+	items?: NavNode[];
+}
+
+interface NavEntry {
+	section: string;
+	version?: string;
+	tree: NavNode[];
+}
+
+interface RedirectEntry {
+	from: string;
+	to: string;
+	status: number;
+	source: string;
+}
 
 const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(APP_DIR);
@@ -36,7 +71,7 @@ const release = `${gitSha}-${Date.now()}`;
 
 // ── Collect pages ────────────────────────────────────────────────────────────
 
-const SECTIONS = [
+const SECTIONS: Section[] = [
 	{ dir: 'learn', route: 'learn', section: 'learn' },
 	{ dir: 'reference', route: 'reference/v5', section: 'reference', version: 'v5' },
 	{ dir: 'reference_versioned_docs/version-v4', route: 'reference/v4', section: 'reference', version: 'v4' },
@@ -44,7 +79,7 @@ const SECTIONS = [
 	{ dir: 'fabric', route: 'fabric', section: 'fabric' },
 ];
 
-const docs = [];
+const docs: Doc[] = [];
 for (const { dir, route, section, version } of SECTIONS) {
 	const abs = path.join(REPO_ROOT, dir);
 	if (!existsSync(abs)) continue;
@@ -80,7 +115,7 @@ if (existsSync(homepageFile)) {
 
 // ── Navigation trees ─────────────────────────────────────────────────────────
 
-const navEntries = [];
+const navEntries: NavEntry[] = [];
 navEntries.push({
 	section: 'reference',
 	version: 'v5',
@@ -96,38 +131,38 @@ navEntries.push({
 });
 navEntries.push({ section: 'root', tree: [] });
 
-async function sidebarTree(file, base) {
+async function sidebarTree(file: string, base: string): Promise<NavNode[]> {
 	try {
 		const mod = await import(path.join(REPO_ROOT, file));
 		const sidebars = mod.default;
 		const items = Object.values(sidebars)[0];
 		return transformItems(items, base);
-	} catch (err) {
+	} catch (err: any) {
 		console.warn(`sidebar ${file} failed (${err.message}); using flat fallback`);
 		return fallbackTree(base.split('/')[0]);
 	}
 }
 
-function jsonSidebarTree(file, base) {
+function jsonSidebarTree(file: string, base: string): NavNode[] {
 	try {
 		const sidebars = JSON.parse(readFileSync(path.join(REPO_ROOT, file), 'utf8'));
 		const items = Object.values(sidebars)[0];
 		return transformItems(items, base);
-	} catch (err) {
+	} catch (err: any) {
 		console.warn(`sidebar ${file} failed (${err.message}); using flat fallback`);
 		return [];
 	}
 }
 
-function transformItems(items, base) {
+function transformItems(items: any, base: string): any[] {
 	if (!Array.isArray(items)) return [];
 	return items
-		.map((item) => {
+		.map((item: any) => {
 			if (typeof item === 'string') return { label: item.split('/').pop(), path: docIdToPath(item, base) };
 			if (item.type === 'doc' || (item.id && !item.type))
 				return { label: item.label ?? item.id, path: docIdToPath(item.id, base) };
 			if (item.type === 'category') {
-				const node = { label: item.label, items: transformItems(item.items, base) };
+				const node: NavNode = { label: item.label, items: transformItems(item.items, base) };
 				if (item.link?.type === 'doc') node.path = docIdToPath(item.link.id, base);
 				return node;
 			}
@@ -138,11 +173,11 @@ function transformItems(items, base) {
 		.filter(Boolean);
 }
 
-function docIdToPath(id, base) {
+function docIdToPath(id: string, base: string): string {
 	return id === 'index' ? base : id.endsWith('/index') ? `${base}/${id.slice(0, -6)}` : `${base}/${id}`;
 }
 
-function fallbackTree(sectionRoute) {
+function fallbackTree(sectionRoute: string): NavNode[] {
 	return docs
 		.filter((d) => d.path === sectionRoute || d.path.startsWith(`${sectionRoute}/`))
 		.sort((a, b) => a.path.localeCompare(b.path))
@@ -151,7 +186,7 @@ function fallbackTree(sectionRoute) {
 
 // ── Redirects ────────────────────────────────────────────────────────────────
 
-const redirectEntries = [];
+const redirectEntries: RedirectEntry[] = [];
 try {
 	// redirects.ts uses an extensionless TS import that native Node ESM can't
 	// resolve — import via a shim with the specifier patched.
@@ -171,7 +206,7 @@ try {
 	// Dedup by `from`: entries share the Redirect primary key "<release>:<from>",
 	// so duplicates collapse server-side. Deduping here keeps the client's
 	// expected count exact for the activation guard (last mapping wins).
-	const byFrom = new Map();
+	const byFrom = new Map<string, RedirectEntry>();
 	for (const rule of mod.redirects) {
 		const froms = Array.isArray(rule.from) ? rule.from : [rule.from];
 		for (let from of froms) {
@@ -180,7 +215,7 @@ try {
 		}
 	}
 	redirectEntries.push(...byFrom.values());
-} catch (err) {
+} catch (err: any) {
 	console.warn(`redirects.ts import failed (${err.message}); skipping redirects`);
 }
 
@@ -213,8 +248,8 @@ console.log('activated:', JSON.stringify(result));
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function walk(dir) {
-	const out = [];
+function walk(dir: string): string[] {
+	const out: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) out.push(...walk(full));
@@ -226,8 +261,8 @@ function walk(dir) {
 // POST with retry + exponential backoff. `pages` batches embed inline via
 // @embed, so a transient provider rate spike surfaces as a 500 — retry rather
 // than abort the whole ingest. Backoff also throttles the sustained embed rate.
-async function post(body, attempt = 0) {
-	const backoff = async (label) => {
+async function post(body: any, attempt = 0): Promise<any> {
+	const backoff = async (label: string): Promise<any> => {
 		if (attempt >= 5) throw new Error(`Ingest ${body.action} failed after ${attempt} retries: ${label}`);
 		const waitMs = Math.min(2 ** attempt * 1000, 15000);
 		process.stdout.write(`\n  ${body.action} ${label}, retry ${attempt + 1}/5 in ${waitMs}ms…`);
@@ -243,7 +278,7 @@ async function post(body, attempt = 0) {
 			body: JSON.stringify(body),
 			signal: AbortSignal.timeout(120000),
 		});
-	} catch (err) {
+	} catch (err: any) {
 		// Network failure / DNS / reset / timeout — retriable.
 		return backoff(err.name === 'TimeoutError' ? 'timed out' : `network error (${err.message})`);
 	}
@@ -253,7 +288,7 @@ async function post(body, attempt = 0) {
 	throw new Error(`Ingest ${body.action} failed: ${res.status} ${text}`);
 }
 
-function resolveAuth() {
+function resolveAuth(): string {
 	let user = process.env.HARPER_CLI_USERNAME;
 	let pass = process.env.HARPER_CLI_PASSWORD;
 	if (!user || !pass) {
@@ -270,7 +305,7 @@ function resolveAuth() {
 	return Buffer.from(`${user}:${pass}`).toString('base64');
 }
 
-function argValue(flag) {
+function argValue(flag: string): string | undefined {
 	const i = process.argv.indexOf(flag);
 	return i >= 0 ? process.argv[i + 1] : undefined;
 }

@@ -9,15 +9,15 @@
 //   {action:'buildIndex', release}  → builds the Term dictionary + corpus stats
 //   {action:'activate', release}   → validates, archives previous active, activates
 
-import { Resource, tables, server } from 'harper';
+import { Resource, tables, server, type HarperTable } from '../lib/harper.ts';
 import { createHash } from 'node:crypto';
-import { renderDoc } from '../lib/render.mjs';
-import { tokenize, termCounts, trigrams } from '../lib/tokenize.mjs';
+import { renderDoc } from '../lib/render.ts';
+import { tokenize, termCounts, trigrams } from '../lib/tokenize.ts';
 
 const { ContentRelease, Page, Navigation, Redirect, SitePointer, SearchChunk, Term, IngestRun } = tables;
 
 export class Ingest extends Resource {
-	static async post(_target, data) {
+	static async post(_target: any, data: any): Promise<any> {
 		const body = await data;
 		switch (body.action) {
 			case 'begin': {
@@ -29,7 +29,7 @@ export class Ingest extends Resource {
 				let count = 0;
 				let chunkCount = 0;
 				for (const doc of body.docs ?? []) {
-					const rendered = await renderDoc(doc.markdown);
+					const rendered: any = await renderDoc(doc.markdown);
 					const title = rendered.title || doc.path.split('/').pop(); // Docusaurus falls back to the doc id
 					await Page.put({
 						id: `${body.release}:${doc.path}`,
@@ -95,7 +95,7 @@ export class Ingest extends Resource {
 				// Aggregate term document-frequencies + corpus stats across every
 				// chunk in the release, then write the Term dictionary. A per-release
 				// pass, run after all pages are staged and before activation.
-				const df = new Map();
+				const df = new Map<string, number>();
 				let chunkCount = 0;
 				let totalLength = 0;
 				for await (const chunk of SearchChunk.search({
@@ -133,7 +133,7 @@ export class Ingest extends Resource {
 				// persisted every record the client sent before making it live. A
 				// short batch (an embed failure, a crash mid-ingest) must NOT flip
 				// the pointer — it marks the release failed and refuses.
-				const actual = { pages: 0, nav: 0, redirects: 0 };
+				const actual: Record<string, number> = { pages: 0, nav: 0, redirects: 0 };
 				for await (const _ of Page.search({
 					conditions: [{ attribute: 'release', value: body.release }],
 					select: ['id'],
@@ -151,7 +151,7 @@ export class Ingest extends Resource {
 					actual.redirects++;
 				if (actual.pages === 0) throw new Error(`release ${body.release} has no pages; refusing to activate`);
 				const expect = body.expect ?? {};
-				const mismatch = [];
+				const mismatch: string[] = [];
 				for (const key of ['pages', 'nav', 'redirects']) {
 					if (expect[key] != null && actual[key] !== expect[key]) mismatch.push(`${key} ${actual[key]}/${expect[key]}`);
 				}
@@ -179,7 +179,7 @@ export class Ingest extends Resource {
 				});
 				await SitePointer.put({ id: 'active', release: body.release });
 				// Archive the previously-active release(s).
-				const toArchive = [];
+				const toArchive: any[] = [];
 				for await (const rel of ContentRelease.search({ conditions: [{ attribute: 'status', value: 'active' }] })) {
 					if (rel.id !== body.release) toArchive.push({ ...plainRelease(rel, rel.id), status: 'archived' });
 				}
@@ -212,7 +212,7 @@ const DELETE_BATCH = 500;
 // `table.delete(id)` path-parses composite ids (our chunk/term ids contain
 // ':', '#', '/'), so it silently no-ops on them; the operations delete treats
 // each id as a literal key. authorize:false runs as the system user.
-async function bulkDelete(tableName, ids) {
+async function bulkDelete(tableName: string, ids: any[]): Promise<void> {
 	for (let i = 0; i < ids.length; i += DELETE_BATCH) {
 		await server.operation(
 			{ operation: 'delete', database: DELETE_DB, table: tableName, ids: ids.slice(i, i + DELETE_BATCH) },
@@ -228,15 +228,15 @@ async function bulkDelete(tableName, ids) {
 // by a toDelete list from ContentRelease) makes it self-healing — it also
 // removes orphaned records left by an earlier failed/partial prune. Returns the
 // number of distinct releases removed.
-async function pruneReleases(currentRelease) {
-	const releases = [];
+async function pruneReleases(currentRelease: any): Promise<number> {
+	const releases: Array<{ id: any; createdAt: number }> = [];
 	for await (const rel of ContentRelease.search({ select: ['id', 'createdAt'] })) {
 		releases.push({ id: rel.id, createdAt: rel.createdAt ? new Date(rel.createdAt).getTime() : 0 });
 	}
 	releases.sort((a, b) => b.createdAt - a.createdAt);
 	const keep = new Set([currentRelease, ...releases.slice(0, RETAIN_RELEASES).map((r) => r.id)]);
 
-	const removed = new Set();
+	const removed = new Set<any>();
 	for (const [name, table, key] of [
 		['SearchChunk', SearchChunk, 'release'],
 		['Term', Term, 'release'],
@@ -244,8 +244,8 @@ async function pruneReleases(currentRelease) {
 		['Navigation', Navigation, 'release'],
 		['Redirect', Redirect, 'release'],
 		['ContentRelease', ContentRelease, 'id'],
-	]) {
-		const ids = [];
+	] as Array<[string, HarperTable, string]>) {
+		const ids: any[] = [];
 		for await (const rec of table.search({ select: ['id', key] })) {
 			if (!keep.has(rec[key])) {
 				ids.push(rec.id);
@@ -257,10 +257,30 @@ async function pruneReleases(currentRelease) {
 	return removed.size;
 }
 
+// A per-run observability record. Fields Harper stores are dynamic; typed
+// loosely here so plainRun can build a flat snapshot.
+interface IngestRunRecord {
+	id: any;
+	gitSha: string;
+	status: any;
+	pages: any;
+	chunks: any;
+	terms: any;
+	nav: any;
+	redirects: any;
+	avgChunkLength: any;
+	pruned: any;
+	guard: any;
+	error: any;
+	startedAt: any;
+	finishedAt: any;
+	durationMs: any;
+}
+
 // Ingest observability. Records are lazy proxies (spread drops fields), so
 // merge explicitly onto a plain snapshot. Best-effort — never fail an ingest
 // on a telemetry write.
-function plainRun(r, id) {
+function plainRun(r: any, id: any): IngestRunRecord {
 	return {
 		id,
 		gitSha: r?.gitSha ?? '',
@@ -280,7 +300,7 @@ function plainRun(r, id) {
 	};
 }
 
-async function updateRun(id, fields) {
+async function updateRun(id: any, fields: Record<string, any>): Promise<void> {
 	try {
 		const run = await IngestRun.get(id);
 		await IngestRun.put({ ...plainRun(run, id), ...fields });
@@ -290,7 +310,7 @@ async function updateRun(id, fields) {
 }
 
 // Finalize a run: set terminal status + finishedAt + durationMs from startedAt.
-async function finishRun(id, fields) {
+async function finishRun(id: any, fields: Record<string, any>): Promise<void> {
 	try {
 		const run = await IngestRun.get(id);
 		const finishedAt = new Date();
@@ -308,7 +328,7 @@ async function finishRun(id, fields) {
 
 // Table records are lazy proxies — spread does not copy fields. Build a plain
 // object carrying every ContentRelease field so writes never drop stats.
-function plainRelease(rel, id) {
+function plainRelease(rel: any, id: any): Record<string, any> {
 	return {
 		id,
 		status: rel?.status ?? 'staging',
@@ -322,7 +342,7 @@ function plainRelease(rel, id) {
 }
 
 // Write one SearchChunk per rendered section. Skips empty chunks.
-async function writeChunks(release, doc, title, chunks) {
+async function writeChunks(release: any, doc: any, title: any, chunks: any[]): Promise<number> {
 	const breadcrumb = doc.path ? doc.path.split('/') : [];
 	let written = 0;
 	for (let i = 0; i < chunks.length; i++) {

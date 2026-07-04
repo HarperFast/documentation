@@ -3,22 +3,51 @@
 The Harper-native replatform of docs.harperdb.io. Design doc: `plans/harper-replatform/README.md`
 (in Kyle's main working copy, untracked) / https://claude.ai/code/artifact/d6526d21-c7be-4593-8106-22997dba354d
 
-## Admin area — ingest observability
+## Admin area — observability dashboards
 
-`/admin/ingest` is a server-rendered dashboard (CSP-safe: inline SVG charts, no client JS)
-over the `IngestRun` table — one row per ingest, created at `begin` (`status: running`, so a
-stuck row flags a crashed/hung ingest) and finalized at `activate` with pages/chunks/terms/nav/
-redirects, the activation-guard result, prune count, and duration. 90-day TTL via
-`@table(expiration:)`. Summary cards, a duration-by-run bar chart (colored by status), and a
-runs table.
+Server-rendered, CSP-safe (inline SVG charts, no client JS), three tabs sharing one shell
+(`lib/admin.ts` renders; `lib/metrics.ts` aggregates; routed in `resources/site.ts`):
+
+- **`/admin/ingest`** — the `IngestRun` table: one row per ingest, created at `begin`
+  (`status: running`, so a stuck row flags a crashed/hung ingest) and finalized at `activate`
+  with pages/chunks/terms/nav/redirects, the activation-guard result, prune count, and duration.
+  Summary cards, a duration-by-run bar chart (colored by status), and a runs table.
+- **`/admin/search`** — search analytics over `SearchQueryLog` (last 14 days): total queries,
+  zero-result rate, top queries, the **content-gap report** (zero-result queries), per-day volume,
+  and a section breakdown. Only *committed* queries are logged — the UI beacons `/api/search?log=1`
+  when a query settles (~1.1s) or is acted on, so debounced keystroke partials and the relevance
+  eval's own `/api/search` calls never pollute the analytics.
+- **`/admin/validation`** — relevance + parity trends. `search-eval` writes an `EvalRun` row
+  (MRR/Recall@k) and `parity` writes a `ParityRun` row (pages, similarity, hard failures) via
+  `POST /Metrics` (`resources/metrics.ts`, admin-authed like `/Ingest`); the panel charts the
+  latest run + a sparkline trend. Best-effort recording — a failure never fails the CLI. Opt out
+  with `--no-record`.
+
+All observability tables carry a 90-day TTL via `@table(expiration:)`.
 
 **Auth**: Google OAuth via the `@harperfast/oauth` plugin (configured in `config.yaml`;
-`OAUTH_GOOGLE_CLIENT_ID`/`_SECRET` from `.env`, gitignored). Unauthenticated hits redirect to
-`/oauth/google/login`; access is restricted to `ADMIN_ALLOWED_DOMAINS` (default
-`harperdb.io,harper.fast`). Register the callback `https://<host>/oauth/google/callback` in the
-Google Cloud OAuth client. **Dev/verification bypass**: set `ADMIN_DEV_KEY` in the env and pass
-a matching `x-admin-dev-key` header to reach the dashboard without the OAuth round-trip — a local
-tool only, inert unless the env var is set (never set it in production).
+`GOOGLE_CLIENT_ID`/`_SECRET` from `.env`, gitignored). The plugin writes the signed-in profile
+onto the Harper session as `oauthUser`; `adminAuth` reads `session.oauthUser.email` and requires
+it to match `ADMIN_ALLOWED_DOMAINS` (default `harperdb.io,harper.fast`). Unauthenticated hits
+redirect to `/oauth/google/login`. Register the callback `https://<host>/oauth/google/callback`
+in the Google Cloud OAuth client.
+
+> **Gotcha (cost a redirect loop):** `request.session` is only populated for handlers that run
+> *after* Harper's auth stage. A bare `server.http(handler)` runs **before** it and gets no
+> session, so every session gate silently fails (→ infinite redirect to Google). This middleware
+> must register as `server.http(handler, { after: 'authentication' })` — matching how Harper's own
+> REST/GraphQL/static layers opt in. Session cookies are `SameSite=None; Secure`, which browsers
+> accept over `http://localhost` (a secure context) and require for the cross-site OAuth callback.
+
+**Dev/verification login** (`GET /admin/dev-login`): establishes a real admin session without the
+Google round-trip, so the dashboard can be driven locally (e.g. Playwright). Two gates, both
+required: `ADMIN_DEV_LOGIN=true` in the env (unset in production) **and** the request is already
+locally authorized as a super_user — which the isolated instance grants either via
+`authorizeLocal` (currently `false`) or a Basic-auth super_user (the `~/hdb-docs-replatform/.admin-credentials`
+used for ingest). It writes the same `oauthUser.email` session shape the plugin does, so `adminAuth`
+stays one code path. Verify with:
+`ADMIN_DEV_LOGIN=true npm run dev`, then `curl -u <admin> -c jar http://localhost:9936/admin/dev-login`
+followed by `curl -b jar http://localhost:9936/admin/ingest`.
 
 Deploy note: the plugin derives its callback from the request host; the local instance runs on
 :9936 while the plugin logged Harper's default :9926 — reconcile the callback host per environment.
@@ -111,10 +140,34 @@ cd app
 npm install
 npm run dev        # harper dev against the isolated instance (foreground)
 npm run ingest     # full content ingest + atomic activate (server must be up)
+npm run typecheck  # tsc --noEmit — no build step, just checking
 ```
 
 Auth for ingest comes from `~/hdb-docs-replatform/.admin-credentials` or
 `HARPER_CLI_USERNAME`/`HARPER_CLI_PASSWORD`.
+
+### TypeScript
+
+The app is TypeScript with **no build step** — Harper and Node 24 strip types at load time
+(`config.yaml` points `jsResource` at `resources/*.ts`; CLI scripts run via `node scripts/*.ts`).
+Local imports carry explicit `.ts` extensions. `lib/harper.ts` is a thin shim over the `harper`
+package that permissively types `tables`/`server` (Harper 5.x types `search()` for `RequestTarget`
+only, but we pass plain option objects). `npm run typecheck` gates types; there is no emit.
+
+### Tests
+
+Three tiers, all `node:test` (zero deps; Playwright for e2e):
+
+```bash
+npm test              # unit — pure logic (tokenize/BM25, admin renderers, record client)
+npm run test:integration  # live HTTP: /api/search, admin auth, dev-login, /Metrics (server must be up)
+npm run test:e2e      # Playwright: search modal + admin auth/tabs (server must be up)
+npm run test:all      # all three in sequence
+```
+
+Integration + e2e self-skip when the server is unreachable or admin credentials are absent, so
+`npm test` stays hermetic. All three run in CI (`replatform-parity.yaml`), alongside the parity
+and relevance gates.
 
 ### Known issues
 
@@ -127,20 +180,32 @@ Auth for ingest comes from `~/hdb-docs-replatform/.admin-credentials` or
   `urlPath` breaks it. Workaround: nest files under `web/assets/` so the
   glob-base strip produces the same URLs. TODO: file as platform feedback.
 - Table records are lazy proxies: `{...record}` does not copy fields. Write explicit
-  objects (see `resources/ingest.js` activate handler).
+  objects (see `resources/ingest.ts` activate handler).
 
 ## Layout
 
 ```
 app/
 ├── config.yaml          # Harper component config (replaces defaults entirely)
-├── schemas/docs.graphql # ContentRelease, Page, Navigation, Redirect
+├── tsconfig.json        # type-checking only (noEmit); no build step
+├── schemas/docs.graphql # ContentRelease, Page, Navigation, Redirect, IngestRun,
+│                        #   SearchChunk, Term, SearchQueryLog, EvalRun, ParityRun
 ├── resources/
-│   ├── ingest.js        # POST /Ingest — staged ingest + atomic activate
-│   └── site.js          # server.http middleware — pages, redirects, .md, llms, sitemap
+│   ├── ingest.ts        # POST /Ingest — staged ingest + atomic activate
+│   ├── metrics.ts       # POST /Metrics — records EvalRun / ParityRun rows
+│   └── site.ts          # server.http middleware — pages, search API, admin, .md, llms, sitemap
 ├── lib/
-│   ├── render.mjs       # markdown → html/toc/rendered-md (remark/rehype pipeline)
-│   └── layout.mjs       # SSR layout shell
-├── scripts/ingest.mjs   # client: walks repo content + sidebars + redirects → /Ingest
-└── web/styles.css       # skeleton styles (served at /assets/)
+│   ├── harper.ts        # typed shim over the `harper` package (tables/server)
+│   ├── render.ts        # markdown → html/toc/rendered-md (remark/rehype pipeline)
+│   ├── layout.ts        # SSR layout shell
+│   ├── search.ts        # hybrid keyword + semantic search
+│   ├── admin.ts         # server-rendered admin dashboards (3 tabs)
+│   └── metrics.ts       # admin data-aggregation layer
+├── scripts/
+│   ├── ingest.ts        # client: walks repo content + sidebars + redirects → /Ingest
+│   ├── parity.ts        # parity harness (records ParityRun)
+│   ├── search-eval.ts   # relevance eval (records EvalRun)
+│   └── lib/record.ts    # shared /Metrics recording client
+├── test/                # unit/ · integration/ · e2e/  (node:test + Playwright)
+└── web/assets/          # styles + client search modal (served at /assets/)
 ```

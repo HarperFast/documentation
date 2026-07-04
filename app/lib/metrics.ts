@@ -1,0 +1,134 @@
+// Admin data-aggregation layer. Reads the observability tables and shapes them
+// into the view models the admin panels render. Server-side only (uses the
+// `tables` binding, not the REST API). Kept separate from rendering (lib/admin.ts)
+// so the two can be tested independently.
+
+import { tables } from './harper.ts';
+import { type SearchAnalytics, type EvalTrend, type ParityTrend, type EvalRunRow, type ParityRunRow } from './admin.ts';
+
+const { SearchQueryLog, EvalRun, ParityRun } = tables;
+
+const DAY_MS = 86400000;
+const WINDOW_DAYS = 14;
+
+// Aggregate the last WINDOW_DAYS of SearchQueryLog into top queries, the
+// zero-result content-gap list, per-day volume, and a section breakdown.
+export async function searchAnalytics(): Promise<SearchAnalytics> {
+	const now = Date.now();
+	const windowMs = WINDOW_DAYS * DAY_MS;
+	const byQuery = new Map<string, { count: number; zeroCount: number }>();
+	const bySection = new Map<string, number>();
+	const byDay = new Map<string, number>();
+	let queries = 0;
+	let zeroResult = 0;
+
+	for await (const row of SearchQueryLog.search({})) {
+		const created = new Date(row.createdAt ?? 0).getTime();
+		if (now - created > windowMs) continue; // outside the reporting window
+		queries++;
+		const q = String(row.query ?? '')
+			.trim()
+			.toLowerCase();
+		const isZero = (row.resultCount ?? 0) === 0;
+		if (isZero) zeroResult++;
+		if (q) {
+			const e = byQuery.get(q) ?? { count: 0, zeroCount: 0 };
+			e.count++;
+			if (isZero) e.zeroCount++;
+			byQuery.set(q, e);
+		}
+		const sec = row.section || 'all';
+		bySection.set(sec, (bySection.get(sec) ?? 0) + 1);
+		const day = new Date(created).toISOString().slice(0, 10);
+		byDay.set(day, (byDay.get(day) ?? 0) + 1);
+	}
+
+	const topTerms = [...byQuery.entries()]
+		.map(([query, e]) => ({ query, count: e.count, zero: e.count > 0 && e.zeroCount === e.count }))
+		.sort((a, b) => b.count - a.count)
+		.slice(0, 15);
+
+	// Content gaps: zero-result queries, excluding sub-3-char keystroke fragments
+	// (the search UI logs each debounced partial, so "s"/"sc" are noise, not gaps).
+	const zeroResultList = [...byQuery.entries()]
+		.filter(([query, e]) => e.zeroCount > 0 && query.length >= 3)
+		.map(([query, e]) => ({ query, count: e.zeroCount }))
+		.sort((a, b) => b.count - a.count)
+		.slice(0, 15);
+
+	// Fill every day in the window (including zero days) for a continuous chart.
+	const volume: Array<{ day: string; count: number }> = [];
+	for (let i = WINDOW_DAYS - 1; i >= 0; i--) {
+		const day = new Date(now - i * DAY_MS).toISOString().slice(0, 10);
+		volume.push({ day, count: byDay.get(day) ?? 0 });
+	}
+
+	const bySectionArr = [...bySection.entries()]
+		.map(([section, count]) => ({ section, count }))
+		.sort((a, b) => b.count - a.count);
+
+	return {
+		totals: {
+			// zeroRate is a 0..1 fraction; the renderer formats it as a percentage.
+			queries,
+			zeroResult,
+			zeroRate: queries ? zeroResult / queries : 0,
+			windowDays: WINDOW_DAYS,
+		},
+		topTerms,
+		zeroResult: zeroResultList,
+		volume,
+		bySection: bySectionArr,
+	};
+}
+
+function plainEval(r: any): EvalRunRow {
+	return {
+		id: r.id,
+		gitSha: r.gitSha ?? '',
+		mrr: r.mrr ?? 0,
+		recall5: r.recall5 ?? 0,
+		recall10: r.recall10 ?? 0,
+		zeroRate: r.zeroRate ?? 0,
+		cases: r.cases ?? 0,
+		weak: r.weak ?? 0,
+		passed: r.passed ?? null,
+		createdAt: r.createdAt ?? 0,
+	};
+}
+
+function plainParity(r: any): ParityRunRow {
+	return {
+		id: r.id,
+		gitSha: r.gitSha ?? '',
+		pages: r.pages ?? 0,
+		titlesOk: r.titlesOk ?? 0,
+		redirectsOk: r.redirectsOk ?? 0,
+		simMedian: r.simMedian ?? 0,
+		simMin: r.simMin ?? 0,
+		hardFailures: r.hardFailures ?? 0,
+		strict: r.strict ?? false,
+		passed: r.passed ?? false,
+		createdAt: r.createdAt ?? 0,
+	};
+}
+
+function byCreatedDesc(a: { createdAt: string | number }, b: { createdAt: string | number }): number {
+	return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+}
+
+export async function evalTrend(limit = 30): Promise<EvalTrend> {
+	const runs: EvalRunRow[] = [];
+	for await (const r of EvalRun.search({})) runs.push(plainEval(r));
+	runs.sort(byCreatedDesc);
+	const top = runs.slice(0, limit);
+	return { latest: top[0] ?? null, runs: top };
+}
+
+export async function parityTrend(limit = 30): Promise<ParityTrend> {
+	const runs: ParityRunRow[] = [];
+	for await (const r of ParityRun.search({})) runs.push(plainParity(r));
+	runs.sort(byCreatedDesc);
+	const top = runs.slice(0, limit);
+	return { latest: top[0] ?? null, runs: top };
+}

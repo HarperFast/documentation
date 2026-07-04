@@ -3,8 +3,30 @@
 // through /api/search. No standing in-memory index — every structure is a
 // table read; per-query memory is bounded to the candidate set.
 
-import { tables, models } from 'harper';
-import { tokenize, trigrams, trigramSimilarity, editDistance } from './tokenize.mjs';
+import { tables, models } from './harper.ts';
+import { tokenize, trigrams, trigramSimilarity, editDistance } from './tokenize.ts';
+
+interface TermMatch {
+	term: string;
+	docFreq: number;
+	weight: number;
+}
+
+interface SearchResponse {
+	query: string;
+	results: any[];
+	total: number;
+	lanes?: { keyword: number; semantic: number };
+}
+
+interface SearchOptions {
+	q?: string;
+	section?: string | null;
+	version?: string | null;
+	// Accepts a raw query-string value (string | null) as well as a number; the
+	// implementation coerces/clamps it.
+	limit?: number | string | null;
+}
 
 const { SitePointer, ContentRelease, SearchChunk, Term } = tables;
 
@@ -23,9 +45,9 @@ const MAX_QUERY_TERMS = 12; // hard cap on distinct scored terms (DoS guard)
 // Max edit distance for a typo correction, scaled to query-term length so a
 // single substitution in a short word (vektor→vector) is accepted while long
 // words tolerate two (replciation→replication).
-const maxEdits = (len) => (len <= 4 ? 1 : 2);
+const maxEdits = (len: number): number => (len <= 4 ? 1 : 2);
 
-async function activeRelease() {
+async function activeRelease(): Promise<string | null> {
 	const pointer = await SitePointer.get('active');
 	return pointer?.release ?? null;
 }
@@ -35,11 +57,11 @@ async function activeRelease() {
 // ACCEPTED if it is within the edit-distance budget OR has high trigram
 // overlap — edit distance catches single-char typos that trigrams miss on
 // short words. Returns [{term, docFreq, weight}].
-async function resolveTerm(release, term) {
+async function resolveTerm(release: string, term: string): Promise<TermMatch[]> {
 	const exact = await Term.get(`${release}:${term}`);
 	if (exact) return [{ term, docFreq: exact.docFreq, weight: 1 }];
 
-	const seen = new Map();
+	const seen = new Map<string, number>();
 	for (const g of trigrams(term)) {
 		for await (const t of Term.search({
 			conditions: [
@@ -70,7 +92,7 @@ async function resolveTerm(release, term) {
 // Hybrid search. { q, section, version, limit } → { query, results, total }.
 // Runs the keyword lane (always) and the vector lane (when an embedding model
 // is configured and reachable), then fuses them with reciprocal-rank fusion.
-export async function runSearch({ q = '', section = null, version = null, limit = 10 } = {}) {
+export async function runSearch({ q = '', section = null, version = null, limit = 10 }: SearchOptions = {}): Promise<SearchResponse> {
 	// Bound every input: q may arrive null (missing param), limit negative or huge.
 	q = String(q ?? '')
 		.trim()
@@ -81,7 +103,7 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	const release = await activeRelease();
 	if (!release) return { query: q, results: [], total: 0 };
 
-	const scope = [{ attribute: 'release', value: release }];
+	const scope: Array<{ attribute: string; value: any }> = [{ attribute: 'release', value: release }];
 	if (section) scope.push({ attribute: 'section', value: section });
 	if (version) scope.push({ attribute: 'version', value: version });
 	// Cap distinct terms so a synthetic many-word query can't fan out into
@@ -92,7 +114,6 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	// search intent — return empty rather than embed it and surface arbitrary
 	// nearest-neighbors (and skip the wasted embedding call).
 	if (queryTerms.length === 0) {
-		await logQuery(q, section, version, 0);
 		return { query: q, results: [], total: 0, lanes: { keyword: 0, semantic: 0 } };
 	}
 
@@ -115,7 +136,7 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 	// rebuilds), still adds recall for queries keyword can't answer, and keeps
 	// embeddings available for M3 chat grounding. (Natural-language search is
 	// better served by chat, which does its own semantic retrieval.)
-	const byPage = new Map();
+	const byPage = new Map<any, { chunk: any; score: number; semanticOnly?: boolean }>();
 	keyword.forEach((chunk, i) => {
 		if (!byPage.has(chunk.pageId)) byPage.set(chunk.pageId, { chunk, score: 1 / (RRF_K + i + 1) });
 	});
@@ -140,18 +161,17 @@ export async function runSearch({ q = '', section = null, version = null, limit 
 		score: Number(score.toFixed(5)),
 	}));
 
-	await logQuery(q, section, version, byPage.size);
 	return { query: q, results, total: byPage.size, lanes: { keyword: keyword.length, semantic: semantic.length } };
 }
 
 // Keyword lane: BM25 over the table-backed inverted index. Returns chunks
 // ranked best-first.
-async function keywordLane(release, q, queryTerms, scope) {
+async function keywordLane(release: string, q: string, queryTerms: string[], scope: Array<{ attribute: string; value: any }>): Promise<any[]> {
 	const rel = await ContentRelease.get(release);
 	const N = rel?.chunkCount || 1;
 	const avgLen = rel?.avgChunkLength || 1;
 
-	const resolved = [];
+	const resolved: Array<{ query: string; matches: TermMatch[] }> = [];
 	for (const qt of queryTerms) {
 		const matches = await resolveTerm(release, qt);
 		if (matches.length) resolved.push({ query: qt, matches });
@@ -163,7 +183,7 @@ async function keywordLane(release, q, queryTerms, scope) {
 	// per term (rarest first) measured better on the golden set than splitting
 	// the cap evenly across terms.
 	const flat = resolved.flatMap((r) => r.matches).sort((a, b) => a.docFreq - b.docFreq);
-	const candidates = new Map();
+	const candidates = new Map<any, any>();
 	for (const { term } of flat) {
 		if (candidates.size >= CANDIDATE_CAP) break;
 		for await (const chunk of SearchChunk.search({
@@ -174,8 +194,8 @@ async function keywordLane(release, q, queryTerms, scope) {
 		}
 	}
 
-	const idf = (docFreq) => Math.log(1 + (N - docFreq + 0.5) / (docFreq + 0.5));
-	const scored = [];
+	const idf = (docFreq: number): number => Math.log(1 + (N - docFreq + 0.5) / (docFreq + 0.5));
+	const scored: Array<{ chunk: any; score: number }> = [];
 	for (const chunk of candidates.values()) {
 		const counts = chunk.termCounts ?? {};
 		const len = chunk.length || 1;
@@ -212,17 +232,17 @@ async function keywordLane(release, q, queryTerms, scope) {
 // Vector lane: embed the query, HNSW nearest-neighbor over the chunk vectors,
 // scoped to the same section/version. Returns chunks ranked by similarity, or
 // [] if no embedding model is configured/reachable (keyword lane stands alone).
-async function semanticLane(release, q, scope) {
-	let vector;
+async function semanticLane(release: string, q: string, scope: Array<{ attribute: string; value: any }>): Promise<any[]> {
+	let vector: any;
 	try {
 		// Logical name must equal the wire model id (see schema note on @embed);
 		// query embeddings must use the same model that produced the index.
-		[vector] = await models.embed(q, { model: EMBED_MODEL, inputType: 'query' });
+		[vector] = await (models as any).embed(q, { model: EMBED_MODEL, inputType: 'query' });
 	} catch {
 		return []; // no/failed embedding model — degrade to keyword-only
 	}
 	if (!vector) return [];
-	const out = [];
+	const out: any[] = [];
 	try {
 		for await (const chunk of SearchChunk.search({
 			conditions: scope,
@@ -241,7 +261,7 @@ async function semanticLane(release, q, scope) {
 }
 
 // Build a short snippet around the first query-term hit.
-function snippet(text, queryTerms) {
+function snippet(text: string | null | undefined, queryTerms: string[]): string {
 	if (!text) return '';
 	const lower = text.toLowerCase();
 	let at = -1;
@@ -256,7 +276,20 @@ function snippet(text, queryTerms) {
 	return s;
 }
 
-async function logQuery(query, section, version, resultCount) {
+// Log a *committed* query (the search UI fires this only when a query settles or
+// is acted on — see web/assets/search.js), NOT every debounced keystroke, so the
+// content-gap report reflects intent rather than typing fragments. Best-effort.
+export async function logQuery(
+	query: string,
+	section: string | null,
+	version: string | null,
+	resultCount: number
+): Promise<void> {
+	if (!query || query.trim().length < 2) return; // ignore trivially short queries
+	// The commit beacon is public and its inputs are caller-supplied — bound them
+	// so a hostile client can't store megabyte query strings or absurd counts.
+	const safeQuery = query.slice(0, MAX_QUERY_CHARS);
+	const safeCount = Number.isFinite(resultCount) ? Math.max(0, Math.min(Math.trunc(resultCount), 100000)) : 0;
 	try {
 		const { SearchQueryLog } = tables;
 		if (SearchQueryLog) {
@@ -264,11 +297,11 @@ async function logQuery(query, section, version, resultCount) {
 				// Random suffix: same-length queries in the same ms must not
 				// collide and overwrite each other (distorts zero-result stats).
 				id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-				query,
+				query: safeQuery,
 				querySource: 'ui',
 				section,
 				version,
-				resultCount,
+				resultCount: safeCount,
 			});
 		}
 	} catch {

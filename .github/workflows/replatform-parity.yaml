@@ -34,6 +34,12 @@ jobs:
           npm --prefix app ci
           npm install -g harper
 
+      - name: Typecheck
+        run: npm --prefix app run typecheck
+
+      - name: Unit tests
+        run: npm --prefix app test
+
       - name: Install & start Harper
         env:
           TC_AGREEMENT: 'yes'
@@ -42,6 +48,9 @@ jobs:
           ROOTPATH: ${{ runner.temp }}/hdb
           HTTP_PORT: '9936'
           OPERATIONSAPI_NETWORK_PORT: '9935'
+          # Enables the /admin/dev-login affordance so the integration + e2e
+          # tests can establish an admin session without the Google round-trip.
+          ADMIN_DEV_LOGIN: 'true'
           # Embedding model for @embed / the semantic lane. Requires the
           # GEMINI_API_KEY repo secret; HARPER_CONFIG merges the models section
           # into the instance config at startup. Without it, @embed writes fail
@@ -64,16 +73,41 @@ jobs:
         env:
           HARPER_CLI_USERNAME: HDB_ADMIN
           HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
-        run: node app/scripts/ingest.mjs --target http://127.0.0.1:9936
+        run: node app/scripts/ingest.ts --target http://127.0.0.1:9936
+
+      - name: Integration tests
+        env:
+          HARPER_TARGET: http://127.0.0.1:9936
+          HARPER_CLI_USERNAME: HDB_ADMIN
+          HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+        run: npm --prefix app run test:integration
 
       - name: Parity gate (strict)
-        run: node app/scripts/parity.mjs --strict --target http://127.0.0.1:9936
+        # Also records a ParityRun row for the admin Validation trend — needs the
+        # admin credentials, or recordMetric() silently no-ops.
+        env:
+          HARPER_CLI_USERNAME: HDB_ADMIN
+          HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+        run: node app/scripts/parity.ts --strict --target http://127.0.0.1:9936
 
       - name: Search relevance gate
         # Keyword-primary ranking makes the eval deterministic (MRR 0.907,
         # stable across rebuilds), so a real floor holds. 0.85 leaves headroom
-        # for golden-set edits without flaking.
-        run: node app/scripts/search-eval.mjs --min-mrr 0.85 --target http://127.0.0.1:9936
+        # for golden-set edits without flaking. Also records an EvalRun row.
+        env:
+          HARPER_CLI_USERNAME: HDB_ADMIN
+          HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+        run: node app/scripts/search-eval.ts --min-mrr 0.85 --target http://127.0.0.1:9936
+
+      - name: Install Playwright browser
+        run: npx --prefix app playwright install --with-deps chromium
+
+      - name: E2E tests
+        env:
+          HARPER_TARGET: http://127.0.0.1:9936
+          HARPER_CLI_USERNAME: HDB_ADMIN
+          HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+        run: npm --prefix app run test:e2e
 
       - name: Upload parity report
         if: always()

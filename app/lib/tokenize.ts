@@ -12,9 +12,9 @@ const STOPWORDS = new Set(
 // - camelCase / PascalCase identifiers are split into parts AND kept whole, so
 //   both "getRecordCount" and "record"/"count" retrieve the same chunk.
 // - lowercased, split on non-alphanumeric, stopwords dropped, 1-char dropped.
-export function tokenize(text) {
+export function tokenize(text: string | null | undefined): string[] {
 	if (!text) return [];
-	const out = [];
+	const out: string[] = [];
 	for (const raw of String(text).split(/[^A-Za-z0-9]+/)) {
 		if (!raw) continue;
 		const lower = raw.toLowerCase();
@@ -36,23 +36,23 @@ export function tokenize(text) {
 }
 
 // term -> { term: count } for a chunk (BM25 term-frequency input).
-export function termCounts(tokens) {
-	const counts = {};
+export function termCounts(tokens: string[]): Record<string, number> {
+	const counts: Record<string, number> = {};
 	for (const t of tokens) counts[t] = (counts[t] ?? 0) + 1;
 	return counts;
 }
 
 // Sliding trigrams of a term, for typo/fuzzy matching (pg_trgm-style).
 // Short terms (<3) index the whole term so they remain matchable.
-export function trigrams(term) {
+export function trigrams(term: string): string[] {
 	if (term.length < 3) return [term];
-	const grams = [];
+	const grams: string[] = [];
 	for (let i = 0; i <= term.length - 3; i++) grams.push(term.slice(i, i + 3));
 	return grams;
 }
 
 // Trigram similarity in [0,1] between two terms (Dice over trigram sets).
-export function trigramSimilarity(a, b) {
+export function trigramSimilarity(a: string, b: string): number {
 	const ga = new Set(trigrams(a));
 	const gb = new Set(trigrams(b));
 	if (ga.size === 0 && gb.size === 0) return a === b ? 1 : 0;
@@ -65,12 +65,12 @@ export function trigramSimilarity(a, b) {
 // bounded: returns max+1 as soon as the best possible distance exceeds `max`.
 // Catches single-char typos that trigrams miss on short words
 // (vektor→vector, replciation→replication) without scanning the dictionary.
-export function editDistance(a, b, max = 2) {
+export function editDistance(a: string, b: string, max = 2): number {
 	if (a === b) return 0;
 	if (Math.abs(a.length - b.length) > max) return max + 1;
-	const prev2 = new Array(b.length + 1);
-	let prev = new Array(b.length + 1);
-	let curr = new Array(b.length + 1);
+	const prev2: number[] = new Array(b.length + 1);
+	let prev: number[] = new Array(b.length + 1);
+	let curr: number[] = new Array(b.length + 1);
 	for (let j = 0; j <= b.length; j++) prev[j] = j;
 	for (let i = 1; i <= a.length; i++) {
 		curr[0] = i;

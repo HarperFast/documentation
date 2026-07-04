@@ -16,6 +16,53 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'node-html-parser';
+import { recordMetric, gitSha } from './lib/record.ts';
+
+interface Page {
+	url: string;
+	file: string;
+}
+
+interface PageResult {
+	url: string;
+	status?: number;
+	fail?: string;
+	titleMatch?: boolean;
+	title?: { expected: string; actual: string };
+	descriptionMatch?: boolean;
+	canonicalMatch?: boolean;
+	anchorTotal?: number;
+	anchorMissing?: string[];
+	similarity?: number;
+}
+
+interface Extracted {
+	title: string;
+	description: string | undefined;
+	canonical: string | undefined;
+	article: boolean;
+	anchors: string[];
+	text: string;
+}
+
+interface RedirectRule {
+	from: string;
+	to: string;
+}
+
+interface RedirectResult {
+	from: string;
+	to: string;
+	status: number;
+	location: string;
+	ok: boolean;
+}
+
+interface MdResult {
+	path: string;
+	ok: boolean;
+	status: number;
+}
 
 const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(APP_DIR);
@@ -23,6 +70,7 @@ const BUILD_DIR = path.resolve(REPO_ROOT, argValue('--build') ?? 'build');
 const TARGET = argValue('--target') ?? process.env.HARPER_TARGET ?? 'http://localhost:9936';
 const FILTER = argValue('--filter');
 const STRICT = process.argv.includes('--strict');
+const NO_RECORD = process.argv.includes('--no-record');
 const REPORT_PATH = argValue('--report') ?? path.join(APP_DIR, 'parity-report.json');
 const CONCURRENCY = 12;
 const WARN_SIMILARITY = 0.9;
@@ -38,8 +86,8 @@ if (!existsSync(BUILD_DIR)) {
 
 // ── Enumerate build URLs ─────────────────────────────────────────────────────
 
-const pages = []; // {url, file}
-const mdFiles = []; // build-relative .md paths from the llms plugin
+const pages: Page[] = []; // {url, file}
+const mdFiles: string[] = []; // build-relative .md paths from the llms plugin
 for (const file of walk(BUILD_DIR)) {
 	const rel = '/' + path.relative(BUILD_DIR, file).replace(/\\/g, '/');
 	if (rel.startsWith('/assets/') || rel.startsWith('/img/') || rel.startsWith('/js/')) continue;
@@ -62,9 +110,9 @@ console.log(`parity: ${pages.length} pages, ${mdFiles.length} md files from ${BU
 
 // ── Page comparison ──────────────────────────────────────────────────────────
 
-const results = [];
+const results: PageResult[] = [];
 await pool(pages, CONCURRENCY, async ({ url, file }) => {
-	const result = { url };
+	const result: PageResult = { url };
 	try {
 		const expected = extract(readFileSync(file, 'utf8'), 'build');
 		const res = await fetch(TARGET + url, { redirect: 'manual' });
@@ -86,7 +134,7 @@ await pool(pages, CONCURRENCY, async ({ url, file }) => {
 		result.anchorMissing = realAnchors.filter((a) => !actual.anchors.includes(a));
 		result.similarity = similarity(expected.text, actual.text);
 		results.push(result);
-	} catch (err) {
+	} catch (err: any) {
 		// A worker error is a failure, not an omission — count it as one.
 		results.push({ ...result, fail: `error: ${err.message}` });
 	}
@@ -94,7 +142,7 @@ await pool(pages, CONCURRENCY, async ({ url, file }) => {
 
 // ── Redirects ────────────────────────────────────────────────────────────────
 
-const redirectResults = [];
+const redirectResults: RedirectResult[] = [];
 const redirectRules = await loadRedirects();
 await pool(redirectRules, CONCURRENCY, async ({ from, to }) => {
 	const res = await tryFetch(TARGET + from, { redirect: 'manual' });
@@ -113,13 +161,13 @@ const harperSitemap = await tryFetch(`${TARGET}/sitemap.xml`)
 const onlyInBuild = [...buildSitemap].filter((p) => !harperSitemap.has(p) && !SKIP_URLS.has(p));
 const onlyInHarper = [...harperSitemap].filter((p) => !buildSitemap.has(p));
 
-const mdResults = [];
+const mdResults: MdResult[] = [];
 await pool(mdFiles, CONCURRENCY, async (rel) => {
 	const res = await tryFetch(TARGET + rel, { method: 'HEAD' });
 	mdResults.push({ path: rel, ok: res?.status === 200, status: res?.status ?? 0 });
 });
 
-const llms = {};
+const llms: Record<string, boolean> = {};
 for (const f of ['/llms.txt', '/llms-full.txt']) {
 	const res = await tryFetch(TARGET + f, { method: 'HEAD' });
 	llms[f] = res?.status === 200 && existsSync(path.join(BUILD_DIR, f.slice(1)));
@@ -131,30 +179,30 @@ const missing = results.filter((r) => r.fail);
 const titleMiss = results.filter((r) => !r.fail && !r.titleMatch);
 const descMiss = results.filter((r) => !r.fail && !r.descriptionMatch);
 const canonicalMiss = results.filter((r) => !r.fail && !r.canonicalMatch);
-const anchorMiss = results.filter((r) => !r.fail && r.anchorMissing.length > 0);
+const anchorMiss = results.filter((r) => !r.fail && r.anchorMissing!.length > 0);
 const totalAnchors = results.reduce((n, r) => n + (r.anchorTotal ?? 0), 0);
 const totalAnchorsMissing = results.reduce((n, r) => n + (r.anchorMissing?.length ?? 0), 0);
 const sims = results
 	.filter((r) => !r.fail)
-	.map((r) => r.similarity)
+	.map((r) => r.similarity!)
 	.sort((a, b) => a - b);
-const simWarn = results.filter((r) => !r.fail && r.similarity < WARN_SIMILARITY && r.similarity >= FAIL_SIMILARITY);
-const simFail = results.filter((r) => !r.fail && r.similarity < FAIL_SIMILARITY);
+const simWarn = results.filter((r) => !r.fail && r.similarity! < WARN_SIMILARITY && r.similarity! >= FAIL_SIMILARITY);
+const simFail = results.filter((r) => !r.fail && r.similarity! < FAIL_SIMILARITY);
 const redirectFail = redirectResults.filter((r) => !r.ok);
 const mdFail = mdResults.filter((r) => !r.ok);
 
 console.log(`
 ── Pages ────────────────────────────────────────────
   served 200:        ${results.length - missing.length}/${results.length}${list(missing, (r) => `${r.url} → ${r.fail}`)}
-  title match:       ${results.length - missing.length - titleMiss.length}/${results.length - missing.length}${list(titleMiss, (r) => `${r.url}: "${r.title.expected}" vs "${r.title.actual}"`)}
+  title match:       ${results.length - missing.length - titleMiss.length}/${results.length - missing.length}${list(titleMiss, (r) => `${r.url}: "${r.title!.expected}" vs "${r.title!.actual}"`)}
   description match: ${results.length - missing.length - descMiss.length}/${results.length - missing.length}${list(descMiss.slice(0, 10), (r) => r.url)}
   canonical match:   ${results.length - missing.length - canonicalMiss.length}/${results.length - missing.length}${list(canonicalMiss.slice(0, 10), (r) => r.url)}
-  anchors present:   ${totalAnchors - totalAnchorsMissing}/${totalAnchors} across ${anchorMiss.length} pages with gaps${list(anchorMiss.slice(0, 10), (r) => `${r.url}: missing ${r.anchorMissing.slice(0, 5).join(', ')}`)}
+  anchors present:   ${totalAnchors - totalAnchorsMissing}/${totalAnchors} across ${anchorMiss.length} pages with gaps${list(anchorMiss.slice(0, 10), (r) => `${r.url}: missing ${r.anchorMissing!.slice(0, 5).join(', ')}`)}
 
 ── Article text similarity ──────────────────────────
   median ${pct(sims[Math.floor(sims.length / 2)] ?? 0)} · p10 ${pct(sims[Math.floor(sims.length * 0.1)] ?? 0)} · min ${pct(sims[0] ?? 0)}
-  < ${WARN_SIMILARITY} (warn): ${simWarn.length}${list(simWarn.slice(0, 15), (r) => `${r.url} (${pct(r.similarity)})`)}
-  < ${FAIL_SIMILARITY} (fail): ${simFail.length}${list(simFail.slice(0, 15), (r) => `${r.url} (${pct(r.similarity)})`)}
+  < ${WARN_SIMILARITY} (warn): ${simWarn.length}${list(simWarn.slice(0, 15), (r) => `${r.url} (${pct(r.similarity!)})`)}
+  < ${FAIL_SIMILARITY} (fail): ${simFail.length}${list(simFail.slice(0, 15), (r) => `${r.url} (${pct(r.similarity!)})`)}
 
 ── Routing ──────────────────────────────────────────
   redirects:  ${redirectResults.length - redirectFail.length}/${redirectResults.length}${list(redirectFail.slice(0, 10), (r) => `${r.from} → got ${r.status} ${r.location || '(none)'} want ${r.to}`)}
@@ -187,7 +235,7 @@ console.log(`report: ${REPORT_PATH}`);
 // Each gate is a hard contract for the migration. Description and canonical
 // and warn-level similarity stay advisory (Docusaurus's excerpt algorithm and
 // small-page word-swings are not worth blocking a deploy over).
-const gates = {
+const gates: Record<string, number> = {
 	'missing/broken pages': missing.length,
 	'title mismatches': titleMiss.length,
 	'anchor gaps (real)': anchorMiss.length,
@@ -201,6 +249,25 @@ const gates = {
 	'worker errors': workerErrors,
 };
 const hardFailures = Object.values(gates).reduce((a, b) => a + b, 0);
+
+// Persist this run so the admin Validation panel can chart the trend (best-effort;
+// a recording failure never fails parity). simMedian/simMin are 0..1 fractions.
+if (!NO_RECORD) {
+	const servedPages = results.length - missing.length;
+	await recordMetric(TARGET, {
+		action: 'record-parity',
+		gitSha: gitSha(),
+		pages: results.length,
+		titlesOk: servedPages - titleMiss.length,
+		redirectsOk: redirectResults.length - redirectFail.length,
+		simMedian: sims[Math.floor(sims.length / 2)] ?? 0,
+		simMin: sims[0] ?? 0,
+		hardFailures,
+		strict: STRICT,
+		passed: hardFailures === 0,
+	});
+}
+
 if (STRICT) {
 	const breached = Object.entries(gates).filter(([, n]) => n > 0);
 	if (breached.length) {
@@ -213,7 +280,7 @@ if (STRICT) {
 
 // ── Extraction & helpers ─────────────────────────────────────────────────────
 
-function extract(html, kind) {
+function extract(html: string, kind: string): Extracted {
 	const root = parse(html);
 	const title = root.querySelector('title')?.text ?? '';
 	const description = root.querySelector('meta[name="description"]')?.getAttribute('content');
@@ -226,11 +293,11 @@ function extract(html, kind) {
 			? (root.querySelector('.theme-doc-markdown') ?? root.querySelector('article'))
 			: root.querySelector('article');
 	let text = '';
-	const anchors = [];
+	const anchors: string[] = [];
 	if (article) {
 		for (const el of article.querySelectorAll('nav, aside.theme-doc-toc-mobile, script, style, .page-footer'))
 			el.remove();
-		for (const h of article.querySelectorAll('h2[id], h3[id]')) anchors.push(h.getAttribute('id'));
+		for (const h of article.querySelectorAll('h2[id], h3[id]')) anchors.push(h.getAttribute('id')!);
 		// Extract from innerHTML, not `.text`: node-html-parser's `.text`
 		// concatenates adjacent elements with no separator ("Tucker4.7.32") and
 		// leaks raw <pre> markup, and the build vs Harper DOMs differ in
@@ -245,7 +312,7 @@ function extract(html, kind) {
 	return { title, description, canonical, article: !!article, anchors, text };
 }
 
-function decodeEntities(s) {
+function decodeEntities(s: string): string {
 	return s
 		.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
 		.replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
@@ -256,11 +323,11 @@ function decodeEntities(s) {
 		.replace(/&amp;/g, '&');
 }
 
-function coreTitle(t) {
+function coreTitle(t: string): string {
 	return (t ?? '').split('|')[0].trim().toLowerCase();
 }
 
-function normalize(p) {
+function normalize(p: string): string {
 	if (!p) return p;
 	let out = p.split('?')[0];
 	if (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);
@@ -268,7 +335,7 @@ function normalize(p) {
 }
 
 // Word-frequency dice coefficient over the extracted article text.
-function similarity(a, b) {
+function similarity(a: string, b: string): number {
 	if (!a && !b) return 1;
 	const fa = freq(a);
 	const fb = freq(b);
@@ -277,29 +344,29 @@ function similarity(a, b) {
 	let totalB = 0;
 	for (const [w, c] of fa) {
 		totalA += c;
-		if (fb.has(w)) inter += Math.min(c, fb.get(w));
+		if (fb.has(w)) inter += Math.min(c, fb.get(w)!);
 	}
 	for (const c of fb.values()) totalB += c;
 	return totalA + totalB === 0 ? 1 : (2 * inter) / (totalA + totalB);
 }
 
-function freq(text) {
-	const map = new Map();
+function freq(text: string): Map<string, number> {
+	const map = new Map<string, number>();
 	for (const w of text.split(' ')) {
 		if (w) map.set(w, (map.get(w) ?? 0) + 1);
 	}
 	return map;
 }
 
-function sitemapPaths(xml) {
-	const out = new Set();
+function sitemapPaths(xml: string): Set<string> {
+	const out = new Set<string>();
 	for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
 		out.add(normalize(m[1].replace(/^https?:\/\/[^/]+/, '') || '/'));
 	}
 	return out;
 }
 
-async function loadRedirects() {
+async function loadRedirects(): Promise<RedirectRule[]> {
 	const { writeFileSync: write, unlinkSync } = await import('node:fs');
 	const shimPath = path.join(REPO_ROOT, '.redirects-shim.ts');
 	const source = readFileSync(path.join(REPO_ROOT, 'redirects.ts'), 'utf8').replace(
@@ -313,14 +380,14 @@ async function loadRedirects() {
 	} finally {
 		unlinkSync(shimPath);
 	}
-	const rules = [];
+	const rules: RedirectRule[] = [];
 	for (const rule of mod.redirects) {
 		for (const from of Array.isArray(rule.from) ? rule.from : [rule.from]) rules.push({ from, to: rule.to });
 	}
 	return FILTER ? rules.filter((r) => r.from.includes(FILTER)) : rules;
 }
 
-async function pool(items, size, worker) {
+async function pool<T>(items: T[], size: number, worker: (item: T) => Promise<void>): Promise<void> {
 	let i = 0;
 	await Promise.all(
 		Array.from({ length: Math.min(size, items.length) }, async () => {
@@ -328,7 +395,7 @@ async function pool(items, size, worker) {
 				const item = items[i++];
 				try {
 					await worker(item);
-				} catch (err) {
+				} catch (err: any) {
 					// Last-resort guard so one item can't reject the whole batch.
 					// Counted so --strict fails rather than silently under-reporting.
 					workerErrors++;
@@ -341,7 +408,7 @@ async function pool(items, size, worker) {
 
 // Fetch that never throws — a down target must produce gated failures with a
 // clean breakdown, not an uncaught crash that skips the strict report.
-async function tryFetch(url, opts) {
+async function tryFetch(url: string, opts?: RequestInit): Promise<Response | null> {
 	try {
 		return await fetch(url, opts);
 	} catch {
@@ -350,8 +417,8 @@ async function tryFetch(url, opts) {
 	}
 }
 
-function walk(dir) {
-	const out = [];
+function walk(dir: string): string[] {
+	const out: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) out.push(...walk(full));
@@ -360,16 +427,16 @@ function walk(dir) {
 	return out;
 }
 
-function list(items, fmt) {
+function list<T>(items: T[], fmt: (item: T) => string): string {
 	if (!items.length) return '';
 	return '\n' + items.map((i) => `      · ${fmt(i)}`).join('\n');
 }
 
-function pct(n) {
+function pct(n: number): string {
 	return `${(n * 100).toFixed(1)}%`;
 }
 
-function argValue(flag) {
+function argValue(flag: string): string | undefined {
 	const i = process.argv.indexOf(flag);
 	return i >= 0 ? process.argv[i + 1] : undefined;
 }

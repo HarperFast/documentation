@@ -10,14 +10,14 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
 
-const ORDINAL = { 1: '1st', 2: '2nd', 3: '3rd' };
-const ordinal = (n) => ORDINAL[n] ?? `${n}th`;
+const ORDINAL: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd' };
+const ordinal = (n: number): string => ORDINAL[n] ?? `${n}th`;
 
 // Resolve `import Name from '<rel>.mdx'` and inline `<Name/>` occurrences with
 // the partial's body (frontmatter stripped). One level deep is enough for the
 // corpus; guards against self-reference.
-function expandPartials(markdown, sourceFile, seen = new Set()) {
-	const imports = new Map();
+function expandPartials(markdown: string, sourceFile: string, seen: Set<string> = new Set()): string {
+	const imports = new Map<string, string>();
 	for (const m of markdown.matchAll(/^import\s+(\w+)\s+from\s+['"]([^'"]+\.mdx?)['"];?\s*$/gm)) {
 		imports.set(m[1], m[2]);
 	}
@@ -40,15 +40,15 @@ function expandPartials(markdown, sourceFile, seen = new Set()) {
 
 // Render <ReleaseNotesList/> to markdown matching the Docusaurus component,
 // driven by release-notes-data.json (the same source the component reads).
-function releaseNotesListMarkdown(releaseData) {
+function releaseNotesListMarkdown(releaseData: any): string {
 	const majors = Object.keys(releaseData)
 		.map(Number)
 		.sort((a, b) => b - a);
 	if (majors.length === 0) return '';
 	const [current, ...previous] = majors;
 	const cur = releaseData[current];
-	const slug = (major, pup) => `/release-notes/v${major}-${pup.toLowerCase()}`;
-	const lines = [];
+	const slug = (major: number, pup: string) => `/release-notes/v${major}-${pup.toLowerCase()}`;
+	const lines: string[] = [];
 
 	lines.push(`## Current Release - Version ${current} (${cur.pupName})`, '');
 	lines.push(
@@ -74,19 +74,19 @@ function releaseNotesListMarkdown(releaseData) {
 
 // <LatestPatchLink major={M} minor={N} label="..."/> → link to the latest
 // M.N.x patch (or bracketed fallback when unknown), matching the component.
-function expandLatestPatchLink(markdown, releaseData) {
+function expandLatestPatchLink(markdown: string, releaseData: any): string {
 	return markdown.replace(/<LatestPatchLink\s+([^>]*?)\/>/g, (_, attrs) => {
 		const major = Number(/major=\{?(\d+)\}?/.exec(attrs)?.[1]);
 		const minor = Number(/minor=\{?(\d+)\}?/.exec(attrs)?.[1]);
 		const label = /label=["']([^"']+)["']/.exec(attrs)?.[1] ?? `${major}.${minor}`;
 		const rd = releaseData[major];
-		const patch = rd?.versions?.find((v) => v.startsWith(`${major}.${minor}.`));
+		const patch = rd?.versions?.find((v: string) => v.startsWith(`${major}.${minor}.`));
 		if (!rd || !patch) return `[${label}]`;
 		return `[${label}](/release-notes/v${major}-${rd.pupName.toLowerCase()}/${patch})`;
 	});
 }
 
-export function expandComponents(markdown, { sourceFile, releaseData }) {
+export function expandComponents(markdown: string, { sourceFile, releaseData }: { sourceFile: string; releaseData: any }): string {
 	let out = expandPartials(markdown, sourceFile);
 	if (releaseData) {
 		out = out.replace(/<ReleaseNotesList\s*\/>/g, () => releaseNotesListMarkdown(releaseData));

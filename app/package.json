@@ -11,9 +11,14 @@
 		"local:start": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper start",
 		"local:stop": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper stop",
 		"local:status": "HOME=/Users/kyle/hdb-docs-replatform ROOTPATH=/Users/kyle/hdb-docs-replatform/hdb harper status",
-		"ingest": "node scripts/ingest.mjs",
-		"parity": "node scripts/parity.mjs",
-		"search-eval": "node scripts/search-eval.mjs"
+		"typecheck": "tsc --noEmit",
+		"test": "node --test test/unit/*.test.ts",
+		"test:integration": "node --test test/integration/*.test.ts",
+		"test:e2e": "node --test test/e2e/*.test.ts",
+		"test:all": "npm run test && npm run test:integration && npm run test:e2e",
+		"ingest": "node scripts/ingest.ts",
+		"parity": "node scripts/parity.ts",
+		"search-eval": "node scripts/search-eval.ts"
 	},
 	"dependencies": {
 		"@harperfast/oauth": "^2.1.2",
@@ -30,6 +35,7 @@
 	},
 	"devDependencies": {
 		"node-html-parser": "^8.0.4",
-		"playwright": "^1.61.1"
+		"playwright": "^1.61.1",
+		"typescript": "^6.0.3"
 	}
 }

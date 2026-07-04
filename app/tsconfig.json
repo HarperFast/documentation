@@ -1,0 +1,25 @@
+{
+	// Type-checking only — Harper (and Node 24) strip types at load time, so
+	// there is NO build step. `npm run typecheck` runs `tsc --noEmit`.
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2023", "DOM", "DOM.Iterable"],
+		"types": ["node"],
+		// Local imports carry explicit `.ts` extensions (type-stripping rule).
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"moduleDetection": "force",
+		"noEmit": true,
+		// Enforce that every construct is erasable — no enums/namespaces with
+		// runtime semantics — so Node/Harper type-stripping never breaks.
+		"erasableSyntaxOnly": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"noUncheckedSideEffectImports": true
+	},
+	"include": ["resources", "lib", "scripts", "test"]
+}

@@ -8,7 +8,7 @@ graphqlSchema:
   files: 'schemas/*.graphql'
 
 jsResource:
-  files: 'resources/*.js'
+  files: 'resources/*.ts'
 
 rest: true
 

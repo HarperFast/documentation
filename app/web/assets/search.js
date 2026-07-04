@@ -34,12 +34,19 @@
 	let items = [];
 	let active = -1;
 	let seq = 0;
+	let lastQuery = ''; // the query the currently-rendered results belong to
+	let lastCount = 0; // result count for lastQuery
+	let loggedQuery = ''; // last query already committed this session (dedupe)
+	let pendingQuery = ''; // a commit intent whose results haven't rendered yet
 
 	function open() {
 		overlay.hidden = false;
 		input.value = '';
 		list.innerHTML = '';
 		empty.hidden = true;
+		lastQuery = '';
+		loggedQuery = '';
+		pendingQuery = '';
 		input.focus();
 	}
 	function close() {
@@ -63,6 +70,9 @@
 		if (!q.trim()) {
 			list.innerHTML = '';
 			empty.hidden = true;
+			lastQuery = '';
+			loggedQuery = '';
+			pendingQuery = '';
 			return;
 		}
 		const scope = allScope.checked ? {} : currentScope();
@@ -74,7 +84,40 @@
 			return;
 		}
 		if (mine !== seq) return; // a newer query already returned
-		render(data.results ?? []);
+		const results = data.results ?? [];
+		render(results);
+		// Remember what these results are for, so a commit logs the right count.
+		lastQuery = q.trim();
+		lastCount = results.length;
+		// If a commit was requested before these results were in (search slower
+		// than the settle debounce, or Enter pressed early), complete it now.
+		if (pendingQuery && pendingQuery === lastQuery) commit(lastQuery);
+	}
+
+	// Fire the commit beacon for query q (its results — hence count — are known).
+	// Sends the count the user actually saw; keepalive lets it survive navigation.
+	function commit(q) {
+		if (q === loggedQuery) return; // already logged this query this session
+		loggedQuery = q;
+		pendingQuery = '';
+		const scope = allScope.checked ? {} : currentScope();
+		const params = new URLSearchParams({ q, log: '1', n: String(lastCount), ...scope });
+		try {
+			fetch(`/api/search?${params}`, { keepalive: true }).catch(() => {});
+		} catch {
+			/* best-effort */
+		}
+	}
+
+	// Commit-logging: called only when a query is "committed" — typing has settled
+	// (see settleLog) or the user acted on a result — so debounced keystroke
+	// partials never reach the server-side query log. Logs now if results are in;
+	// otherwise records the intent so run() completes it when results render.
+	function logCommit() {
+		const q = input.value.trim();
+		if (q.length < 2) return;
+		pendingQuery = q;
+		if (q === lastQuery) commit(q);
 	}
 
 	function render(results) {
@@ -103,6 +146,7 @@
 		list.children[active]?.scrollIntoView({ block: 'nearest' });
 	}
 	function go() {
+		logCommit(); // committing by acting on a result
 		const url = items[active]?.url;
 		if (url) location.href = url;
 	}
@@ -112,10 +156,12 @@
 	}
 
 	trigger.addEventListener('click', open);
-	input.addEventListener(
-		'input',
-		debounce((e) => run(e.target.value), 140)
-	);
+	const liveSearch = debounce((v) => run(v), 140);
+	const settleLog = debounce(logCommit, 1100); // "commit" once typing rests ~1.1s
+	input.addEventListener('input', (e) => {
+		liveSearch(e.target.value);
+		settleLog();
+	});
 	allScope.addEventListener('change', () => run(input.value));
 	overlay.addEventListener('click', (e) => {
 		if (e.target === overlay) close();

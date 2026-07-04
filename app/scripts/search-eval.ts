@@ -19,6 +19,30 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordMetric, gitSha } from './lib/record.ts';
+
+interface Case {
+	q: string;
+	expect: string[];
+	section?: string;
+	version?: string;
+}
+
+interface SearchResult {
+	path: string;
+}
+
+interface Row {
+	q: string;
+	expect?: string[];
+	error?: string;
+	rank: number;
+	rr: number;
+	hit5?: boolean;
+	hit10?: boolean;
+	zero?: boolean;
+	top: string;
+}
 
 const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const TARGET = argValue('--target') ?? process.env.HARPER_TARGET ?? 'http://localhost:9936';
@@ -26,19 +50,20 @@ const SET_PATH = path.resolve(APP_DIR, argValue('--set') ?? 'eval/golden-set.jso
 const MIN_MRR = Number(argValue('--min-mrr') ?? NaN);
 const VERBOSE = process.argv.includes('--verbose');
 const JSON_OUT = process.argv.includes('--json');
+const NO_RECORD = process.argv.includes('--no-record');
 const K = 10;
 
-const { cases } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
+const { cases }: { cases: Case[] } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
 
-const rows = [];
+const rows: Row[] = [];
 for (const c of cases) {
 	const params = new URLSearchParams({ q: c.q, limit: String(K) });
 	if (c.section) params.set('section', c.section);
 	if (c.version) params.set('version', c.version);
-	let results = [];
+	let results: SearchResult[] = [];
 	try {
 		results = (await (await fetch(`${TARGET}/api/search?${params}`)).json()).results ?? [];
-	} catch (err) {
+	} catch (err: any) {
 		rows.push({ q: c.q, error: err.message, rank: 0, rr: 0, top: '' });
 		continue;
 	}
@@ -94,6 +119,10 @@ if (JSON_OUT) {
 	}
 }
 
+// Persist this run so the admin Validation panel can chart the trend
+// (best-effort; a recording failure never fails the eval). Skip with --no-record.
+await recordEval();
+
 if (!Number.isNaN(MIN_MRR)) {
 	if (mrr < MIN_MRR) {
 		console.error(`\nGATE FAIL: MRR ${mrr.toFixed(3)} < ${MIN_MRR}`);
@@ -102,10 +131,26 @@ if (!Number.isNaN(MIN_MRR)) {
 	console.log(`\nGATE PASS: MRR ${mrr.toFixed(3)} ≥ ${MIN_MRR}`);
 }
 
-function avg(xs) {
+async function recordEval(): Promise<void> {
+	if (NO_RECORD) return;
+	const passed = Number.isNaN(MIN_MRR) ? null : mrr >= MIN_MRR;
+	await recordMetric(TARGET, {
+		action: 'record-eval',
+		gitSha: gitSha(APP_DIR),
+		mrr,
+		recall5,
+		recall10,
+		zeroRate,
+		cases: n,
+		weak: weak.length,
+		passed,
+	});
+}
+
+function avg(xs: number[]): number {
 	return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 }
-function argValue(flag) {
+function argValue(flag: string): string | undefined {
 	const i = process.argv.indexOf(flag);
 	return i >= 0 ? process.argv[i + 1] : undefined;
 }
