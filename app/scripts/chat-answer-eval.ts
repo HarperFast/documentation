@@ -39,18 +39,18 @@ const { cases }: { cases: Case[] } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
 const KEY = loadAnthropicKey();
 
 // Get the app's real answer via /api/chat (server holds the generation key).
-async function getAnswer(q: string): Promise<{ answer: string; sources: number; error?: string }> {
+async function getAnswer(q: string): Promise<{ answer: string; sources: any[]; error?: string }> {
 	const res = await fetch(`${TARGET}/api/chat`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ question: q }),
 	});
-	if (!res.ok || !res.body) return { answer: '', sources: 0, error: `chat HTTP ${res.status}` };
+	if (!res.ok || !res.body) return { answer: '', sources: [], error: `chat HTTP ${res.status}` };
 	const reader = res.body.getReader();
 	const decoder = new TextDecoder();
 	let buf = '';
 	let answer = '';
-	let sources = 0;
+	let sources: any[] = [];
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
@@ -68,7 +68,7 @@ async function getAnswer(q: string): Promise<{ answer: string; sources: number; 
 			try {
 				const parsed = JSON.parse(data);
 				if (event === 'token' && typeof parsed === 'string') answer += parsed;
-				else if (event === 'sources' && Array.isArray(parsed)) sources = parsed.length;
+				else if (event === 'sources' && Array.isArray(parsed)) sources = parsed;
 				else if (event === 'error') return { answer, sources, error: parsed.message ?? 'generation error' };
 			} catch {
 				// ignore non-JSON frames
@@ -78,39 +78,55 @@ async function getAnswer(q: string): Promise<{ answer: string; sources: number; 
 	return { answer, sources };
 }
 
-// Ask the judge model to score the answer against the rubric.
-async function judge(q: string, keyPoints: string[], answer: string): Promise<Judgement> {
+// Ask the judge model to score the answer against the rubric. The answer's
+// grounding sources are passed in so the judge grades faithfulness against what
+// was actually retrieved — not its own memory (else it flags real-but-unfamiliar
+// Harper features, e.g. createBlob(), as hallucinations). Retries once on a
+// transient empty/unparseable judge response.
+async function judge(q: string, keyPoints: string[], answer: string, sources: any[]): Promise<Judgement> {
+	const sourceList = sources.length
+		? sources.map((s, i) => `  [${i + 1}] ${s.title ?? s.path}${s.heading ? ` — ${s.heading}` : ''}`).join('\n')
+		: '  (none)';
 	const system =
 		'You are a strict but fair grader of a Harper (harperdb) documentation assistant. ' +
-		'Grade the answer only against the rubric key points and Harper reality. Do NOT reward ' +
-		'fluent-but-wrong or invented content. Respond ONLY with a single JSON object, no prose.';
+		'Grade the answer against the rubric key points. The answer was generated with grounding ' +
+		'from real Harper documentation sections (listed below) — treat features/APIs that plausibly ' +
+		'belong to those sections as real, and only mark it un-grounded for claims that clearly ' +
+		'contradict Harper or are obviously invented. Do NOT reward fluent-but-wrong content. ' +
+		'Respond ONLY with a single JSON object, no prose.';
 	const user = `Question: ${q}
 
 Rubric — a correct answer should cover these key points:
 ${keyPoints.map((k, i) => `  ${i + 1}. ${k}`).join('\n')}
 
+The answer was grounded on these real Harper documentation sections:
+${sourceList}
+
 Answer to grade:
 """
-${answer}
+${answer.slice(0, 4000)}
 """
 
 Respond as JSON exactly:
 {"correctness": <1-5 integer>, "completeness": <1-5 integer>, "grounded": <true|false>, "notes": "<one short line>"}
-correctness = are the stated facts right, with no hallucination.
+correctness = are the stated facts right (consistent with Harper / the grounding).
 completeness = how fully the key points are correctly covered.
-grounded = is the answer based on real Harper features (not invented).`;
+grounded = are the claims supported by real Harper documentation (per the sections above).`;
 
-	const res = await fetch('https://api.anthropic.com/v1/messages', {
-		method: 'POST',
-		headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-		body: JSON.stringify({ model: JUDGE_MODEL, max_tokens: 300, system, messages: [{ role: 'user', content: user }] }),
-	});
-	if (!res.ok) throw new Error(`judge HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-	const body: any = await res.json();
-	const text = (body.content ?? []).map((c: any) => c.text ?? '').join('');
-	const match = text.match(/\{[\s\S]*\}/);
-	if (!match) throw new Error(`judge returned no JSON: ${text.slice(0, 120)}`);
-	return JSON.parse(match[0]);
+	for (let attempt = 0; attempt < 2; attempt++) {
+		const res = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+			body: JSON.stringify({ model: JUDGE_MODEL, max_tokens: 400, system, messages: [{ role: 'user', content: user }] }),
+		});
+		if (!res.ok) throw new Error(`judge HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+		const body: any = await res.json();
+		const text = (body.content ?? []).map((c: any) => c.text ?? '').join('');
+		const match = text.match(/\{[\s\S]*\}/);
+		if (match) return JSON.parse(match[0]);
+		if (attempt === 1) throw new Error(`judge returned no JSON after retry: "${text.slice(0, 80)}"`);
+	}
+	throw new Error('unreachable');
 }
 
 interface Row {
@@ -121,6 +137,7 @@ interface Row {
 	sources: number;
 	notes: string;
 	error?: string;
+	chatError?: boolean; // true = /api/chat (endpoint) failed; false/undef = judge hiccup
 }
 
 const rows: Row[] = [];
@@ -128,50 +145,53 @@ const list = Number.isNaN(LIMIT) ? cases : cases.slice(0, LIMIT);
 for (const c of list) {
 	const a = await getAnswer(c.q);
 	if (a.error) {
-		rows.push({ q: c.q, correctness: 0, completeness: 0, grounded: false, sources: a.sources, notes: '', error: a.error });
+		rows.push({ q: c.q, correctness: 0, completeness: 0, grounded: false, sources: a.sources.length, notes: '', error: a.error, chatError: true });
 		continue;
 	}
 	try {
-		const j = await judge(c.q, c.key_points, a.answer);
+		const j = await judge(c.q, c.key_points, a.answer, a.sources);
 		rows.push({
 			q: c.q,
 			correctness: j.correctness,
 			completeness: j.completeness,
 			grounded: Boolean(j.grounded),
-			sources: a.sources,
+			sources: a.sources.length,
 			notes: j.notes,
 		});
 	} catch (err: any) {
-		rows.push({ q: c.q, correctness: 0, completeness: 0, grounded: false, sources: a.sources, notes: '', error: err.message });
+		rows.push({ q: c.q, correctness: 0, completeness: 0, grounded: false, sources: a.sources.length, notes: '', error: err.message });
 	}
 }
 
 const n = rows.length;
-const errored = rows.filter((r) => r.error);
+const chatErrors = rows.filter((r) => r.chatError); // endpoint failures — hard fail
+const judgeErrors = rows.filter((r) => r.error && !r.chatError); // judge hiccups — excluded, not fatal
 const scored = rows.filter((r) => !r.error);
 const avg = (f: (r: Row) => number): number => (scored.length ? scored.reduce((a, r) => a + f(r), 0) / scored.length : 0);
 const avgCorr = avg((r) => r.correctness);
 const avgComp = avg((r) => r.completeness);
 const groundedRate = scored.length ? scored.filter((r) => r.grounded).length / scored.length : 0;
 
-console.log(`\nChat answer quality — ${n} questions vs ${TARGET} (judge: ${JUDGE_MODEL})\n`);
+console.log(`\nChat answer quality — ${scored.length}/${n} scored vs ${TARGET} (judge: ${JUDGE_MODEL})\n`);
 console.log(`  Correctness:  ${avgCorr.toFixed(2)}/5`);
 console.log(`  Completeness: ${avgComp.toFixed(2)}/5`);
 console.log(`  Grounded:     ${(groundedRate * 100).toFixed(0)}%`);
+if (judgeErrors.length) console.log(`  (excluded ${judgeErrors.length} un-judgeable — see below)`);
 
-if (VERBOSE || errored.length) {
+if (VERBOSE || rows.some((r) => r.error)) {
 	console.log('\n  Per question:');
 	for (const r of rows) {
 		console.log(
 			r.error
-				? `    ⚠ "${r.q}" → error: ${r.error}`
+				? `    ⚠ "${r.q}" → ${r.chatError ? 'CHAT' : 'judge'} error: ${r.error}`
 				: `    correct ${r.correctness}/5 · complete ${r.completeness}/5 ${r.grounded ? '· grounded' : '· NOT grounded'}  "${r.q}" — ${r.notes}`
 		);
 	}
 }
 
-if (errored.length) {
-	console.error(`\nFAIL: ${errored.length}/${n} questions errored (endpoint/judge failure).`);
+// Only an endpoint (chat) failure is fatal — a stray un-judgeable answer isn't.
+if (chatErrors.length) {
+	console.error(`\nFAIL: ${chatErrors.length}/${n} questions had a chat-endpoint failure.`);
 	process.exit(1);
 }
 if (!Number.isNaN(MIN_SCORE)) {

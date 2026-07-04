@@ -48,6 +48,38 @@
 				"point it at your .env file(s)",
 				"the variables become available to the application"
 			]
+		},
+		{
+			"q": "How do I store binary data (like a file or image) in a Harper table?",
+			"key_points": [
+				"use the Blob data type for a binary attribute in the schema",
+				"a string or buffer assigned to a Blob field is stored as a blob",
+				"read it back via the record's blob (e.g. bytes()/stream()/text())"
+			]
+		},
+		{
+			"q": "How do I define a relationship between two tables?",
+			"key_points": [
+				"use the @relationship directive in the GraphQL schema",
+				"it references attributes (from/to) that act as the foreign key",
+				"lets you resolve/join related records"
+			]
+		},
+		{
+			"q": "How do I query a table over REST with filters, sorting, and pagination?",
+			"key_points": [
+				"send a GET request to the table's REST endpoint",
+				"use query parameters to filter by attribute conditions",
+				"sort and paginate (e.g. limit/offset or select) via query params"
+			]
+		},
+		{
+			"q": "How do I install Harper and connect to it?",
+			"key_points": [
+				"install Harper (e.g. via npm/CLI or Docker)",
+				"start the instance",
+				"connect over the operations API / a client / the studio"
+			]
 		}
 	]
 }

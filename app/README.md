@@ -144,18 +144,21 @@ chat retrieval calls `runSearch` with three levers, each validated to help:
 - `CHAT_RETRIEVE_K=8` distinct pages — Recall@K rises with K (chat grounds on all K sources): **75%
   at 5, 92% at 8**, no gain at 10.
 
-`npm run chat-eval` runs `eval/chat-grounding.json` (NL questions → expected doc-page substrings)
+`npm run chat-eval` runs `eval/chat-grounding.json` (24 NL questions → expected doc-page substrings)
 via the `retrieveOnly` endpoint (no model/quota) and scores Recall@K / MRR — currently
-**Recall@8 92%, MRR 0.78**; CI gates it at `--min-recall 0.6` (and hard-fails on any endpoint error).
+**Recall@8 100%, MRR 0.88** (MRR is the discriminating metric — recall@8 saturates once retrieval is
+solid); CI gates it at `--min-recall 0.6` (and hard-fails on any endpoint error).
 
-**Answer-quality eval** (`npm run answer-eval`, `eval/chat-answers.json`): recall only proves "the
-right page was in context" — this measures whether the *answer* is right. Each question runs through
-the real `/api/chat` pipeline, then an **LLM judge** scores correctness/completeness/grounded against
-a rubric of key points. Current: **correctness 4.33/5, 100% grounded** (judge `claude-sonnet-5`,
-override with `JUDGE_MODEL`; note it's self-judging — use Opus for a stricter grade). It costs 2 API
-calls per question (needs `ANTHROPIC_API_KEY`), so it's a manual/periodic check, not a per-push gate.
-It already earned its keep: the "load env vars" answer scored 2/5 completeness — a real answer gap
-(the grounding surfaced the page but not the `config.yaml` `loadEnv` syntax) that recall alone missed.
+**Answer-quality eval** (`npm run answer-eval`, `eval/chat-answers.json`, 10 questions): recall only
+proves "the right page was in context" — this measures whether the *answer* is right. Each question
+runs through the real `/api/chat` pipeline, then an **LLM judge** — given the grounding sources so it
+grades faithfulness, not its own memory — scores correctness/completeness/grounded against a rubric.
+Current: **correctness 4.22/5, 89% grounded** (judge `claude-sonnet-5`, override with `JUDGE_MODEL`;
+it's self-judging — use Opus for a stricter grade). Retries once and excludes an un-judgeable answer
+rather than failing the run; only a chat-endpoint error is fatal. Costs 2 API calls/question (needs
+`ANTHROPIC_API_KEY`) — a manual/periodic check, not a per-push gate. It keeps earning its keep: it
+caught the "load env vars" answer missing the `config.yaml` syntax, and the relationship answer using
+`@relation` instead of the correct `@relationship` directive — factual gaps recall can't see.
 
 **Follow-ups**: grow + curate both eval sets from real `ChatLog` questions (the seed sets are small
 and some grounding expectations are debatable) — that makes the metrics trustworthy and doubles as a
