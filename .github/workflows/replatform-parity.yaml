@@ -99,6 +99,13 @@ jobs:
           HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
         run: node app/scripts/ingest.ts --target http://127.0.0.1:9936
 
+      # Surface the server-side error when a step above fails (e.g. an ingest 500
+      # from an @embed write when GEMINI_API_KEY is missing) instead of leaving
+      # only the client's opaque "500 after 5 retries".
+      - name: Harper server log (on failure)
+        if: failure()
+        run: tail -200 "${{ runner.temp }}/hdb/harper-run.log" || echo "(no harper-run.log)"
+
       - name: Integration tests
         env:
           HARPER_TARGET: http://127.0.0.1:9936
