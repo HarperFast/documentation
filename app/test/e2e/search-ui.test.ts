@@ -87,7 +87,16 @@ test('all-docs toggle broadens scope', async () => {
 	try {
 		await query(page, 'vector index', '/reference/v5');
 		await page.check('.search-allscope');
-		await page.waitForTimeout(400);
+		// Wait for the re-search to actually broaden (a non-reference result to
+		// appear) rather than a fixed timeout — under CI load a short fixed wait can
+		// read the still-scoped results and flake.
+		await page.waitForFunction(
+			() => {
+				const links = [...document.querySelectorAll('.search-result a')].map((a) => a.getAttribute('href') ?? '');
+				return links.length > 0 && links.some((h) => !h.startsWith('/reference/v5'));
+			},
+			{ timeout: 4000 }
+		);
 		const all = await page.$$eval('.search-result', (els) =>
 			els.map((e) => e.querySelector('a')!.getAttribute('href')!)
 		);
