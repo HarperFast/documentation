@@ -179,6 +179,7 @@ type ChatLog @table(expiration: 7776000) {
 	sessionId: String # opaque per-browser id (best-effort)
 	ipHash: String # hashed client IP (never store raw IPs)
 	feedback: Int @indexed # -1 | 0 | +1 (thumbs), 0 = none
+	cached: Boolean @indexed # answer was served from the ChatCache (no generation)
 	# Async faithfulness monitor (scored after the answer streams — off the user path):
 	faithfulness: Float # 0..1, how well the answer is supported by the retrieved context
 	flagged: Boolean @indexed # faithfulness below the flag threshold (needs review)
@@ -192,4 +193,24 @@ type ChatQuota @table(expiration: 172800) {
 	id: ID @primaryKey
 	count: Int
 	updatedAt: Date @updatedTime
+}
+
+# Answer cache: a repeated/near-identical question can be served from here
+# instead of re-retrieving and re-generating. id = "<version>:<hash(normQuestion)>"
+# for the O(1) exact path; the HNSW embedding powers the semantic path. Scoped by
+# version (a v4 and v5 answer must never be shared) and release (invalidated when
+# content changes). 7-day TTL for freshness.
+type ChatCache @table(expiration: 604800) {
+	id: ID @primaryKey # "<version>:<hash>"
+	version: String @indexed # major doc version (v4/v5) or "default"
+	release: String @indexed # content release the answer was grounded on
+	normQuestion: String # normalized standalone question (exact match)
+	question: String # the standalone question (display)
+	embedText: String # the standalone question, embedded for semantic lookup
+	embedding: [Float] @embed(source: "embedText", model: "gemini-embedding-001")
+	answer: String
+	sources: Any # citations [{ rank, path, title, heading, url }]
+	model: String
+	hitCount: Int @indexed
+	createdAt: Date @createdTime
 }

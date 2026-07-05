@@ -19,6 +19,10 @@ import {
 	newChatId,
 	recordFeedback,
 	scoreFaithfulness,
+	lookupCache,
+	storeCache,
+	currentRelease,
+	type CacheHit,
 } from '../lib/chat.ts';
 import { renderChatPage } from '../lib/chat-ui.ts';
 
@@ -392,7 +396,17 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 		return jsonResponse(body.debug ? { sources: grounding.sources, context: grounding.context } : { sources: grounding.sources }, 200);
 	}
 
+	// Scope the answer cache by major version (a v4 answer must never serve a v5
+	// reader) and content release (invalidated when docs change).
+	const version = typeof body.version === 'string' && body.version ? body.version : 'default';
+	const release = await currentRelease();
 	const ipHash = hashIp(clientIp(request));
+
+	// Cache check BEFORE the quota — a cached answer costs no generation, so it
+	// shouldn't count against the caller's daily cap.
+	const cached = await lookupCache(version, release, question);
+	if (cached) return streamCachedAnswer(cached, question, sessionId, ipHash);
+
 	const quota = await checkAndBumpQuota(ipHash);
 	if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);
 
@@ -441,6 +455,8 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 				// Fire-and-forget: score faithfulness AFTER responding, off the user
 				// path — patches the ChatLog row when it completes. Never awaited.
 				void scoreFaithfulness(chatId, grounding.context, answer);
+				// Cache the answer for future repeats (skip the dev stub). Off-path.
+				if (modelId() !== 'stub') void storeCache(version, release, question, answer, grounding.sources, modelId());
 			} catch (err: any) {
 				// Log detail server-side; the client only gets a generic message.
 				console.error('[chat] generation error', err?.message ?? err);
@@ -466,5 +482,52 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 			'cache-control': 'no-store',
 			'x-accel-buffering': 'no', // don't let a proxy buffer the stream
 		},
+	});
+}
+
+// Stream a cached answer as SSE — same event shape as a live answer, so the
+// client is oblivious. No generation, no quota, no faithfulness re-score.
+function streamCachedAnswer(cached: CacheHit, question: string, sessionId: string, ipHash: string): Response {
+	const chatId = newChatId();
+	const started = Date.now();
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream({
+		async start(controller) {
+			const send = (event: string, data: unknown) => {
+				try {
+					controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+				} catch {
+					/* closed */
+				}
+			};
+			try {
+				send('sources', cached.sources);
+				// Emit the stored answer in chunks for a streaming feel.
+				for (let i = 0; i < cached.answer.length; i += 240) send('token', cached.answer.slice(i, i + 240));
+				send('done', { id: chatId, model: cached.model, cached: true, via: cached.via, latencyMs: Date.now() - started });
+			} finally {
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
+				await logChat({
+					id: chatId,
+					question,
+					answer: cached.answer,
+					sources: cached.sources,
+					grounded: cached.sources.length > 0,
+					promptChars: 0,
+					latencyMs: Date.now() - started,
+					sessionId,
+					ipHash,
+					cached: true,
+				});
+			}
+		},
+	});
+	return new Response(stream, {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' },
 	});
 }

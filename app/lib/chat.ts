@@ -6,10 +6,14 @@
 // citations, quota, logging) is exercised without a key.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { tables, type HarperRequest } from './harper.ts';
+import { tables, models, type HarperRequest } from './harper.ts';
 import { runSearch } from './search.ts';
 
-const { SitePointer, Page, ChatLog, ChatQuota } = tables;
+const { SitePointer, Page, ChatLog, ChatQuota, ChatCache } = tables;
+
+const EMBED_MODEL = 'gemini-embedding-001'; // must match the SearchChunk/@embed model
+const CACHE_ENABLED = process.env.CHAT_CACHE !== 'false';
+const CACHE_SIM_THRESHOLD = Number(process.env.CHAT_CACHE_SIM) || 0.95; // conservative — near-paraphrase only
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5';
 // Faithfulness monitor runs off the user path. It needs an accurate judge —
@@ -110,6 +114,123 @@ export async function checkAndBumpQuota(ipHash: string): Promise<QuotaResult> {
 		// best-effort: never block a chat on the counter write
 	}
 	return { ok: true, count: count + 1, cap: DAILY_CAP };
+}
+
+// ── Answer cache ─────────────────────────────────────────────────────────────
+
+export async function currentRelease(): Promise<string> {
+	return (await SitePointer.get('active'))?.release ?? '';
+}
+
+function normalizeQuestion(q: string): string {
+	return q
+		.toLowerCase()
+		.replace(/\s+/g, ' ')
+		.replace(/[?!.,;:]+$/g, '')
+		.trim();
+}
+
+function cacheKey(version: string, normQ: string): string {
+	return `${version}:${createHash('sha256').update(normQ).digest('hex').slice(0, 20)}`;
+}
+
+function cosine(a: number[], b: number[]): number {
+	let dot = 0;
+	let na = 0;
+	let nb = 0;
+	const n = Math.min(a.length, b.length);
+	for (let i = 0; i < n; i++) {
+		dot += a[i] * b[i];
+		na += a[i] * a[i];
+		nb += b[i] * b[i];
+	}
+	return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
+
+export interface CacheHit {
+	answer: string;
+	sources: Source[];
+	model: string;
+	via: 'exact' | 'semantic';
+}
+
+// Look up a cached answer for this (version, release, question). Exact path is an
+// O(1) primary-key get (no embedding). On an exact miss, a semantic path embeds
+// the question and finds the nearest cached one within the same version+release,
+// accepting only above a conservative cosine threshold (near-paraphrase).
+export async function lookupCache(version: string, release: string, question: string): Promise<CacheHit | null> {
+	if (!CACHE_ENABLED || !release) return null;
+	const normQ = normalizeQuestion(question);
+	try {
+		const exact = await ChatCache.get(cacheKey(version, normQ));
+		if (exact && exact.release === release && exact.answer) {
+			bumpCacheHit(exact.id, exact.hitCount ?? 0);
+			return { answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
+		}
+	} catch {
+		/* fall through to semantic */
+	}
+	try {
+		const [vector] = await (models as any).embed(question, { model: EMBED_MODEL, inputType: 'query' });
+		if (!vector) return null;
+		const qv = Array.from(vector) as number[];
+		for await (const row of ChatCache.search({
+			conditions: [
+				{ attribute: 'version', value: version },
+				{ attribute: 'release', value: release },
+			],
+			sort: { attribute: 'embedding', target: qv, ef: 200 },
+			limit: 1,
+		})) {
+			if (row?.answer && Array.isArray(row.embedding) && cosine(qv, row.embedding) >= CACHE_SIM_THRESHOLD) {
+				bumpCacheHit(row.id, row.hitCount ?? 0);
+				return { answer: row.answer, sources: safeSources(row.sources), model: row.model ?? 'cache', via: 'semantic' };
+			}
+			break; // only the single nearest neighbor
+		}
+	} catch {
+		/* cache miss */
+	}
+	return null;
+}
+
+function safeSources(s: unknown): Source[] {
+	return Array.isArray(s) ? (s as Source[]) : [];
+}
+
+function bumpCacheHit(id: string, current: number): void {
+	// fire-and-forget hit counter (analytics only)
+	ChatCache.patch({ id, hitCount: current + 1 }).catch(() => {});
+}
+
+// Store a freshly-generated answer in the cache. Skip un-cacheable answers (empty).
+export async function storeCache(
+	version: string,
+	release: string,
+	question: string,
+	answer: string,
+	sources: Source[],
+	model: string
+): Promise<void> {
+	if (!CACHE_ENABLED || !release || !answer.trim()) return;
+	const normQ = normalizeQuestion(question);
+	const q = question.slice(0, 500);
+	try {
+		await ChatCache.put({
+			id: cacheKey(version, normQ),
+			version,
+			release,
+			normQuestion: normQ,
+			question: q,
+			embedText: q,
+			answer,
+			sources,
+			model,
+			hitCount: 0,
+		});
+	} catch (err: any) {
+		console.error('[chat] cache store', err?.message ?? err);
+	}
 }
 
 // ── Retrieval / grounding ────────────────────────────────────────────────────
@@ -315,6 +436,7 @@ export interface ChatLogInput {
 	latencyMs: number;
 	sessionId: string;
 	ipHash: string;
+	cached?: boolean;
 }
 
 export async function logChat(input: ChatLogInput): Promise<void> {
@@ -332,6 +454,7 @@ export async function logChat(input: ChatLogInput): Promise<void> {
 			sessionId: input.sessionId.slice(0, 64),
 			ipHash: input.ipHash,
 			feedback: 0,
+			cached: Boolean(input.cached),
 		});
 	} catch {
 		// observability is best-effort; never fail a chat on it
