@@ -5,9 +5,11 @@
 // back to a deterministic dev stub so the whole pipeline (retrieval, streaming,
 // citations, quota, logging) is exercised without a key.
 
-import { createHash, randomBytes } from 'node:crypto';
-import { tables, models, type HarperRequest } from './harper.ts';
+import { tables, models } from './harper.ts';
 import { runSearch } from './search.ts';
+import { normalizeQuestion, cacheKey, cosine, MAX_QUESTION } from './chat-pure.ts';
+// Re-export the pure helpers so existing callers keep importing from './chat.ts'.
+export { clientIp, hashIp, parseVersion, computeCacheId, validateQuestion } from './chat-pure.ts';
 
 const { SitePointer, Page, ChatLog, ChatQuota, ChatCache } = tables;
 
@@ -34,20 +36,7 @@ const CTX_CHARS = 1500; // per-page context budget (matched-chunk text)
 // one matched section — a matched chunk alone often misses the exact syntax.
 const EXPAND_TOP = Number(process.env.CHAT_EXPAND_TOP) || 3;
 const PAGE_CTX = 2500; // per-expanded-page content budget
-const MAX_QUESTION = 1000; // reject longer questions
 const ANSWER_STORE_CAP = 8000; // truncate stored answers
-
-// Secret salt so stored IP hashes aren't reversible via a precomputed IPv4
-// rainbow table (the address space is small). Set CHAT_IP_SALT in production for
-// a STABLE secret salt (so per-IP quota survives restarts); otherwise a random
-// per-process salt keeps hashes private, at the cost of resetting the quota
-// window on restart.
-const IP_SALT = process.env.CHAT_IP_SALT || randomBytes(16).toString('hex');
-
-// Only trust X-Forwarded-For when explicitly behind a proxy that appends the
-// real client IP (CHAT_TRUST_PROXY=true). Off by default so the socket peer —
-// which a client cannot spoof — is used for quota bucketing.
-const TRUST_PROXY = process.env.CHAT_TRUST_PROXY === 'true';
 
 // Fuse both lanes equally for chat retrieval (semantic counts for NL questions).
 // Env-toggleable so it can be A/B'd against keyword-primary via the grounding eval.
@@ -61,31 +50,7 @@ export interface Source {
 	url: string;
 }
 
-// ── Client identity + quota ──────────────────────────────────────────────────
-
-export function clientIp(request: HarperRequest): string {
-	// Behind a trusted proxy, take the RIGHTMOST X-Forwarded-For hop — the one the
-	// proxy appended — since the leftmost entries are client-supplied and spoofable.
-	if (TRUST_PROXY) {
-		const fwd = request.headers.get('x-forwarded-for');
-		if (fwd) {
-			const hops = fwd
-				.split(',')
-				.map((s) => s.trim())
-				.filter(Boolean);
-			if (hops.length) return hops[hops.length - 1];
-		}
-	}
-	return (request as any).ip || 'local';
-}
-
-// Never store raw IPs — hash with a salt and keep a short prefix.
-export function hashIp(ip: string): string {
-	return createHash('sha256')
-		.update(`${IP_SALT}:${ip}`)
-		.digest('hex')
-		.slice(0, 16);
-}
+// ── Quota ────────────────────────────────────────────────────────────────────
 
 function today(): string {
 	return new Date().toISOString().slice(0, 10);
@@ -180,39 +145,6 @@ export async function currentRelease(): Promise<string> {
 	return (await SitePointer.get('active'))?.release ?? '';
 }
 
-function normalizeQuestion(q: string): string {
-	return q
-		.toLowerCase()
-		.replace(/\s+/g, ' ')
-		.replace(/[?!.,;:]+$/g, '')
-		.trim();
-}
-
-// Major doc version mentioned in a question ("...in v4" → "v4"), or null. The
-// condenser bakes the version into the standalone question, so this recovers the
-// version intent when the UI didn't pin one — used to scope the cache correctly.
-export function parseVersion(text: string): string | null {
-	// Return a version only when EXACTLY one is mentioned. A comparison question
-	// ("differences between v4 and v5") names both — scope it to `default`, not
-	// whichever appears first, so retrieval/cache aren't biased to one version.
-	const versions = new Set<string>();
-	for (const m of text.matchAll(/\bv([45])\b/gi)) versions.add(`v${m[1]}`);
-	return versions.size === 1 ? [...versions][0] : null;
-}
-
-// Cache id: release + version + question hash. Release is in the KEY (not just a
-// field) so a straggler request on an old release can't overwrite a fresh
-// row for the current release — old rows simply age out via TTL.
-function cacheKey(release: string, version: string, normQ: string): string {
-	return `${release}:${version}:${createHash('sha256').update(normQ).digest('hex').slice(0, 20)}`;
-}
-
-// The cache id a generated answer will be stored under — recorded on its ChatLog
-// row so a later thumbs-down or faithfulness flag can evict exactly that entry.
-export function computeCacheId(release: string, version: string, question: string): string {
-	return cacheKey(release, version, normalizeQuestion(question));
-}
-
 // Drop a cached answer (thumbs-down / faithfulness flag) so a bad answer is not
 // re-served for the rest of its TTL. Best-effort; a missing id is a no-op.
 export async function evictCache(cacheId: unknown): Promise<void> {
@@ -222,19 +154,6 @@ export async function evictCache(cacheId: unknown): Promise<void> {
 	} catch {
 		/* best-effort: a missing/already-evicted row is fine */
 	}
-}
-
-function cosine(a: number[], b: number[]): number {
-	let dot = 0;
-	let na = 0;
-	let nb = 0;
-	const n = Math.min(a.length, b.length);
-	for (let i = 0; i < n; i++) {
-		dot += a[i] * b[i];
-		na += a[i] * a[i];
-		nb += b[i] * b[i];
-	}
-	return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
 }
 
 export interface CacheHit {
@@ -506,13 +425,6 @@ async function* stubStream(question: string, sources: Source[]): AsyncGenerator<
 }
 
 // ── Validation + logging ─────────────────────────────────────────────────────
-
-export function validateQuestion(q: unknown): string | null {
-	if (typeof q !== 'string') return null;
-	const trimmed = q.trim();
-	if (trimmed.length < 2 || trimmed.length > MAX_QUESTION) return null;
-	return trimmed;
-}
 
 // Stable id for a chat exchange, minted before streaming so it can be sent to
 // the client (in the `done` event) for later thumbs feedback.
