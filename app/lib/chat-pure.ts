@@ -42,7 +42,7 @@ export function clientIp(request: ClientRequest): string {
 			if (hops.length) return hops[hops.length - 1];
 		}
 	}
-	return (request as any).ip || 'local';
+	return request.ip || 'local';
 }
 
 // Never store raw IPs — hash with a salt and keep a short prefix.
