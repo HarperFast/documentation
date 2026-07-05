@@ -61,19 +61,31 @@ jobs:
           # multi-turn cases exercise a no-op condenser. Add the secret to run
           # those for real (each CI run then makes a modest number of API calls).
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Embedding model for @embed / the semantic lane. Requires the
-          # GEMINI_API_KEY repo secret; HARPER_CONFIG merges the models section
-          # into the instance config at startup. Without it, @embed writes fail
-          # and ingest aborts (the @embed ingest-time coupling — see #1594).
+          # Embedding backend for @embed / the semantic lane (ingest-time coupling,
+          # see #1594). Requires the GEMINI_API_KEY repo secret. Registered by
+          # writing the models section into the instance config below — the same
+          # config the local dev instance uses (HARPER_CONFIG env is NOT merged
+          # under `harper run .`, which is why @embed 500'd with "No backend
+          # registered for embedding.gemini-embedding-001").
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          HARPER_CONFIG: >-
-            {"models":{"embedding":{"gemini-embedding-001":{"backend":"openai",
-            "baseUrl":"https://generativelanguage.googleapis.com/v1beta/openai/",
-            "apiKey":"${GEMINI_API_KEY}","model":"gemini-embedding-001"}}}}
         run: |
           harper install --TC_AGREEMENT=yes --HDB_ADMIN_USERNAME="$HDB_ADMIN_USERNAME" \
             --HDB_ADMIN_PASSWORD="$HDB_ADMIN_PASSWORD" --ROOTPATH="$ROOTPATH" \
             --HTTP_PORT=9936 --OPERATIONSAPI_NETWORK_PORT=9935
+          # Register the embedding backend in the instance config (Harper expands
+          # ${GEMINI_API_KEY} from the env at startup). Append so install's ports
+          # etc. are preserved.
+          test -f "$ROOTPATH/harper-config.yaml" || { echo "::error::no $ROOTPATH/harper-config.yaml after install"; ls -la "$ROOTPATH"; exit 1; }
+          cat >> "$ROOTPATH/harper-config.yaml" <<'YAML'
+
+          models:
+            embedding:
+              gemini-embedding-001:
+                backend: openai
+                baseUrl: https://generativelanguage.googleapis.com/v1beta/openai/
+                apiKey: ${GEMINI_API_KEY}
+                model: gemini-embedding-001
+          YAML
           # Run the app as a COMPONENT — `harper run .` loads app/ (its custom
           # resources: /Ingest, /api/*, /admin/*), whereas `harper start` boots a
           # bare instance with none of them (so ingest 404'd). Backgrounded so the
