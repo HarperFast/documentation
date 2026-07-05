@@ -19,6 +19,21 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { loadCreds } from '../../scripts/lib/record.ts';
+
+const CREDS = loadCreds();
+const OPS = process.env.HARPER_OPS_TARGET ?? 'http://127.0.0.1:9935';
+
+// Minimal Harper Operations API client (for tests that need to read/write tables
+// directly, e.g. injecting a faithfulness tombstone deterministically).
+async function op(body: Record<string, unknown>): Promise<any> {
+	const res = await fetch(OPS, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json', authorization: `Basic ${CREDS}` },
+		body: JSON.stringify(body),
+	});
+	return res.ok ? res.json() : null;
+}
 
 const BASE = process.env.HARPER_TARGET ?? 'http://localhost:9936';
 const NONCE = Date.now().toString(36);
@@ -163,22 +178,31 @@ test('eviction: a thumbs-down drops the cached answer so the next ask regenerate
 	assert.ok(!after.cached, 'after eviction the answer regenerates (not served from cache)');
 });
 
-test('durable eviction: the tombstone stops the evicted answer re-caching immediately', async (t) => {
+test('durable eviction: a faithfulness tombstone stops re-caching (lookup + store honor it)', async (t) => {
 	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
 	if (!(await liveModel())) return t.skip('dev stub does not cache — needs ANTHROPIC_API_KEY');
+	if (!CREDS) return t.skip('no admin credentials for the ops API');
 	const q = `cache tombstone ${NONCE}: how do I rotate a signing key?`;
 	const gen = await chat(q, { ip: '203.0.113.60', version: SCOPE }); // generate + cache
 	if (gen === QUOTA || gen === null) return t.skip('quota/environmental');
 	const hit = await chat(q, { ip: '203.0.113.61', version: SCOPE });
 	if (hit === QUOTA || hit === null) return t.skip('quota/environmental');
-	assert.equal(hit.cached, true, 'cached before eviction');
-	assert.equal(await rate(hit.id, -1), 200, 'thumbs-down recorded');
-	// Two asks after eviction: WITHOUT the tombstone the first would regenerate and
-	// re-cache, so the second would be a hit again. The tombstone keeps both misses.
+	assert.equal(hit.cached, true, 'cached before the tombstone');
+
+	// Only the faithfulness monitor tombstones (a user thumbs-down merely evicts,
+	// which isn't deterministic to trigger), so simulate its flag: read the served
+	// row's cacheId and insert the tombstone the monitor would write.
+	const rows = await op({ operation: 'sql', sql: `SELECT cacheId FROM data.ChatLog WHERE id = '${hit.id}'` });
+	const cacheId = Array.isArray(rows) && rows[0]?.cacheId;
+	assert.ok(cacheId, 'ChatLog row carries the served cacheId');
+	await op({ operation: 'insert', database: 'data', table: 'ChatCacheEvicted', records: [{ id: cacheId, reason: 'flagged' }] });
+
+	// lookup must reject the tombstoned row (even though it still exists), and the
+	// regeneration must not re-cache it — two asks in a row both regenerate.
 	const a1 = await chat(q, { ip: '203.0.113.62', version: SCOPE });
 	if (a1 === QUOTA || a1 === null) return t.skip('quota/environmental');
 	const a2 = await chat(q, { ip: '203.0.113.63', version: SCOPE });
 	if (a2 === QUOTA || a2 === null) return t.skip('quota/environmental');
-	assert.ok(!a1.cached, 'first ask after eviction regenerates');
-	assert.ok(!a2.cached, 'second ask still regenerates — tombstone blocked re-caching');
+	assert.ok(!a1.cached, 'tombstoned answer not served (lookup rejects it)');
+	assert.ok(!a2.cached, 'still not re-cached (store respects the tombstone)');
 });

@@ -147,15 +147,28 @@ export async function currentRelease(): Promise<string> {
 
 // Drop a cached answer (thumbs-down / faithfulness flag) so a bad answer is not
 // re-served for the rest of its TTL. Best-effort; a missing id is a no-op.
-export async function evictCache(cacheId: unknown, reason = 'evicted'): Promise<void> {
+export async function evictCache(cacheId: unknown, reason = 'evicted', durable = false): Promise<void> {
 	if (!CACHE_ENABLED || typeof cacheId !== 'string' || !cacheId) return;
 	try {
 		await ChatCache.delete(cacheId);
-		// Tombstone the id so storeCache won't immediately re-cache the same bad
-		// answer on the next ask (short TTL — see the ChatCacheEvicted schema).
-		await ChatCacheEvicted.put({ id: cacheId, reason });
+		// Durable suppression (a tombstone that blocks re-caching for its TTL) is
+		// reserved for the RELIABLE signal — the faithfulness monitor's flag. A single
+		// user thumbs-down just evicts: the next asker regenerates (a fresh, possibly
+		// better answer), and if that is ALSO bad the monitor flags+tombstones it. This
+		// keeps one anonymous downvote from suppressing a popular answer's cache for an
+		// hour for everyone (a UX/cost concern raised in review).
+		if (durable) await ChatCacheEvicted.put({ id: cacheId, reason });
 	} catch {
 		/* best-effort: a missing/already-evicted row is fine */
+	}
+}
+
+// A cache id under an active eviction tombstone must never be served or re-stored.
+async function isTombstoned(id: string): Promise<boolean> {
+	try {
+		return Boolean(await ChatCacheEvicted.get(id));
+	} catch {
+		return false; // best-effort: a lookup failure shouldn't block serving
 	}
 }
 
@@ -177,8 +190,14 @@ export async function lookupCache(version: string, release: string, question: st
 	try {
 		const exact = await ChatCache.get(cacheKey(release, version, normQ));
 		if (exact && exact.release === release && exact.answer) {
-			bumpCacheHit(exact.id, exact.hitCount ?? 0);
-			return { id: exact.id, answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
+			// A row can slip into the cache under an active tombstone via a store/evict
+			// race; never serve it, and remove it.
+			if (await isTombstoned(exact.id)) {
+				void ChatCache.delete(exact.id);
+			} else {
+				bumpCacheHit(exact.id, exact.hitCount ?? 0);
+				return { id: exact.id, answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
+			}
 		}
 	} catch {
 		/* fall through to semantic */
@@ -196,6 +215,10 @@ export async function lookupCache(version: string, release: string, question: st
 			limit: 1,
 		})) {
 			if (row?.answer && Array.isArray(row.embedding) && cosine(qv, row.embedding) >= CACHE_SIM_THRESHOLD) {
+				if (await isTombstoned(row.id)) {
+					void ChatCache.delete(row.id); // slipped in under a tombstone (race) — remove
+					break;
+				}
 				bumpCacheHit(row.id, row.hitCount ?? 0);
 				return { id: row.id, answer: row.answer, sources: safeSources(row.sources), model: row.model ?? 'cache', via: 'semantic' };
 			}
@@ -529,7 +552,7 @@ export async function scoreFaithfulness(id: string, context: string, answer: str
 		});
 		// A flagged (likely-hallucinated) answer is evicted so it isn't re-served
 		// from cache while it sits in the review queue.
-		if (flagged && cacheId) void evictCache(cacheId, 'flagged');
+		if (flagged && cacheId) void evictCache(cacheId, 'flagged', true); // durable: reliable signal
 	} catch (err: any) {
 		console.error('[chat] faithfulness error', err?.message ?? err);
 	}
@@ -546,7 +569,7 @@ export async function recordFeedback(id: unknown, value: unknown): Promise<boole
 		await ChatLog.patch({ id, feedback: v });
 		// A thumbs-down evicts the cached answer so the next asker doesn't get the
 		// same disliked response for the rest of its TTL.
-		if (v < 0 && existing.cacheId) void evictCache(existing.cacheId, 'thumbs-down');
+		if (v < 0 && existing.cacheId) void evictCache(existing.cacheId, 'thumbs-down'); // evict only, not durable
 		return true;
 	} catch {
 		return false;
