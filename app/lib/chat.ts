@@ -192,8 +192,12 @@ function normalizeQuestion(q: string): string {
 // condenser bakes the version into the standalone question, so this recovers the
 // version intent when the UI didn't pin one — used to scope the cache correctly.
 export function parseVersion(text: string): string | null {
-	const m = /\bv([45])\b/i.exec(text);
-	return m ? `v${m[1]}` : null;
+	// Return a version only when EXACTLY one is mentioned. A comparison question
+	// ("differences between v4 and v5") names both — scope it to `default`, not
+	// whichever appears first, so retrieval/cache aren't biased to one version.
+	const versions = new Set<string>();
+	for (const m of text.matchAll(/\bv([45])\b/gi)) versions.add(`v${m[1]}`);
+	return versions.size === 1 ? [...versions][0] : null;
 }
 
 // Cache id: release + version + question hash. Release is in the KEY (not just a
@@ -298,13 +302,14 @@ export async function storeCache(
 	answer: string,
 	sources: Source[],
 	model: string
-): Promise<void> {
-	if (!CACHE_ENABLED || !release || !answer.trim()) return;
+): Promise<string | null> {
+	if (!CACHE_ENABLED || !release || !answer.trim()) return null;
 	const normQ = normalizeQuestion(question);
+	const id = cacheKey(release, version, normQ);
 	const q = question.slice(0, 500);
 	try {
 		await ChatCache.put({
-			id: cacheKey(release, version, normQ),
+			id,
 			version,
 			release,
 			normQuestion: normQ,
@@ -315,8 +320,10 @@ export async function storeCache(
 			model,
 			hitCount: 0,
 		});
+		return id; // returned so the caller records it on the ChatLog row only after a successful store
 	} catch (err: any) {
 		console.error('[chat] cache store', err?.message ?? err);
+		return null;
 	}
 }
 

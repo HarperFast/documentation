@@ -23,7 +23,6 @@ import {
 	scoreFaithfulness,
 	lookupCache,
 	storeCache,
-	computeCacheId,
 	currentRelease,
 	condenseQuestion,
 	type CacheHit,
@@ -396,14 +395,25 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	// Multi-turn: condense (conversation history + latest message) into a
 	// STANDALONE question, then treat everything below as single-turn — this one
 	// question drives the cache, retrieval, generation, and logging. First turn or
-	// no history → unchanged (no extra call). The condenser is an LLM call that
-	// runs before the generation quota is charged, so gate it behind a read-only
-	// quota peek — otherwise an over-cap caller could force unbounded condensation
-	// calls (also reachable via retrieveOnly, which is itself quota-free).
+	// no history → unchanged (no extra call).
+	//
+	// The condenser is an LLM call that runs before the generation quota. A
+	// multi-turn cache hit returns before that quota, so without charging here it
+	// could be spammed for free. Charge the condensation to the daily quota for the
+	// answer path (a follow-up costs an LLM call regardless of a later cache hit);
+	// the retrieveOnly path (grounding preview + eval) uses a read-only peek so it
+	// stays quota-free but still can't be driven by an over-cap caller.
 	const history = Array.isArray(body.history) ? body.history : [];
+	let quotaCharged = false;
 	if (history.length) {
-		const peek = await peekQuota(ipHash);
-		if (!peek.ok) return jsonResponse({ error: 'daily quota exceeded', cap: peek.cap }, 429);
+		if (body.retrieveOnly) {
+			const peek = await peekQuota(ipHash);
+			if (!peek.ok) return jsonResponse({ error: 'daily quota exceeded', cap: peek.cap }, 429);
+		} else {
+			const q = await checkAndBumpQuota(ipHash);
+			if (!q.ok) return jsonResponse({ error: 'daily quota exceeded', cap: q.cap }, 429);
+			quotaCharged = true;
+		}
 	}
 	const question = history.length ? await condenseQuestion(history, rawQuestion) : rawQuestion;
 
@@ -429,14 +439,17 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	const cached = await lookupCache(version, release, question);
 	if (cached) return streamCachedAnswer(cached, question, sessionId, ipHash);
 
-	const quota = await checkAndBumpQuota(ipHash);
-	if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);
+	// Charge generation — unless a multi-turn request already charged for its
+	// condensation above (don't double-bill the same follow-up).
+	if (!quotaCharged) {
+		const quota = await checkAndBumpQuota(ipHash);
+		if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);
+	}
 
-	// The id this answer will be cached under (empty when uncacheable — dev stub or
-	// no release). Recorded on the ChatLog row so a thumbs-down or a faithfulness
-	// flag can evict exactly this entry.
+	// Whether this answer is cacheable (not the dev stub, and a release is active).
+	// The actual cache id is learned from storeCache after a successful write and
+	// recorded on the ChatLog row so a thumbs-down / flag can evict exactly it.
 	const cacheable = modelId() !== 'stub' && Boolean(release);
-	const cacheId = cacheable ? computeCacheId(release, version, question) : '';
 
 	const started = Date.now();
 	const grounding = await retrieve(question, body.section ?? null, body.version ?? null);
@@ -458,7 +471,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					/* stream already closed/cancelled */
 				}
 			};
-			const writeLog = () =>
+			const writeLog = (storedCacheId?: string) =>
 				logChat({
 					id: chatId,
 					question,
@@ -469,7 +482,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					latencyMs: Date.now() - started,
 					sessionId,
 					ipHash,
-					cacheId: cacheable ? cacheId : undefined,
+					cacheId: storedCacheId, // only the id of a successfully-stored entry
 				});
 			try {
 				send('sources', grounding.sources);
@@ -477,17 +490,17 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					answer += delta;
 					send('token', delta);
 				}
-				// Persist the row BEFORE announcing its id, so a fast rating click on
-				// /api/chat-feedback can't arrive before the ChatLog row exists.
-				await writeLog();
+				// Cache the answer (skip the dev stub) BEFORE announcing done, so both
+				// the ChatLog row AND the cache entry exist by the time the client can
+				// click a rating — otherwise a fast thumbs-down evicts nothing and the
+				// disliked answer is then stored. writeLog records only a
+				// successfully-stored cacheId, so eviction can't dangle or mis-target.
+				const storedCacheId = cacheable ? (await storeCache(version, release, question, answer, grounding.sources, modelId())) ?? undefined : undefined;
+				await writeLog(storedCacheId);
 				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
-				// Cache the answer for future repeats (skip the dev stub). Store BEFORE
-				// scoring so the faithfulness monitor can evict this exact entry if it
-				// flags the answer (the store is a fast put; the judge is a slow call).
-				if (cacheable) await storeCache(version, release, question, answer, grounding.sources, modelId());
 				// Fire-and-forget: score faithfulness AFTER responding, off the user
 				// path — patches the ChatLog row and evicts the cache entry if flagged.
-				void scoreFaithfulness(chatId, grounding.context, answer, cacheable ? cacheId : undefined);
+				void scoreFaithfulness(chatId, grounding.context, answer, storedCacheId);
 			} catch (err: any) {
 				// Log detail server-side; the client only gets a generic message.
 				console.error('[chat] generation error', err?.message ?? err);
@@ -535,13 +548,9 @@ function streamCachedAnswer(cached: CacheHit, question: string, sessionId: strin
 				send('sources', cached.sources);
 				// Emit the stored answer in chunks for a streaming feel.
 				for (let i = 0; i < cached.answer.length; i += 240) send('token', cached.answer.slice(i, i + 240));
-				send('done', { id: chatId, model: cached.model, cached: true, via: cached.via, latencyMs: Date.now() - started });
-			} finally {
-				try {
-					controller.close();
-				} catch {
-					/* already closed */
-				}
+				// Persist the row BEFORE announcing done — same invariant as the live
+				// path — so a fast thumbs-down (which the UI enables on `done`) finds
+				// the ChatLog row and can evict this cached answer.
 				await logChat({
 					id: chatId,
 					question,
@@ -555,6 +564,13 @@ function streamCachedAnswer(cached: CacheHit, question: string, sessionId: strin
 					cached: true,
 					cacheId: cached.id, // so a thumbs-down on a cached answer evicts it too
 				});
+				send('done', { id: chatId, model: cached.model, cached: true, via: cached.via, latencyMs: Date.now() - started });
+			} finally {
+				try {
+					controller.close();
+				} catch {
+					/* already closed */
+				}
 			}
 		},
 	});
