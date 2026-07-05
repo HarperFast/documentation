@@ -179,6 +179,10 @@ type ChatLog @table(expiration: 7776000) {
 	sessionId: String # opaque per-browser id (best-effort)
 	ipHash: String # hashed client IP (never store raw IPs)
 	feedback: Int @indexed # -1 | 0 | +1 (thumbs), 0 = none
+	# Async faithfulness monitor (scored after the answer streams — off the user path):
+	faithfulness: Float # 0..1, how well the answer is supported by the retrieved context
+	flagged: Boolean @indexed # faithfulness below the flag threshold (needs review)
+	flaggedNote: String # one-line description of the unsupported claim(s)
 	createdAt: Date @createdTime
 }
 

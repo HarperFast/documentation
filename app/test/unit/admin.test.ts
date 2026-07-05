@@ -118,11 +118,23 @@ test('renderValidationDashboard: empty states when no runs', () => {
 });
 
 const SAMPLE_CHAT: ChatAnalytics = {
-	totals: { chats: 19, grounded: 19, groundedRate: 1, avgLatencyMs: 390, windowDays: 14 },
+	totals: {
+		chats: 19,
+		grounded: 19,
+		groundedRate: 1,
+		avgLatencyMs: 390,
+		windowDays: 14,
+		avgFaithfulness: 0.94,
+		scored: 18,
+		flaggedCount: 1,
+	},
 	topQuestions: [{ question: 'what is replication?', count: 5 }],
 	volume: [{ day: '2026-07-04', count: 19 }],
 	byModel: [{ model: 'stub', count: 19 }],
 	feedback: { up: 0, down: 0, none: 19 },
+	flagged: [
+		{ question: 'how do I install harper?', faithfulness: 0.4, note: 'invented docker image harperfast/harper', createdAt: '2026-07-04T19:00:00Z' },
+	],
 	recent: [
 		{
 			question: 'what is replication?',
@@ -144,4 +156,9 @@ test('renderChatDashboard: active Chat tab, grounded %, recent rows', () => {
 	assert.match(html, /what is replication\?/);
 	assert.match(html, /Recent conversations/);
 	assert.match(html, /grounded/);
+	// Faithfulness monitor: card + flagged-answers panel.
+	assert.match(html, /Avg faithfulness/);
+	assert.match(html, /94\.0%/); // avgFaithfulness 0.94
+	assert.match(html, /Flagged answers/);
+	assert.match(html, /invented docker image/);
 });

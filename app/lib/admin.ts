@@ -59,12 +59,29 @@ export interface ChatRecent {
 	createdAt: string | number;
 }
 
+export interface ChatFlagged {
+	question: string;
+	faithfulness: number;
+	note: string;
+	createdAt: string | number;
+}
+
 export interface ChatAnalytics {
-	totals: { chats: number; grounded: number; groundedRate: number; avgLatencyMs: number; windowDays: number };
+	totals: {
+		chats: number;
+		grounded: number;
+		groundedRate: number;
+		avgLatencyMs: number;
+		windowDays: number;
+		avgFaithfulness: number; // over scored answers
+		scored: number; // answers with a faithfulness score
+		flaggedCount: number; // answers below the flag threshold
+	};
 	topQuestions: Array<{ question: string; count: number }>; // pre-sorted desc
 	volume: Array<{ day: string; count: number }>; // chronological
 	byModel: Array<{ model: string; count: number }>; // pre-sorted desc
 	feedback: { up: number; down: number; none: number };
+	flagged: ChatFlagged[]; // low-faithfulness answers, newest-first
 	recent: ChatRecent[]; // newest-first
 }
 
@@ -334,6 +351,16 @@ export function renderChatDashboard(a: ChatAnalytics): string {
 	const cards: Card[] = [
 		{ label: 'Total chats', value: num(t.chats) },
 		{ label: 'Grounded', value: `${pct(t.groundedRate)}%`, color: STATUS.activated.color },
+		{
+			label: 'Avg faithfulness',
+			value: t.scored ? `${pct(t.avgFaithfulness)}%` : '—',
+			color: t.scored && t.avgFaithfulness < 0.85 ? STATUS.rejected.color : STATUS.activated.color,
+		},
+		{
+			label: 'Flagged',
+			value: num(t.flaggedCount),
+			color: t.flaggedCount > 0 ? STATUS.rejected.color : undefined,
+		},
 		{ label: 'Avg latency', value: fmtDuration(t.avgLatencyMs) },
 		{ label: 'Window', value: `${t.windowDays} days` },
 	];
@@ -370,6 +397,21 @@ export function renderChatDashboard(a: ChatAnalytics): string {
 	${barList(feedback, 'No feedback yet.')}
 </section>
 <section class="admin-panel">
+	<h2>Flagged answers <span class="admin-sub">low faithfulness — likely hallucination, review these</span></h2>
+	<div class="admin-table-scroll">
+	<table class="admin-table">
+		<thead><tr><th>Question</th><th class="num">Faithfulness</th><th>Unsupported claim</th><th>When</th></tr></thead>
+		<tbody>
+		${
+			a.flagged.length
+				? a.flagged.map((f) => rowFlagged(f)).join('')
+				: `<tr><td colspan="4" class="admin-empty">${t.scored ? 'No flagged answers — all scored answers are well-grounded.' : 'No faithfulness scores yet (needs a live model + traffic).'}</td></tr>`
+		}
+		</tbody>
+	</table>
+	</div>
+</section>
+<section class="admin-panel">
 	<h2>Recent conversations</h2>
 	<div class="admin-table-scroll">
 	<table class="admin-table">
@@ -382,6 +424,15 @@ export function renderChatDashboard(a: ChatAnalytics): string {
 </section>`;
 
 	return shell('chat', body, 'Chat');
+}
+
+function rowFlagged(f: ChatFlagged): string {
+	return `<tr>
+		<td>${esc((f.question ?? '').slice(0, 80))}</td>
+		<td class="num"><span class="admin-pill" style="color:${STATUS.rejected.color};background:${STATUS.rejected.bg}">${pct(f.faithfulness)}%</span></td>
+		<td>${esc((f.note ?? '').slice(0, 120))}</td>
+		<td class="admin-when">${esc(fmtWhen(f.createdAt))}</td>
+	</tr>`;
 }
 
 function rowChat(r: ChatRecent): string {

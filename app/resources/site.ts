@@ -18,6 +18,7 @@ import {
 	logChat,
 	newChatId,
 	recordFeedback,
+	scoreFaithfulness,
 } from '../lib/chat.ts';
 import { renderChatPage } from '../lib/chat-ui.ts';
 
@@ -437,6 +438,9 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 				// /api/chat-feedback can't arrive before the ChatLog row exists.
 				await writeLog();
 				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
+				// Fire-and-forget: score faithfulness AFTER responding, off the user
+				// path — patches the ChatLog row when it completes. Never awaited.
+				void scoreFaithfulness(chatId, grounding.context, answer);
 			} catch (err: any) {
 				// Log detail server-side; the client only gets a generic message.
 				console.error('[chat] generation error', err?.message ?? err);

@@ -12,6 +12,7 @@ import {
 	type ParityRunRow,
 	type ChatAnalytics,
 	type ChatRecent,
+	type ChatFlagged,
 } from './admin.ts';
 
 const { SearchQueryLog, EvalRun, ParityRun, ChatLog } = tables;
@@ -150,17 +151,34 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 	const byDay = new Map<string, number>();
 	const byModel = new Map<string, number>();
 	const recent: ChatRecent[] = [];
+	const flagged: ChatFlagged[] = [];
 	const feedback = { up: 0, down: 0, none: 0 };
 	let chats = 0;
 	let grounded = 0;
 	let latencySum = 0;
 	let latencyN = 0;
+	let faithSum = 0;
+	let faithN = 0;
+	let flaggedCount = 0;
 
 	for await (const row of ChatLog.search({})) {
 		const created = new Date(row.createdAt ?? 0).getTime();
 		if (now - created > windowMs) continue;
 		chats++;
 		if (row.grounded) grounded++;
+		if (typeof row.faithfulness === 'number') {
+			faithSum += row.faithfulness;
+			faithN++;
+			if (row.flagged) {
+				flaggedCount++;
+				flagged.push({
+					question: row.question ?? '',
+					faithfulness: row.faithfulness,
+					note: String(row.flaggedNote ?? ''),
+					createdAt: row.createdAt ?? 0,
+				});
+			}
+		}
 		if (typeof row.latencyMs === 'number') {
 			latencySum += row.latencyMs;
 			latencyN++;
@@ -187,6 +205,7 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 	}
 
 	recent.sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+	flagged.sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
 	const topQuestions = [...byQuestion.entries()]
 		.map(([question, count]) => ({ question, count }))
 		.sort((a, b) => b.count - a.count)
@@ -207,11 +226,15 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 			groundedRate: chats ? grounded / chats : 0,
 			avgLatencyMs: latencyN ? latencySum / latencyN : 0,
 			windowDays: WINDOW_DAYS,
+			avgFaithfulness: faithN ? faithSum / faithN : 0,
+			scored: faithN,
+			flaggedCount,
 		},
 		topQuestions,
 		volume,
 		byModel: byModelArr,
 		feedback,
+		flagged: flagged.slice(0, 12),
 		recent: recent.slice(0, 12),
 	};
 }
