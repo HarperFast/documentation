@@ -38,6 +38,7 @@ const SET_PATH = path.resolve(APP_DIR, argValue('--set') ?? 'eval/chat-grounding
 const MIN_RECALL = Number(argValue('--min-recall') ?? NaN);
 const VERBOSE = process.argv.includes('--verbose');
 const NO_RECORD = process.argv.includes('--no-record');
+const RUNS = Math.max(1, Number(argValue('--runs') ?? 1)); // average N passes to beat query-embedding noise
 
 const { cases }: { cases: Case[] } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
 
@@ -57,46 +58,61 @@ function label(c: Case): string {
 	return lastUser ? `${lastUser.content} ⟶ ${c.q}` : c.q;
 }
 
-const rows: Row[] = [];
-for (const c of cases) {
-	let sources: Source[] = [];
-	try {
-		const res = await fetch(`${TARGET}/api/chat`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ question: c.q, retrieveOnly: true, ...(c.history ? { history: c.history } : {}) }),
-		});
-		// A non-2xx (e.g. 429/500) is an endpoint failure, not a content miss —
-		// surface it rather than silently counting it as recall=0.
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		sources = ((await res.json()) as { sources?: Source[] }).sources ?? [];
-	} catch (err: any) {
-		rows.push({ q: label(c), hit: false, rank: 0, top: [], error: err.message });
-		continue;
-	}
-	const paths = sources.map((s) => s.path);
-	let rank = 0;
-	for (let i = 0; i < paths.length; i++) {
-		if (c.expect.some((e) => paths[i].includes(e))) {
-			rank = i + 1;
-			break;
+async function onePass(): Promise<{ rows: Row[]; recall: number; mrr: number }> {
+	const rows: Row[] = [];
+	for (const c of cases) {
+		let sources: Source[] = [];
+		try {
+			const res = await fetch(`${TARGET}/api/chat`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ question: c.q, retrieveOnly: true, ...(c.history ? { history: c.history } : {}) }),
+			});
+			// A non-2xx (e.g. 429/500) is an endpoint failure, not a content miss —
+			// surface it rather than silently counting it as recall=0.
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			sources = ((await res.json()) as { sources?: Source[] }).sources ?? [];
+		} catch (err: any) {
+			rows.push({ q: label(c), hit: false, rank: 0, top: [], error: err.message });
+			continue;
 		}
+		const paths = sources.map((s) => s.path);
+		let rank = 0;
+		for (let i = 0; i < paths.length; i++) {
+			if (c.expect.some((e) => paths[i].includes(e))) {
+				rank = i + 1;
+				break;
+			}
+		}
+		rows.push({ q: label(c), hit: rank > 0, rank, top: paths });
 	}
-	rows.push({ q: label(c), hit: rank > 0, rank, top: paths });
+	const m = rows.length;
+	const recall = m ? rows.filter((r) => r.hit).length / m : 0;
+	const mrr = m ? rows.reduce((a, r) => a + (r.rank ? 1 / r.rank : 0), 0) / m : 0;
+	return { rows, recall, mrr };
 }
+
+// Query embeddings from the live model aren't bit-identical run-to-run, so the
+// semantic lane — and thus MRR — carries ~±0.02 noise. Average `--runs` passes
+// to get a number stable enough to compare retrieval configs (and to steady the
+// CI gate). The last pass drives the per-case miss/verbose report.
+const passes: Array<{ rows: Row[]; recall: number; mrr: number }> = [];
+for (let i = 0; i < RUNS; i++) passes.push(await onePass());
+const rows = passes[passes.length - 1].rows;
+const recall = passes.reduce((a, p) => a + p.recall, 0) / RUNS;
+const mrr = passes.reduce((a, p) => a + p.mrr, 0) / RUNS;
+const mrrSpread = RUNS > 1 ? Math.max(...passes.map((p) => p.mrr)) - Math.min(...passes.map((p) => p.mrr)) : 0;
 
 const n = rows.length;
 const errored = rows.filter((r) => r.error);
-const recall = n ? rows.filter((r) => r.hit).length / n : 0;
-const mrr = n ? rows.reduce((a, r) => a + (r.rank ? 1 / r.rank : 0), 0) / n : 0;
 const misses = rows.filter((r) => !r.hit);
 // K = grounding sources returned (chat grounds on ALL of them), so "expected page
 // is anywhere in the K sources" is the meaningful recall — report it honestly.
 const k = Math.max(0, ...rows.map((r) => r.top.length));
 
-console.log(`\nChat grounding — ${n} questions vs ${TARGET}\n`);
+console.log(`\nChat grounding — ${n} questions vs ${TARGET}${RUNS > 1 ? ` (mean of ${RUNS} runs)` : ''}\n`);
 console.log(`  Recall@${k}:   ${(recall * 100).toFixed(1)}%  (expected page appears in the K grounding sources)`);
-console.log(`  MRR:        ${mrr.toFixed(3)}`);
+console.log(`  MRR:        ${mrr.toFixed(3)}${RUNS > 1 ? `  (±${(mrrSpread / 2).toFixed(3)} across runs)` : ''}`);
 
 if (misses.length) {
 	console.log(`\n  Misses:`);

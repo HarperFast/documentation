@@ -159,6 +159,12 @@ export async function runSearch({
 		// grounding recall on the chat eval (92% vs 83% for one-contribution-per-lane
 		// RRF). We keep the single BEST-scoring chunk per page so `withText` grounds
 		// on the strongest section (not just the first lane's).
+		// NOTE: keyword-anchoring this blend (weighting the keyword lane above the
+		// semantic lane so a precise match isn't demoted by a long tutorial's many
+		// weak section-hits) was swept on the grounding eval (weights 1–3, averaged
+		// over 5 runs to beat the ~±0.02 query-embedding noise). It did NOT help:
+		// 1.0 → MRR 0.839, 1.5 → 0.836 (indistinguishable), ≥2 clearly hurt. So the
+		// equal-weight blend below stands; don't re-litigate without a harder eval.
 		const add = (chunk: any, i: number) => {
 			const s = 1 / (RRF_K + i + 1);
 			const e = byPage.get(chunk.pageId);
