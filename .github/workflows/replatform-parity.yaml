@@ -23,6 +23,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+          # Cache the npm download store (~/.npm) keyed off both lockfiles, so the
+          # root `npm ci` and app `npm ci` skip re-downloading unchanged deps.
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
 
       # Fail early with an actionable message rather than a cryptic ingest 500.
       # GEMINI_API_KEY is REQUIRED: the schema's @embed backend won't register
@@ -179,6 +185,13 @@ jobs:
         # chat retrieval still surfaces the right doc page for NL questions.
         run: node app/scripts/chat-grounding.ts --min-recall 0.6 --target http://127.0.0.1:9936
 
+      # Cache the downloaded Chromium so only the first run (per Playwright version)
+      # pays the download; keyed off the app lockfile so a version bump reinstalls.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/package-lock.json') }}
       - name: Install Playwright browser
         run: npx --prefix app playwright install --with-deps chromium
 
