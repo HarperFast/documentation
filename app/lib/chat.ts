@@ -11,7 +11,7 @@ import { normalizeQuestion, cacheKey, cosine, MAX_QUESTION } from './chat-pure.t
 // Re-export the pure helpers so existing callers keep importing from './chat.ts'.
 export { clientIp, hashIp, parseVersion, computeCacheId, validateQuestion } from './chat-pure.ts';
 
-const { SitePointer, Page, ChatLog, ChatQuota, ChatCache } = tables;
+const { SitePointer, Page, ChatLog, ChatQuota, ChatCache, ChatCacheEvicted } = tables;
 
 const EMBED_MODEL = 'gemini-embedding-001'; // must match the SearchChunk/@embed model
 const CACHE_ENABLED = process.env.CHAT_CACHE !== 'false';
@@ -147,10 +147,13 @@ export async function currentRelease(): Promise<string> {
 
 // Drop a cached answer (thumbs-down / faithfulness flag) so a bad answer is not
 // re-served for the rest of its TTL. Best-effort; a missing id is a no-op.
-export async function evictCache(cacheId: unknown): Promise<void> {
+export async function evictCache(cacheId: unknown, reason = 'evicted'): Promise<void> {
 	if (!CACHE_ENABLED || typeof cacheId !== 'string' || !cacheId) return;
 	try {
 		await ChatCache.delete(cacheId);
+		// Tombstone the id so storeCache won't immediately re-cache the same bad
+		// answer on the next ask (short TTL — see the ChatCacheEvicted schema).
+		await ChatCacheEvicted.put({ id: cacheId, reason });
 	} catch {
 		/* best-effort: a missing/already-evicted row is fine */
 	}
@@ -225,6 +228,13 @@ export async function storeCache(
 	if (!CACHE_ENABLED || !release || !answer.trim()) return null;
 	const normQ = normalizeQuestion(question);
 	const id = cacheKey(release, version, normQ);
+	// Don't re-cache an answer that was just evicted (thumbs-down / flagged) — let
+	// the next asker regenerate until the tombstone's TTL lapses.
+	try {
+		if (await ChatCacheEvicted.get(id)) return null;
+	} catch {
+		/* tombstone check is best-effort — fall through and cache */
+	}
 	const q = question.slice(0, 500);
 	try {
 		await ChatCache.put({
@@ -519,7 +529,7 @@ export async function scoreFaithfulness(id: string, context: string, answer: str
 		});
 		// A flagged (likely-hallucinated) answer is evicted so it isn't re-served
 		// from cache while it sits in the review queue.
-		if (flagged && cacheId) void evictCache(cacheId);
+		if (flagged && cacheId) void evictCache(cacheId, 'flagged');
 	} catch (err: any) {
 		console.error('[chat] faithfulness error', err?.message ?? err);
 	}
@@ -536,7 +546,7 @@ export async function recordFeedback(id: unknown, value: unknown): Promise<boole
 		await ChatLog.patch({ id, feedback: v });
 		// A thumbs-down evicts the cached answer so the next asker doesn't get the
 		// same disliked response for the rest of its TTL.
-		if (v < 0 && existing.cacheId) void evictCache(existing.cacheId);
+		if (v < 0 && existing.cacheId) void evictCache(existing.cacheId, 'thumbs-down');
 		return true;
 	} catch {
 		return false;

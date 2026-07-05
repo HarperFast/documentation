@@ -162,3 +162,23 @@ test('eviction: a thumbs-down drops the cached answer so the next ask regenerate
 	if (after === QUOTA || after === null) return t.skip('quota/environmental');
 	assert.ok(!after.cached, 'after eviction the answer regenerates (not served from cache)');
 });
+
+test('durable eviction: the tombstone stops the evicted answer re-caching immediately', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	if (!(await liveModel())) return t.skip('dev stub does not cache — needs ANTHROPIC_API_KEY');
+	const q = `cache tombstone ${NONCE}: how do I rotate a signing key?`;
+	const gen = await chat(q, { ip: '203.0.113.60', version: SCOPE }); // generate + cache
+	if (gen === QUOTA || gen === null) return t.skip('quota/environmental');
+	const hit = await chat(q, { ip: '203.0.113.61', version: SCOPE });
+	if (hit === QUOTA || hit === null) return t.skip('quota/environmental');
+	assert.equal(hit.cached, true, 'cached before eviction');
+	assert.equal(await rate(hit.id, -1), 200, 'thumbs-down recorded');
+	// Two asks after eviction: WITHOUT the tombstone the first would regenerate and
+	// re-cache, so the second would be a hit again. The tombstone keeps both misses.
+	const a1 = await chat(q, { ip: '203.0.113.62', version: SCOPE });
+	if (a1 === QUOTA || a1 === null) return t.skip('quota/environmental');
+	const a2 = await chat(q, { ip: '203.0.113.63', version: SCOPE });
+	if (a2 === QUOTA || a2 === null) return t.skip('quota/environmental');
+	assert.ok(!a1.cached, 'first ask after eviction regenerates');
+	assert.ok(!a2.cached, 'second ask still regenerates — tombstone blocked re-caching');
+});

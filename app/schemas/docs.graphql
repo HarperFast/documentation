@@ -230,3 +230,15 @@ type ChatCache @table(expiration: 604800) {
 	hitCount: Int @indexed
 	createdAt: Date @createdTime
 }
+
+# Eviction tombstone: when an answer is evicted (thumbs-down or faithfulness flag)
+# it's recorded here so the SAME key can't immediately be re-cached with the same
+# bad answer — the next asker regenerates instead of getting the disliked answer
+# back from cache. id = the evicted ChatCache id. 1-hour TTL breaks the
+# evict→regenerate→re-cache churn while letting a genuine fix cache again later;
+# release is in the id, so a content re-ingest clears these naturally.
+type ChatCacheEvicted @table(expiration: 3600) {
+	id: ID @primaryKey # the evicted ChatCache id
+	reason: String # "thumbs-down" | "flagged"
+	createdAt: Date @createdTime
+}
