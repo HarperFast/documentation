@@ -210,12 +210,13 @@ type ChatQuota @table(expiration: 172800) {
 }
 
 # Answer cache: a repeated/near-identical question can be served from here
-# instead of re-retrieving and re-generating. id = "<version>:<hash(normQuestion)>"
-# for the O(1) exact path; the HNSW embedding powers the semantic path. Scoped by
-# version (a v4 and v5 answer must never be shared) and release (invalidated when
-# content changes). 7-day TTL for freshness.
+# instead of re-retrieving and re-generating. id = "<release>:<version>:<hash(normQuestion)>"
+# for the O(1) exact path; the HNSW embedding powers the semantic path. Release is
+# in the key (not just a field) so a straggler on an old release can't clobber a
+# fresh row. Scoped by version (a v4 and v5 answer must never be shared) and
+# release (invalidated when content changes). 7-day TTL for freshness.
 type ChatCache @table(expiration: 604800) {
-	id: ID @primaryKey # "<version>:<hash>"
+	id: ID @primaryKey # "<release>:<version>:<hash>"
 	version: String @indexed # major doc version (v4/v5) or "default"
 	release: String @indexed # content release the answer was grounded on
 	normQuestion: String # normalized standalone question (exact match)

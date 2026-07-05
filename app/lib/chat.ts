@@ -118,6 +118,19 @@ export async function checkAndBumpQuota(ipHash: string): Promise<QuotaResult> {
 	return { ok: true, count: count + 1, cap: DAILY_CAP };
 }
 
+// Read-only quota check (no bump). Used to gate the pre-cache condenser LLM call
+// so an over-cap caller can't force unbounded condensation calls (which run
+// before the generation quota is charged). A read failure fails open.
+export async function peekQuota(ipHash: string): Promise<QuotaResult> {
+	const id = `${ipHash}:${today()}`;
+	try {
+		const count = (await ChatQuota.get(id))?.count ?? 0;
+		return { ok: count < DAILY_CAP, count, cap: DAILY_CAP };
+	} catch {
+		return { ok: true, count: 0, cap: DAILY_CAP };
+	}
+}
+
 // ── Multi-turn condenser ─────────────────────────────────────────────────────
 
 export interface Turn {
@@ -175,8 +188,19 @@ function normalizeQuestion(q: string): string {
 		.trim();
 }
 
-function cacheKey(version: string, normQ: string): string {
-	return `${version}:${createHash('sha256').update(normQ).digest('hex').slice(0, 20)}`;
+// Major doc version mentioned in a question ("...in v4" → "v4"), or null. The
+// condenser bakes the version into the standalone question, so this recovers the
+// version intent when the UI didn't pin one — used to scope the cache correctly.
+export function parseVersion(text: string): string | null {
+	const m = /\bv([45])\b/i.exec(text);
+	return m ? `v${m[1]}` : null;
+}
+
+// Cache id: release + version + question hash. Release is in the KEY (not just a
+// field) so a straggler request on an old release can't overwrite a fresh
+// row for the current release — old rows simply age out via TTL.
+function cacheKey(release: string, version: string, normQ: string): string {
+	return `${release}:${version}:${createHash('sha256').update(normQ).digest('hex').slice(0, 20)}`;
 }
 
 function cosine(a: number[], b: number[]): number {
@@ -207,7 +231,7 @@ export async function lookupCache(version: string, release: string, question: st
 	if (!CACHE_ENABLED || !release) return null;
 	const normQ = normalizeQuestion(question);
 	try {
-		const exact = await ChatCache.get(cacheKey(version, normQ));
+		const exact = await ChatCache.get(cacheKey(release, version, normQ));
 		if (exact && exact.release === release && exact.answer) {
 			bumpCacheHit(exact.id, exact.hitCount ?? 0);
 			return { answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
@@ -262,7 +286,7 @@ export async function storeCache(
 	const q = question.slice(0, 500);
 	try {
 		await ChatCache.put({
-			id: cacheKey(version, normQ),
+			id: cacheKey(release, version, normQ),
 			version,
 			release,
 			normQuestion: normQ,

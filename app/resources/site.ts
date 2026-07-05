@@ -11,6 +11,8 @@ import {
 	clientIp,
 	hashIp,
 	checkAndBumpQuota,
+	peekQuota,
+	parseVersion,
 	retrieve,
 	buildMessages,
 	streamAnswer,
@@ -388,12 +390,20 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	const rawQuestion = validateQuestion(body.question);
 	if (!rawQuestion) return jsonResponse({ error: 'invalid question' }, 400);
 	const sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
+	const ipHash = hashIp(clientIp(request));
 
 	// Multi-turn: condense (conversation history + latest message) into a
 	// STANDALONE question, then treat everything below as single-turn — this one
 	// question drives the cache, retrieval, generation, and logging. First turn or
-	// no history → unchanged (no extra call).
+	// no history → unchanged (no extra call). The condenser is an LLM call that
+	// runs before the generation quota is charged, so gate it behind a read-only
+	// quota peek — otherwise an over-cap caller could force unbounded condensation
+	// calls (also reachable via retrieveOnly, which is itself quota-free).
 	const history = Array.isArray(body.history) ? body.history : [];
+	if (history.length) {
+		const peek = await peekQuota(ipHash);
+		if (!peek.ok) return jsonResponse({ error: 'daily quota exceeded', cap: peek.cap }, 429);
+	}
 	const question = history.length ? await condenseQuestion(history, rawQuestion) : rawQuestion;
 
 	// Retrieval-only mode: return the grounding sources without generating an
@@ -405,10 +415,13 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	}
 
 	// Scope the answer cache by major version (a v4 answer must never serve a v5
-	// reader) and content release (invalidated when docs change).
-	const version = typeof body.version === 'string' && body.version ? body.version : 'default';
+	// reader) and content release (invalidated when docs change). When the UI
+	// didn't pin a version, recover it from the (condensed) question — the
+	// condenser bakes "v4"/"v5" in — so a version-specific answer is never cached
+	// under, or served to, a different version scope.
+	const explicitVersion = typeof body.version === 'string' && body.version ? body.version : '';
+	const version = explicitVersion || parseVersion(question) || 'default';
 	const release = await currentRelease();
-	const ipHash = hashIp(clientIp(request));
 
 	// Cache check BEFORE the quota — a cached answer costs no generation, so it
 	// shouldn't count against the caller's daily cap.
