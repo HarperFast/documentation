@@ -74,10 +74,24 @@ jobs:
           harper install --TC_AGREEMENT=yes --HDB_ADMIN_USERNAME="$HDB_ADMIN_USERNAME" \
             --HDB_ADMIN_PASSWORD="$HDB_ADMIN_PASSWORD" --ROOTPATH="$ROOTPATH" \
             --HTTP_PORT=9936 --OPERATIONSAPI_NETWORK_PORT=9935
-          (cd app && ROOTPATH="$ROOTPATH" harper start)
-          for i in $(seq 1 30); do
+          # Run the app as a COMPONENT — `harper run .` loads app/ (its custom
+          # resources: /Ingest, /api/*, /admin/*), whereas `harper start` boots a
+          # bare instance with none of them (so ingest 404'd). Backgrounded so the
+          # later steps run against it; env (incl. the API keys) is inherited.
+          (cd app && ROOTPATH="$ROOTPATH" nohup harper run . > "$ROOTPATH/harper-run.log" 2>&1 &)
+          for i in $(seq 1 45); do
             curl -sf -o /dev/null "http://127.0.0.1:9936/" && break || sleep 2
           done
+          curl -s -o /dev/null -w "Harper up: HTTP %{http_code} on /\n" "http://127.0.0.1:9936/" || true
+          # Fail fast (with the app log) if the component didn't register its routes:
+          # a 404 on /Ingest means the app didn't load; any other code means it did.
+          ingest_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:9936/Ingest")
+          echo "/Ingest probe: HTTP $ingest_code"
+          if [ "$ingest_code" = "404" ]; then
+            echo "::error::/Ingest 404 — app component did not load its routes"
+            tail -80 "$ROOTPATH/harper-run.log" || true
+            exit 1
+          fi
 
       - name: Ingest corpus
         env:
