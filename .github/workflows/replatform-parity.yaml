@@ -24,6 +24,27 @@ jobs:
         with:
           node-version: '24'
 
+      # Fail early with an actionable message rather than a cryptic ingest 500.
+      # GEMINI_API_KEY is REQUIRED: the schema's @embed backend won't register
+      # without it, so ingest can't write SearchChunk rows. ANTHROPIC_API_KEY is
+      # optional — without it chat runs the dev stub and the model-gated cache
+      # tests self-skip.
+      - name: Preflight — required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY repo secret is not set — @embed cannot register a backend and ingest will 500. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "GEMINI_API_KEY: set"
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set — chat runs the dev stub; the model-gated cache tests will skip."
+          else
+            echo "ANTHROPIC_API_KEY: set"
+          fi
+
       - name: Build Docusaurus (ground truth)
         run: |
           npm ci
