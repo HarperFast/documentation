@@ -1,5 +1,5 @@
 {
-	"_comment": "Chat-grounding eval: natural-language questions with expected doc-path substrings. Measures whether chat retrieval (blend + withText + K) surfaces the right page in the grounding sources. Run: npm run chat-eval. A case is a hit when any top source path contains any `expect` substring. Grow this from real ChatLog questions as traffic arrives.",
+	"_comment": "Chat-grounding eval: natural-language questions with expected doc-path substrings. Measures whether chat retrieval (blend + withText + K) surfaces the right page in the grounding sources. Run: npm run chat-eval. A case is a hit when any top source path contains any `expect` substring. Cases with a `history` array are multi-turn: the endpoint condenses history + q into a standalone question before retrieving (this exercises the condenser, and costs one small Haiku call per such case — single-turn cases remain LLM-free). Grow this from real ChatLog questions as traffic arrives.",
 	"cases": [
 		{ "q": "How do I define a table with a primary key?", "expect": ["database/schema", "create-your-first-application", "database/overview"] },
 		{ "q": "How does replication work in Harper?", "expect": ["replication"] },
@@ -24,6 +24,98 @@
 		{ "q": "How do I monitor Harper with analytics?", "expect": ["analytics", "monitoring"] },
 		{ "q": "How do I use write-through caching to an external database?", "expect": ["write-through", "caching"] },
 		{ "q": "How do I set a TTL or expiration on records?", "expect": ["caching", "schema", "expiration"] },
-		{ "q": "How do I define a component and its config.yaml?", "expect": ["components", "configuration"] }
+		{ "q": "How do I define a component and its config.yaml?", "expect": ["components", "configuration"] },
+
+		{ "_comment": "── Multi-turn cases: the follow-up `q` is meaningless on its own; the endpoint condenses history + q into a standalone question before retrieving. These give the condenser the same golden-set coverage as the single-turn cases above.",
+		  "q": "what about for v4?",
+		  "history": [
+			{ "role": "user", "content": "How does replication work in Harper?" },
+			{ "role": "assistant", "content": "Harper replication syncs data across nodes using a subscription model." }
+		  ],
+		  "expect": ["replication"] },
+
+		{ "q": "how do I configure it?",
+		  "history": [
+			{ "role": "user", "content": "How does replication work in Harper?" },
+			{ "role": "assistant", "content": "Harper replication syncs data across nodes." }
+		  ],
+		  "expect": ["replication"] },
+
+		{ "q": "how do I query it?",
+		  "history": [
+			{ "role": "user", "content": "How do I add a vector index for similarity search?" },
+			{ "role": "assistant", "content": "Add an @embed/vector attribute in your schema to build an HNSW index." }
+		  ],
+		  "expect": ["vector", "similarity", "query-optimization"] },
+
+		{ "q": "can I add authentication to it?",
+		  "history": [
+			{ "role": "user", "content": "How do I write a custom REST endpoint?" },
+			{ "role": "assistant", "content": "Define a Resource class and export it; Harper routes REST requests to it." }
+		  ],
+		  "expect": ["security", "authentication", "auth", "resources"] },
+
+		{ "q": "how do I serve them back as images?",
+		  "history": [
+			{ "role": "user", "content": "How do I store binary data like images?" },
+			{ "role": "assistant", "content": "Use the Blob data type to store binary payloads efficiently." }
+		  ],
+		  "expect": ["blob", "content-types", "binary", "database/api"] },
+
+		{ "q": "what about write-through to an external database?",
+		  "history": [
+			{ "role": "user", "content": "How do I cache data from an external source?" },
+			{ "role": "assistant", "content": "Harper supports integrated caching that pulls from an external source on miss." }
+		  ],
+		  "expect": ["write-through", "caching"] },
+
+		{ "q": "how do I create an account first?",
+		  "history": [
+			{ "role": "user", "content": "How do I deploy my application to Harper Fabric?" },
+			{ "role": "assistant", "content": "Deploy your component to a Fabric cluster from the CLI or dashboard." }
+		  ],
+		  "expect": ["fabric", "account", "cluster"] },
+
+		{ "q": "does it need a build step?",
+		  "history": [
+			{ "role": "user", "content": "Can I write my Harper components in TypeScript?" },
+			{ "role": "assistant", "content": "Yes — Harper runs TypeScript directly via Node's type stripping." }
+		  ],
+		  "expect": ["typescript", "javascript-environment"] },
+
+		{ "q": "which plugin loads them?",
+		  "history": [
+			{ "role": "user", "content": "How do I use environment variables from a .env file?" },
+			{ "role": "assistant", "content": "Harper reads .env values into your app's configuration at startup." }
+		  ],
+		  "expect": ["env", "configuration"] },
+
+		{ "q": "how do I query across them?",
+		  "history": [
+			{ "role": "user", "content": "How do I define a relationship between two tables?" },
+			{ "role": "assistant", "content": "Declare a relationship attribute in your GraphQL schema linking the two tables." }
+		  ],
+		  "expect": ["schema", "relationship", "querying", "query"] },
+
+		{ "q": "can I do the same over WebSockets?",
+		  "history": [
+			{ "role": "user", "content": "How do I subscribe to real-time changes over MQTT?" },
+			{ "role": "assistant", "content": "Subscribe to a topic over MQTT and Harper pushes changes as they happen." }
+		  ],
+		  "expect": ["real-time", "mqtt", "pub", "websocket"] },
+
+		{ "q": "how do I add an index to one of the columns?",
+		  "history": [
+			{ "role": "user", "content": "How do I define a table with a primary key?" },
+			{ "role": "assistant", "content": "Declare the table in a GraphQL schema and mark the id field @primaryKey." }
+		  ],
+		  "expect": ["schema", "indexed", "query-optimization"] },
+
+		{ "q": "and how do I set a TTL on the records?",
+		  "history": [
+			{ "role": "user", "content": "How do I cache data from an external source?" },
+			{ "role": "assistant", "content": "Harper caches external data in a table and refreshes it on access." }
+		  ],
+		  "expect": ["caching", "schema", "expiration"] }
 	]
 }

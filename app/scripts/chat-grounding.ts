@@ -13,9 +13,18 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+interface Turn {
+	role: string;
+	content: string;
+}
+
 interface Case {
 	q: string;
 	expect: string[];
+	// Optional prior conversation. When present, the endpoint condenses
+	// history + q into a standalone question before retrieving — this is how the
+	// multi-turn condenser gets the same golden-set coverage as single-turn.
+	history?: Turn[];
 }
 
 interface Source {
@@ -31,11 +40,19 @@ const VERBOSE = process.argv.includes('--verbose');
 const { cases }: { cases: Case[] } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
 
 interface Row {
-	q: string;
+	q: string; // display label (follow-ups show the prior turn for context)
 	hit: boolean;
 	rank: number; // 1-based rank of the first matching source, 0 = miss
 	top: string[];
 	error?: string;
+}
+
+// A follow-up on its own ("what about for v4?") is meaningless in the report —
+// prefix it with the last user turn so misses are debuggable.
+function label(c: Case): string {
+	if (!c.history?.length) return c.q;
+	const lastUser = [...c.history].reverse().find((t) => t.role === 'user');
+	return lastUser ? `${lastUser.content} ⟶ ${c.q}` : c.q;
 }
 
 const rows: Row[] = [];
@@ -45,14 +62,14 @@ for (const c of cases) {
 		const res = await fetch(`${TARGET}/api/chat`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ question: c.q, retrieveOnly: true }),
+			body: JSON.stringify({ question: c.q, retrieveOnly: true, ...(c.history ? { history: c.history } : {}) }),
 		});
 		// A non-2xx (e.g. 429/500) is an endpoint failure, not a content miss —
 		// surface it rather than silently counting it as recall=0.
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		sources = ((await res.json()) as { sources?: Source[] }).sources ?? [];
 	} catch (err: any) {
-		rows.push({ q: c.q, hit: false, rank: 0, top: [], error: err.message });
+		rows.push({ q: label(c), hit: false, rank: 0, top: [], error: err.message });
 		continue;
 	}
 	const paths = sources.map((s) => s.path);
@@ -63,7 +80,7 @@ for (const c of cases) {
 			break;
 		}
 	}
-	rows.push({ q: c.q, hit: rank > 0, rank, top: paths });
+	rows.push({ q: label(c), hit: rank > 0, rank, top: paths });
 }
 
 const n = rows.length;
