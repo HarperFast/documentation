@@ -54,6 +54,13 @@ jobs:
           # Trust X-Forwarded-For so the chat tests can isolate their per-IP quota
           # (this runner is a trusted environment).
           CHAT_TRUST_PROXY: 'true'
+          # Generation model for chat answers, the multi-turn condenser, and the
+          # faithfulness monitor. OPTIONAL: without the ANTHROPIC_API_KEY repo
+          # secret the server runs the deterministic dev stub — chat still streams,
+          # but the model-gated cache tests self-skip and the grounding eval's
+          # multi-turn cases exercise a no-op condenser. Add the secret to run
+          # those for real (each CI run then makes a modest number of API calls).
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # Embedding model for @embed / the semantic lane. Requires the
           # GEMINI_API_KEY repo secret; HARPER_CONFIG merges the models section
           # into the instance config at startup. Without it, @embed writes fail
