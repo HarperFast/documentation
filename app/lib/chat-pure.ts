@@ -15,11 +15,6 @@ export const MAX_QUESTION = 1000; // reject longer questions
 // window on restart.
 const IP_SALT = process.env.CHAT_IP_SALT || randomBytes(16).toString('hex');
 
-// Only trust X-Forwarded-For when explicitly behind a proxy that appends the
-// real client IP (CHAT_TRUST_PROXY=true). Off by default so the socket peer —
-// which a client cannot spoof — is used for quota bucketing.
-const TRUST_PROXY = process.env.CHAT_TRUST_PROXY === 'true';
-
 // Minimal shape of the request fields clientIp reads — kept local so this module
 // needs no Harper types (importing them would boot the runtime).
 interface ClientRequest {
@@ -30,9 +25,13 @@ interface ClientRequest {
 // ── Client identity ──────────────────────────────────────────────────────────
 
 export function clientIp(request: ClientRequest): string {
-	// Behind a trusted proxy, take the RIGHTMOST X-Forwarded-For hop — the one the
-	// proxy appended — since the leftmost entries are client-supplied and spoofable.
-	if (TRUST_PROXY) {
+	// Only trust X-Forwarded-For when explicitly behind a proxy that appends the
+	// real client IP (CHAT_TRUST_PROXY=true). Off by default so the socket peer —
+	// which a client cannot spoof — is used for quota bucketing. Read at call time
+	// (not a module const) so it reflects the current env and is unit-testable.
+	if (process.env.CHAT_TRUST_PROXY === 'true') {
+		// Behind a trusted proxy, take the RIGHTMOST X-Forwarded-For hop — the one the
+		// proxy appended — since the leftmost entries are client-supplied and spoofable.
 		const fwd = request.headers.get('x-forwarded-for');
 		if (fwd) {
 			const hops = fwd

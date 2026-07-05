@@ -6,7 +6,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVersion, normalizeQuestion, cacheKey, computeCacheId, validateQuestion, cosine } from '../../lib/chat-pure.ts';
+import { parseVersion, normalizeQuestion, cacheKey, computeCacheId, validateQuestion, cosine, clientIp, hashIp } from '../../lib/chat-pure.ts';
+
+// A minimal fake request: X-Forwarded-For header + socket-peer ip.
+function req(xff: string | null, ip?: string) {
+	return { headers: { get: (n: string) => (n.toLowerCase() === 'x-forwarded-for' ? xff : null) }, ip };
+}
 
 test('parseVersion: exactly one version → that version', () => {
 	assert.equal(parseVersion('how does replication work in v4?'), 'v4');
@@ -59,6 +64,42 @@ test('validateQuestion: trims valid, rejects non-strings and out-of-range length
 	assert.equal(validateQuestion(null), null);
 	assert.equal(validateQuestion('x'.repeat(1001)), null); // > MAX_QUESTION
 	assert.equal(validateQuestion('x'.repeat(1000)), 'x'.repeat(1000)); // exactly MAX is ok
+});
+
+test('clientIp: ignores X-Forwarded-For unless CHAT_TRUST_PROXY=true (anti-spoofing)', () => {
+	const prev = process.env.CHAT_TRUST_PROXY;
+	try {
+		delete process.env.CHAT_TRUST_PROXY; // default: do NOT trust the header
+		assert.equal(clientIp(req('1.1.1.1, 2.2.2.2', '9.9.9.9')), '9.9.9.9', 'untrusted → socket peer, not spoofable header');
+		assert.equal(clientIp(req(null, '9.9.9.9')), '9.9.9.9');
+		assert.equal(clientIp(req('1.1.1.1')), 'local', 'no socket ip → "local"');
+	} finally {
+		if (prev === undefined) delete process.env.CHAT_TRUST_PROXY;
+		else process.env.CHAT_TRUST_PROXY = prev;
+	}
+});
+
+test('clientIp: behind a trusted proxy, takes the RIGHTMOST hop', () => {
+	const prev = process.env.CHAT_TRUST_PROXY;
+	try {
+		process.env.CHAT_TRUST_PROXY = 'true';
+		// Leftmost hops are client-supplied/spoofable; the proxy appends the real one last.
+		assert.equal(clientIp(req('1.1.1.1, 2.2.2.2, 3.3.3.3', '9.9.9.9')), '3.3.3.3');
+		assert.equal(clientIp(req('  1.1.1.1 ,  2.2.2.2  ', '9.9.9.9')), '2.2.2.2', 'trims hops');
+		assert.equal(clientIp(req('1.1.1.1, , ', '9.9.9.9')), '1.1.1.1', 'skips empty trailing hops');
+		assert.equal(clientIp(req(null, '9.9.9.9')), '9.9.9.9', 'no header → socket peer');
+		assert.equal(clientIp(req('', '9.9.9.9')), '9.9.9.9', 'empty header → socket peer');
+	} finally {
+		if (prev === undefined) delete process.env.CHAT_TRUST_PROXY;
+		else process.env.CHAT_TRUST_PROXY = prev;
+	}
+});
+
+test('hashIp: 16-hex, deterministic, and collision-resistant across IPs', () => {
+	const a = hashIp('203.0.113.7');
+	assert.match(a, /^[0-9a-f]{16}$/, 'never a raw IP — 16 hex chars');
+	assert.equal(a, hashIp('203.0.113.7'), 'same IP → same hash (stable quota bucket in-process)');
+	assert.notEqual(a, hashIp('203.0.113.8'), 'different IP → different hash');
 });
 
 test('cosine: identical→1, orthogonal→0, opposite→-1, zero-vector→0', () => {
