@@ -5,7 +5,7 @@ import { server, tables, type HarperRequest, type HarperTable } from '../lib/har
 import { layout } from '../lib/layout.ts';
 import { runSearch, logQuery } from '../lib/search.ts';
 import { renderIngestDashboard, renderSearchDashboard, renderValidationDashboard, renderChatDashboard } from '../lib/admin.ts';
-import { searchAnalytics, evalTrend, parityTrend, chatAnalytics } from '../lib/metrics.ts';
+import { searchAnalytics, evalTrend, parityTrend, chatEvalTrend, chatAnalytics } from '../lib/metrics.ts';
 import {
 	validateQuestion,
 	clientIp,
@@ -234,7 +234,7 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 		if (request.pathname === '/admin/search') {
 			html = renderSearchDashboard(await searchAnalytics());
 		} else if (request.pathname === '/admin/validation') {
-			html = renderValidationDashboard(await evalTrend(), await parityTrend());
+			html = renderValidationDashboard(await evalTrend(), await parityTrend(), await chatEvalTrend());
 		} else if (request.pathname === '/admin/chat') {
 			html = renderChatDashboard(await chatAnalytics());
 		} else {

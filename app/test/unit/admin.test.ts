@@ -12,6 +12,7 @@ import {
 	type SearchAnalytics,
 	type EvalTrend,
 	type ParityTrend,
+	type ChatEvalTrend,
 	type ChatAnalytics,
 } from '../../lib/admin.ts';
 
@@ -101,20 +102,31 @@ const SAMPLE_PARITY: ParityTrend = {
 	],
 };
 
-test('renderValidationDashboard: active Validation tab, eval + parity numbers', () => {
-	const html = renderValidationDashboard(SAMPLE_EVAL, SAMPLE_PARITY);
+const SAMPLE_CHAT_EVAL: ChatEvalTrend = {
+	latest: { id: 'c1', gitSha: 'abc123', recall: 1, mrr: 0.827, cases: 37, multiTurn: 13, passed: true, createdAt: '2026-07-04T00:00:00Z' },
+	runs: [
+		{ id: 'c1', gitSha: 'abc123', recall: 1, mrr: 0.827, cases: 37, multiTurn: 13, passed: true, createdAt: '2026-07-04T00:00:00Z' },
+	],
+};
+
+test('renderValidationDashboard: active Validation tab, eval + parity + chat numbers', () => {
+	const html = renderValidationDashboard(SAMPLE_EVAL, SAMPLE_PARITY, SAMPLE_CHAT_EVAL);
 	assert.match(html, /class="admin-tab is-active"[^>]*>Validation/);
-	assert.match(html, /0\.907/); // MRR (3 decimals)
+	assert.match(html, /0\.907/); // search MRR (3 decimals)
 	assert.match(html, /100\.0%/); // recall5 1 → 100.0%
 	assert.match(html, /Content parity/);
 	assert.match(html, /99\.9%/); // simMedian
 	assert.match(html, /84\.2%/); // simMin
+	// Chat-grounding panel: heading, chat MRR, and the multi-turn count.
+	assert.match(html, /Chat grounding/);
+	assert.match(html, /0\.827/); // chat MRR
+	assert.match(html, /Multi-turn/);
 });
 
 test('renderValidationDashboard: empty states when no runs', () => {
-	const html = renderValidationDashboard({ latest: null, runs: [] }, { latest: null, runs: [] });
+	const html = renderValidationDashboard({ latest: null, runs: [] }, { latest: null, runs: [] }, { latest: null, runs: [] });
 	assert.match(html, /class="admin-tab is-active"[^>]*>Validation/);
-	assert.match(html, /No .{0,40}runs/i); // both sections show an empty-state message
+	assert.match(html, /No .{0,40}runs/i); // sections show an empty-state message
 });
 
 const SAMPLE_CHAT: ChatAnalytics = {

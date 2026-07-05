@@ -49,6 +49,22 @@ export interface ParityTrend {
 	runs: ParityRunRow[]; // newest-first
 }
 
+export interface ChatEvalRunRow {
+	id: string;
+	gitSha: string;
+	recall: number; // Recall@K
+	mrr: number;
+	cases: number;
+	multiTurn: number; // how many cases exercise the multi-turn condenser
+	passed: boolean | null;
+	createdAt: string | number;
+}
+
+export interface ChatEvalTrend {
+	latest: ChatEvalRunRow | null;
+	runs: ChatEvalRunRow[]; // newest-first
+}
+
 export interface ChatRecent {
 	question: string;
 	answerPreview: string;
@@ -286,7 +302,7 @@ export function renderSearchDashboard(a: SearchAnalytics): string {
 
 // ── Validation dashboard ────────────────────────────────────────────────────
 
-export function renderValidationDashboard(ev: EvalTrend, par: ParityTrend): string {
+export function renderValidationDashboard(ev: EvalTrend, par: ParityTrend, chat: ChatEvalTrend): string {
 	// Search relevance (golden set).
 	let evalBody: string;
 	if (ev.latest && ev.runs.length) {
@@ -332,9 +348,33 @@ ${sparkline(sims, 0, 1, (n) => `${pct(n)}%`, 'Similarity median across parity ru
 		parBody = '<div class="admin-empty">No content-parity runs recorded yet.</div>';
 	}
 
+	// Chat grounding (RAG retrieval golden set — the chat analogue of search relevance).
+	let chatBody: string;
+	if (chat.latest && chat.runs.length) {
+		const c = chat.latest;
+		const cards: Card[] = [
+			{ label: `Recall@K`, value: `${pct(c.recall)}%` },
+			{ label: 'MRR', value: c.mrr.toFixed(3) },
+			{ label: 'Cases', value: num(c.cases) },
+			{ label: 'Multi-turn', value: num(c.multiTurn) },
+			{ label: 'Result', html: passPill(c.passed) },
+		];
+		const recalls = chat.runs.map((r) => r.recall).reverse();
+		chatBody = `<div class="admin-cards">
+	${cardsHtml(cards)}
+</div>
+${sparkline(recalls, 0, 1, (n) => `${pct(n)}%`, 'Recall@K across chat-grounding runs')}`;
+	} else {
+		chatBody = '<div class="admin-empty">No chat-grounding runs recorded yet.</div>';
+	}
+
 	const body = `<section class="admin-panel">
 	<h2>Search relevance <span class="admin-sub">golden set</span></h2>
 	${evalBody}
+</section>
+<section class="admin-panel">
+	<h2>Chat grounding <span class="admin-sub">RAG retrieval golden set</span></h2>
+	${chatBody}
 </section>
 <section class="admin-panel">
 	<h2>Content parity</h2>

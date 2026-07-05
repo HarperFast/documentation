@@ -3,12 +3,13 @@
 // trend. Authenticated the same way as /Ingest (admin/super_user Basic auth).
 //
 // Protocol (POST /Metrics, authenticated):
-//   {action:'record-eval',   gitSha, mrr, recall5, recall10, zeroRate, cases, weak?, passed?}
-//   {action:'record-parity', gitSha, pages, titlesOk, redirectsOk, simMedian, simMin, hardFailures, strict?, passed}
+//   {action:'record-eval',      gitSha, mrr, recall5, recall10, zeroRate, cases, weak?, passed?}
+//   {action:'record-parity',    gitSha, pages, titlesOk, redirectsOk, simMedian, simMin, hardFailures, strict?, passed}
+//   {action:'record-chat-eval', gitSha, recall, mrr, cases, multiTurn?, passed?}
 
 import { Resource, tables } from '../lib/harper.ts';
 
-const { EvalRun, ParityRun } = tables;
+const { EvalRun, ParityRun, ChatEvalRun } = tables;
 
 function newId(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -45,6 +46,19 @@ export class Metrics extends Resource {
 					simMin: body.simMin ?? null,
 					hardFailures: body.hardFailures ?? null,
 					strict: body.strict ?? false,
+					passed: body.passed ?? null,
+				});
+				return { ok: true, id };
+			}
+			case 'record-chat-eval': {
+				const id = newId();
+				await ChatEvalRun.put({
+					id,
+					gitSha: body.gitSha ?? '',
+					recall: body.recall ?? null,
+					mrr: body.mrr ?? null,
+					cases: body.cases ?? null,
+					multiTurn: body.multiTurn ?? 0,
 					passed: body.passed ?? null,
 				});
 				return { ok: true, id };

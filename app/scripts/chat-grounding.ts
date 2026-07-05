@@ -12,6 +12,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordMetric, gitSha } from './lib/record.ts';
 
 interface Turn {
 	role: string;
@@ -36,6 +37,7 @@ const TARGET = argValue('--target') ?? process.env.HARPER_TARGET ?? 'http://loca
 const SET_PATH = path.resolve(APP_DIR, argValue('--set') ?? 'eval/chat-grounding.json');
 const MIN_RECALL = Number(argValue('--min-recall') ?? NaN);
 const VERBOSE = process.argv.includes('--verbose');
+const NO_RECORD = process.argv.includes('--no-record');
 
 const { cases }: { cases: Case[] } = JSON.parse(readFileSync(SET_PATH, 'utf8'));
 
@@ -112,12 +114,31 @@ if (VERBOSE) {
 	for (const r of rows) console.log(`    ${r.rank ? `#${r.rank}`.padEnd(4) : 'MISS'} "${r.q}" → ${r.top.join(', ')}`);
 }
 
+// Persist this run so the admin Validation panel can chart the trend
+// (best-effort; a recording failure never fails the eval). Skip with --no-record.
+await recordChatEval();
+
 if (!Number.isNaN(MIN_RECALL)) {
 	if (recall < MIN_RECALL) {
 		console.error(`\nGATE FAIL: recall ${recall.toFixed(3)} < ${MIN_RECALL}`);
 		process.exit(1);
 	}
 	console.log(`\nGATE PASS: recall ${recall.toFixed(3)} ≥ ${MIN_RECALL}`);
+}
+
+async function recordChatEval(): Promise<void> {
+	if (NO_RECORD) return;
+	const multiTurn = cases.filter((c) => c.history && c.history.length).length;
+	const passed = Number.isNaN(MIN_RECALL) ? null : recall >= MIN_RECALL;
+	await recordMetric(TARGET, {
+		action: 'record-chat-eval',
+		gitSha: gitSha(APP_DIR),
+		recall,
+		mrr,
+		cases: n,
+		multiTurn,
+		passed,
+	});
 }
 
 function argValue(flag: string): string | undefined {

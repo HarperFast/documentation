@@ -164,6 +164,20 @@ type ParityRun @table(expiration: 7776000) {
 	createdAt: Date @createdTime
 }
 
+# Chat-grounding runs: one row per `chat-eval` invocation (the RAG retrieval
+# golden set — the chat analogue of EvalRun). Trend is charted in the admin
+# Validation panel. 90-day TTL.
+type ChatEvalRun @table(expiration: 7776000) {
+	id: ID @primaryKey # "<timestamp>-<rand>"
+	gitSha: String
+	recall: Float # Recall@K: expected page appears in the K grounding sources
+	mrr: Float
+	cases: Int # total golden-set questions scored
+	multiTurn: Int # how many of those cases are multi-turn (exercise the condenser)
+	passed: Boolean # against --min-recall, when supplied (else null)
+	createdAt: Date @createdTime
+}
+
 # M3 chat observability: one row per grounded chat answer. Powers the admin Chat
 # panel (volume, latency, grounded rate, top questions, feedback). 90-day TTL.
 type ChatLog @table(expiration: 7776000) {

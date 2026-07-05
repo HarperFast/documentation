@@ -10,12 +10,14 @@ import {
 	type ParityTrend,
 	type EvalRunRow,
 	type ParityRunRow,
+	type ChatEvalTrend,
+	type ChatEvalRunRow,
 	type ChatAnalytics,
 	type ChatRecent,
 	type ChatFlagged,
 } from './admin.ts';
 
-const { SearchQueryLog, EvalRun, ParityRun, ChatLog } = tables;
+const { SearchQueryLog, EvalRun, ParityRun, ChatEvalRun, ChatLog } = tables;
 
 const DAY_MS = 86400000;
 const WINDOW_DAYS = 14;
@@ -137,6 +139,27 @@ export async function evalTrend(limit = 30): Promise<EvalTrend> {
 export async function parityTrend(limit = 30): Promise<ParityTrend> {
 	const runs: ParityRunRow[] = [];
 	for await (const r of ParityRun.search({})) runs.push(plainParity(r));
+	runs.sort(byCreatedDesc);
+	const top = runs.slice(0, limit);
+	return { latest: top[0] ?? null, runs: top };
+}
+
+function plainChatEval(r: any): ChatEvalRunRow {
+	return {
+		id: r.id,
+		gitSha: r.gitSha ?? '',
+		recall: r.recall ?? 0,
+		mrr: r.mrr ?? 0,
+		cases: r.cases ?? 0,
+		multiTurn: r.multiTurn ?? 0,
+		passed: r.passed ?? null,
+		createdAt: r.createdAt ?? 0,
+	};
+}
+
+export async function chatEvalTrend(limit = 30): Promise<ChatEvalTrend> {
+	const runs: ChatEvalRunRow[] = [];
+	for await (const r of ChatEvalRun.search({})) runs.push(plainChatEval(r));
 	runs.sort(byCreatedDesc);
 	const top = runs.slice(0, limit);
 	return { latest: top[0] ?? null, runs: top };
