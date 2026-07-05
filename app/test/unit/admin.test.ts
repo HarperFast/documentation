@@ -134,6 +134,8 @@ const SAMPLE_CHAT: ChatAnalytics = {
 		chats: 19,
 		grounded: 19,
 		groundedRate: 1,
+		cacheHits: 5,
+		cacheHitRate: 5 / 19,
 		avgLatencyMs: 390,
 		windowDays: 14,
 		avgFaithfulness: 0.94,
@@ -171,6 +173,9 @@ test('renderChatDashboard: active Chat tab, grounded %, recent rows', () => {
 	// Faithfulness monitor: card + flagged-answers panel.
 	assert.match(html, /Avg faithfulness/);
 	assert.match(html, /94\.0%/); // avgFaithfulness 0.94
+	// Cache hit-rate card: 5/19 → 26.3%.
+	assert.match(html, /Cache hit rate/);
+	assert.match(html, /26\.3%/);
 	assert.match(html, /Flagged answers/);
 	assert.match(html, /invented docker image/);
 });

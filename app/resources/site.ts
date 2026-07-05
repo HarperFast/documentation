@@ -23,6 +23,7 @@ import {
 	scoreFaithfulness,
 	lookupCache,
 	storeCache,
+	computeCacheId,
 	currentRelease,
 	condenseQuestion,
 	type CacheHit,
@@ -431,6 +432,12 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 	const quota = await checkAndBumpQuota(ipHash);
 	if (!quota.ok) return jsonResponse({ error: 'daily quota exceeded', cap: quota.cap }, 429);
 
+	// The id this answer will be cached under (empty when uncacheable — dev stub or
+	// no release). Recorded on the ChatLog row so a thumbs-down or a faithfulness
+	// flag can evict exactly this entry.
+	const cacheable = modelId() !== 'stub' && Boolean(release);
+	const cacheId = cacheable ? computeCacheId(release, version, question) : '';
+
 	const started = Date.now();
 	const grounding = await retrieve(question, body.section ?? null, body.version ?? null);
 	const { system } = buildMessages(question, grounding.context);
@@ -462,6 +469,7 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 					latencyMs: Date.now() - started,
 					sessionId,
 					ipHash,
+					cacheId: cacheable ? cacheId : undefined,
 				});
 			try {
 				send('sources', grounding.sources);
@@ -473,11 +481,13 @@ async function handleChat(request: HarperRequest): Promise<Response> {
 				// /api/chat-feedback can't arrive before the ChatLog row exists.
 				await writeLog();
 				send('done', { id: chatId, model: modelId(), latencyMs: Date.now() - started });
+				// Cache the answer for future repeats (skip the dev stub). Store BEFORE
+				// scoring so the faithfulness monitor can evict this exact entry if it
+				// flags the answer (the store is a fast put; the judge is a slow call).
+				if (cacheable) await storeCache(version, release, question, answer, grounding.sources, modelId());
 				// Fire-and-forget: score faithfulness AFTER responding, off the user
-				// path — patches the ChatLog row when it completes. Never awaited.
-				void scoreFaithfulness(chatId, grounding.context, answer);
-				// Cache the answer for future repeats (skip the dev stub). Off-path.
-				if (modelId() !== 'stub') void storeCache(version, release, question, answer, grounding.sources, modelId());
+				// path — patches the ChatLog row and evicts the cache entry if flagged.
+				void scoreFaithfulness(chatId, grounding.context, answer, cacheable ? cacheId : undefined);
 			} catch (err: any) {
 				// Log detail server-side; the client only gets a generic message.
 				console.error('[chat] generation error', err?.message ?? err);
@@ -543,6 +553,7 @@ function streamCachedAnswer(cached: CacheHit, question: string, sessionId: strin
 					sessionId,
 					ipHash,
 					cached: true,
+					cacheId: cached.id, // so a thumbs-down on a cached answer evicts it too
 				});
 			}
 		},

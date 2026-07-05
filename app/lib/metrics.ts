@@ -178,6 +178,7 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 	const feedback = { up: 0, down: 0, none: 0 };
 	let chats = 0;
 	let grounded = 0;
+	let cacheHits = 0;
 	let latencySum = 0;
 	let latencyN = 0;
 	let faithSum = 0;
@@ -189,6 +190,7 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 		if (now - created > windowMs) continue;
 		chats++;
 		if (row.grounded) grounded++;
+		if (row.cached) cacheHits++;
 		if (typeof row.faithfulness === 'number') {
 			faithSum += row.faithfulness;
 			faithN++;
@@ -247,6 +249,8 @@ export async function chatAnalytics(): Promise<ChatAnalytics> {
 			chats,
 			grounded,
 			groundedRate: chats ? grounded / chats : 0,
+			cacheHits,
+			cacheHitRate: chats ? cacheHits / chats : 0,
 			avgLatencyMs: latencyN ? latencySum / latencyN : 0,
 			windowDays: WINDOW_DAYS,
 			avgFaithfulness: faithN ? faithSum / faithN : 0,

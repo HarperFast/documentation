@@ -87,6 +87,8 @@ export interface ChatAnalytics {
 		chats: number;
 		grounded: number;
 		groundedRate: number;
+		cacheHits: number; // answers served from the ChatCache (no generation)
+		cacheHitRate: number; // cacheHits / chats
 		avgLatencyMs: number;
 		windowDays: number;
 		avgFaithfulness: number; // over scored answers
@@ -401,6 +403,7 @@ export function renderChatDashboard(a: ChatAnalytics): string {
 			value: num(t.flaggedCount),
 			color: t.flaggedCount > 0 ? STATUS.rejected.color : undefined,
 		},
+		{ label: 'Cache hit rate', value: `${pct(t.cacheHitRate)}%`, color: STATUS.activated.color },
 		{ label: 'Avg latency', value: fmtDuration(t.avgLatencyMs) },
 		{ label: 'Window', value: `${t.windowDays} days` },
 	];

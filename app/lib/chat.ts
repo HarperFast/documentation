@@ -203,6 +203,23 @@ function cacheKey(release: string, version: string, normQ: string): string {
 	return `${release}:${version}:${createHash('sha256').update(normQ).digest('hex').slice(0, 20)}`;
 }
 
+// The cache id a generated answer will be stored under — recorded on its ChatLog
+// row so a later thumbs-down or faithfulness flag can evict exactly that entry.
+export function computeCacheId(release: string, version: string, question: string): string {
+	return cacheKey(release, version, normalizeQuestion(question));
+}
+
+// Drop a cached answer (thumbs-down / faithfulness flag) so a bad answer is not
+// re-served for the rest of its TTL. Best-effort; a missing id is a no-op.
+export async function evictCache(cacheId: unknown): Promise<void> {
+	if (!CACHE_ENABLED || typeof cacheId !== 'string' || !cacheId) return;
+	try {
+		await ChatCache.delete(cacheId);
+	} catch {
+		/* best-effort: a missing/already-evicted row is fine */
+	}
+}
+
 function cosine(a: number[], b: number[]): number {
 	let dot = 0;
 	let na = 0;
@@ -217,6 +234,7 @@ function cosine(a: number[], b: number[]): number {
 }
 
 export interface CacheHit {
+	id: string; // the ChatCache row id — recorded on the hit's ChatLog row for eviction
 	answer: string;
 	sources: Source[];
 	model: string;
@@ -234,7 +252,7 @@ export async function lookupCache(version: string, release: string, question: st
 		const exact = await ChatCache.get(cacheKey(release, version, normQ));
 		if (exact && exact.release === release && exact.answer) {
 			bumpCacheHit(exact.id, exact.hitCount ?? 0);
-			return { answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
+			return { id: exact.id, answer: exact.answer, sources: safeSources(exact.sources), model: exact.model ?? 'cache', via: 'exact' };
 		}
 	} catch {
 		/* fall through to semantic */
@@ -253,7 +271,7 @@ export async function lookupCache(version: string, release: string, question: st
 		})) {
 			if (row?.answer && Array.isArray(row.embedding) && cosine(qv, row.embedding) >= CACHE_SIM_THRESHOLD) {
 				bumpCacheHit(row.id, row.hitCount ?? 0);
-				return { answer: row.answer, sources: safeSources(row.sources), model: row.model ?? 'cache', via: 'semantic' };
+				return { id: row.id, answer: row.answer, sources: safeSources(row.sources), model: row.model ?? 'cache', via: 'semantic' };
 			}
 			break; // only the single nearest neighbor
 		}
@@ -506,6 +524,7 @@ export interface ChatLogInput {
 	sessionId: string;
 	ipHash: string;
 	cached?: boolean;
+	cacheId?: string; // the ChatCache entry this answer is stored under (for eviction)
 }
 
 export async function logChat(input: ChatLogInput): Promise<void> {
@@ -524,6 +543,7 @@ export async function logChat(input: ChatLogInput): Promise<void> {
 			ipHash: input.ipHash,
 			feedback: 0,
 			cached: Boolean(input.cached),
+			cacheId: input.cacheId ?? '',
 		});
 	} catch {
 		// observability is best-effort; never fail a chat on it
@@ -535,7 +555,7 @@ export async function logChat(input: ChatLogInput): Promise<void> {
 // the score + any unsupported claim on the ChatLog row. This catches hallucinations
 // (e.g. an invented Docker image) for review in the admin tab — WITHOUT adding
 // latency or cost to the live chat. Best-effort: never throws.
-export async function scoreFaithfulness(id: string, context: string, answer: string): Promise<void> {
+export async function scoreFaithfulness(id: string, context: string, answer: string, cacheId?: string): Promise<void> {
 	if (!hasLiveModel() || !context || !answer.trim()) return;
 	// Both context (doc content) and answer are treated as data to check.
 	const safe = (s: string, n: number) => s.replace(/<\/?(context|answer)>/gi, '').slice(0, n);
@@ -578,6 +598,9 @@ export async function scoreFaithfulness(id: string, context: string, answer: str
 			flagged,
 			flaggedNote: flagged ? note.slice(0, 300) : '',
 		});
+		// A flagged (likely-hallucinated) answer is evicted so it isn't re-served
+		// from cache while it sits in the review queue.
+		if (flagged && cacheId) void evictCache(cacheId);
 	} catch (err: any) {
 		console.error('[chat] faithfulness error', err?.message ?? err);
 	}
@@ -592,6 +615,9 @@ export async function recordFeedback(id: unknown, value: unknown): Promise<boole
 		const existing = await ChatLog.get(id);
 		if (!existing) return false;
 		await ChatLog.patch({ id, feedback: v });
+		// A thumbs-down evicts the cached answer so the next asker doesn't get the
+		// same disliked response for the rest of its TTL.
+		if (v < 0 && existing.cacheId) void evictCache(existing.cacheId);
 		return true;
 	} catch {
 		return false;

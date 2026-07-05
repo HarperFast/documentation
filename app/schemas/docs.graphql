@@ -194,6 +194,7 @@ type ChatLog @table(expiration: 7776000) {
 	ipHash: String # hashed client IP (never store raw IPs)
 	feedback: Int @indexed # -1 | 0 | +1 (thumbs), 0 = none
 	cached: Boolean @indexed # answer was served from the ChatCache (no generation)
+	cacheId: String # the ChatCache entry this answer is stored under (thumbs-down / flag evicts it)
 	# Async faithfulness monitor (scored after the answer streams — off the user path):
 	faithfulness: Float # 0..1, how well the answer is supported by the retrieved context
 	flagged: Boolean @indexed # faithfulness below the flag threshold (needs review)
