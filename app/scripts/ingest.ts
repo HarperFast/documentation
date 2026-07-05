@@ -226,11 +226,27 @@ console.log(
 );
 
 await post({ action: 'begin', release, gitSha });
-for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-	const batch = docs.slice(i, i + BATCH_SIZE);
-	await post({ action: 'pages', release, docs: batch });
-	process.stdout.write(`\r  pages ${Math.min(i + BATCH_SIZE, docs.length)}/${docs.length}`);
-}
+// Post page batches with bounded concurrency. Each batch embeds its chunks inline
+// via @embed, so posting serially left the provider idle between batches; running
+// a few batches in flight overlaps the embed calls and ~N×'s ingest throughput.
+// The earlier fully-serial pacing was a hedge against a rate limit we never
+// actually observed — and post() already retries 429/500 with backoff, so a real
+// rate spike self-heals. Tunable via INGEST_CONCURRENCY.
+const CONCURRENCY = Math.max(1, Number(process.env.INGEST_CONCURRENCY) || 4);
+const batches: (typeof docs)[] = [];
+for (let i = 0; i < docs.length; i += BATCH_SIZE) batches.push(docs.slice(i, i + BATCH_SIZE));
+const queue = batches.slice();
+let posted = 0;
+await Promise.all(
+	Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
+		// queue.shift() is atomic between awaits (single-threaded), so no batch runs twice.
+		for (let batch = queue.shift(); batch; batch = queue.shift()) {
+			await post({ action: 'pages', release, docs: batch });
+			posted += batch.length;
+			process.stdout.write(`\r  pages ${posted}/${docs.length}`);
+		}
+	})
+);
 console.log();
 await post({ action: 'nav', release, entries: navEntries });
 for (let i = 0; i < redirectEntries.length; i += 200) {
