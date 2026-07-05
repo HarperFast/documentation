@@ -46,6 +46,11 @@ jobs:
           HDB_ADMIN_USERNAME: HDB_ADMIN
           HDB_ADMIN_PASSWORD: ${{ github.run_id }}-parity
           ROOTPATH: ${{ runner.temp }}/hdb
+          # Match the known-working local invocation, where HOME is the PARENT of
+          # ROOTPATH (ROOTPATH = $HOME/hdb). Harper resolves parts of its config
+          # relative to HOME, so leaving it at the runner default can leave the
+          # models/embedding backend unregistered even with the config in ROOTPATH.
+          HOME: ${{ runner.temp }}
           HTTP_PORT: '9936'
           OPERATIONSAPI_NETWORK_PORT: '9935'
           # Enables the /admin/dev-login affordance so the integration + e2e
@@ -119,9 +124,10 @@ jobs:
         run: |
           echo "=== harper run stdout ==="
           tail -40 "${{ runner.temp }}/hdb/harper-run.log" 2>/dev/null || echo "(none)"
-          echo "=== Harper internal log(s) — the real @embed / request errors ==="
-          find "${{ runner.temp }}/hdb" -name '*.log' -not -name harper-run.log \
-            -exec sh -c 'echo "── $1 ──"; tail -120 "$1"' _ {} \; 2>/dev/null || echo "(no logs found)"
+          echo "=== hdb.log (the real @embed / request errors) ==="
+          tail -120 "${{ runner.temp }}/hdb/log/hdb.log" 2>/dev/null || echo "(no hdb.log)"
+          echo "=== instance config (models backend should be present) ==="
+          cat "${{ runner.temp }}/hdb/harper-config.yaml" 2>/dev/null || echo "(no config)"
 
       - name: Integration tests
         env:
