@@ -22,6 +22,7 @@ import {
 	lookupCache,
 	storeCache,
 	currentRelease,
+	condenseQuestion,
 	type CacheHit,
 } from '../lib/chat.ts';
 import { renderChatPage } from '../lib/chat-ui.ts';
@@ -384,9 +385,16 @@ async function readJsonBody(request: HarperRequest): Promise<any> {
 async function handleChat(request: HarperRequest): Promise<Response> {
 	const body = await readJsonBody(request);
 	if (body === null) return jsonResponse({ error: 'bad request' }, 400);
-	const question = validateQuestion(body.question);
-	if (!question) return jsonResponse({ error: 'invalid question' }, 400);
+	const rawQuestion = validateQuestion(body.question);
+	if (!rawQuestion) return jsonResponse({ error: 'invalid question' }, 400);
 	const sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';
+
+	// Multi-turn: condense (conversation history + latest message) into a
+	// STANDALONE question, then treat everything below as single-turn — this one
+	// question drives the cache, retrieval, generation, and logging. First turn or
+	// no history → unchanged (no extra call).
+	const history = Array.isArray(body.history) ? body.history : [];
+	const question = history.length ? await condenseQuestion(history, rawQuestion) : rawQuestion;
 
 	// Retrieval-only mode: return the grounding sources without generating an
 	// answer — no LLM cost, no quota. Powers the grounding preview + chat eval.

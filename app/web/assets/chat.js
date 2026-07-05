@@ -82,6 +82,11 @@
 		const input = mount.querySelector('.chat-input');
 		const send = mount.querySelector('.chat-send');
 		let streaming = false;
+		// Conversation history for multi-turn follow-ups. The server condenses
+		// (history + latest message) into a standalone question. Capped to the last
+		// few turns to bound the condense prompt.
+		const history = [];
+		const HISTORY_TURNS = 4;
 
 		if (!transcript.children.length) {
 			const hint = document.createElement('div');
@@ -156,6 +161,9 @@
 					bubble.classList.remove('chat-streaming');
 					answer.innerHTML = `<span class="chat-error">${escapeHtml(message)}</span>`;
 				},
+				getText() {
+					return text;
+				},
 			};
 		}
 
@@ -202,7 +210,7 @@
 				res = await fetch('/api/chat', {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ question, sessionId: SID, ...currentScope() }),
+					body: JSON.stringify({ question, sessionId: SID, history: history.slice(-HISTORY_TURNS * 2), ...currentScope() }),
 				});
 			} catch {
 				msg.fail('Network error — please try again.');
@@ -233,6 +241,12 @@
 
 			try {
 				await readStream(res.body, msg);
+				// Record the turn so the next message can be condensed against it.
+				const answered = msg.getText().trim();
+				if (answered) {
+					history.push({ role: 'user', content: question }, { role: 'assistant', content: answered });
+					if (history.length > HISTORY_TURNS * 2) history.splice(0, history.length - HISTORY_TURNS * 2);
+				}
 			} catch {
 				msg.fail('The connection was interrupted.');
 			} finally {
