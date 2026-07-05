@@ -141,6 +141,11 @@ jobs:
         env:
           HARPER_CLI_USERNAME: HDB_ADMIN
           HARPER_CLI_PASSWORD: ${{ github.run_id }}-parity
+          # This runner's embedding throughput is the ingest bottleneck (~180s),
+          # not client concurrency: 4 and 12 both land ~180s, but 12 provokes
+          # server 500s/timeouts + retries (churn, wasted embed calls) for no gain.
+          # Pin low here; the default (12) is for capable local machines.
+          INGEST_CONCURRENCY: '4'
         run: node app/scripts/ingest.ts --target http://127.0.0.1:9936
 
       # Surface the server-side error when a step above fails (e.g. an ingest 500

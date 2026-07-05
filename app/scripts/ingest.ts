@@ -233,7 +233,9 @@ await post({ action: 'begin', release, gitSha });
 // actually observed — and post() already retries 429/500 with backoff, so a real
 // rate spike self-heals. Tunable via INGEST_CONCURRENCY; a local sweep plateaued
 // around 12 (4→131s, 8→81s, 12→72s, 16→77s, all with zero retries — past ~12 the
-// server-side embedding, not the API, is the bottleneck).
+// server-side embedding, not the API, is the bottleneck). Constrained environments
+// (e.g. CI) hit that embedding ceiling much sooner: there 4 and 12 both land ~180s
+// but 12 provokes 500s/timeouts, so CI pins it lower via the env var.
 const CONCURRENCY = Math.max(1, Number(process.env.INGEST_CONCURRENCY) || 12);
 const batches: (typeof docs)[] = [];
 for (let i = 0; i < docs.length; i += BATCH_SIZE) batches.push(docs.slice(i, i + BATCH_SIZE));
