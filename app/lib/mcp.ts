@@ -25,6 +25,12 @@ const RESOURCE_TEMPLATE = {
 };
 const SERVER_INFO = { name: 'harper-docs', title: 'Harper Documentation', version: '1.0.0' };
 const SECTIONS = ['learn', 'reference', 'fabric', 'release-notes'];
+// v5 is the current reference version listed for discovery; legacy v4 pages stay
+// reachable via the resource template / fetch_doc, just not enumerated here.
+const REFERENCE_VERSION = 'v5';
+// Cap per-answer generation time — a single-JSON MCP response can't detect client
+// disconnect the way the SSE chat path can, so bound the worst case.
+const ANSWER_TIMEOUT_MS = 30_000;
 
 // Public, read-only corpus → permissive CORS so any agent/browser client reaches it.
 const CORS: Record<string, string> = {
@@ -178,7 +184,7 @@ async function listResources(): Promise<any[]> {
 			if (depth < 1 && Array.isArray(n?.items)) walk(n.items, depth + 1);
 		}
 	};
-	for (const sec of ['learn', 'reference:v5', 'fabric', 'release-notes']) {
+	for (const sec of ['learn', `reference:${REFERENCE_VERSION}`, 'fabric', 'release-notes']) {
 		const nav = await Navigation.get(`${release}:${sec}`);
 		if (Array.isArray(nav?.tree)) walk(nav.tree, 0);
 	}
@@ -242,17 +248,22 @@ async function fetchDoc(args: any) {
 // shares the chat daily quota by client IP (this is a public LLM call). Falls back
 // to the deterministic dev stub when no model key is set.
 async function answerTool(args: any, ipHash?: string) {
-	const question = validateQuestion(args.question);
+	const question = validateQuestion(args.question); // also caps length at MAX_QUESTION
 	if (!question) return toolText('answer requires a non-empty "question".', true);
-	if (ipHash) {
-		const quota = await checkAndBumpQuota(ipHash);
-		if (!quota.ok) return toolText(`Daily question limit reached (cap ${quota.cap}). Use search_docs + fetch_doc instead.`, true);
-	}
+	// Public LLM call: require a client identity and meter it. Fail CLOSED rather
+	// than run an unmetered generation if the IP is somehow absent (defense in
+	// depth — site.ts always supplies a hash, falling back to "local").
+	if (!ipHash) return toolText('Rate limiting unavailable (no client identity); try again.', true);
+	const quota = await checkAndBumpQuota(ipHash);
+	if (!quota.ok) return toolText(`Daily question limit reached (cap ${quota.cap}). Use search_docs + fetch_doc instead.`, true);
 	const section = SECTIONS.includes(args.section) ? args.section : null;
 	const version = ['v4', 'v5'].includes(args.version) ? args.version : null;
 	const grounding = await retrieve(question, section, version);
 	let answer = '';
-	for await (const delta of streamAnswer(question, grounding)) answer += delta;
+	// A single-JSON MCP response has no stream-cancel hook to abort on client
+	// disconnect (unlike the SSE chat path), so bound each generation with a
+	// timeout; the per-IP quota bounds how many can be started.
+	for await (const delta of streamAnswer(question, grounding, AbortSignal.timeout(ANSWER_TIMEOUT_MS))) answer += delta;
 	const cites = grounding.sources
 		.map((s, i) => `[${i + 1}] ${s.title}${s.heading ? ` › ${s.heading}` : ''} — ${s.url}`)
 		.join('\n');
