@@ -71,19 +71,24 @@ export function handleMcpOptions(): Response {
 // a parse failure). Handles a single JSON-RPC message or a batch (array).
 export async function handleMcp(body: any): Promise<Response> {
 	if (body === null || typeof body !== 'object') return json(rpcError(null, -32700, 'Parse error'));
-	if (Array.isArray(body)) {
-		const out = (await Promise.all(body.map(dispatch))).filter((r) => r !== null);
-		return out.length ? json(out) : new Response(null, { status: 202, headers: CORS });
-	}
+	// MCP 2025-06-18 removed JSON-RPC batching. Reject arrays rather than fan out an
+	// unbounded number of concurrent tool calls (each a remote embed) from a single
+	// unauthenticated request — the batch-amplification DoS both reviews flagged.
+	if (Array.isArray(body)) return json(rpcError(null, -32600, 'Batched requests are not supported.'));
 	const res = await dispatch(body);
 	return res === null ? new Response(null, { status: 202, headers: CORS }) : json(res);
 }
 
 async function dispatch(msg: any): Promise<any | null> {
-	if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return rpcError(msg?.id ?? null, -32600, 'Invalid Request');
-	const { id, method, params } = msg;
-	const isNotification = id === undefined || id === null;
-	switch (method) {
+	// JSON-RPC: a NOTIFICATION is a request with the `id` member ABSENT — and it is
+	// never answered. `id: null` is a valid request id (its response echoes null).
+	const hasId = msg != null && typeof msg === 'object' && 'id' in msg;
+	const id = hasId ? msg.id : null;
+	if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
+		return hasId ? rpcError(id, -32600, 'Invalid Request') : null; // drop a malformed notification
+	}
+	if (!hasId) return null; // notification (e.g. notifications/initialized) — no response
+	switch (msg.method) {
 		case 'initialize':
 			return rpcResult(id, {
 				protocolVersion: PROTOCOL_VERSION,
@@ -91,17 +96,14 @@ async function dispatch(msg: any): Promise<any | null> {
 				serverInfo: SERVER_INFO,
 				instructions: 'Search the Harper docs with search_docs, then read a page with fetch_doc using its path.',
 			});
-		case 'notifications/initialized':
-		case 'notifications/cancelled':
-			return null; // notifications get no response
 		case 'ping':
 			return rpcResult(id, {});
 		case 'tools/list':
 			return rpcResult(id, { tools: TOOLS });
 		case 'tools/call':
-			return callTool(id, params);
+			return callTool(id, msg.params);
 		default:
-			return isNotification ? null : rpcError(id, -32601, `Method not found: ${method}`);
+			return rpcError(id, -32601, `Method not found: ${msg.method}`);
 	}
 }
 
@@ -124,8 +126,10 @@ async function searchDocs(args: any) {
 	const query = String(args.query ?? '').trim();
 	if (!query) return toolText('search_docs requires a non-empty "query".', true);
 	const limit = Math.max(1, Math.min(Number(args.limit) || 8, 20));
-	const section = typeof args.section === 'string' ? args.section : null;
-	const version = typeof args.version === 'string' ? args.version : null;
+	// Enforce the advertised enums (schema-declared) rather than passing arbitrary
+	// strings through to runSearch.
+	const section = SECTIONS.includes(args.section) ? args.section : null;
+	const version = ['v4', 'v5'].includes(args.version) ? args.version : null;
 	// blend = semantic + keyword: better for the natural-language questions agents ask.
 	const { results } = await runSearch({ q: query, section, version, limit, blend: true });
 	void logQuery(query, section, version, results.length, 'mcp'); // content-gap report, source=mcp

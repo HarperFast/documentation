@@ -82,6 +82,18 @@ test('MCP protocol edges: notification → 202, unknown method → -32601, bad t
 	assert.equal(badTool.body.error.code, -32602);
 });
 
+test('MCP rejects batches, and answers an id:null request (not as a notification)', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	// Batching removed in MCP 2025-06-18 + a DoS-amplification vector → rejected.
+	const batch = await rpc([{ jsonrpc: '2.0', id: 1, method: 'ping' }]);
+	assert.equal(batch.body.error.code, -32600, 'array body is an invalid request');
+	// id:null is a valid request id, NOT a notification — it must get a response.
+	const nullId = await rpc({ jsonrpc: '2.0', id: null, method: 'bogus/method' });
+	assert.equal(nullId.status, 200);
+	assert.equal(nullId.body.id, null, 'response echoes the null id');
+	assert.equal(nullId.body.error.code, -32601);
+});
+
 test('MCP CORS preflight (OPTIONS) allows cross-origin', async (t) => {
 	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
 	const res = await fetch(MCP, { method: 'OPTIONS' });
