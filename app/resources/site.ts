@@ -276,7 +276,16 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 		const stream = new ReadableStream({
 			async start(controller) {
 				try {
-					controller.enqueue(encoder.encode('# Harper Documentation\n\n'));
+					controller.enqueue(
+						encoder.encode(
+							'# Harper Documentation\n\n' +
+								'> Agents can query these docs over the Model Context Protocol (MCP):\n' +
+								`> endpoint \`POST ${SITE_ORIGIN}/mcp\` — Streamable-HTTP transport, JSON-RPC 2.0,\n` +
+								'> public, read-only, rate-limited. Tools: `search_docs` (hybrid search),\n' +
+								'> `fetch_doc` (a page’s Markdown by path), `answer` (grounded Q&A with citations).\n' +
+								'> Resources: `harper-docs:///{path}` to list and read pages.\n\n',
+						),
+					);
 					for await (const page of Page.search({
 						conditions: [{ attribute: 'release', value: release }],
 						select: full ? ['path', 'title', 'renderedMarkdown'] : ['path', 'title', 'description'],
