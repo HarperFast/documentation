@@ -94,6 +94,11 @@ test('MCP answer tool returns a grounded answer with citations', async (t) => {
 
 	const bad = await call('answer', {});
 	assert.equal(bad.body.result.isError, true, 'missing question is a tool error');
+
+	// validateQuestion caps length at MAX_QUESTION (1000) — an over-length question
+	// is rejected before any retrieve/generate, so no unbounded input reaches the model.
+	const long = await call('answer', { question: 'a '.repeat(600) }); // 1200 chars
+	assert.equal(long.body.result.isError, true, 'over-length question is rejected');
 });
 
 test('MCP resources: template, list from nav, read a page, bad uri → -32002', async (t) => {
@@ -112,6 +117,12 @@ test('MCP resources: template, list from nav, read a page, bad uri → -32002', 
 
 	const missing = await rpc({ jsonrpc: '2.0', id: 4, method: 'resources/read', params: { uri: 'harper-docs:///nope/nope' } });
 	assert.equal(missing.body.error.code, -32002, 'missing resource → -32002');
+
+	// resources/list only enumerates the current reference version (v5), but legacy
+	// v4 pages stay readable via the template — listing is discovery, not an allowlist.
+	assert.ok(!resources.some((r) => r.uri.includes('reference/v4')), 'v4 is not enumerated');
+	const v4 = await rpc({ jsonrpc: '2.0', id: 5, method: 'resources/read', params: { uri: 'harper-docs:///reference/v4/cli/commands' } });
+	assert.match(v4.body.result.contents[0].text, /^# /, 'unlisted v4 page still reads via the template');
 });
 
 test('MCP rejects batches, and answers an id:null request (not as a notification)', async (t) => {
