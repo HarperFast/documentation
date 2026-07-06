@@ -87,6 +87,8 @@ test('MCP rejects batches, and answers an id:null request (not as a notification
 	// Batching removed in MCP 2025-06-18 + a DoS-amplification vector → rejected.
 	const batch = await rpc([{ jsonrpc: '2.0', id: 1, method: 'ping' }]);
 	assert.equal(batch.body.error.code, -32600, 'array body is an invalid request');
+	// A valid-JSON-but-not-an-object body parsed fine → Invalid Request, not Parse error.
+	assert.equal((await rpc(42)).body.error.code, -32600, 'non-object body is -32600');
 	// id:null is a valid request id, NOT a notification — it must get a response.
 	const nullId = await rpc({ jsonrpc: '2.0', id: null, method: 'bogus/method' });
 	assert.equal(nullId.status, 200);

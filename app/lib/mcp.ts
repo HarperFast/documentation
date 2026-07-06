@@ -70,11 +70,15 @@ export function handleMcpOptions(): Response {
 // The public MCP surface. site.ts reads the JSON body and passes it here (null on
 // a parse failure). Handles a single JSON-RPC message or a batch (array).
 export async function handleMcp(body: any): Promise<Response> {
-	if (body === null || typeof body !== 'object') return json(rpcError(null, -32700, 'Parse error'));
+	// readJsonBody returns null when JSON.parse fails (or the body is oversized).
+	if (body === null) return json(rpcError(null, -32700, 'Parse error'));
 	// MCP 2025-06-18 removed JSON-RPC batching. Reject arrays rather than fan out an
 	// unbounded number of concurrent tool calls (each a remote embed) from a single
 	// unauthenticated request — the batch-amplification DoS both reviews flagged.
 	if (Array.isArray(body)) return json(rpcError(null, -32600, 'Batched requests are not supported.'));
+	// Valid JSON that isn't a request object (a number, string, boolean) → Invalid
+	// Request, not a parse error (the JSON parsed fine).
+	if (typeof body !== 'object') return json(rpcError(null, -32600, 'Invalid Request'));
 	const res = await dispatch(body);
 	return res === null ? new Response(null, { status: 202, headers: CORS }) : json(res);
 }
@@ -109,6 +113,7 @@ async function dispatch(msg: any): Promise<any | null> {
 
 async function callTool(id: any, params: any): Promise<any> {
 	const name = params?.name;
+	if (typeof name !== 'string') return rpcError(id, -32602, 'Invalid params: "name" (tool name) is required.');
 	const args = params?.arguments ?? {};
 	try {
 		if (name === 'search_docs') return rpcResult(id, await searchDocs(args));
