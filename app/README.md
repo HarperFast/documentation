@@ -165,8 +165,22 @@ and some grounding expectations are debatable) — that makes the metrics trustw
 content-gap report. Retrieval refinements, in impact order: version-aware dedup so the K=8 budget
 isn't spent on v4/v5 near-duplicates (seen in verify), query expansion for true recall gaps (words
 that don't match any page), and a keyword-anchored blend to stop strong keyword hits being demoted.
-Thumbs feedback is modeled (`ChatLog.feedback`) but not yet wired to a UI control. MCP server
-exposure is a later step.
+Thumbs feedback is modeled (`ChatLog.feedback`) and wired to a UI control.
+
+## MCP (agent access) — the docs as tools + resources
+
+`POST /mcp` (`lib/mcp.ts`) is a Model Context Protocol server so agents and IDEs
+can use the docs. Stateless **Streamable-HTTP** transport (JSON-RPC 2.0, single
+JSON responses — a read-only server has no server-initiated stream); public and
+read-only, so CORS is open. It reuses the M2/M3 retrieval, not a second copy.
+
+**Tools**: `search_docs` (hybrid keyword+semantic; logs `querySource='mcp'`),
+`fetch_doc` (a page's Markdown by path/url), and `answer` (grounded Q&A — the M3
+pipeline as one non-streaming call, per-IP quota-gated, stub fallback without a
+key). **Resources**: `resources/list` surfaces ~60 nav entry points, the
+`harper-docs:///{+path}` template reads any page, and `resources/read` returns its
+Markdown. Verified with the official `@modelcontextprotocol/sdk` client and
+covered by `test/integration/mcp.test.ts`.
 
 ## Current state: M1 (render/serve) at parity
 

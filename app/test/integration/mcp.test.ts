@@ -82,6 +82,38 @@ test('MCP protocol edges: notification → 202, unknown method → -32601, bad t
 	assert.equal(badTool.body.error.code, -32602);
 });
 
+test('MCP answer tool returns a grounded answer with citations', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	// Works with or without a model key: streamAnswer falls back to the dev stub,
+	// and citations come from retrieval (no model needed).
+	const { body } = await call('answer', { question: 'How does replication work in Harper?' });
+	assert.equal(body.result.isError ?? false, false);
+	const textOut = body.result.content[0].text;
+	assert.ok(textOut.length > 20, 'non-empty answer');
+	assert.match(textOut, /Sources:/, 'includes a citations block');
+
+	const bad = await call('answer', {});
+	assert.equal(bad.body.result.isError, true, 'missing question is a tool error');
+});
+
+test('MCP resources: template, list from nav, read a page, bad uri → -32002', async (t) => {
+	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
+	const tmpl = await rpc({ jsonrpc: '2.0', id: 1, method: 'resources/templates/list' });
+	assert.match(tmpl.body.result.resourceTemplates[0].uriTemplate, /^harper-docs:/, 'exposes the page template');
+
+	const list = await rpc({ jsonrpc: '2.0', id: 2, method: 'resources/list' });
+	const resources: any[] = list.body.result.resources;
+	assert.ok(resources.length > 0, 'lists nav entry points');
+	assert.match(resources[0].uri, /^harper-docs:\/\//);
+
+	const read = await rpc({ jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: 'harper-docs:///reference/v5/replication/overview' } });
+	assert.match(read.body.result.contents[0].text, /^# /, 'reads the page Markdown');
+	assert.equal(read.body.result.contents[0].mimeType, 'text/markdown');
+
+	const missing = await rpc({ jsonrpc: '2.0', id: 4, method: 'resources/read', params: { uri: 'harper-docs:///nope/nope' } });
+	assert.equal(missing.body.error.code, -32002, 'missing resource → -32002');
+});
+
 test('MCP rejects batches, and answers an id:null request (not as a notification)', async (t) => {
 	if (!(await serverUp())) return t.skip(`server not reachable at ${BASE}`);
 	// Batching removed in MCP 2025-06-18 + a DoS-amplification vector → rejected.

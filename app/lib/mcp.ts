@@ -10,10 +10,19 @@
 
 import { tables } from './harper.ts';
 import { runSearch, logQuery } from './search.ts';
+import { retrieve, streamAnswer, checkAndBumpQuota, validateQuestion } from './chat.ts';
 
-const { Page, SitePointer } = tables;
+const { Page, SitePointer, Navigation } = tables;
 
 const PROTOCOL_VERSION = '2025-06-18';
+const RESOURCE_SCHEME = 'harper-docs';
+// Read any page as a resource: harper-docs:///reference/v5/database/schema
+const RESOURCE_TEMPLATE = {
+	uriTemplate: `${RESOURCE_SCHEME}:///{+path}`,
+	name: 'Harper documentation page',
+	description: 'Any docs page by path, e.g. harper-docs:///reference/v5/database/schema',
+	mimeType: 'text/markdown',
+};
 const SERVER_INFO = { name: 'harper-docs', title: 'Harper Documentation', version: '1.0.0' };
 const SECTIONS = ['learn', 'reference', 'fabric', 'release-notes'];
 
@@ -51,6 +60,20 @@ const TOOLS = [
 			required: ['path'],
 		},
 	},
+	{
+		name: 'answer',
+		description:
+			'Ask a question and get a concise answer grounded in the Harper docs, with source citations. Use this for a direct answer; use search_docs + fetch_doc to browse the source material yourself. Rate-limited per client.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				question: { type: 'string', description: 'A natural-language question about Harper.' },
+				section: { type: 'string', enum: SECTIONS, description: 'Optional: restrict grounding to a section.' },
+				version: { type: 'string', enum: ['v4', 'v5'], description: 'Optional: restrict grounding to a major version.' },
+			},
+			required: ['question'],
+		},
+	},
 ];
 
 // ── JSON-RPC helpers ─────────────────────────────────────────────────────────
@@ -69,7 +92,7 @@ export function handleMcpOptions(): Response {
 
 // The public MCP surface. site.ts reads the JSON body and passes it here (null on
 // a parse failure). Handles a single JSON-RPC message or a batch (array).
-export async function handleMcp(body: any): Promise<Response> {
+export async function handleMcp(body: any, ipHash?: string): Promise<Response> {
 	// readJsonBody returns null when JSON.parse fails (or the body is oversized).
 	if (body === null) return json(rpcError(null, -32700, 'Parse error'));
 	// MCP 2025-06-18 removed JSON-RPC batching. Reject arrays rather than fan out an
@@ -79,11 +102,11 @@ export async function handleMcp(body: any): Promise<Response> {
 	// Valid JSON that isn't a request object (a number, string, boolean) → Invalid
 	// Request, not a parse error (the JSON parsed fine).
 	if (typeof body !== 'object') return json(rpcError(null, -32600, 'Invalid Request'));
-	const res = await dispatch(body);
+	const res = await dispatch(body, ipHash);
 	return res === null ? new Response(null, { status: 202, headers: CORS }) : json(res);
 }
 
-async function dispatch(msg: any): Promise<any | null> {
+async function dispatch(msg: any, ipHash?: string): Promise<any | null> {
 	// JSON-RPC: a NOTIFICATION is a request with the `id` member ABSENT — and it is
 	// never answered. `id: null` is a valid request id (its response echoes null).
 	const hasId = msg != null && typeof msg === 'object' && 'id' in msg;
@@ -96,34 +119,84 @@ async function dispatch(msg: any): Promise<any | null> {
 		case 'initialize':
 			return rpcResult(id, {
 				protocolVersion: PROTOCOL_VERSION,
-				capabilities: { tools: { listChanged: false } },
+				capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
 				serverInfo: SERVER_INFO,
-				instructions: 'Search the Harper docs with search_docs, then read a page with fetch_doc using its path.',
+				instructions:
+					'Search the Harper docs with search_docs, read a page with fetch_doc (or the harper-docs:// resource), or get a grounded answer with the answer tool.',
 			});
 		case 'ping':
 			return rpcResult(id, {});
 		case 'tools/list':
 			return rpcResult(id, { tools: TOOLS });
 		case 'tools/call':
-			return callTool(id, msg.params);
+			return callTool(id, msg.params, ipHash);
+		case 'resources/templates/list':
+			return rpcResult(id, { resourceTemplates: [RESOURCE_TEMPLATE] });
+		case 'resources/list':
+			return rpcResult(id, { resources: await listResources() });
+		case 'resources/read':
+			try {
+				return rpcResult(id, await readResource(msg.params?.uri));
+			} catch (err: any) {
+				return rpcError(id, -32002, `Resource not found: ${msg.params?.uri} (${err?.message ?? err})`);
+			}
 		default:
 			return rpcError(id, -32601, `Method not found: ${msg.method}`);
 	}
 }
 
-async function callTool(id: any, params: any): Promise<any> {
+async function callTool(id: any, params: any, ipHash?: string): Promise<any> {
 	const name = params?.name;
 	if (typeof name !== 'string') return rpcError(id, -32602, 'Invalid params: "name" (tool name) is required.');
 	const args = params?.arguments ?? {};
 	try {
 		if (name === 'search_docs') return rpcResult(id, await searchDocs(args));
 		if (name === 'fetch_doc') return rpcResult(id, await fetchDoc(args));
+		if (name === 'answer') return rpcResult(id, await answerTool(args, ipHash));
 		return rpcError(id, -32602, `Unknown tool: ${name}`);
 	} catch (err: any) {
 		// Per MCP, a tool's own failure is reported in the result (isError), not as a
 		// protocol-level error — the model should see and can recover from it.
 		return rpcResult(id, toolText(`Tool "${name}" failed: ${err?.message ?? err}`, true));
 	}
+}
+
+// ── Resources ────────────────────────────────────────────────────────────────
+// resources/list: entry-point pages from the navigation (any page is still
+// reachable via the harper-docs:// template). Capped so the list stays browsable.
+async function listResources(): Promise<any[]> {
+	const release = (await SitePointer.get('active'))?.release;
+	if (!release) return [];
+	const out: any[] = [];
+	const seen = new Set<string>();
+	const walk = (nodes: any[], depth: number) => {
+		for (const n of nodes ?? []) {
+			if (typeof n?.path === 'string' && !seen.has(n.path)) {
+				seen.add(n.path);
+				out.push({ uri: `${RESOURCE_SCHEME}:///${n.path}`, name: n.label ?? n.path, mimeType: 'text/markdown' });
+			}
+			if (depth < 1 && Array.isArray(n?.items)) walk(n.items, depth + 1);
+		}
+	};
+	for (const sec of ['learn', 'reference:v5', 'fabric', 'release-notes']) {
+		const nav = await Navigation.get(`${release}:${sec}`);
+		if (Array.isArray(nav?.tree)) walk(nav.tree, 0);
+	}
+	return out.slice(0, 60);
+}
+
+// resources/read: resolve a harper-docs:// uri to a page's Markdown.
+async function readResource(uri: unknown): Promise<any> {
+	const m = /^harper-docs:\/{2,3}(.*)$/.exec(String(uri ?? ''));
+	if (!m) throw new Error('unsupported uri scheme');
+	const path = m[1]
+		.replace(/[#?].*$/, '')
+		.replace(/^\/+/, '')
+		.replace(/\/+$/, '');
+	const release = (await SitePointer.get('active'))?.release;
+	const page = release ? await Page.get(`${release}:${path}`) : null;
+	if (!page?.renderedMarkdown) throw new Error('no such page');
+	return { contents: [{ uri, mimeType: 'text/markdown', text: `# ${page.title}\n\n${page.renderedMarkdown}` }] };
 }
 
 // ── Tools ────────────────────────────────────────────────────────────────────
@@ -162,4 +235,26 @@ async function fetchDoc(args: any) {
 	const page = await Page.get(`${release}:${path}`);
 	if (!page?.renderedMarkdown) return toolText(`No page at "${path}". Use search_docs to find the right path.`, true);
 	return toolText(`# ${page.title}\n\n${page.renderedMarkdown}`);
+}
+
+// Grounded Q&A over the docs — the chat pipeline exposed as a tool. Reuses the
+// same retrieval + generation, non-streaming (a tool call is one response), and
+// shares the chat daily quota by client IP (this is a public LLM call). Falls back
+// to the deterministic dev stub when no model key is set.
+async function answerTool(args: any, ipHash?: string) {
+	const question = validateQuestion(args.question);
+	if (!question) return toolText('answer requires a non-empty "question".', true);
+	if (ipHash) {
+		const quota = await checkAndBumpQuota(ipHash);
+		if (!quota.ok) return toolText(`Daily question limit reached (cap ${quota.cap}). Use search_docs + fetch_doc instead.`, true);
+	}
+	const section = SECTIONS.includes(args.section) ? args.section : null;
+	const version = ['v4', 'v5'].includes(args.version) ? args.version : null;
+	const grounding = await retrieve(question, section, version);
+	let answer = '';
+	for await (const delta of streamAnswer(question, grounding)) answer += delta;
+	const cites = grounding.sources
+		.map((s, i) => `[${i + 1}] ${s.title}${s.heading ? ` › ${s.heading}` : ''} — ${s.url}`)
+		.join('\n');
+	return toolText(cites ? `${answer.trim()}\n\nSources:\n${cites}` : answer.trim());
 }

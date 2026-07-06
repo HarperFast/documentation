@@ -164,7 +164,7 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 	// (+ CORS preflight). Public, read-only — see lib/mcp.ts.
 	if (request.pathname === '/mcp') {
 		if (request.method === 'OPTIONS') return handleMcpOptions();
-		if (request.method === 'POST') return handleMcp(await readJsonBody(request));
+		if (request.method === 'POST') return handleMcp(await readJsonBody(request), hashIp(clientIp(request)));
 		// This stateless server has no server-initiated stream, so the optional GET
 		// SSE channel isn't offered — 405 (not a page 404) per the transport spec.
 		return new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST, OPTIONS' } });
