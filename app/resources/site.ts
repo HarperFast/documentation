@@ -28,6 +28,7 @@ import {
 	type CacheHit,
 } from '../lib/chat.ts';
 import { renderChatPage } from '../lib/chat-ui.ts';
+import { handleMcp, handleMcpOptions } from '../lib/mcp.ts';
 
 const { Page, Navigation, Redirect, SitePointer, IngestRun } = tables;
 
@@ -158,6 +159,15 @@ server.http(async (request: HarperRequest, next: (request: HarperRequest) => Res
 		if (body === null) return jsonResponse({ error: 'bad request' }, 400);
 		const ok = await recordFeedback(body.id, body.value);
 		return jsonResponse({ ok }, ok ? 200 : 404);
+	}
+	// MCP server: agents/IDEs search + read the docs. JSON-RPC over POST /mcp
+	// (+ CORS preflight). Public, read-only — see lib/mcp.ts.
+	if (request.pathname === '/mcp') {
+		if (request.method === 'OPTIONS') return handleMcpOptions();
+		if (request.method === 'POST') return handleMcp(await readJsonBody(request));
+		// This stateless server has no server-initiated stream, so the optional GET
+		// SSE channel isn't offered — 405 (not a page 404) per the transport spec.
+		return new Response('Method Not Allowed', { status: 405, headers: { allow: 'POST, OPTIONS' } });
 	}
 	if ((request.method !== 'GET' && request.method !== 'HEAD') || PASSTHROUGH.test(request.pathname))
 		return next(request);

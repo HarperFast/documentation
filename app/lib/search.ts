@@ -333,7 +333,8 @@ export async function logQuery(
 	query: string,
 	section: string | null,
 	version: string | null,
-	resultCount: number
+	resultCount: number,
+	source: 'ui' | 'agent' | 'mcp' = 'ui'
 ): Promise<void> {
 	if (!query || query.trim().length < 2) return; // ignore trivially short queries
 	// The commit beacon is public and its inputs are caller-supplied — bound them
@@ -348,7 +349,7 @@ export async function logQuery(
 				// collide and overwrite each other (distorts zero-result stats).
 				id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
 				query: safeQuery,
-				querySource: 'ui',
+				querySource: source,
 				section,
 				version,
 				resultCount: safeCount,
