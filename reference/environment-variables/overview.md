@@ -78,18 +78,15 @@ loadEnv:
 
 Files are loaded in the order specified.
 
-## Config-Shaping Variables
+## Config-Shaping Variables Are Not Honored
 
 <VersionBadge type="changed" version="v5.2.0" />
 
-The three configuration env vars — `HARPER_DEFAULT_CONFIG`, `HARPER_CONFIG`, and `HARPER_SET_CONFIG` (see [Configuration](../configuration/overview.md)) — shape Harper's root configuration, which is composed once at startup, before components load. When one of these is delivered through a `loadEnv` `.env` file, Harper applies it before composing the configuration, so `.env` delivery behaves the same as setting a real process environment variable. (Prior to 5.2.0, these variables silently had no effect when delivered via `.env`, because they were read after the configuration had already been composed.)
+The three configuration env vars — `HARPER_DEFAULT_CONFIG`, `HARPER_CONFIG`, and `HARPER_SET_CONFIG` (see [Configuration](../configuration/overview.md)) — shape Harper's root configuration, which is composed once at startup, **before components load**. Delivering one of them through a `loadEnv` `.env` file therefore has **no effect**: configuration is strictly top-down (the instance's configuration controls components, never the reverse), so a component cannot shape instance-wide config.
 
-Notes and limitations:
+As of 5.2.0 this is no longer silent: Harper logs a prominent warning at startup for each config-shaping variable found in a component `.env` file — naming the variable and the file — and again at component load time (which also covers components deployed after startup). Earlier versions ignored these variables without any message.
 
-- A real process environment variable still takes precedence over the `.env` value, unless `loadEnv` is configured with `override: true`.
-- Encrypted (`enc:v1:`) values cannot shape configuration — secret decryptors are not registered until components load. Such values are skipped with an error log.
-- `componentsRoot` cannot be redirected this way: Harper discovers the `.env` files by scanning the components root from the config file, so a `componentsRoot` override delivered via env var or `.env` cannot change where that scan looks.
-- Only these three variables are applied early. All other `.env` keys load at component-load time as usual.
+To configure the instance, use the supported channels instead: set the variable in the process environment (container env, service unit, shell), or put the equivalent keys in the instance's `harper-config.yaml`.
 
 ## Related
 
