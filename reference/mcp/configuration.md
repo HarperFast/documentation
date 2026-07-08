@@ -153,6 +153,12 @@ mcp:
 // resources.js
 const DAILY_LIMIT = 100;
 export class McpQuota extends tables.QuotaCounter {
+	// Exporting makes the class config-addressable — but it would also surface
+	// update_/delete_McpQuota MCP tools and a REST endpoint, letting a
+	// permitted client reset its own counter. Keep the quota table off the MCP
+	// surface and restrict its REST permissions.
+	static exportTypes = { mcp: false };
+
 	static async allowMcpCall({ identity, tool, user, profile, sessionId }) {
 		const id = identity ?? 'unknown';
 		const existing = await McpQuota.get(id);
