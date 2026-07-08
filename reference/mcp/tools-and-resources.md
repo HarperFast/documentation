@@ -110,7 +110,7 @@ The corresponding instance method runs through Harper's normal `transactional()`
 
 ### Custom `mcpResources` opt-in
 
-A component author can expose arbitrary content — documentation pages, rendered reports, any `text` or `blob` payload — as MCP resources under author-chosen URIs by declaring a static `mcpResources` array (5.1.16+):
+A component author can expose arbitrary content — documentation pages, rendered reports, any `text` or `blob` payload — as MCP resources under author-chosen URIs by declaring a static `mcpResources` array (5.1.18+):
 
 ```ts
 class DocsPages extends Resource {
@@ -178,7 +178,7 @@ The schema URIs honor each user's `permission[db].tables[table]` walk — a user
 
 ### `harper+rest://` URIs
 
-The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as a `harper+rest://<host>:<port>/<path>` URI (5.1.16+ — earlier releases listed these under `http(s)://`, which the MCP spec reserves for resources a client can fetch directly from the web; legacy `http(s)://` URIs continue to work for `resources/read` and `resources/subscribe`). These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
+The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as a `harper+rest://<host>:<port>/<path>` URI (5.1.18+ — earlier releases listed these under `http(s)://`, which the MCP spec reserves for resources a client can fetch directly from the web; legacy `http(s)://` URIs continue to work for `resources/read` and `resources/subscribe`). These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
 
 ```json
 {
