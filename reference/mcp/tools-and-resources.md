@@ -146,7 +146,7 @@ Each entry declares exactly one of `uri` (fixed — listed by `resources/list`) 
 
 Notes:
 
-- Reads dispatch on the **live** registry class, so an exported `resources.js` subclass's method (and its access control) always wins — the same rule as custom `mcpTools`. Authentication is "is the user logged in"; finer-grained gating is the method's responsibility.
+- Reads dispatch on the **live** registry class, so an exported `resources.js` subclass's method (and its access control) always wins — the same rule as custom `mcpTools`. Custom resources are served to **any** MCP session, including anonymous, unauthenticated ones (the public-docs case this feature targets) — the MCP layer performs no auth check for them; to restrict one, check `context.user` in the `read` method and throw.
 - `completions` optionally declares candidate values per template parameter, served by `completion/complete`.
 - Custom URIs must use an author-chosen scheme (`docs:///…` above). The reserved schemes — `harper:`, `harper+rest:`, `http:`, `https:` — are rejected at registration so custom entries cannot shadow the built-in surfaces.
 - A read error from the method surfaces to the client as a sanitized JSON-RPC error; the raw error is written to the server log.
