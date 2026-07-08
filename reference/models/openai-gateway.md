@@ -17,10 +17,11 @@ Harper exposes an OpenAI-compatible REST gateway on the application HTTP server 
 
 ## Enabling it
 
-The gateway is opt-in. Add `modelsGateway: {}` to `harper-config.yaml` alongside at least one configured model:
+The gateway is off by default. Enable it by setting `modelsGateway.enabled: true` in `harper-config.yaml` alongside at least one configured model:
 
 ```yaml
-modelsGateway: {}
+modelsGateway:
+  enabled: true
 models:
   generative:
     default:
@@ -29,7 +30,7 @@ models:
       model: gpt-4o
 ```
 
-The gateway does not add its own authentication — requests go through Harper's normal REST auth chain like any other resource. Deploy behind a network boundary or configure Harper's [authentication](../security/overview) as appropriate.
+Requests require authentication: unauthenticated calls receive an OpenAI-shaped `401` error, and callers must carry `super_user` permission (the same default gate as other Harper resources). Credentials flow through Harper's normal REST auth chain — see [authentication](../security/overview).
 
 ## Using it with an OpenAI client
 
