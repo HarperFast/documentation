@@ -185,7 +185,7 @@ The `type` prop defaults to `"added"`, so the most common case is just `version`
 
 <VersionBadge version="v4.3.0" />
 
-The `@relation` directive allows you to define relationships between tables...
+The `@relationship` directive allows you to define relationships between tables...
 ```
 
 **Changed behavior:**
