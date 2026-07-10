@@ -74,6 +74,30 @@ In addition to the standard `files`, `urlPath`, and `timeout` options, `static` 
 
 - **`notFound`** - `string | { file: string; statusCode: number }` - _optional_ - A custom file (or file + status code) to return when a path is not found. Useful for serving a custom 404 page or for SPAs that use client-side routing.
 
+### Cache Headers
+
+<VersionBadge version="v5.2.0" />
+
+Static files are served before authentication runs, so they are public by construction. Use the following options to control the `Cache-Control` header Harper emits for served files:
+
+- **`maxAge`** - `number` (seconds) or `string` (duration) - _optional_ - Freshness lifetime for served files. A number is treated as seconds; a string like `'5m'` or `'1d'` is parsed as a duration. Emits `Cache-Control: public, max-age=<seconds>`. Defaults to `0` (revalidate on every request via ETag/Last-Modified). Malformed values throw at startup rather than silently degrading.
+
+- **`immutable`** - `boolean` - _optional_ - When `true`, appends the `immutable` directive to the `Cache-Control` header. Use this for content-hashed assets whose URL changes when the content changes, so browsers and CDNs never revalidate them. Defaults to `false`.
+
+- **`cacheControl`** - `string | false` - _optional_ - Full `Cache-Control` override string. Takes precedence over `maxAge` and `immutable` when set. Set to `false` to suppress the `Cache-Control` header entirely.
+
+The `notFound` fallback always uses `max-age=0` regardless of `maxAge`, which is correct for SPA index fallbacks — a `200 index.html` response should revalidate so updated builds are picked up promptly.
+
+Example: serve a Next.js-style `_next/static/` directory with long-lived caching for hashed assets:
+
+```yaml
+static:
+  files: 'web/_next/static/**'
+  urlPath: '_next/static'
+  maxAge: '1y'
+  immutable: true
+```
+
 ## Auto-Updates
 
 <VersionBadge version="v4.7.0" />
