@@ -198,7 +198,36 @@ replication:
 
 In this example, the local node only receives from `node-two` (one-way inbound) and only sends to `node-three` (one-way outbound).
 
-> **Note**: When using controlled flow replication, avoid replicating the `system` database. The `system` database contains node configurations, so replicating it would cause all nodes to have identical (and incorrect) route configurations.
+You can also scope flow per database, so different databases flow in different directions between the same two nodes. Use `sendsTo` / `receivesFrom` entries with a `database`:
+
+```yaml
+replication:
+  databases:
+    - cardata
+    - config
+    - system
+  routes:
+    - host: node-two
+      replicates:
+        sendsTo:
+          - database: config # push central config downstream
+        receivesFrom:
+          - database: cardata # aggregate telemetry upstream
+```
+
+#### Replicating the `system` database with controlled flow
+
+<VersionBadge type="changed" version="v5.2.0" />
+
+Before v5.2, replicating the `system` database under controlled flow was discouraged: because `hdb_nodes` (the node registry) lives in `system` and each node advertised itself as a full-mesh participant, replicating `system` caused every node to discover and directly connect to every other node — collapsing a constrained topology into a full mesh.
+
+As of v5.2 you can replicate `system` while keeping a constrained topology. When a node has directional routes, it advertises a **directional** registry record derived from those routes (which neighbors it sends to / receives from) instead of a blanket "connect to everyone." Discovered non-neighbor nodes therefore do not open direct connections. This lets central configuration — users, roles, and schemas — propagate transitively across the whole cluster while user-database connections stay on the routes you configured. For example, in a `roadside → middle → core` aggregation tree, a role created on a roadside node reaches the core through the middle tier, yet the core never opens a direct socket to a roadside node.
+
+Notes and current limitations:
+
+- This applies only when a node has **directional** routes (`replicates` with `sends`/`receives` or `sendsTo`/`receivesFrom`). A node with no directional routes keeps the legacy full-mesh advertisement.
+- Central visibility of every node is not guaranteed: an aggregation node may not list every distant leaf in its `hdb_nodes` registry (the registry relay differs from data relay). This does not open a connection either way.
+- Route changes to a node's own directionality take effect on restart.
 
 ### Explicit Subscriptions
 
