@@ -28,10 +28,10 @@ A single cluster-shared keypair is distributed to every node the same way the JW
 
 Each secret is delivered exactly one of two ways, decided by the row itself. The two tiers are mutually exclusive — a `process.env` secret is already global, so scoping it would be meaningless, and `set_secret` rejects a row that is both.
 
-| Tier | Row flag | Reaches components as | In `process.env`? | Inherited by child processes? |
-| ---- | -------- | --------------------- | ----------------- | ----------------------------- |
-| **Global** | `processEnv: true` | `process.env.NAME` | Yes | Yes |
-| **Scoped** | `grants: [...]` | `secrets.NAME` (granted components only) | No | No |
+| Tier       | Row flag           | Reaches components as                    | In `process.env`? | Inherited by child processes? |
+| ---------- | ------------------ | ---------------------------------------- | ----------------- | ----------------------------- |
+| **Global** | `processEnv: true` | `process.env.NAME`                       | Yes               | Yes                           |
+| **Scoped** | `grants: [...]`    | `secrets.NAME` (granted components only) | No                | No                            |
 
 **Global tier** secrets are materialized into the real `process.env` at startup, before components load — exactly like `.env` values, with the same semantics (a pre-existing real environment variable always wins over the store). There is no isolation between components on this tier.
 
@@ -45,13 +45,13 @@ JS-level scoping is a slowdown layer, not a hard security boundary — component
 
 All secret operations are **`super_user` only** and are documented in the [Operations Reference](../operations-api/operations.md#secrets). The core operations:
 
-| Operation | Purpose |
-| --------- | ------- |
-| `set_secret` | Create or update a secret (and choose its tier) |
+| Operation                        | Purpose                                                 |
+| -------------------------------- | ------------------------------------------------------- |
+| `set_secret`                     | Create or update a secret (and choose its tier)         |
 | `grant_secret` / `revoke_secret` | Add or remove a component from a scoped secret's grants |
-| `list_secrets` | List secret metadata (never values) |
-| `delete_secret` | Remove a secret row |
-| `get_secrets_public_key` | Fetch the cluster public key for client-side encryption |
+| `list_secrets`                   | List secret metadata (never values)                     |
+| `delete_secret`                  | Remove a secret row                                     |
+| `get_secrets_public_key`         | Fetch the cluster public key for client-side encryption |
 
 ### Create a global (process.env) secret
 
@@ -124,7 +124,23 @@ import { secrets } from 'harper';
 const stripe = new Stripe(secrets.STRIPE_KEY);
 ```
 
-The recommended idiom is a **module-top-level destructure**, which binds correctly in every component-loading mode:
+**The accessor is live.** On the scoped tier a property read (`secrets.STRIPE_KEY`) always returns the latest stored value — a rotation is reflected on the next read, no reload required. So most components need nothing more than the accessor: read the secret **where you use it**, and every request sees the current value. Reading inside a resource handler is the common case:
+
+```js
+import { Resource, secrets } from 'harper';
+
+export class Report extends Resource {
+	async get() {
+		// Read at call time, so each request uses the current token — even after a rotation.
+		const response = await fetch('https://api.example.com/report', {
+			headers: { authorization: `Bearer ${secrets.API_TOKEN}` },
+		});
+		return response.json();
+	}
+}
+```
+
+The one thing that is **not** live is a **destructure**: `const { STRIPE_KEY } = secrets` — or any assignment that copies the value into your own variable — takes a **point-in-time snapshot** and won't observe a later rotation. That's fine for a value read once and used as-is, and it's the idiom to use when the read must happen at module load (see the loader note below):
 
 ```js
 import { secrets } from 'harper';
@@ -132,15 +148,64 @@ import { secrets } from 'harper';
 const { STRIPE_KEY, WEBHOOK_SECRET } = secrets;
 ```
 
-The `secrets` object is frozen and enumerable (`Object.keys(secrets)`, spread). Global-tier secrets are read from `process.env` as usual and do not need the accessor.
+The `secrets` object is a read-only, live view of the secrets granted to the component; its secret names are enumerable (`Object.keys(secrets)`, spread), while the `subscribe` method below is a non-enumerable member so it never leaks into a spread of values. Global-tier secrets are read from `process.env` as usual and do not need the accessor.
 
 :::note
-Under the VM/compartment component loaders the `harper` module is per-scope, so `import { secrets } from 'harper'` binds to the loading component exactly. Under the native loader the `harper` package is a process-wide singleton, so `secrets` binds to the current component via the component-load context; accessing it **outside** a component-load context fails loudly rather than guessing which component is asking. The module-top-level destructure above is exact in all modes.
+Under the VM/compartment component loaders (the default) the `harper` module is per-scope, so `import { secrets } from 'harper'` is a view bound to your component — you can read `secrets.NAME` live from anywhere in it, including inside request handlers. Under the native loader the `harper` package is a process-wide singleton that resolves the calling component from the component-load context, so a read **outside** component load fails loudly rather than guessing which component is asking; there, read at module top level during load (the destructure above — a snapshot) or use `secrets.subscribe()` to track changes. The module-top-level destructure is exact in all modes.
 :::
 
-### Healing after changes
+### React to rotations with `secrets.subscribe()`
 
-Materialization happens once per load cycle — there is no live re-materialization. A secret that was granted late, rotated, or whose custody came up after boot heals on the next **restart or component reload**, when the store is re-read.
+Reading `secrets.NAME` per use (above) already picks up rotations, so reach for a subscription only when you build something **from** a secret and keep it around — an API client, a connection pool, a cached signer — and need to rebuild that object when the secret changes.
+
+`secrets.subscribe(name)` returns an async iterable that yields the secret's **current value immediately**, then a new value on **every change** — a grant, a rotation (`set_secret`), a revoke, or a delete. It lets a component hot-swap a rotated secret without a restart.
+
+The iterator stays open for the life of the component, so a top-level `for await` would block module load forever. Instead, use the current value right away, then subscribe in a **background task** so module load is never blocked and the rest of the component keeps initializing:
+
+```js
+import { secrets } from 'harper';
+
+// Ready to serve immediately with the current value...
+let currentKey = secrets.STRIPE_KEY;
+let stripe = new Stripe(currentKey);
+
+// ...then hot-swap on every rotation, without blocking module load.
+(async () => {
+	try {
+		for await (const key of secrets.subscribe('STRIPE_KEY')) {
+			if (key === currentKey) continue; // the first yield is the value we already have
+			currentKey = key;
+			stripe = new Stripe(currentKey);
+		}
+	} catch (error) {
+		// Log and keep serving the last client; it stays valid until the next reload.
+		console.error('secret subscription ended for STRIPE_KEY:', error);
+	}
+})();
+```
+
+The first value `subscribe` yields is the secret's **current** value — the same one read synchronously above — so the guard skips a redundant rebuild on startup and only rebuilds the client when the key actually rotates.
+
+Authority is re-evaluated on **every** event through the same rules as the read accessor:
+
+- A **revoke** or **delete** yields `undefined` (no plaintext is retained), while the stream stays **open**.
+- A later **re-grant** or **re-add** resumes delivery on the same iterator — no restart, no re-subscribe.
+
+`subscribe` is a reserved name: it can never be a secret's name, and never resolves to a secret value.
+
+### How each tier sees a change
+
+The two tiers observe changes differently:
+
+| Read path                   | Scoped tier (`grants`)                               | Global tier (`processEnv`)                        |
+| --------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| `secrets.NAME` accessor     | **Live** — reflects the latest value on a fresh read | Current value at load; reload-only                |
+| `secrets.subscribe('NAME')` | **Live** — streams every change                      | Current value only; reload-only                   |
+| `process.env.NAME`          | n/a                                                  | Reload-only — never re-mutated under running code |
+
+**Scoped-tier** consumers see grants, rotations, revokes, and late-arriving custody take effect live, through the accessor or a subscription.
+
+**Global-tier** secrets are materialized into `process.env` once at startup, before components load, and are deliberately **not** re-materialized under running code: child processes inherit `process.env`, and the "a pre-existing real environment variable always wins" precedence must hold. A change to a global secret — or custody that only came up after boot — heals on the next **restart or component reload**, when the store is re-read.
 
 ## Client-side encryption (encrypt before it leaves the client)
 
@@ -187,7 +252,7 @@ enc:v1:<base64url( JSON )>
 	"k": "<base64: RSA-OAEP(SHA-256) wrap of the 32-byte AES key>",
 	"iv": "<base64: 12-byte AES-GCM nonce>",
 	"ct": "<base64: AES-256-GCM ciphertext of the UTF-8 value>",
-	"tag": "<base64: 16-byte AES-GCM authentication tag>"
+	"tag": "<base64: 16-byte AES-GCM authentication tag>",
 }
 ```
 
