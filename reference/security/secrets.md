@@ -28,10 +28,10 @@ A single cluster-shared keypair is distributed to every node the same way the JW
 
 Each secret is delivered exactly one of two ways, decided by the row itself. The two tiers are mutually exclusive — a `process.env` secret is already global, so scoping it would be meaningless, and `set_secret` rejects a row that is both.
 
-| Tier | Row flag | Reaches components as | In `process.env`? | Inherited by child processes? |
-| ---- | -------- | --------------------- | ----------------- | ----------------------------- |
-| **Global** | `processEnv: true` | `process.env.NAME` | Yes | Yes |
-| **Scoped** | `grants: [...]` | `secrets.NAME` (granted components only) | No | No |
+| Tier       | Row flag           | Reaches components as                    | In `process.env`? | Inherited by child processes? |
+| ---------- | ------------------ | ---------------------------------------- | ----------------- | ----------------------------- |
+| **Global** | `processEnv: true` | `process.env.NAME`                       | Yes               | Yes                           |
+| **Scoped** | `grants: [...]`    | `secrets.NAME` (granted components only) | No                | No                            |
 
 **Global tier** secrets are materialized into the real `process.env` at startup, before components load — exactly like `.env` values, with the same semantics (a pre-existing real environment variable always wins over the store). There is no isolation between components on this tier.
 
@@ -45,13 +45,13 @@ JS-level scoping is a slowdown layer, not a hard security boundary — component
 
 All secret operations are **`super_user` only** and are documented in the [Operations Reference](../operations-api/operations.md#secrets). The core operations:
 
-| Operation | Purpose |
-| --------- | ------- |
-| `set_secret` | Create or update a secret (and choose its tier) |
+| Operation                        | Purpose                                                 |
+| -------------------------------- | ------------------------------------------------------- |
+| `set_secret`                     | Create or update a secret (and choose its tier)         |
 | `grant_secret` / `revoke_secret` | Add or remove a component from a scoped secret's grants |
-| `list_secrets` | List secret metadata (never values) |
-| `delete_secret` | Remove a secret row |
-| `get_secrets_public_key` | Fetch the cluster public key for client-side encryption |
+| `list_secrets`                   | List secret metadata (never values)                     |
+| `delete_secret`                  | Remove a secret row                                     |
+| `get_secrets_public_key`         | Fetch the cluster public key for client-side encryption |
 
 ### Create a global (process.env) secret
 
@@ -132,15 +132,54 @@ import { secrets } from 'harper';
 const { STRIPE_KEY, WEBHOOK_SECRET } = secrets;
 ```
 
-The `secrets` object is frozen and enumerable (`Object.keys(secrets)`, spread). Global-tier secrets are read from `process.env` as usual and do not need the accessor.
+On the scoped tier the accessor is **live**: a fresh property read (`secrets.STRIPE_KEY`) always reflects the latest stored value, with no reload. A destructure like the one above is a convenient **point-in-time copy** — ideal when a secret is read once at load and never changes, but it will _not_ observe a later rotation. To react to rotations, read the property when you need it, or subscribe (see [React to rotations](#react-to-rotations-with-secretssubscribe)).
+
+The `secrets` object is a read-only, live view of the secrets granted to the component; its secret names are enumerable (`Object.keys(secrets)`, spread), while the `subscribe` method below is a non-enumerable member so it never leaks into a spread of values. Global-tier secrets are read from `process.env` as usual and do not need the accessor.
 
 :::note
 Under the VM/compartment component loaders the `harper` module is per-scope, so `import { secrets } from 'harper'` binds to the loading component exactly. Under the native loader the `harper` package is a process-wide singleton, so `secrets` binds to the current component via the component-load context; accessing it **outside** a component-load context fails loudly rather than guessing which component is asking. The module-top-level destructure above is exact in all modes.
 :::
 
-### Healing after changes
+### React to rotations with `secrets.subscribe()`
 
-Materialization happens once per load cycle — there is no live re-materialization. A secret that was granted late, rotated, or whose custody came up after boot heals on the next **restart or component reload**, when the store is re-read.
+`secrets.subscribe(name)` returns an async iterable that yields the secret's **current value immediately**, then a new value on **every change** — a grant, a rotation (`set_secret`), a revoke, or a delete. It lets a component hot-swap a rotated secret without a restart.
+
+The iterator stays open for the life of the component, so a top-level `for await` would block module load forever. Instead, use the current value right away, then subscribe in a **background task** so module load is never blocked and the rest of the component keeps initializing:
+
+```js
+import { secrets } from 'harper';
+
+// Ready to serve immediately with the current value...
+let stripe = new Stripe(secrets.STRIPE_KEY);
+
+// ...then hot-swap on every rotation, without blocking module load.
+(async () => {
+	for await (const key of secrets.subscribe('STRIPE_KEY')) {
+		stripe = new Stripe(key);
+	}
+})();
+```
+
+Authority is re-evaluated on **every** event through the same rules as the read accessor:
+
+- A **revoke** or **delete** yields `undefined` (no plaintext is retained), while the stream stays **open**.
+- A later **re-grant** or **re-add** resumes delivery on the same iterator — no restart, no re-subscribe.
+
+`subscribe` is a reserved name: it can never be a secret's name, and never resolves to a secret value.
+
+### How each tier sees a change
+
+The two tiers observe changes differently:
+
+| Read path                   | Scoped tier (`grants`)                               | Global tier (`processEnv`)                        |
+| --------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| `secrets.NAME` accessor     | **Live** — reflects the latest value on a fresh read | Current value at load; reload-only                |
+| `secrets.subscribe('NAME')` | **Live** — streams every change                      | Current value only; reload-only                   |
+| `process.env.NAME`          | n/a                                                  | Reload-only — never re-mutated under running code |
+
+**Scoped-tier** consumers see grants, rotations, revokes, and late-arriving custody take effect live, through the accessor or a subscription.
+
+**Global-tier** secrets are materialized into `process.env` once at startup, before components load, and are deliberately **not** re-materialized under running code: child processes inherit `process.env`, and the "a pre-existing real environment variable always wins" precedence must hold. A change to a global secret — or custody that only came up after boot — heals on the next **restart or component reload**, when the store is re-read.
 
 ## Client-side encryption (encrypt before it leaves the client)
 
@@ -187,7 +226,7 @@ enc:v1:<base64url( JSON )>
 	"k": "<base64: RSA-OAEP(SHA-256) wrap of the 32-byte AES key>",
 	"iv": "<base64: 12-byte AES-GCM nonce>",
 	"ct": "<base64: AES-256-GCM ciphertext of the UTF-8 value>",
-	"tag": "<base64: 16-byte AES-GCM authentication tag>"
+	"tag": "<base64: 16-byte AES-GCM authentication tag>",
 }
 ```
 
