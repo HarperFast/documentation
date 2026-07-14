@@ -187,7 +187,7 @@ Type: `string`
 
 Default: unset (no durable quota)
 
-Path of an exported Resource whose static quota method Harper calls before each admitted `tools/call`. Dispatch uses the live registry class, so an exported subclass (and its policy) wins on reload.
+Path of a **registered** Resource whose static quota method Harper calls before each admitted `tools/call`. Harper resolves the resource by name from the live registry on every call, so the currently-registered class (and its policy) wins on reload. Registration — not export — is what makes it resolvable: register it either by exporting a `@export`/schema Resource, or (as in the example above) with `server.resources.set(name, Resource, exportTypes)`, which keeps it resolvable by the hook while `exportTypes: { …all false }` keeps its inherited CRUD off every transport.
 
 ### `mcp.<profile>.quota.method`
 
