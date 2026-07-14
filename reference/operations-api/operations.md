@@ -612,11 +612,11 @@ Additional parameters:
 
 When a component is installed from a private npm registry, `registryAuth` supplies the credential. It is an array of entries, each naming a `registry` and providing the credential exactly one of two ways:
 
-| Field      | Description                                                                                   |
-| ---------- | --------------------------------------------------------------------------------------------- |
-| `registry` | The registry URL or host the credential applies to. **Required.**                             |
-| `token`    | A literal auth token, or                                                                       |
-| `secret`   | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.           |
+| Field      | Description                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `registry` | The registry URL or host the credential applies to. **Required.**                                |
+| `token`    | A literal auth token, or                                                                         |
+| `secret`   | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.             |
 | `scope`    | Optional npm `@scope` (e.g. `"@my-org"`) the entry applies to; omit to set the default registry. |
 
 A provided **`token`** is not treated as ephemeral: Harper ingests it into the encrypted [secrets store](../security/secrets.md) and references it everywhere, so package-reference deploys keep working through rollback, reboot, and new peers joining — without re-supplying the token. The token is encrypted at rest, stripped from the operation before replication and from the operations log, and only ever crosses the cluster as ciphertext. Using a **`secret`** reference names an existing store row directly. Ingesting a token requires custody on the deploying node; on OSS core without custody, a literal token falls back to a transient, this-node-only credential (not persisted or replicated).
@@ -754,26 +754,26 @@ Operations for managing the encrypted [secrets store](../security/secrets.md) (`
 Detailed documentation: [Secrets](../security/secrets.md)
 
 | Operation                | Description                                                    | Role Required |
-| ------------------------ | ------------------------------------------------------------- | ------------- |
-| `set_secret`             | Creates or updates a secret and chooses its delivery tier     | super_user    |
+| ------------------------ | -------------------------------------------------------------- | ------------- |
+| `set_secret`             | Creates or updates a secret and chooses its delivery tier      | super_user    |
 | `grant_secret`           | Adds a component to a scoped secret's grants (idempotent)      | super_user    |
 | `revoke_secret`          | Removes a component from a scoped secret's grants (idempotent) | super_user    |
-| `list_secrets`           | Lists secret metadata — never envelopes or values             | super_user    |
-| `delete_secret`          | Deletes a secret row                                          | super_user    |
-| `get_secrets_public_key` | Returns the cluster public key for client-side encryption     | super_user    |
+| `list_secrets`           | Lists secret metadata — never envelopes or values              | super_user    |
+| `delete_secret`          | Deletes a secret row                                           | super_user    |
+| `get_secrets_public_key` | Returns the cluster public key for client-side encryption      | super_user    |
 
 ### `set_secret`
 
 Creates or updates a secret. Supply exactly one of `value` (plaintext, encrypted on ingest — requires custody on this node) or `envelope` (an `enc:v1:` ciphertext produced client-side against `get_secrets_public_key`). The delivery tier is `processEnv: true` **or** `grants` — the two are mutually exclusive. On update, tier and metadata default to the stored row, so a value rotation preserves the tier without re-specifying it.
 
-| Parameter    | Type       | Description                                                                       |
-| ------------ | ---------- | -------------------------------------------------------------------------------- |
-| `name`       | string     | Secret name (word characters, dots, dashes). **Required.**                       |
-| `value`      | string     | Plaintext value; encrypted immediately, then discarded. Requires custody.        |
-| `envelope`   | string     | `enc:v1:` ciphertext (alternative to `value`).                                   |
-| `processEnv` | boolean    | `true` delivers the secret via `process.env` (global tier).                      |
-| `grants`     | string[]   | Components allowed to read the secret via the `secrets` accessor (scoped tier).  |
-| `metadata`   | object     | Optional free-form label object (not a payload store).                           |
+| Parameter    | Type     | Description                                                                     |
+| ------------ | -------- | ------------------------------------------------------------------------------- |
+| `name`       | string   | Secret name (word characters, dots, dashes). **Required.**                      |
+| `value`      | string   | Plaintext value; encrypted immediately, then discarded. Requires custody.       |
+| `envelope`   | string   | `enc:v1:` ciphertext (alternative to `value`).                                  |
+| `processEnv` | boolean  | `true` delivers the secret via `process.env` (global tier).                     |
+| `grants`     | string[] | Components allowed to read the secret via the `secrets` accessor (scoped tier). |
+| `metadata`   | object   | Optional free-form label object (not a payload store).                          |
 
 ```json
 {
