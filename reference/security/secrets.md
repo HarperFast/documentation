@@ -124,7 +124,23 @@ import { secrets } from 'harper';
 const stripe = new Stripe(secrets.STRIPE_KEY);
 ```
 
-The recommended idiom is a **module-top-level destructure**, which binds correctly in every component-loading mode:
+**The accessor is live.** On the scoped tier a property read (`secrets.STRIPE_KEY`) always returns the latest stored value — a rotation is reflected on the next read, no reload required. So most components need nothing more than the accessor: read the secret **where you use it**, and every request sees the current value. Reading inside a resource handler is the common case:
+
+```js
+import { Resource, secrets } from 'harper';
+
+export class Report extends Resource {
+	async get() {
+		// Read at call time, so each request uses the current token — even after a rotation.
+		const response = await fetch('https://api.example.com/report', {
+			headers: { authorization: `Bearer ${secrets.API_TOKEN}` },
+		});
+		return response.json();
+	}
+}
+```
+
+The one thing that is **not** live is a **destructure**: `const { STRIPE_KEY } = secrets` — or any assignment that copies the value into your own variable — takes a **point-in-time snapshot** and won't observe a later rotation. That's fine for a value read once and used as-is, and it's the idiom to use when the read must happen at module load (see the loader note below):
 
 ```js
 import { secrets } from 'harper';
@@ -132,15 +148,15 @@ import { secrets } from 'harper';
 const { STRIPE_KEY, WEBHOOK_SECRET } = secrets;
 ```
 
-On the scoped tier the accessor is **live**: a fresh property read (`secrets.STRIPE_KEY`) always reflects the latest stored value, with no reload. A destructure like the one above is a convenient **point-in-time copy** — ideal when a secret is read once at load and never changes, but it will _not_ observe a later rotation. To react to rotations, read the property when you need it, or subscribe (see [React to rotations](#react-to-rotations-with-secretssubscribe)).
-
 The `secrets` object is a read-only, live view of the secrets granted to the component; its secret names are enumerable (`Object.keys(secrets)`, spread), while the `subscribe` method below is a non-enumerable member so it never leaks into a spread of values. Global-tier secrets are read from `process.env` as usual and do not need the accessor.
 
 :::note
-Under the VM/compartment component loaders the `harper` module is per-scope, so `import { secrets } from 'harper'` binds to the loading component exactly. Under the native loader the `harper` package is a process-wide singleton, so `secrets` binds to the current component via the component-load context; accessing it **outside** a component-load context fails loudly rather than guessing which component is asking. The module-top-level destructure above is exact in all modes.
+Under the VM/compartment component loaders (the default) the `harper` module is per-scope, so `import { secrets } from 'harper'` is a view bound to your component — you can read `secrets.NAME` live from anywhere in it, including inside request handlers. Under the native loader the `harper` package is a process-wide singleton that resolves the calling component from the component-load context, so a read **outside** component load fails loudly rather than guessing which component is asking; there, read at module top level during load (the destructure above — a snapshot) or use `secrets.subscribe()` to track changes. The module-top-level destructure is exact in all modes.
 :::
 
 ### React to rotations with `secrets.subscribe()`
+
+Reading `secrets.NAME` per use (above) already picks up rotations, so reach for a subscription only when you build something **from** a secret and keep it around — an API client, a connection pool, a cached signer — and need to rebuild that object when the secret changes.
 
 `secrets.subscribe(name)` returns an async iterable that yields the secret's **current value immediately**, then a new value on **every change** — a grant, a rotation (`set_secret`), a revoke, or a delete. It lets a component hot-swap a rotated secret without a restart.
 
