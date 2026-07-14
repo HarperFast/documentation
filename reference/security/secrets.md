@@ -150,15 +150,20 @@ The iterator stays open for the life of the component, so a top-level `for await
 import { secrets } from 'harper';
 
 // Ready to serve immediately with the current value...
-let stripe = new Stripe(secrets.STRIPE_KEY);
+let currentKey = secrets.STRIPE_KEY;
+let stripe = new Stripe(currentKey);
 
 // ...then hot-swap on every rotation, without blocking module load.
 (async () => {
 	for await (const key of secrets.subscribe('STRIPE_KEY')) {
-		stripe = new Stripe(key);
+		if (key === currentKey) continue; // the first yield is the value we already have
+		currentKey = key;
+		stripe = new Stripe(currentKey);
 	}
 })();
 ```
+
+The first value `subscribe` yields is the secret's **current** value — the same one read synchronously above — so the guard skips a redundant rebuild on startup and only rebuilds the client when the key actually rotates.
 
 Authority is re-evaluated on **every** event through the same rules as the read accessor:
 
