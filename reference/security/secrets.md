@@ -155,10 +155,15 @@ let stripe = new Stripe(currentKey);
 
 // ...then hot-swap on every rotation, without blocking module load.
 (async () => {
-	for await (const key of secrets.subscribe('STRIPE_KEY')) {
-		if (key === currentKey) continue; // the first yield is the value we already have
-		currentKey = key;
-		stripe = new Stripe(currentKey);
+	try {
+		for await (const key of secrets.subscribe('STRIPE_KEY')) {
+			if (key === currentKey) continue; // the first yield is the value we already have
+			currentKey = key;
+			stripe = new Stripe(currentKey);
+		}
+	} catch (error) {
+		// Log and keep serving the last client; it stays valid until the next reload.
+		console.error('secret subscription ended for STRIPE_KEY:', error);
 	}
 })();
 ```
