@@ -108,6 +108,10 @@ GET /assets/app.js  -> 200 text/javascript    (static file)
 GET /app/settings   -> 200 text/html          (index.html - client-side route)
 ```
 
+Note the tradeoff: `after: 'rest'` runs the static handler after authentication, so every static-asset request now incurs the credential parsing that the default ordering skips. This is worth it when you serve an API alongside your files, but for an app serving a high volume of assets, choose it deliberately rather than as a free fix.
+
+> **Note:** Handler names are case-sensitive and must match the registered lowercase config key — use `rest`, not the legacy `REST` alias. An unrecognized name such as `after: 'REST'` matches nothing and only logs a warning, leaving the default ordering in place.
+
 Ordering is applied when the component loads; changing `before` or `after` in `config.yaml` automatically restarts the component so the new ordering takes effect.
 
 ## Auto-Updates
