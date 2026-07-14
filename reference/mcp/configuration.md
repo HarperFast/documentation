@@ -166,10 +166,19 @@ class McpQuota extends tables.QuotaCounter {
 }
 
 // Register the class so the quota hook can resolve it by name — WITHOUT
-// module-exporting it, which would surface update_/delete_McpQuota MCP tools
-// and a REST endpoint that let a permitted client reset its own counter.
-// exportTypes gates each transport independently (see the HTTP API reference).
-server.resources.set('McpQuota', McpQuota, { mcp: false, rest: false });
+// module-exporting it. An exported QuotaCounter surfaces its inherited CRUD verbs
+// (update_/delete_McpQuota MCP tools, plus REST/SSE/WS/GraphQL/MQTT access) that
+// let a permitted client reset its own counter. exportTypes gates each transport
+// independently and unset means exposed, so close every one — not just the two
+// that named the bug (see the HTTP API reference).
+server.resources.set('McpQuota', McpQuota, {
+	mcp: false,
+	rest: false,
+	sse: false,
+	ws: false,
+	graphql: false,
+	mqtt: false,
+});
 ```
 
 ### `mcp.<profile>.quota.resource`
