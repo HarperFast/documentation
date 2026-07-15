@@ -4,13 +4,13 @@ title: Multiple Applications on One Cluster
 
 # Multiple Applications on One Cluster
 
-A single Harper cluster can host any number of applications side by side. Because the database, cache, application logic, messaging, and search run within one distributed runtime, an application is not a group of containers wired together—it is a [component](./), a self-contained module that Harper loads and serves. You add an application to a cluster by registering another component, not by provisioning a new cluster.
+A single Harper cluster can host any number of applications side by side. Because the database, cache, application logic, messaging, and search run within one distributed runtime, an application is not a group of containers wired together—it is a [component](/reference/v5/components/overview), a self-contained module that Harper loads and serves. You add an application to a cluster by registering another component, not by provisioning a new cluster.
 
 This guide covers how to run multiple applications on one cluster: how they coexist, how to isolate them where required, and how to deploy them across every node.
 
 ## Applications are components
 
-The unit you deploy in Harper is a component. In the [Operations API](../operations-api/components) and CLI, "component" refers to an application—a collection of schemas, resources, routes, and static assets that Harper loads and serves.
+The unit you deploy in Harper is a component. In the [Operations API](/reference/v5/operations-api/overview) and CLI, "component" refers to an application—a collection of schemas, resources, routes, and static assets that Harper loads and serves.
 
 Two consequences follow:
 
@@ -40,13 +40,13 @@ static:
   urlPath: '/listings'
 ```
 
-A `config.yaml` **completely replaces** the default configuration; it is not merged with Harper's defaults. Each application therefore defines its own surface area explicitly. For the full list of options, see the [Component Configuration](../../reference/components/configuration) and [Built-In Extensions](../../reference/components/built-in-extensions) reference pages.
+A `config.yaml` **completely replaces** the default configuration; it is not merged with Harper's defaults. Each application therefore defines its own surface area explicitly. For the full list of options, see the [Component Configuration](/reference/v5/components/overview#configuration) and [Built-In Extensions](/reference/v5/components/overview#built-in-extensions-reference) reference pages.
 
 ### Namespacing routes
 
 Applications on the same instance respond on the same HTTP port (`9926` by default), so route collisions must be designed around.
 
-For [Fastify routes](./define-routes) and static assets, set a unique `urlPath` prefix per application—for example `/listings`, `/inventory`, or `/admin`. Custom routes and web content are then kept separate.
+For [Fastify routes](/reference/v5/fastify-routes/overview) and static assets, set a unique `urlPath` prefix per application—for example `/listings`, `/inventory`, or `/admin`. Custom routes and web content are then kept separate.
 
 REST endpoint paths are derived from the resource and table names an application exports, not from `urlPath`. Give each application uniquely named resources or, preferably, its own database. Two applications that export a `User` resource into the same database will conflict; two applications with tables in separate databases will not.
 
@@ -58,7 +58,7 @@ When one application needs data from another—for example, an `admin-dashboard`
 
 ## Configuring authentication per application
 
-Each application can include its own [`roles.yaml`](./defining-roles) file, defining the roles and permissions that control access to its resources. Co-located applications do not share a permission model: a public-facing listings API and an internal admin tool can enforce different access rules on the same cluster. Define each application's roles around its own data; the runtime enforces them independently.
+Each application can include its own [`roles.yaml`](/reference/v5/users-and-roles/configuration) file, defining the roles and permissions that control access to its resources. Co-located applications do not share a permission model: a public-facing listings API and an internal admin tool can enforce different access rules on the same cluster. Define each application's roles around its own data; the runtime enforces them independently.
 
 ## Registering multiple applications
 
@@ -66,10 +66,10 @@ There are two ways to add applications to an instance.
 
 ### Declaratively, through the instance config
 
-Harper reads applications from the `harperdb-config.yaml` file in its root path (usually `~/hdb`). Each entry points to a package—a GitHub repository, an npm package, a tarball, a local path, or a URL:
+Harper reads applications from the `harper-config.yaml` file in its root path (usually `~/hdb`). Each entry points to a package—a GitHub repository, an npm package, a tarball, a local path, or a URL:
 
 ```yaml
-# ~/hdb/harperdb-config.yaml
+# ~/hdb/harper-config.yaml
 listings-api:
   package: my-org/listings-api#v1.4.0
 inventory-service:
@@ -82,14 +82,14 @@ Reference a Git repository with a semver tag to lock each application to a speci
 
 ### Imperatively, through the CLI
 
-To deploy from an application directory, run `harperdb deploy` inside the project. This packages the current directory and sends it to the active instance:
+To deploy from an application directory, run `harper deploy` inside the project. This packages the current directory and sends it to the active instance:
 
 ```bash
 cd listings-api
-harperdb deploy
+harper deploy
 ```
 
-For local iteration, `harperdb dev .` runs the application and watches for file changes, restarting worker threads on edit. See the [Applications reference](../../reference/components/applications) for the complete set of deployment options.
+For local iteration, `harper dev .` runs the application and watches for file changes, restarting worker threads on edit. See the [Applications reference](/reference/v5/components/applications) for the complete set of deployment options.
 
 ## Deploying across the cluster
 
@@ -98,18 +98,20 @@ The preceding sections deploy an application to a single instance. To deploy it 
 When deploying in a clustered environment, set `replicated=true` to spread the deployment to all nodes:
 
 ```bash
-harperdb deploy_component \
+harper deploy_component \
   project=listings-api \
   package=https://github.com/my-org/listings-api#v1.4.0 \
   target=https://cluster-node-1.example.com:9925 \
   replicated=true
 ```
 
-`target` points to a node's operations endpoint. `replicated=true` sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](../replication/) to the application itself.
+`target` points to a node's operations endpoint. `replicated=true` sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
 
-> Restart afterward to apply the changes—for example, `harperdb restart target=https://cluster-node-1.example.com:9925 replicated=true`.
+:::note
+Restart afterward to apply the changes—for example, `harper restart target=https://cluster-node-1.example.com:9925 replicated=true`.
+:::
 
-On Harper Fabric, a single `harperdb deploy` from the project directory deploys the application across regions, with replication, routing, and failover managed by the platform.
+On Harper Fabric, a single `harper deploy` from the project directory deploys the application across regions, with replication, routing, and failover managed by the platform.
 
 ## When to co-locate
 
