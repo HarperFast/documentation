@@ -116,6 +116,7 @@ These map directly to indexed storage operations:
 - **Primary-key lookups** — `WHERE id = ...`, `WHERE id IN (...)`.
 - **Equality and `IN` on an indexed attribute** — `WHERE status = 'active'`, `WHERE breed_id IN (1, 2, 3)`.
 - **Range predicates on an indexed attribute** — `<`, `<=`, `>`, `>=`, and `BETWEEN` (compiled to a bounded index range).
+- **`OR` of indexed predicates** — `WHERE a = 1 OR b = 2` is served as a union of index scans, provided **every** branch is an index-driving predicate on an indexed attribute.
 - **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan.
 - **`ORDER BY` on an indexed attribute** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read.
 - **`GROUP BY` on an indexed attribute** — aggregates stream group-by-group with O(1) memory per group.
@@ -127,8 +128,8 @@ These map directly to indexed storage operations:
 These can't be served from an index. They still return correct results, but the engine falls back to the legacy full-scan path, so cost and memory grow with table size:
 
 - **Filters on un-indexed attributes** — any equality, range, or `IN` on an attribute with no index.
-- **`OR` across different attributes** — e.g. `WHERE a = 1 OR b = 2`. (An `IN` list on a _single_ indexed attribute is fine.)
-- **Suffix / substring `LIKE`** — `LIKE '%x'` and `LIKE '%x%'` (only prefix `LIKE 'x%'` is index-served). A suffix/contains `LIKE` combined with an indexed predicate is applied as a cheap residual filter on the indexed result, so pair it with an indexed condition.
+- **`OR` where a branch isn't index-driving** — e.g. `WHERE a = 1 OR b = 2` when `b` is un-indexed, or `WHERE a = 1 OR name LIKE '%x%'`. A single un-indexed (or non-index-comparator) branch taints the whole disjunction and forces a scan. When **every** branch is an indexed, index-driving predicate, the `OR` stays on the fast path (see above).
+- **Suffix / substring `LIKE`** — `LIKE '%x'` and `LIKE '%x%'` (only prefix `LIKE 'x%'` is index-served). A suffix/contains `LIKE` combined (via `AND`) with an indexed predicate is applied as a cheap residual filter on the indexed result, so pair it with an indexed condition.
 - **`!=` / `<>` and `NOT` negations** — matching "everything except" a value can't use an index.
 - **`ORDER BY` with no indexed filter to drive it** — a table-wide ordered scan on an un-indexed sort key.
 - **`SEARCH_JSON`** — evaluates JSONata over each candidate row's nested JSON; it is not index-backed. Narrow the candidate set with an indexed `WHERE` condition first.
