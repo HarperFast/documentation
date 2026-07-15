@@ -139,7 +139,18 @@ Note that `UNION`, sub-`SELECT`, and `INSERT … SELECT` are not supported by ei
 
 ### The fallback contract
 
-The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't, so **no query changes its results** — only its performance profile. Fallbacks are logged (`sql-engine v2 fallback: ...`) with the reason and the offending column, which is a useful signal for finding queries worth an added index or a reshape.
+The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't. A query that falls back returns exactly what the legacy engine would — **its results don't change, only its performance profile.** Fallbacks are logged (`sql-engine v2 fallback: ...`) with the reason and the offending column, which is a useful signal for finding queries worth an added index or a reshape. (For queries the new engine _does_ plan, it corrects a few long-standing legacy quirks — see [Behavior changes from the legacy engine](#behavior-changes-from-the-legacy-engine).)
+
+### Behavior changes from the legacy engine
+
+For queries the new engine plans (the default under `auto`), a handful of non-standard legacy behaviors are corrected, so you may see different — standard-SQL-conformant — results after upgrading:
+
+- **Aggregates over an empty result set** return `NULL` for `SUM`, `AVG`, `MIN`, and `MAX` (and `0` for `COUNT`), per the SQL standard. The legacy engine returned `0` for `SUM` and omitted `MIN`/`MAX` from the response entirely.
+- **`MIN`/`MAX` over text columns** return the lexicographically smallest/largest value. The legacy engine produced no result for string `MIN`/`MAX`.
+- **`NULL` never equals `NULL` in a join key.** Rows whose join key is `NULL` on either side no longer match each other (three-valued logic). The legacy engine incorrectly joined `NULL` to `NULL`.
+- **A `NULL`-valued expression result is returned as an explicit `null`** rather than omitted from the row. A computed column or `COALESCE` that evaluates to `NULL` — or `UPPER(<null>)` — now yields `null` (the legacy engine dropped the key, and `UPPER` of a `NULL` returned the literal string `"NULL"`).
+
+These are deliberate corrections toward standard SQL, applied when the new engine serves the query — not fallbacks. If your application depended on a legacy quirk, adjust for the standard behavior.
 
 ### Practical guidance
 
@@ -383,16 +394,17 @@ Geospatial data must be stored using the [GeoJSON standard](https://geojson.org/
 
 ## Reserved Words
 
-If a database, table, or attribute name conflicts with a reserved word, wrap it in backticks or brackets:
+If a database, table, attribute, or column-alias name conflicts with a reserved word, wrap it in backticks or brackets. This applies to `AS` aliases too: an unquoted reserved word such as `AS total` fails to parse — quote it, as in the last example below.
 
 ```sql
 SELECT * FROM data.`ASSERT`
 SELECT * FROM data.[ASSERT]
+SELECT SUM(qty) AS `total` FROM data.dog
 ```
 
 <details>
 <summary>Full reserved word list</summary>
 
-ABSOLUTE, ACTION, ADD, AGGR, ALL, ALTER, AND, ANTI, ANY, APPLY, ARRAY, AS, ASSERT, ASC, ATTACH, AUTOINCREMENT, AUTO_INCREMENT, AVG, BEGIN, BETWEEN, BREAK, BY, CALL, CASE, CAST, CHECK, CLASS, CLOSE, COLLATE, COLUMN, COLUMNS, COMMIT, CONSTRAINT, CONTENT, CONTINUE, CONVERT, CORRESPONDING, COUNT, CREATE, CROSS, CUBE, CURRENT_TIMESTAMP, CURSOR, DATABASE, DECLARE, DEFAULT, DELETE, DELETED, DESC, DETACH, DISTINCT, DOUBLEPRECISION, DROP, ECHO, EDGE, END, ENUM, ELSE, EXCEPT, EXISTS, EXPLAIN, FALSE, FETCH, FIRST, FOREIGN, FROM, GO, GRAPH, GROUP, GROUPING, HAVING, HDB_HASH, HELP, IF, IDENTITY, IS, IN, INDEX, INNER, INSERT, INSERTED, INTERSECT, INTO, JOIN, KEY, LAST, LET, LEFT, LIKE, LIMIT, LOOP, MATCHED, MATRIX, MAX, MERGE, MIN, MINUS, MODIFY, NATURAL, NEXT, NEW, NOCASE, NO, NOT, NULL, OFF, ON, ONLY, OFFSET, OPEN, OPTION, OR, ORDER, OUTER, OVER, PATH, PARTITION, PERCENT, PLAN, PRIMARY, PRINT, PRIOR, QUERY, READ, RECORDSET, REDUCE, REFERENCES, RELATIVE, REPLACE, REMOVE, RENAME, REQUIRE, RESTORE, RETURN, RETURNS, RIGHT, ROLLBACK, ROLLUP, ROW, SCHEMA, SCHEMAS, SEARCH, SELECT, SEMI, SET, SETS, SHOW, SOME, SOURCE, STRATEGY, STORE, SYSTEM, SUM, TABLE, TABLES, TARGET, TEMP, TEMPORARY, TEXTSTRING, THEN, TIMEOUT, TO, TOP, TRAN, TRANSACTION, TRIGGER, TRUE, TRUNCATE, UNION, UNIQUE, UPDATE, USE, USING, VALUE, VERTEX, VIEW, WHEN, WHERE, WHILE, WITH, WORK
+ABSOLUTE, ACTION, ADD, AGGR, ALL, ALTER, AND, ANTI, ANY, APPLY, ARRAY, AS, ASSERT, ASC, ATTACH, AUTOINCREMENT, AUTO_INCREMENT, AVG, BEGIN, BETWEEN, BREAK, BY, CALL, CASE, CAST, CHECK, CLASS, CLOSE, COLLATE, COLUMN, COLUMNS, COMMIT, CONSTRAINT, CONTENT, CONTINUE, CONVERT, CORRESPONDING, COUNT, CREATE, CROSS, CUBE, CURRENT_TIMESTAMP, CURSOR, DATABASE, DECLARE, DEFAULT, DELETE, DELETED, DESC, DETACH, DISTINCT, DOUBLEPRECISION, DROP, ECHO, EDGE, END, ENUM, ELSE, EXCEPT, EXISTS, EXPLAIN, FALSE, FETCH, FIRST, FOREIGN, FROM, GO, GRAPH, GROUP, GROUPING, HAVING, HDB_HASH, HELP, IF, IDENTITY, IS, IN, INDEX, INNER, INSERT, INSERTED, INTERSECT, INTO, JOIN, KEY, LAST, LET, LEFT, LIKE, LIMIT, LOOP, MATCHED, MATRIX, MAX, MERGE, MIN, MINUS, MODIFY, NATURAL, NEXT, NEW, NOCASE, NO, NOT, NULL, OFF, ON, ONLY, OFFSET, OPEN, OPTION, OR, ORDER, OUTER, OVER, PATH, PARTITION, PERCENT, PLAN, PRIMARY, PRINT, PRIOR, QUERY, READ, RECORDSET, REDUCE, REFERENCES, RELATIVE, REPLACE, REMOVE, RENAME, REQUIRE, RESTORE, RETURN, RETURNS, RIGHT, ROLLBACK, ROLLUP, ROW, SCHEMA, SCHEMAS, SEARCH, SELECT, SEMI, SET, SETS, SHOW, SOME, SOURCE, STRATEGY, STORE, SYSTEM, SUM, TABLE, TABLES, TARGET, TEMP, TEMPORARY, TEXTSTRING, THEN, TIMEOUT, TO, TOP, TOTAL, TRAN, TRANSACTION, TRIGGER, TRUE, TRUNCATE, UNION, UNIQUE, UPDATE, USE, USING, VALUE, VERTEX, VIEW, WHEN, WHERE, WHILE, WITH, WORK
 
 </details>
