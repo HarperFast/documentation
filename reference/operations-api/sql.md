@@ -11,8 +11,10 @@ title: SQL
 <!-- Source: versioned_docs/version-4.7/reference/sql-guide/reserved-word.md -->
 <!-- Source: versioned_docs/version-4.7/developers/operations-api/sql-operations.md -->
 
-:::warning
-SQL querying is not recommended for production use or on large tables. SQL queries often do not utilize indexes and are not optimized for performance. Use the [REST interface](../rest/overview.md) for production data access — it provides a more stable, secure, and performant interface. SQL is intended for ad-hoc data investigation and administrative queries.
+:::info Harper 5.2 introduces a new SQL engine
+As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the same results but with the older full-scan cost. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
+
+For your most performance-critical production read paths, the [REST interface](../rest/overview.md) remains the recommended choice — it provides a stable, cacheable, index-driven contract. SQL is well suited to ad-hoc investigation, administrative queries, joins, and reporting.
 :::
 
 Harper includes a SQL interface supporting SELECT, INSERT, UPDATE, and DELETE operations. Tables are referenced using `database.table` notation (e.g., `dev.dog`).
@@ -94,6 +96,56 @@ INNER JOIN dev.breed AS b ON d.breed_id = b.id
 WHERE d.owner_name IN ('Kyle', 'Zach')
 ORDER BY d.dog_name
 ```
+
+---
+
+## Query Performance
+
+Harper 5.2's SQL engine maps SQL clauses onto Harper's native indexed storage. When a query can be planned against an index, it runs as a streaming, index-driven operation with memory bounded by the size of the result — not the size of the table. When it can't, the engine falls back to the legacy path, which fetches candidate rows and evaluates the query in memory, with cost and memory growing with the number of rows scanned.
+
+On any non-trivial table the difference between these two paths is large. The rules below keep your queries on the fast path.
+
+### Index your predicates, sorts, and join keys
+
+The single most important factor is whether the attributes you filter, sort, and join on are indexed. An equality or range filter on an indexed attribute becomes an index lookup; the same filter on an un-indexed attribute forces a full scan. Define indexes on the attributes your queries actually constrain.
+
+### Queries that run efficiently (index-served)
+
+These map directly to indexed storage operations:
+
+- **Primary-key lookups** — `WHERE id = ...`, `WHERE id IN (...)`.
+- **Equality and `IN` on an indexed attribute** — `WHERE status = 'active'`, `WHERE breed_id IN (1, 2, 3)`.
+- **Range predicates on an indexed attribute** — `<`, `<=`, `>`, `>=`, and `BETWEEN` (compiled to a bounded index range).
+- **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan.
+- **`ORDER BY` on an indexed attribute** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read.
+- **`GROUP BY` on an indexed attribute** — aggregates stream group-by-group with O(1) memory per group.
+- **`INNER`/`LEFT JOIN` on an indexed join key** — executed as an index-nested-loop join (stream the outer table, probe the inner by index). Keep the join key indexed on the inner (probed) table.
+- **Column projections** — selecting a subset of columns pushes down so only those attributes are read.
+
+### Queries that fall back to a full scan (avoid on large tables)
+
+These can't be served from an index. They still return correct results, but the engine falls back to the legacy full-scan path, so cost and memory grow with table size:
+
+- **Filters on un-indexed attributes** — any equality, range, or `IN` on an attribute with no index.
+- **`OR` across different attributes** — e.g. `WHERE a = 1 OR b = 2`. (An `IN` list on a _single_ indexed attribute is fine.)
+- **Suffix / substring `LIKE`** — `LIKE '%x'` and `LIKE '%x%'` (only prefix `LIKE 'x%'` is index-served). A suffix/contains `LIKE` combined with an indexed predicate is applied as a cheap residual filter on the indexed result, so pair it with an indexed condition.
+- **`!=` / `<>` and `NOT` negations** — matching "everything except" a value can't use an index.
+- **`ORDER BY` with no indexed filter to drive it** — a table-wide ordered scan on an un-indexed sort key.
+- **`SEARCH_JSON`** — evaluates JSONata over each candidate row's nested JSON; it is not index-backed. Narrow the candidate set with an indexed `WHERE` condition first.
+- **`RIGHT`/`FULL OUTER JOIN`, no-`WHERE` `UPDATE`/`DELETE`, `COUNT(DISTINCT ...)`** — the new engine doesn't plan these yet, so they run on the legacy engine (correct results, legacy cost).
+
+Note that `UNION`, sub-`SELECT`, and `INSERT … SELECT` are not supported by either engine — see the [Features Matrix](#features-matrix).
+
+### The fallback contract
+
+The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't, so **no query changes its results** — only its performance profile. Fallbacks are logged (`sql-engine v2 fallback: ...`) with the reason and the offending column, which is a useful signal for finding queries worth an added index or a reshape.
+
+### Practical guidance
+
+- Index every attribute you filter, sort, or join on.
+- Prefer prefix `LIKE 'x%'` over `LIKE '%x%'`; back a substring search with a separate indexed predicate, or model it as a dedicated indexed attribute.
+- Constrain the row set with an indexed `WHERE` before leaning on `ORDER BY`, `GROUP BY`, joins, or `SEARCH_JSON`.
+- Reach for the [REST interface](../rest/overview.md) on your hottest production read paths for a cacheable, index-driven contract; keep SQL for ad-hoc investigation, joins, and reporting.
 
 ---
 
