@@ -118,8 +118,8 @@ These map directly to indexed storage operations:
 - **Range predicates on an indexed attribute** — `<`, `<=`, `>`, `>=`, and `BETWEEN` (compiled to a bounded index range).
 - **`OR` of indexed predicates** — `WHERE a = 1 OR b = 2` is served as a union of index scans, provided **every** branch is an index-driving predicate on an indexed attribute.
 - **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan.
-- **`ORDER BY` on an indexed attribute** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read.
-- **`GROUP BY` on an indexed attribute** — aggregates stream group-by-group with O(1) memory per group.
+- **`ORDER BY` on an indexed attribute, combined with an indexed `WHERE`** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read. Without an index-driving `WHERE` condition, an `ORDER BY` currently runs on the legacy path.
+- **`GROUP BY` on an indexed attribute, combined with an indexed `WHERE`** — aggregates stream group-by-group with O(1) memory per group (memory is bounded by the group count; every matching row is still read). Without an index-driving `WHERE` condition, a `GROUP BY` currently runs on the legacy path.
 - **`INNER`/`LEFT JOIN` on an indexed join key** — executed as an index-nested-loop join (stream the outer table, probe the inner by index). Keep the join key indexed on the inner (probed) table.
 - **Column projections** — selecting a subset of columns pushes down so only those attributes are read.
 
@@ -139,7 +139,7 @@ Note that `UNION`, sub-`SELECT`, and `INSERT … SELECT` are not supported by ei
 
 ### The fallback contract
 
-The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't. A query that falls back returns exactly what the legacy engine would — **its results don't change, only its performance profile.** Fallbacks are logged (`sql-engine v2 fallback: ...`) with the reason and the offending column, which is a useful signal for finding queries worth an added index or a reshape. (For queries the new engine _does_ plan, it corrects a few long-standing legacy quirks — see [Behavior changes from the legacy engine](#behavior-changes-from-the-legacy-engine).)
+The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't. A query that falls back returns exactly what the legacy engine would — **its results don't change, only its performance profile.** Fallbacks are logged (`SQL engine v2 fallback: ...`) with the reason, which is a useful signal for finding queries worth an added index or a reshape. (For queries the new engine _does_ plan, it corrects a few long-standing legacy quirks — see [Behavior changes from the legacy engine](#behavior-changes-from-the-legacy-engine).)
 
 ### Behavior changes from the legacy engine
 
@@ -148,6 +148,7 @@ For queries the new engine plans (the default under `auto`), a handful of non-st
 - **Aggregates over an empty result set** return `NULL` for `SUM`, `AVG`, `MIN`, and `MAX` (and `0` for `COUNT`), per the SQL standard. The legacy engine returned `0` for `SUM` and omitted `MIN`/`MAX` from the response entirely.
 - **`MIN`/`MAX` over text columns** return the lexicographically smallest/largest value. The legacy engine produced no result for string `MIN`/`MAX`.
 - **`NULL` never equals `NULL` in a join key.** Rows whose join key is `NULL` on either side no longer match each other (three-valued logic). The legacy engine incorrectly joined `NULL` to `NULL`.
+- **`OFFSET` past the end of a result returns no rows.** The legacy engine could still return rows when the `OFFSET` exceeded the number of matches.
 - **A `NULL`-valued expression result is returned as an explicit `null`** rather than omitted from the row. A computed column or `COALESCE` that evaluates to `NULL` — or `UPPER(<null>)` — now yields `null` (the legacy engine dropped the key, and `UPPER` of a `NULL` returned the literal string `"NULL"`).
 
 These are deliberate corrections toward standard SQL, applied when the new engine serves the query — not fallbacks. If your application depended on a legacy quirk, adjust for the standard behavior.
