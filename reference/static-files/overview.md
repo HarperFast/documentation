@@ -110,7 +110,7 @@ GET /app/settings   -> 200 text/html          (index.html - client-side route)
 
 Note the tradeoff: `after: 'rest'` runs the static handler after authentication, so every static-asset request now incurs the credential parsing that the default ordering skips. This is worth it when you serve an API alongside your files, but for an app serving a high volume of assets, choose it deliberately rather than as a free fix.
 
-> **Note:** Handler names are case-sensitive and must match the registered lowercase config key — use `rest`, not the legacy `REST` alias. An unrecognized name such as `after: 'REST'` matches nothing and only logs a warning, leaving the default ordering in place.
+> **Note:** Handler names are case-sensitive and must match the registered config key — use `rest`, not the legacy `REST` alias. Watch for typos: setting `after` (or `before`) to any value suppresses the default `before: 'authentication'` hoist, so if the name matches no registered handler the constraint is ignored (Harper logs a warning) and the handler falls back to registration order — **not** its default pre-authentication position. In other words, `after: 'REST'` behaves like neither the working `after: 'rest'` nor the default.
 
 Ordering is applied when the component loads; changing `before` or `after` in `config.yaml` automatically restarts the component so the new ordering takes effect.
 
