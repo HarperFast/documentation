@@ -13,7 +13,7 @@ This is the production-grade alternative to committing a `.env` file. For the si
 
 Every secret is a named row in `system.hdb_secret`. Only ciphertext is ever stored — a plaintext value submitted to `set_secret` is encrypted immediately and the plaintext is discarded. Values are never returned by any read operation, never written to the operations log, and never travel in the replication payload as plaintext; rows reach peers as encrypted envelopes through normal system-table replication.
 
-Secret names may contain word characters, dots, and dashes (e.g. `STRIPE_KEY`, `deploy.my-app.registry`).
+Secret names may contain word characters, dots, and dashes (e.g. `STRIPE_KEY`, `deploy.my-app.git.github_com`).
 
 ### Custody (Harper Pro)
 
@@ -283,9 +283,9 @@ function encryptSecret(plaintext, publicKeyPem, kid) {
 }
 ```
 
-## Private-registry credentials
+## Private-source deploy credentials
 
-`deploy_component` accepts a `registryAuth` array so a component installed from a private npm registry can authenticate. A provided token is ingested into the secrets store (as a reference, encrypted) rather than travelling in the operation body or persisting as a plaintext `.npmrc`, so package-reference deploys survive rollback, reboot, and new peers joining. See [`deploy_component`](../operations-api/operations.md#deploy_component).
+`deploy_component` accepts a `credentials` array so a component installed from a private **npm registry** or private **git repository** can authenticate. A provided token is ingested into the secrets store (as a reference, encrypted) rather than travelling in the operation body, persisting as a plaintext `.npmrc`, or being written to disk for git — so package-reference deploys survive rollback, reboot, and new peers joining. Ingested tokens are stored under a derived name (`deploy.<component>.<registry>` or `deploy.<component>.git.<host>`) granted to the component. See [`deploy_component`](../operations-api/operations.md#deploy_component).
 
 ## Threat model
 

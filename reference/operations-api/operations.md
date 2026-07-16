@@ -606,29 +606,55 @@ Additional parameters:
 
 - `urlPath` — override the HTTP URL path the component is mounted at (e.g. `"/api/v2"`)
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
-- `registryAuth` — credentials for installing a component from a private npm registry (see below)
+- `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
 
-#### Private-registry authentication (`registryAuth`)
+#### Deploy credentials (`credentials`)
 
-When a component is installed from a private npm registry, `registryAuth` supplies the credential. It is an array of entries, each naming a `registry` and providing the credential exactly one of two ways:
+When a component is installed from a private source, `credentials` supplies the authentication. It is an array of entries; each entry is one of two kinds, identified by its key:
 
-| Field      | Description                                                                                      |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| `registry` | The registry URL or host the credential applies to. **Required.**                                |
-| `token`    | A literal auth token, or                                                                         |
-| `secret`   | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.             |
-| `scope`    | Optional npm `@scope` (e.g. `"@my-org"`) the entry applies to; omit to set the default registry. |
+- **npm registry auth** — an entry with a `registry` key, applied to a private npm registry.
+- **git host auth** — an entry with a `host` key, applied to a private git repository fetched by reference (e.g. `package: "github:my-org/my-app#semver:v1.2.3"`).
 
-A provided **`token`** is not treated as ephemeral: Harper ingests it into the encrypted [secrets store](../security/secrets.md) and references it everywhere, so package-reference deploys keep working through rollback, reboot, and new peers joining — without re-supplying the token. The token is encrypted at rest, stripped from the operation before replication and from the operations log, and only ever crosses the cluster as ciphertext. Using a **`secret`** reference names an existing store row directly. Ingesting a token requires custody on the deploying node; on OSS core without custody, a literal token falls back to a transient, this-node-only credential (not persisted or replicated).
+An entry provides its credential exactly one of two ways — a literal `token`, or a `secret` reference:
+
+| Field      | Kind     | Description                                                                                       |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `registry` | npm      | The registry URL or host the credential applies to. **Required** for an npm entry.               |
+| `scope`    | npm      | Optional npm `@scope` (e.g. `"@my-org"`) the entry applies to; omit to set the default registry. |
+| `host`     | git      | The bare git host the credential applies to (e.g. `"github.com"`). **Required** for a git entry. |
+| `username` | git      | Optional git HTTPS username. Defaults to `x-access-token` (GitHub); GitLab uses `oauth2`, Bitbucket `x-token-auth`. |
+| `token`    | both     | A literal auth token, **or**                                                                      |
+| `secret`   | both     | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.              |
+
+A provided **`token`** is not treated as ephemeral: Harper ingests it into the encrypted [secrets store](../security/secrets.md) and references it everywhere, so package-reference deploys keep working through rollback, reboot, and new peers joining — without re-supplying the token. The token is encrypted at rest, stripped from the operation before replication and from the operations log, and only ever crosses the cluster as ciphertext. A git-host token is additionally served to git **from memory** (via a credential helper) — it is never written to a file or into a URL. Using a **`secret`** reference names an existing store row directly. Ingesting a token requires custody on the deploying node; on OSS core without custody, a literal token falls back to a transient, this-node-only credential (not persisted or replicated).
+
+Ingested tokens are stored under a derived name granted to the component — `deploy.<component>.<registry>` for a registry entry, `deploy.<component>.git.<host>` for a git entry — so re-deploying with a rotated token idempotently updates the same row.
+
+Private npm registry:
 
 ```json
 {
 	"operation": "deploy_component",
 	"project": "my-app",
 	"package": "npm:@my-org/my-app@1.2.3",
-	"registryAuth": [{ "registry": "https://registry.my-org.com", "token": "npm_...", "scope": "@my-org" }]
+	"credentials": [{ "registry": "https://registry.my-org.com", "scope": "@my-org", "token": "npm_..." }]
 }
 ```
+
+Private git repository (token resolved from an existing secret):
+
+```json
+{
+	"operation": "deploy_component",
+	"project": "my-app",
+	"package": "github:my-org/my-app#semver:v1.2.3",
+	"credentials": [{ "host": "github.com", "secret": "deploy.my-app.git.github_com" }]
+}
+```
+
+:::note
+`credentials` replaces the earlier `registryAuth` field (renamed while the feature was in alpha, before it grew to carry git-host credentials). `registryAuth` is now rejected with an error directing you to `credentials`.
+:::
 
 The response includes a `deployment_id` that can be used to query the deployment record:
 
