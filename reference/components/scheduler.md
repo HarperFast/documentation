@@ -8,7 +8,9 @@ title: Scheduler
 
 The scheduler is a built-in plugin that runs recurring jobs declared in a component's configuration. Harper invokes a designated export from your component on a cron or interval schedule, and in a cluster each job fires exactly once per occurrence - on a single, automatically elected node - rather than once per node or worker.
 
-Use it for the maintenance passes applications otherwise hand-roll with `setInterval`: nightly cleanups, periodic re-aggregation, cache refreshes, digest generation.
+Use it for the recurring work applications otherwise hand-roll with `setInterval`: taking daily snapshots of a dataset, pulling from an external API on a schedule, re-aggregating summary tables, generating digests or reports.
+
+For expiring old records, prefer the table-level [`expiration` and `eviction` options](../database/schema.md#table) - record cleanup is built into Harper and does not need a scheduled job.
 
 ## Configuration
 
@@ -17,13 +19,13 @@ In your component's `config.yaml`, use the `scheduler` key to declare jobs:
 ```yaml
 scheduler:
   jobs:
-    - name: nightly-cleanup
+    - name: daily-metrics-snapshot
       cron: '0 2 * * *'
       timezone: America/New_York
-      handler: ./jobs.js#cleanupOldRecords
-    - name: refresh-summaries
-      interval: 90s
-      handler: ./jobs.js#refreshSummaries
+      handler: ./jobs.js#snapshotMetrics
+    - name: sync-exchange-rates
+      interval: 15m
+      handler: ./jobs.js#syncExchangeRates
 ```
 
 Each job entry supports:
@@ -71,14 +73,29 @@ A bad handler reference (missing module, missing export, non-function export) fa
 The handler is called with a single context argument and may return a promise:
 
 ```javascript
-export async function cleanupOldRecords(context) {
+// Nightly snapshot: roll the current state of a table into a dated snapshot record
+export async function snapshotMetrics(context) {
 	// context.jobName     - the configured job name
 	// context.scheduledAt - the occurrence this run is for (Date)
 	// context.catchUp     - true when this run is making up a missed occurrence
-	const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-	for await (const record of tables.Events.search([{ attribute: 'timestamp', comparator: 'less', value: cutoff }])) {
-		await tables.Events.delete(record.id);
+	const day = context.scheduledAt.toISOString().slice(0, 10);
+	let total = 0;
+	let active = 0;
+	for await (const device of tables.Devices.search([])) {
+		total++;
+		if (device.status === 'active') active++;
 	}
+	// Keyed by day, so a duplicate delivery of the same occurrence just rewrites
+	// the same record - this is what makes the handler idempotent
+	await tables.DailyDeviceSnapshot.put({ id: day, total, active });
+}
+
+// Scheduled pull from an external API into a Harper table
+export async function syncExchangeRates(context) {
+	const response = await fetch('https://api.example.com/rates');
+	if (!response.ok) throw new Error(`rates API responded ${response.status}`);
+	const rates = await response.json();
+	await tables.ExchangeRates.put({ id: 'latest', fetchedAt: context.scheduledAt, ...rates });
 }
 ```
 
