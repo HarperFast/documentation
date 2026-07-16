@@ -43,6 +43,8 @@ JS-level scoping is a slowdown layer, not a hard security boundary — component
 
 ## Managing secrets (Operations API)
 
+Secrets can be managed graphically in [Harper Studio](../studio/overview.md), which provides a friendly interface for creating, granting, and rotating secrets without hand-crafting operation requests. The operations below are the underlying API that Studio (and your own tooling) drives.
+
 All secret operations are **`super_user` only** and are documented in the [Operations Reference](../operations-api/operations.md#secrets). The core operations:
 
 | Operation                        | Purpose                                                 |
@@ -105,7 +107,7 @@ env:
   SENTRY_DSN: { required: false } # optional
 ```
 
-- A **string** value is an inline literal, written directly into `process.env` (a convenience for non-secret config; do not put real secrets here — they land in `config.yaml`).
+- A **string** value is an inline literal, written directly into `process.env` (a convenience for non-secret config; do not put real secrets here — they are stored in plaintext in `config.yaml`, which is typically committed to version control).
 - An **object** value is a declaration satisfied from `process.env` (a global-tier secret, a literal, or a real environment variable) — it does not by itself expose a scoped secret.
 
 A `required: true` declaration that cannot be satisfied stops **that component** from loading (the instance keeps running). The failure reason is one of:

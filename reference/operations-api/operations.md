@@ -779,6 +779,10 @@ Operations for managing the encrypted [secrets store](../security/secrets.md) (`
 
 Detailed documentation: [Secrets](../security/secrets.md)
 
+:::tip
+Prefer a UI? [Harper Studio](../studio/overview.md) provides a graphical interface for creating, granting, and rotating secrets — it drives these operations for you, so you don't have to hand-craft the request bodies below.
+:::
+
 | Operation                | Description                                                    | Role Required |
 | ------------------------ | -------------------------------------------------------------- | ------------- |
 | `set_secret`             | Creates or updates a secret and chooses its delivery tier      | super_user    |
@@ -832,6 +836,28 @@ Returns metadata for every secret — **never** envelopes or values. Each entry 
 
 ```json
 { "operation": "list_secrets" }
+```
+
+Response:
+
+```json
+{
+	"secrets": [
+		{
+			"name": "STRIPE_KEY",
+			"kid": "a1b2c3d4...",
+			"grants": ["payments-service"],
+			"processEnv": false,
+			"metadata": {},
+			"unverified": false,
+			"updated_by": "admin",
+			"__createdtime__": 1700000000000,
+			"__updatedtime__": 1700000000000,
+			"kid_matches_custody": true
+		}
+	],
+	"custody_fingerprint": "a1b2c3d4..."
+}
 ```
 
 ### `delete_secret`
