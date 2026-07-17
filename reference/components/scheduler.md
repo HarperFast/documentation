@@ -44,6 +44,8 @@ A five-field cron expression: minute, hour, day-of-month, month, day-of-week. Su
 
 There is no seconds field. Expressions that can never fire (such as `0 0 30 2 *` - February 30th) are rejected when the component loads.
 
+Always quote the expression in YAML: a leading `*` (as in `*/5 * * * *`) is YAML alias syntax and `@daily` starts with a reserved character - unquoted, both fail with confusing YAML parse errors rather than anything about cron.
+
 Exactly one of `cron` or `interval` is required.
 
 ### `interval`
@@ -64,7 +66,7 @@ During daylight-saving transitions: a job scheduled inside the spring-forward ga
 
 Type: `string` (required)
 
-The module and export to invoke, as `<module path>#<named export>`, relative to the component directory - for example `./jobs.js#cleanupOldRecords`. Omit the `#...` suffix to use the module's default export. The module is loaded in your component's environment, so it has access to the same globals (`tables`, `databases`, `server`, and so on) as the rest of your component code.
+The module and export to invoke, as `<module path>#<named export>`, relative to the component directory - for example `./jobs.js#snapshotMetrics`. Omit the `#...` suffix to use the module's default export. Do not put a space before the `#` (YAML would treat the rest of the line as a comment and silently drop the export name). The module is loaded in your component's environment, so it has access to the same globals (`tables`, `databases`, `server`, and so on) as the rest of your component code.
 
 A bad handler reference (missing module, missing export, non-function export) fails the component load at deploy time rather than failing silently at the first scheduled fire.
 
