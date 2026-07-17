@@ -71,14 +71,14 @@ Harper processes every HTTP request through a layered middleware chain. Componen
 ```js
 server.http(
 	(request, next) => {
-		if (request.pathname.startsWith('/listings')) return handleListings(request);
+		if (request.headers.get('x-app-target') === 'listings') return handleListings(request);
 		return next(request);
 	},
 	{ runFirst: true }
 );
 ```
 
-`runFirst: true` inserts the handler at the front of the chain. Reach for the middleware chain when path prefixes and resource naming are not enough—for example, to dispatch on a custom header or rewrite a path before it reaches an application. See the [HTTP API](/reference/v5/http/api) reference for the full `Request` object.
+`runFirst: true` inserts the handler at the front of the chain. Reach for the middleware chain when path prefixes and resource naming are not enough—for example, to dispatch on a custom header, as above, or to rewrite a path before it reaches an application. See the [HTTP API](/reference/v5/http/api) reference for the full `Request` object.
 
 ### Host-based routing
 
