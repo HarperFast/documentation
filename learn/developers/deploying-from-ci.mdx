@@ -14,7 +14,7 @@ Both work with private sources: `deploy_component` accepts a [`credentials`](/re
 ## What You Will Learn
 
 - How to choose between git-tag deploys and registry-artifact deploys
-- How to provision a deploy credential once and reference it from CI, so your pipeline never handles the GitHub token
+- How to supply a deploy credential from CI — and why it must be a durable token, not the workflow's ephemeral `GITHUB_TOKEN`
 - A GitHub Actions workflow that deploys a tagged release straight from a private repository
 - A GitHub Actions workflow that builds, publishes to GitHub Packages, and deploys the published artifact
 - How to deploy across a cluster and verify the deployment record
@@ -42,7 +42,7 @@ A second constraint pushes the same direction: a git-reference deploy authentica
 | Needs a build step (bundling, codegen, compilation)     | Private registry |
 | Has private git-hosted dependencies                     | Private registry |
 
-## Provision the deploy credential once
+## Create a durable deploy token
 
 Both paths need Harper to authenticate to GitHub — and it's worth understanding *when*. The credential is not only used at the moment you deploy: Harper persists it (encrypted, in the [secrets store](/reference/v5/security/secrets)) with the component's configuration so that later installs — a new node joining the cluster, a rollback, a re-install after restore — can fetch the package again without you re-supplying auth.
 
@@ -51,7 +51,11 @@ That has one practical consequence: **use a durable token, not your workflow's e
 - **For a private repository (git-tag deploys):** a GitHub [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with **Contents: read-only** permission, scoped to just the application repository. An organization can attach these to a machine account so they aren't tied to an individual.
 - **For GitHub Packages (registry deploys):** a token with the **`read:packages`** scope.
 
-Store it in Harper once, granted to your component, using [`set_secret`](/reference/v5/operations-api/operations#set_secret):
+Then hand it to Harper in one of two ways:
+
+**Pass it inline with the deploy (simplest — used in the workflows below).** Store the token as a repository secret in GitHub Actions and pass it in the `credentials` entry: `{ "host": "github.com", "token": "github_pat_..." }`. There is no separate provisioning step: Harper ingests the token into the encrypted secrets store on the way in (under a derived name like `deploy.my-app.git.github_com`, granted to the component), strips it from the operation before anything is logged or replicated, and reuses the stored copy for every later install. Re-deploying with a new token value rotates the stored one, so rotation is just updating the GitHub Actions secret.
+
+**Or provision it in Harper once, and reference it by name.** Create a secret with [`set_secret`](/reference/v5/operations-api/operations#set_secret) — or in [Harper Studio](/reference/v5/studio/overview), which provides a UI for creating, granting, and rotating secrets — granted to your component:
 
 ```json
 {
@@ -62,17 +66,13 @@ Store it in Harper once, granted to your component, using [`set_secret`](/refere
 }
 ```
 
-From then on, CI references it by name — `{ "host": "github.com", "secret": "gh-deploy-token" }` — and the GitHub token never appears in your pipeline at all. The only secret your CI system holds is the Harper Operations API credential. This is the recommended setup: it separates the credential's lifecycle (rotate it with another `set_secret` call whenever you like — the deploy operation doesn't change) from the pipeline's.
-
-:::note Literal tokens
-You can also pass the token inline: `{ "host": "github.com", "token": "github_pat_..." }`. Harper ingests it into the secrets store automatically (under a derived name like `deploy.my-app.git.github_com`) and the token is stripped from the operation before it is logged or replicated, so this is safe — re-deploying with a new token rotates the stored one. It just means your CI system holds the GitHub token too. Prefer the `secret` reference.
-:::
+CI then references it by name — `{ "host": "github.com", "secret": "gh-deploy-token" }` — and the GitHub token never appears in your pipeline at all; the only secret CI holds is the Harper Operations API credential. Choose this when you want the credential's lifecycle managed in Harper (or shared across pipelines) rather than living in each CI system's secrets.
 
 ## Path A: deploy a tagged release from a private repository
 
 The flow: push a semver tag (`v1.2.3`) → the workflow calls `deploy_component` with a `#semver:` git reference → every node clones that tag and installs.
 
-Add two repository secrets to GitHub — `HARPER_OPS_URL` (your cluster's Operations API endpoint, e.g. `https://my-cluster.example.com:9925`) and `HARPER_OPS_AUTH` (a base64 `user:password` Basic credential or a bearer token for a `super_user`). Then:
+Add three repository secrets to GitHub — `HARPER_OPS_URL` (your cluster's Operations API endpoint, e.g. `https://my-cluster.example.com:9925`), `HARPER_OPS_AUTH` (a base64 `user:password` Basic credential or a bearer token for a `super_user`), and `GH_DEPLOY_TOKEN` (the durable PAT from the previous section). Then:
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -95,7 +95,7 @@ jobs:
             "operation": "deploy_component",
             "project": "my-app",
             "package": "github:my-org/my-app#semver:${GITHUB_REF_NAME}",
-            "credentials": [{ "host": "github.com", "secret": "gh-deploy-token" }],
+            "credentials": [{ "host": "github.com", "token": "${GH_DEPLOY_TOKEN}" }],
             "replicated": true,
             "restart": "rolling"
           }
@@ -103,6 +103,7 @@ jobs:
         env:
           HARPER_OPS_URL: ${{ secrets.HARPER_OPS_URL }}
           HARPER_OPS_AUTH: ${{ secrets.HARPER_OPS_AUTH }}
+          GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
 ```
 
 A few details worth noting:
@@ -169,7 +170,7 @@ jobs:
             "project": "my-app",
             "package": "@my-org/my-app@${VERSION}",
             "credentials": [
-              { "registry": "https://npm.pkg.github.com", "scope": "@my-org", "secret": "gh-packages-token" }
+              { "registry": "https://npm.pkg.github.com", "scope": "@my-org", "token": "${GH_PACKAGES_TOKEN}" }
             ],
             "replicated": true,
             "restart": "rolling"
@@ -178,12 +179,13 @@ jobs:
         env:
           HARPER_OPS_URL: ${{ secrets.HARPER_OPS_URL }}
           HARPER_OPS_AUTH: ${{ secrets.HARPER_OPS_AUTH }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
 ```
 
 Note the two tokens play different roles, matching their lifetimes:
 
 - **Publishing** uses the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`). Publishing happens entirely inside the job, so an ephemeral token is exactly right.
-- **Installing** uses `gh-packages-token`, the durable `read:packages` secret you provisioned in Harper — because installs can happen long after this workflow ends.
+- **Installing** uses `GH_PACKAGES_TOKEN`, the durable `read:packages` token — because installs can happen long after this workflow ends, and Harper stores this one for them.
 
 The `scope` field maps the `@my-org` scope to GitHub Packages on the installing node, so scoped dependencies from the same registry resolve too.
 
@@ -203,7 +205,7 @@ A useful pattern is to have the workflow poll [`get_deployment`](/reference/v5/o
 ## Operational notes
 
 - **Rollback is just another deploy.** Both paths deploy immutable versions, so rolling back is re-running the deploy with the previous tag or version. This is a big part of why pinned references (`#semver:v1.2.3`, `@my-org/my-app@1.2.3`) beat branch references (`#main`) in a pipeline: `#main` moves, so you can neither audit nor re-deploy "what was running yesterday."
-- **Rotating the deploy credential** is a `set_secret` call with the same name and new value — no change to the pipeline or the component.
+- **Rotating the deploy credential**: with inline tokens, update the CI secret — the next deploy overwrites the stored copy. With a named secret, it's a `set_secret` call (or an edit in Harper Studio) with the same name and a new value; the pipeline doesn't change.
 - **Git-host credentials require git ≥ 2.31** on the Harper nodes, and are not supported on Windows nodes (the deploy fails with a clear error rather than degrading security). Registry credentials have no such constraints. Fabric instances satisfy both.
 - **Self-managed OSS core without the Pro secrets component:** `secret` references can't be resolved (no decryption custody), and a literal `token` is used transiently for that node's install only — it is not persisted for later installs. The durable-credential patterns in this guide assume custody (Fabric provides it).
 
