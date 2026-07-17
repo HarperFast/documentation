@@ -97,7 +97,9 @@ export async function syncExchangeRates(context) {
 	const response = await fetch('https://api.example.com/rates');
 	if (!response.ok) throw new Error(`rates API responded ${response.status}`);
 	const rates = await response.json();
-	await tables.ExchangeRates.put({ id: 'latest', fetchedAt: context.scheduledAt, ...rates });
+	// Spread the untrusted API payload first so our explicit keys win - otherwise
+	// a rogue `id` in the response could redirect the write to another record
+	await tables.ExchangeRates.put({ ...rates, id: 'latest', fetchedAt: context.scheduledAt });
 }
 ```
 
