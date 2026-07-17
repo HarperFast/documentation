@@ -47,6 +47,7 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 - Reference is versioned; current version is v5 (`reference/`). Archived v4 content is in `reference_versioned_docs/version-v4/`.
 - Do not modify `reference_versioned_docs/` for current (v5) work; edit `reference/` instead.
 - The `<VersionBadge>` component is globally registered — no import needed in `.md`/`.mdx` files.
+- The `<EngineBadge>` component (also global) tags storage-engine support inline: `<EngineBadge engines="RocksDB" />` or `<EngineBadge engines="RocksDB, LMDB" />`.
 - See the complete repository organization in `CONTRIBUTING.md`
 
 ## Versioning Content
