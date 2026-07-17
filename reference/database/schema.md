@@ -558,6 +558,41 @@ How the one definition applies at each scope (when permission checking is active
 
 Constraints: the check must be synchronous, side-effect free, and fast — it can run once per candidate record visited during traversal (verdicts are memoized per query). `this` is the frozen record during per-record evaluation. A thrown exception denies that record (fail closed). On caching tables the check is enforced against the record actually returned, after any source revalidation.
 
+### Record-Level Access Control for Writes (Record-Scoped `allowDelete` / `allowUpdate` / `allowCreate`)
+
+<VersionBadge version="v5.2.0" />
+
+The write-side authorization hooks get the same record-scoped treatment when overridden. Unlike `allowRead`, they stay on the resource (records do not expose them): during per-record evaluation `this` is a per-row resource instance with the record loaded, so schema attributes read naturally (`this.ownerId`) and `super.allow*(...)` composes the role/RBAC baseline. Because the write paths are asynchronous, `async` overrides participate too (they are awaited, fail-closed).
+
+```javascript
+export class Reports extends tables.Reports {
+	allowDelete(user, target, context) {
+		// Compose the table/RBAC grant first, so losing the role's delete denies.
+		if (!super.allowDelete(user, target, context)) return false;
+		if (user.role.permission.super_user) return true;
+		return this.ownerId === user.id; // per matching record
+	}
+	allowUpdate(user, updates, context) {
+		// `this` = the EXISTING record's resource; `updates` = the incoming data.
+		return this.ownerId === user.id;
+	}
+	allowCreate(user, record, context) {
+		// No existing record on a create — the incoming record is the parameter.
+		return record.ownerId === user.id;
+	}
+}
+```
+
+How the overridden hooks apply (when permission checking is active, e.g. any external request):
+
+- **Conditional (query-shaped) `DELETE`** — an overridden `allowDelete` is evaluated once per matching record, with **filter semantics**: rows it denies (including by throwing or rejecting — fail closed) are skipped and the permitted rows are deleted, returning success rather than a blanket 403. `limit`/`offset` count _allowed_ rows, so denied rows don't consume pagination slots.
+- **Array `PUT` into a collection** — with an overridden `allowUpdate`/`allowCreate`, each element is authorized individually: an element whose record already exists is checked with `allowUpdate` (`this` = the existing record's resource), a new element with `allowCreate`. Any denial fails the **whole request** with a 403 and aborts the transaction — no partial batch is committed (each element was an explicit write target, unlike a query's incidental matches).
+- **Single-record writes** (`PUT`/`PATCH`/`DELETE` on an id) — unchanged: evaluated at request entry with the record loaded, so the same override works there too.
+
+The default (non-overridden) hooks are table-level RBAC checks and keep their single request-entry evaluation with no per-record cost — including the collection-scope insert permission governing array `PUT`s. Operations API and SQL writes are governed by role permissions only; the `allow*` hooks apply to the Resource APIs (REST and JavaScript).
+
+One caveat: a class that overrides `delete()` itself replaces the framework's record-scoped delete path — its query-shaped deletes keep the request-entry check (a warning is logged when this combination is detected), and the custom `delete()` is responsible for any row-level enforcement.
+
 ### Tuning Filtered Traversal
 
 Filtered traversal is bounded by a visit budget of `ef * filterExpansion` nodes (`filterExpansion` defaults to 24). If the budget is exhausted before the result list fills — which happens when the filter matches only a tiny fraction of records — the search returns the matches found so far rather than erroring. Both knobs can be set per query:
