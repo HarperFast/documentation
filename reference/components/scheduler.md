@@ -6,7 +6,7 @@ title: Scheduler
 
 <VersionBadge version="v5.2.0" />
 
-The scheduler is a built-in plugin that runs recurring jobs declared in a component's configuration. Harper invokes a designated export from your component on a cron or interval schedule, and in a cluster each job fires exactly once per occurrence - on a single, automatically elected node - rather than once per node or worker.
+The scheduler is a built-in plugin that runs recurring jobs declared in a component's configuration. Harper invokes a designated export from your component on a cron or interval schedule. In a cluster, execution is leader-coordinated: under normal operation each occurrence runs once, on a single automatically elected node, rather than once per node or worker. During leadership failover, daylight-saving fall-back, or split-brain recovery an occurrence can occasionally be delivered more than once - which is why handlers must be idempotent (see below).
 
 Use it for the recurring work applications otherwise hand-roll with `setInterval`: taking daily snapshots of a dataset, pulling from an external API on a schedule, re-aggregating summary tables, generating digests or reports.
 
@@ -50,9 +50,9 @@ Exactly one of `cron` or `interval` is required.
 
 ### `interval`
 
-Type: `string` (duration)
+Type: `string` (duration) or `number` (seconds)
 
-A simple cadence instead of a cron expression: a number of seconds, or a value like `90s`, `5m`, `1h`, `1d`. Minimum one second. Use this for "every N" maintenance passes that do not align to wall-clock times.
+A simple cadence instead of a cron expression: a number of seconds, or a duration string like `90s`, `5m`, `1h`, `1d`. Must be between one second and 365 days. Use this for "every N" maintenance passes that do not align to wall-clock times.
 
 ### `timezone`
 
@@ -103,7 +103,7 @@ export async function syncExchangeRates(context) {
 
 **Handlers should be idempotent.** Harper's clustering has no distributed lock, so leadership failover and daylight-saving fall-back can occasionally deliver the same logical occurrence twice. Design handlers so that running twice for one occurrence is harmless.
 
-Runs of the same job never overlap: if a run is still going when its next occurrence arrives, that occurrence is skipped (with a log entry) rather than stacked.
+Runs of the same job never overlap. Missed time is not queued up, but it is also not always skipped outright: when a run outlasts its cadence, an interval job's next run starts promptly after the previous one finishes (a slow handler can therefore run back-to-back), and a cron job makes up at most its single most recent missed occurrence (delivered with `context.catchUp` set to `true`).
 
 ## Cluster Behavior
 
