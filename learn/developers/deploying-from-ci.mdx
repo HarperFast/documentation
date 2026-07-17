@@ -1,0 +1,217 @@
+---
+title: Deploying from a CI/CD Pipeline
+---
+
+Once an application is past the prototype stage, you want deployments to happen from your CI/CD pipeline, not from a laptop: a tag or release triggers a workflow, the workflow validates the code, and the pipeline tells your Harper cluster to deploy it. Harper's [`deploy_component`](/reference/v5/operations-api/operations#deploy_component) operation is a single HTTP call, so any CI system can drive it — this guide uses GitHub Actions and GitHub's hosting (repositories and the GitHub Packages npm registry), but the patterns translate directly to GitLab, Bitbucket, or any private npm registry.
+
+There are two ways to deliver an application to Harper, and choosing the right one is most of the battle:
+
+- **Deploy from a git tag** — Harper installs your application directly from a tagged commit in your repository. Best for applications that **run from source**.
+- **Deploy from a package registry** — CI builds and publishes an artifact to a private npm registry; Harper installs that artifact by version. Best for applications that **need a build step**.
+
+Both work with private sources: `deploy_component` accepts a [`credentials`](/reference/v5/operations-api/operations#deploy-credentials-credentials) array carrying auth for a private git host or a private npm registry, backed by Harper's encrypted [secrets store](/reference/v5/security/secrets).
+
+## What You Will Learn
+
+- How to choose between git-tag deploys and registry-artifact deploys
+- How to provision a deploy credential once and reference it from CI, so your pipeline never handles the GitHub token
+- A GitHub Actions workflow that deploys a tagged release straight from a private repository
+- A GitHub Actions workflow that builds, publishes to GitHub Packages, and deploys the published artifact
+- How to deploy across a cluster and verify the deployment record
+
+## Prerequisites
+
+- A Harper Fabric cluster (or a self-managed Harper 5.2+ cluster with the Pro secrets component providing [custody](/reference/v5/security/secrets)) and a `super_user` credential for its Operations API
+- A GitHub repository containing a working Harper application ([Create your First Application](../getting-started/create-your-first-application.mdx) if you don't have one)
+- Familiarity with GitHub Actions basics (workflows, repository secrets)
+
+## Choosing a delivery model
+
+**Deploy from a git tag when your application runs from source.** Most Harper applications do: a `config.yaml`, a `schema.graphql`, resource classes in JavaScript (or TypeScript that Harper runs directly via type stripping), and npm dependencies that install cleanly. For these, the repository *is* the artifact. A git-tag deploy has no publish step to maintain — you tag a release, CI calls `deploy_component` with a reference like `github:my-org/my-app#semver:v1.2.3`, and every node installs exactly that commit. Semver-tagged references also keep the deployed version auditable: the deployment record and the component config both name the tag.
+
+**Deploy from a registry when your application needs a build.** If CI must produce output that isn't in the repository — a bundling step, compiled assets, code generation, native compilation — publish the *built* package to a registry and deploy that. This is better than making Harper build it for two reasons:
+
+1. **The artifact you tested is the artifact you run.** CI builds once, tests the result, publishes it. Every Harper node installs that identical, immutable artifact instead of re-running your build independently.
+2. **No build scripts run on your database nodes.** When Harper installs a credentialed git reference, npm's pack step runs with `--ignore-scripts` by default, precisely so repository code can't run during install with the deploy credential in reach. A repository that *requires* a `prepare`/build script to be runnable forces you to set `install_allow_scripts: true`, which allows that script — and your dependencies' install scripts — to execute on the node during deployment. A registry artifact needs none of that: it's already built.
+
+A second constraint pushes the same direction: a git-reference deploy authenticates only the top-level repository. If your application has **private git-hosted dependencies** (a `package.json` dependency pointing at another private repo), their installation is not credentialed and will fail. Private *registry* dependencies work fine — registry credentials apply to the whole install. If your dependency graph reaches into private git repos, publish those dependencies (or the whole app) to a private registry instead.
+
+| Your application...                                    | Deploy from      |
+| ------------------------------------------------------ | ---------------- |
+| Runs from source (schema, resources, npm dependencies) | Git tag          |
+| Needs a build step (bundling, codegen, compilation)     | Private registry |
+| Has private git-hosted dependencies                     | Private registry |
+
+## Provision the deploy credential once
+
+Both paths need Harper to authenticate to GitHub — and it's worth understanding *when*. The credential is not only used at the moment you deploy: Harper persists it (encrypted, in the [secrets store](/reference/v5/security/secrets)) with the component's configuration so that later installs — a new node joining the cluster, a rollback, a re-install after restore — can fetch the package again without you re-supplying auth.
+
+That has one practical consequence: **use a durable token, not your workflow's ephemeral `GITHUB_TOKEN`**. The automatic `GITHUB_TOKEN` in a GitHub Actions run expires when the job ends. It's fine for things that happen *inside* the job (like publishing a package), but if you hand it to Harper as the deploy credential, any install that happens after the workflow finishes fails authentication. Instead, create a token whose lifetime matches how long nodes may need to fetch this component:
+
+- **For a private repository (git-tag deploys):** a GitHub [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with **Contents: read-only** permission, scoped to just the application repository. An organization can attach these to a machine account so they aren't tied to an individual.
+- **For GitHub Packages (registry deploys):** a token with the **`read:packages`** scope.
+
+Store it in Harper once, granted to your component, using [`set_secret`](/reference/v5/operations-api/operations#set_secret):
+
+```json
+{
+	"operation": "set_secret",
+	"name": "gh-deploy-token",
+	"value": "github_pat_...",
+	"grants": ["my-app"]
+}
+```
+
+From then on, CI references it by name — `{ "host": "github.com", "secret": "gh-deploy-token" }` — and the GitHub token never appears in your pipeline at all. The only secret your CI system holds is the Harper Operations API credential. This is the recommended setup: it separates the credential's lifecycle (rotate it with another `set_secret` call whenever you like — the deploy operation doesn't change) from the pipeline's.
+
+:::note Literal tokens
+You can also pass the token inline: `{ "host": "github.com", "token": "github_pat_..." }`. Harper ingests it into the secrets store automatically (under a derived name like `deploy.my-app.git.github_com`) and the token is stripped from the operation before it is logged or replicated, so this is safe — re-deploying with a new token rotates the stored one. It just means your CI system holds the GitHub token too. Prefer the `secret` reference.
+:::
+
+## Path A: deploy a tagged release from a private repository
+
+The flow: push a semver tag (`v1.2.3`) → the workflow calls `deploy_component` with a `#semver:` git reference → every node clones that tag and installs.
+
+Add two repository secrets to GitHub — `HARPER_OPS_URL` (your cluster's Operations API endpoint, e.g. `https://my-cluster.example.com:9925`) and `HARPER_OPS_AUTH` (a base64 `user:password` Basic credential or a bearer token for a `super_user`). Then:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Harper
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy tag to Harper
+        run: |
+          curl --fail-with-body -s "$HARPER_OPS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Basic $HARPER_OPS_AUTH" \
+            -d @- <<EOF
+          {
+            "operation": "deploy_component",
+            "project": "my-app",
+            "package": "github:my-org/my-app#semver:${GITHUB_REF_NAME}",
+            "credentials": [{ "host": "github.com", "secret": "gh-deploy-token" }],
+            "replicated": true,
+            "restart": "rolling"
+          }
+          EOF
+        env:
+          HARPER_OPS_URL: ${{ secrets.HARPER_OPS_URL }}
+          HARPER_OPS_AUTH: ${{ secrets.HARPER_OPS_AUTH }}
+```
+
+A few details worth noting:
+
+- **`#semver:v1.2.3`** resolves the reference through your repo's semver tags. You can also pin an exact commit (`#<sha>`) — useful if you want deploys keyed to commits rather than tags.
+- **`replicated: true`** runs the deploy across the cluster; each node fetches and installs the package itself, resolving the credential from the (replicated) secrets store.
+- **`restart: "rolling"`** restarts nodes sequentially so the cluster keeps serving throughout. Use `restart: true` for a single-node or dev instance.
+- The token is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
+
+If this repository needs a build step to be runnable, stop — don't reach for `install_allow_scripts`. Use Path B.
+
+## Path B: build in CI, publish to GitHub Packages, deploy the artifact
+
+The flow: push a tag → CI builds and tests → `npm publish` to GitHub Packages → `deploy_component` installs the published version from the registry.
+
+Your `package.json` needs a scoped name and a `publishConfig` pointing at GitHub Packages:
+
+```json
+{
+	"name": "@my-org/my-app",
+	"version": "1.2.3",
+	"publishConfig": { "registry": "https://npm.pkg.github.com" },
+	"files": ["config.yaml", "schema.graphql", "dist/"]
+}
+```
+
+Use `files` deliberately — it defines exactly what ships in the artifact. Then:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Build, publish, and deploy to Harper
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy to Harper
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          curl --fail-with-body -s "$HARPER_OPS_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Basic $HARPER_OPS_AUTH" \
+            -d @- <<EOF
+          {
+            "operation": "deploy_component",
+            "project": "my-app",
+            "package": "@my-org/my-app@${VERSION}",
+            "credentials": [
+              { "registry": "https://npm.pkg.github.com", "scope": "@my-org", "secret": "gh-packages-token" }
+            ],
+            "replicated": true,
+            "restart": "rolling"
+          }
+          EOF
+        env:
+          HARPER_OPS_URL: ${{ secrets.HARPER_OPS_URL }}
+          HARPER_OPS_AUTH: ${{ secrets.HARPER_OPS_AUTH }}
+```
+
+Note the two tokens play different roles, matching their lifetimes:
+
+- **Publishing** uses the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`). Publishing happens entirely inside the job, so an ephemeral token is exactly right.
+- **Installing** uses `gh-packages-token`, the durable `read:packages` secret you provisioned in Harper — because installs can happen long after this workflow ends.
+
+The `scope` field maps the `@my-org` scope to GitHub Packages on the installing node, so scoped dependencies from the same registry resolve too.
+
+## Verify the deployment
+
+`deploy_component` responds with a `deployment_id`. Harper records the full lifecycle of every deployment — phase transitions, per-node outcomes, and install output — in a deployment record you can query:
+
+```json
+{
+	"operation": "get_deployment",
+	"deployment_id": "<id from the deploy response>"
+}
+```
+
+A useful pattern is to have the workflow poll [`get_deployment`](/reference/v5/operations-api/operations#get_deployment) until the deployment reaches `success` (or fail the job if it reports `failed`), so a broken deploy fails the pipeline rather than being discovered later. [`list_deployments`](/reference/v5/operations-api/operations#list_deployments) gives you the history — handy for answering "what exactly is deployed right now, and when did it change?"
+
+## Operational notes
+
+- **Rollback is just another deploy.** Both paths deploy immutable versions, so rolling back is re-running the deploy with the previous tag or version. This is a big part of why pinned references (`#semver:v1.2.3`, `@my-org/my-app@1.2.3`) beat branch references (`#main`) in a pipeline: `#main` moves, so you can neither audit nor re-deploy "what was running yesterday."
+- **Rotating the deploy credential** is a `set_secret` call with the same name and new value — no change to the pipeline or the component.
+- **Git-host credentials require git ≥ 2.31** on the Harper nodes, and are not supported on Windows nodes (the deploy fails with a clear error rather than degrading security). Registry credentials have no such constraints. Fabric instances satisfy both.
+- **Self-managed OSS core without the Pro secrets component:** `secret` references can't be resolved (no decryption custody), and a literal `token` is used transiently for that node's install only — it is not persisted for later installs. The durable-credential patterns in this guide assume custody (Fabric provides it).
+
+## Additional Resources
+
+- [`deploy_component` and deploy credentials reference](/reference/v5/operations-api/operations#deploy_component)
+- [Secrets store reference](/reference/v5/security/secrets) — the encrypted store behind `set_secret` and `secret` references
+- [Deployment records](/reference/v5/operations-api/operations#deployment-operations) — `list_deployments`, `get_deployment`
+- [Applications reference](/reference/v5/components/applications) — component structure and the full set of component operations
+- [GitHub: fine-grained personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+- [GitHub Packages: npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)
