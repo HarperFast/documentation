@@ -107,3 +107,5 @@ models.registerBackend(
 The stub still exercises routing, accounting, and [analytics](./analytics) — only the inference itself is faked.
 
 Two scoping notes. `defineBackend` derives `generate` from a supplied `generateStream` (by draining the stream), but not the reverse — if the suite calls `generateStream()`, give the stub a `generateStream` implementation. And a backend registered under `'generative'` serves only generation: `embed()` resolves the `'embedding'` registry, so embedding tests need their own stub registered with `models.registerBackend('embedding', 'default', …)`.
+
+As with any registered backend, register the stub during component initialization (for example, in `handleApplication`) rather than at a test file's top level: each worker thread keeps its own registry, so registration must run in every thread that serves requests — see [`registerBackend()`](./backends#registerbackend).
