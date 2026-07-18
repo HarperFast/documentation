@@ -617,14 +617,14 @@ When a component is installed from a private source, `credentials` supplies the 
 
 An entry provides its credential exactly one of two ways — a literal `token`, or a `secret` reference:
 
-| Field      | Kind     | Description                                                                                       |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `registry` | npm      | The registry URL or host the credential applies to. **Required** for an npm entry.               |
-| `scope`    | npm      | Optional npm `@scope` (e.g. `"@my-org"`) the entry applies to; omit to set the default registry. |
-| `host`     | git      | The bare git host the credential applies to (e.g. `"github.com"`). **Required** for a git entry. |
-| `username` | git      | Optional git HTTPS username. Defaults to `x-access-token` (GitHub); GitLab uses `oauth2`, Bitbucket `x-token-auth`. |
-| `token`    | both     | A literal auth token, **or**                                                                      |
-| `secret`   | both     | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.              |
+| Field      | Kind | Description                                                                                                         |
+| ---------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
+| `registry` | npm  | The registry URL or host the credential applies to. **Required** for an npm entry.                                  |
+| `scope`    | npm  | Optional npm `@scope` (e.g. `"@my-org"`) the entry applies to; omit to set the default registry.                    |
+| `host`     | git  | The bare git host the credential applies to (e.g. `"github.com"`). **Required** for a git entry.                    |
+| `username` | git  | Optional git HTTPS username. Defaults to `x-access-token` (GitHub); GitLab uses `oauth2`, Bitbucket `x-token-auth`. |
+| `token`    | both | A literal auth token, **or**                                                                                        |
+| `secret`   | both | The name of an [`hdb_secret`](../security/secrets.md) row to resolve the token from.                                |
 
 A provided **`token`** is not treated as ephemeral: Harper ingests it into the encrypted [secrets store](../security/secrets.md) and references it everywhere, so package-reference deploys keep working through rollback, reboot, and new peers joining — without re-supplying the token. The token is encrypted at rest, stripped from the operation before replication and from the operations log, and only ever crosses the cluster as ciphertext. A git-host token is additionally served to git **from memory** (via a credential helper) — it is never written to a file or into a URL. Using a **`secret`** reference names an existing store row directly. Ingesting a token requires custody on the deploying node; on OSS core without custody, a literal token falls back to a transient, this-node-only credential (not persisted or replicated).
 
