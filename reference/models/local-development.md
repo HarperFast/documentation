@@ -71,13 +71,15 @@ Two things do not automatically carry across a backend swap:
 
 ## Per-environment configuration
 
-Each Harper instance reads its own configuration file, so the simplest arrangement is a development config with local backends and a production config with hosted ones. Where baking a config file into an image is awkward — containerized or orchestrated deployments — the `models` block can be overridden from the environment with [`HARPER_CONFIG`](../configuration/overview#harper_config), which merges exactly the keys it names over the config file:
+Each Harper instance reads its own configuration file, so the simplest arrangement is a development config with local backends and a production config with hosted ones. Where baking a config file into an image is awkward — containerized or orchestrated deployments — the `models` block can be supplied from the environment with [`HARPER_CONFIG`](../configuration/overview#harper_config), which merges exactly the keys it names over the config file:
 
 ```bash
-export HARPER_CONFIG='{"models":{"generative":{"default":{"backend":"openai","apiKey":"${OPENAI_API_KEY}","model":"gpt-4o"}}}}'
+export HARPER_CONFIG='{"models":{"embedding":{"default":{"backend":"openai","apiKey":"${OPENAI_API_KEY}","model":"text-embedding-3-small"}},"generative":{"default":{"backend":"openai","apiKey":"${OPENAI_API_KEY}","model":"gpt-4o"}}}}'
 ```
 
 The `${OPENAI_API_KEY}` placeholder is resolved by Harper at startup, not by the shell — the single quotes are deliberate.
+
+Because the merge is key-by-key and cannot remove keys, use `HARPER_CONFIG` to supply a `models` block the config file does not define (as above), or to override fields within an entry that keeps the same backend — a model name, a credential. Do not use it to switch an existing entry to a different backend: keys the override does not name stay in place, and a leftover field from the old backend — `host` from an `ollama` entry, say — is an unrecognized field on the new backend's entry, which [fails configuration validation](./overview#startup-behavior) and prevents startup. To swap backends between environments, swap the config file (or define every model entry through `HARPER_CONFIG` and keep the file's `models` block empty), and cover both the `embedding` and `generative` maps — an override that names only one leaves the other pointed wherever the file pointed it.
 
 While iterating on configuration, remember the [startup behavior](./overview#startup-behavior) split: a structurally invalid entry fails configuration validation and prevents startup, while a registration-time error — such as an unreachable backend module — is logged and skipped, and calls to that logical name then throw as unconfigured. If a model works in one environment and throws "not configured" in another, check the startup log for a skipped registration.
 
@@ -103,3 +105,5 @@ models.registerBackend(
 ```
 
 The stub still exercises routing, accounting, and [analytics](./analytics) — only the inference itself is faked.
+
+Two scoping notes. `defineBackend` derives `generate` from a supplied `generateStream` (by draining the stream), but not the reverse — if the suite calls `generateStream()`, give the stub a `generateStream` implementation. And a backend registered under `'generative'` serves only generation: `embed()` resolves the `'embedding'` registry, so embedding tests need their own stub registered with `models.registerBackend('embedding', 'default', …)`.
