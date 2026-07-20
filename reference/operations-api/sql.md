@@ -12,7 +12,7 @@ title: SQL
 <!-- Source: versioned_docs/version-4.7/developers/operations-api/sql-operations.md -->
 
 :::info Harper 5.2 introduces a new SQL engine
-As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the same results but with the older full-scan cost. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
+As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the same results but with the older full-scan cost — each fallback is logged (`SQL engine v2 fallback: ...`) with the reason, so you have direct visibility into which queries aren't being planned. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
 
 For your most performance-critical production read paths, the [REST interface](../rest/overview.md) remains the recommended choice — it provides a stable, cacheable, index-driven contract. SQL is well suited to ad-hoc investigation, administrative queries, joins, and reporting.
 :::
@@ -103,7 +103,11 @@ ORDER BY d.dog_name
 
 Harper 5.2's SQL engine maps SQL clauses onto Harper's native indexed storage. When a query can be planned against an index, it runs as a streaming, index-driven operation with memory bounded by the size of the result — not the size of the table. When it can't, the engine falls back to the legacy path, which fetches candidate rows and evaluates the query in memory, with cost and memory growing with the number of rows scanned.
 
-On any non-trivial table the difference between these two paths is large. The rules below keep your queries on the fast path.
+On any non-trivial table the difference between these two paths is large.
+
+:::caution Full-scan fallback cost
+A fallback isn't just "slower" — it means every row in the table is read and evaluated in memory for that query, with no bound from the result size. On a large table this can be the difference between a sub-millisecond lookup and a scan that reads millions of rows. The rules below keep your queries on the fast path; see [Queries that fall back to a full scan](#queries-that-fall-back-to-a-full-scan-avoid-on-large-tables) for what to avoid.
+:::
 
 ### Index your predicates, sorts, and join keys
 
@@ -118,7 +122,7 @@ These map directly to indexed storage operations:
 - **Range predicates on an indexed attribute** — `<`, `<=`, `>`, `>=`, and `BETWEEN` (compiled to a bounded index range).
 - **`OR` of indexed predicates** — `WHERE a = 1 OR b = 2` is served as a union of index scans, provided **every** branch is an index-driving predicate on an indexed attribute.
 - **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan.
-- **`ORDER BY` on an indexed attribute, combined with an indexed `WHERE`** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read. Without an index-driving `WHERE` condition, an `ORDER BY` currently runs on the legacy path.
+- **`ORDER BY` on an indexed attribute, combined with an indexed `WHERE`** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read. Without an index-driving `WHERE` condition, an `ORDER BY` on a _secondary_ indexed attribute runs on the legacy path — except when sorting on the table's **primary key**, which drives the scan from the primary key's natural index order even with no `WHERE` clause.
 - **`GROUP BY` on an indexed attribute, combined with an indexed `WHERE`** — aggregates stream group-by-group with O(1) memory per group (memory is bounded by the group count; every matching row is still read). Without an index-driving `WHERE` condition, a `GROUP BY` currently runs on the legacy path.
 - **`INNER`/`LEFT JOIN` on an indexed join key** — executed as an index-nested-loop join (stream the outer table, probe the inner by index). Keep the join key indexed on the inner (probed) table.
 - **Column projections** — selecting a subset of columns pushes down so only those attributes are read.
@@ -127,7 +131,7 @@ These map directly to indexed storage operations:
 
 These can't be served from an index. They still return correct results, but the engine falls back to the legacy full-scan path, so cost and memory grow with table size:
 
-- **Filters on un-indexed attributes** — any equality, range, or `IN` on an attribute with no index.
+- **Filters on un-indexed attributes** — any equality, range, or `IN` on an attribute with no index, _when it's the only predicate_. Combined via `AND` with an indexed predicate, it's applied as a cheap residual filter after the index narrows the scan, and the query stays index-served overall — it's only a standalone un-indexed filter (or one joined by `OR`) that forces a full scan.
 - **`OR` where a branch isn't index-driving** — e.g. `WHERE a = 1 OR b = 2` when `b` is un-indexed, or `WHERE a = 1 OR name LIKE '%x%'`. A single un-indexed (or non-index-comparator) branch taints the whole disjunction and forces a scan. When **every** branch is an indexed, index-driving predicate, the `OR` stays on the fast path (see above).
 - **Suffix / substring `LIKE`** — `LIKE '%x'` and `LIKE '%x%'` (only prefix `LIKE 'x%'` is index-served). A suffix/contains `LIKE` combined (via `AND`) with an indexed predicate is applied as a cheap residual filter on the indexed result, so pair it with an indexed condition.
 - **`!=` / `<>` and `NOT` negations** — matching "everything except" a value can't use an index.
@@ -155,7 +159,7 @@ These are deliberate corrections toward standard SQL, applied when the new engin
 
 ### Practical guidance
 
-- Index every attribute you filter, sort, or join on.
+- Index every attribute you filter, sort, or join on — but no more than that. Each index adds storage and write-time maintenance cost, so index for your actual query patterns rather than every attribute in the table.
 - Prefer prefix `LIKE 'x%'` over `LIKE '%x%'`; back a substring search with a separate indexed predicate, or model it as a dedicated indexed attribute.
 - Constrain the row set with an indexed `WHERE` before leaning on `ORDER BY`, `GROUP BY`, joins, or `SEARCH_JSON`.
 - Reach for the [REST interface](../rest/overview.md) on your hottest production read paths for a cacheable, index-driven contract; keep SQL for ad-hoc investigation, joins, and reporting.
