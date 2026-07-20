@@ -115,13 +115,13 @@ export async function syncExchangeRates(context) {
 
 **A failed run is not retried.** If a handler throws (or its outbound request times out), the run is recorded with `lastStatus: error` and the occurrence is not made up - the job simply fires again at its next scheduled time. Handlers that need delivery guarantees should implement their own bounded retry/backoff inside the handler.
 
-Runs of the same job never overlap. Missed time is not queued up, but it is also not always skipped outright: when a run outlasts its cadence, an interval job's next run starts promptly after the previous one finishes (a slow handler can therefore run back-to-back), and a cron job makes up at most its single most recent missed occurrence (delivered with `context.catchUp` set to `true`).
+On a single scheduler leader, runs of the same job never overlap. Note this guard is per-leader: in the rare duplicate-delivery cases above (a partitioned leader with a slow handler still in flight while its successor promotes), the two deliveries of one occurrence run on different nodes and CAN overlap in time - so idempotency must cover concurrent execution, not just repeated execution. Missed time is not queued up, but it is also not always skipped outright: when a run outlasts its cadence, an interval job's next run starts promptly after the previous one finishes (a slow handler can therefore run back-to-back), and a cron job makes up at most its single most recent missed occurrence (delivered with `context.catchUp` set to `true`).
 
 ## Cluster Behavior
 
 One node in the cluster - the scheduler leader - runs all scheduled jobs; the others watch. Leader election is automatic and requires no configuration:
 
-- The leader maintains a heartbeat in the replicated `system` database. If it stops heartbeating (crash, shutdown, partition) for more than five minutes, the next node in line promotes itself; with default timings, failover completes within about six and a half minutes.
+- The leader maintains a heartbeat in the replicated `system` database. If it stops heartbeating (crash, shutdown, partition) for more than five minutes, the next node in line promotes itself; with default timings, failover completes within about six and a half minutes when the first eligible successor is up. Each earlier successor that is also down adds a further escalation delay (two and a half minutes per node) before the next one in line claims leadership.
 - A restarting node defers to an actively heartbeating leader, so leadership is stable across deploys and restarts.
 - On a single-node instance, that node simply runs the jobs.
 
