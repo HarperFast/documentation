@@ -83,7 +83,7 @@ export async function snapshotMetrics(context) {
 	const day = context.scheduledAt.toISOString().slice(0, 10);
 	let total = 0;
 	let active = 0;
-	for await (const device of tables.Devices.search([])) {
+	for await (const device of tables.Devices.search({})) {
 		total++;
 		if (device.status === 'active') active++;
 	}
