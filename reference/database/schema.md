@@ -593,6 +593,8 @@ The default (non-overridden) hooks are table-level RBAC checks and keep their si
 
 One caveat: a class that overrides `delete()` itself replaces the framework's record-scoped delete path — its query-shaped deletes keep the request-entry check (a warning is logged when this combination is detected), and the custom `delete()` is responsible for any row-level enforcement.
 
+For an unauthenticated caller, `user` itself is `undefined` — not an object with a falsy `id`. Leading with `super.allow*(user, ...)`, as the `allowDelete` example does, denies before any `user.*` access runs, since the default checks are written with `user?.`. An override that skips that call and dereferences `user.id` directly, as the `allowUpdate`/`allowCreate` examples do, will throw for an unauthenticated caller instead — which still fails closed (denies), just via an exception rather than an explicit `false`.
+
 ### Upgrading Existing `allow*` Overrides
 
 <VersionBadge version="v5.2.0" />
@@ -665,7 +667,7 @@ export class Reports extends tables.Reports {
 1. List the classes that extend a table _and_ override an `allow*` hook. Anything extending a plain `Resource` can be skipped.
 2. For each, decide whether the override is meant to be a **row-level** decision (consults `this`) or a **whole-request** one. Make `allowRead` synchronous for the former; leave it `async` for the latter.
 3. Check whether any caller does a collection read, an array `PUT`, or a conditional `DELETE` against that table — including the automatic REST routes an `@export`ed table exposes, not just your own code paths.
-4. Update anything asserting on a `403` from those paths, which may now be a filtered `200`.
+4. Update anything asserting on a `403` from a collection read or conditional `DELETE`, which may now be a filtered `200`. Array `PUT` denials still return `403` — the change there is that the hook may now run for the first time (item 3).
 5. If you override `allowUpdate` or `allowCreate`, review the pair together.
 6. Move expensive per-request work in a hook onto `context`, as above.
 
