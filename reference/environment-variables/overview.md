@@ -49,7 +49,9 @@ Because Harper is a single-process application, environment variables are loaded
 :::warning
 `loadEnv` supplies **application** environment variables — values your component code reads from `process.env` (secrets, API endpoints, app settings). It does **not** configure Harper itself.
 
-Harper's own instance-wide configuration is composed once at startup, **before** any component's `loadEnv` runs. As a result, config-shaping variables such as `HARPER_CONFIG`, `HARPER_SET_CONFIG`, and `HARPER_DEFAULT_CONFIG` delivered through a `.env` file are read too late to take effect and are ignored (Harper logs a warning when it detects one). <VersionBadge type="changed" version="v5.2.0" />
+Harper's own instance-wide configuration is composed once at startup, **before** any component's `loadEnv` runs. As a result, config-shaping variables such as `HARPER_CONFIG`, `HARPER_SET_CONFIG`, and `HARPER_DEFAULT_CONFIG` delivered through a `.env` file are read too late to take effect and are ignored (Harper logs a warning when it detects any of them).
+
+<VersionBadge type="changed" version="v5.2.0" />
 
 To change Harper's configuration, set it in the [configuration file](../configuration/overview.md) or export the variable in the real process/container environment **before** Harper starts — not through `loadEnv`.
 :::
