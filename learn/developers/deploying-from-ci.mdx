@@ -53,7 +53,7 @@ That has one practical consequence: **use a durable token, not your workflow's e
 
 Then hand it to Harper in one of two ways:
 
-**Pass it inline with the deploy (simplest — used in the workflows below).** Store the token as a repository secret in GitHub Actions and pass it in the `credentials` entry: `{ "host": "github.com", "token": "github_pat_..." }`. There is no separate provisioning step: Harper ingests the token into the encrypted secrets store on the way in (under a derived name like `deploy.my-app.git.github_com`, granted to the component), strips it from the operation before anything is logged or replicated, and reuses the stored copy for every later install. Re-deploying with a new token value rotates the stored one, so rotation is just updating the GitHub Actions secret.
+**Pass it inline with the deploy (simplest — used in the workflows below).** Store the token as a repository secret in GitHub Actions and pass it in the `credentials` entry: `{ "host": "github.com", "token": "github_pat_..." }`. There is no separate provisioning step: Harper ingests the token into the encrypted secrets store on the way in (under a derived name like `deploy.my-app.git.github.com`, granted to the component), strips it from the operation before anything is logged or replicated, and reuses the stored copy for every later install. Re-deploying with a new token value rotates the stored one, so rotation is just updating the GitHub Actions secret.
 
 **Or provision it in Harper once, and reference it by name.** Create a secret with [`set_secret`](/reference/v5/operations-api/operations#set_secret) — or in [Harper Studio](/reference/v5/studio/overview), which provides a UI for creating, granting, and rotating secrets — granted to your component:
 
@@ -72,7 +72,7 @@ CI then references it by name — `{ "host": "github.com", "secret": "gh-deploy-
 
 The flow: push a semver tag (`v1.2.3`) → the workflow calls `deploy_component` with a `#semver:` git reference → every node clones that tag and installs.
 
-Add three repository secrets to GitHub — `HARPER_OPS_URL` (your cluster's Operations API endpoint, e.g. `https://my-cluster.example.com:9925`), `HARPER_OPS_AUTH` (a base64 `user:password` Basic credential or a bearer token for a `super_user`), and `GH_DEPLOY_TOKEN` (the durable PAT from the previous section). Then:
+Add three repository secrets to GitHub — `HARPER_OPS_URL` (your cluster's Operations API endpoint, e.g. `https://my-cluster.example.com:9925`), `HARPER_OPS_AUTH` (the full `Authorization` header value for a `super_user` — `Basic <base64 user:password>` or `Bearer <token>`), and `GH_DEPLOY_TOKEN` (the durable PAT from the previous section). Then:
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -89,7 +89,7 @@ jobs:
         run: |
           curl --fail-with-body -s "$HARPER_OPS_URL" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Basic $HARPER_OPS_AUTH" \
+            -H "Authorization: $HARPER_OPS_AUTH" \
             -d @- <<EOF
           {
             "operation": "deploy_component",
@@ -163,7 +163,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           curl --fail-with-body -s "$HARPER_OPS_URL" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Basic $HARPER_OPS_AUTH" \
+            -H "Authorization: $HARPER_OPS_AUTH" \
             -d @- <<EOF
           {
             "operation": "deploy_component",
