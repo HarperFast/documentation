@@ -65,7 +65,25 @@ The [`@embed` schema directive](../database/schema#embed), [tool calling](./tool
 
 Two things do not automatically carry across a backend swap:
 
-**Tool support.** The `ollama` backend does not advertise the `tools` capability, so a `generate()` call that declares tools fails up front against it (see [Backends](./backends#ollama)). If your application uses [tool calling](./tool-calling), run an OpenAI-compatible local server (such as vLLM) and select it with the [`openai` backend's `baseUrl` field](./backends#openai) instead — the local backend then advertises tools the way production does.
+**Tool support.** The `ollama` backend does not advertise the `tools` capability, so a `generate()` call that declares tools fails up front against it (see [Backends](./backends#ollama)). If your application uses [tool calling](./tool-calling), run an OpenAI-compatible local server with tool calling enabled and select it with the [`openai` backend's `baseUrl` field](./backends#openai). Two things have to be true for this to work.
+
+First, the server itself must have tool calling switched on. The `openai` backend always advertises the `tools` capability, so Harper's up-front capability check passes regardless of what the server can actually do — a server that cannot parse tool calls fails at request time instead. With [vLLM](https://docs.vllm.ai), that means serving a tool-capable model with automatic tool choice enabled and the tool-call parser that matches the model family — see [vLLM's tool-calling guide](https://docs.vllm.ai/en/latest/features/tool_calling.html) for the model–parser pairings:
+
+```bash
+vllm serve Qwen/Qwen2.5-7B-Instruct --enable-auto-tool-choice --tool-call-parser hermes
+```
+
+Second, the `openai` backend requires a non-empty `apiKey` even when the local server does not authenticate — supply any placeholder. Harper's startup warning about a literal value in a credential field is expected and harmless for a local endpoint:
+
+```yaml
+models:
+  generative:
+    default:
+      backend: openai
+      baseUrl: http://localhost:8000/v1
+      apiKey: local-dev
+      model: Qwen/Qwen2.5-7B-Instruct
+```
 
 **Embedding compatibility.** Embedding vectors are only comparable within a single model's vector space, and models differ in dimensionality. Vectors written locally with one embedding model cannot be meaningfully searched against vectors produced in production by another — which matters whenever embedded data, or an [HNSW index](../database/schema#vector-indexing) built from [`@embed`](../database/schema#embed) vectors, moves between environments. Where embedded data crosses environments, use the same embedding model in both — for example, an open model served by Ollama locally and by an OpenAI-compatible host in production — or re-embed after the move.
 
