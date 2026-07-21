@@ -643,13 +643,19 @@ Response:
 
 Stage now, activate later:
 
+**Stage request** (`activate: false`):
+
 ```json
 { "operation": "deploy_component", "project": "my-app", "package": "my-org/my-app#semver:v1.2.3", "activate": false }
 ```
 
+**Stage response** (nothing is live yet; note the `staged` marker and the `deployment_id`):
+
 ```json
 { "deployment_id": "a3f8c2d1...", "project": "my-app", "staged": true, "message": "Staged component: my-app" }
 ```
+
+**Activation request** (take the staged build live by passing its `deployment_id`):
 
 ```json
 { "operation": "deploy_component", "project": "my-app", "deployment_id": "a3f8c2d1...", "restart": "rolling" }

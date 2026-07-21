@@ -79,10 +79,10 @@ This is just a brief overview of all operations available as CLI commands. Revie
 | `add_component`                  | Add a component                               | [Components](../operations-api/operations.md#components)               | v4.3.0          |
 | `deploy_component`               | Deploy a component                            | [Components](../operations-api/operations.md#components)               | v4.3.0          |
 | `deploy` (alias)                 | Alias for `deploy_component`                  | [Components](../operations-api/operations.md#components)               | v4.3.0          |
-| `stage` (alias)                  | Stage a component without going live          | [Components](../operations-api/operations.md#deploy_component)         | v5.2.0          |
-| `activate` (alias)               | Activate a previously-staged deploy           | [Components](../operations-api/operations.md#deploy_component)         | v5.2.0          |
-| `revert_component`               | Roll a component back to its previous version | [Components](../operations-api/operations.md#revert_component)         | v5.2.0          |
-| `revert` (alias)                 | Alias for `revert_component`                  | [Components](../operations-api/operations.md#revert_component)         | v5.2.0          |
+| `stage` (alias)                  | Stage a component without going live          | [Components](../operations-api/operations.md#components)               | v5.2.0          |
+| `activate` (alias)               | Activate a previously-staged deploy           | [Components](../operations-api/operations.md#components)               | v5.2.0          |
+| `revert_component`               | Roll a component back to its previous version | [Components](../operations-api/operations.md#components)               | v5.2.0          |
+| `revert` (alias)                 | Alias for `revert_component`                  | [Components](../operations-api/operations.md#components)               | v5.2.0          |
 | `package_component`              | Package a component                           | [Components](../operations-api/operations.md#components)               | v4.3.0          |
 | `package` (alias)                | Alias for `package_component`                 | [Components](../operations-api/operations.md#components)               | v4.3.0          |
 | `drop_component`                 | Remove a component                            | [Components](../operations-api/operations.md#components)               | v4.3.0          |
