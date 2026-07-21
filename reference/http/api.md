@@ -182,7 +182,7 @@ type WsListener = (ws: WebSocket, request: Request, chainCompletion: Promise<voi
 
 ### `WsOptions`
 
-`WsOptions` supports the same routing and ordering options as [`HttpOptions`](#httpoptions), plus:
+WsOptions supports the same options as [HttpOptions](#httpoptions), plus:
 
 | Property     | Type   | Default | Description                                     |
 | ------------ | ------ | ------- | ----------------------------------------------- |
@@ -225,7 +225,7 @@ type UpgradeListener = (request: IncomingMessage, socket: Socket, head: Buffer, 
 
 ### `UpgradeOptions`
 
-`UpgradeOptions` supports the same routing and ordering options as [`HttpOptions`](#httpoptions).
+UpgradeOptions supports the same options as [HttpOptions](#httpoptions).
 
 ---
 
