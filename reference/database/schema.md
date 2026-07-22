@@ -397,14 +397,14 @@ type Network @table @export {
 
 ### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
 
-Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. This is useful for many-to-many relationships that join on non-primary-key attributes.
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. Cardinality follows the same rule as the `to`-only form above: a scalar `to` attribute gives a many-to-one join (as below); an array `to` attribute gives a many-to-many join, using the array pattern shown in `@relationship(from: attribute)` above.
 
 ```graphql
 type OrderItem @table @export {
 	id: Long @primaryKey
 	orderId: Long @indexed
 	productSku: Long @indexed
-	product: Product @relationship(from: productSku, to: sku) # join on sku, not primary key
+	product: Product @relationship(from: productSku, to: sku) # many-to-one join on sku, not primary key
 }
 
 type Product @table @export {
