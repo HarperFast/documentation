@@ -110,6 +110,49 @@ The corresponding instance method runs through Harper's normal `transactional()`
 
 **Custom tools are exposed to any MCP session — including anonymous, unauthenticated ones.** Unlike the auto-generated verb tools (which are RBAC-filtered per user at `tools/list` time and enforce table permissions on call), the MCP layer performs no authentication or ACL check for a custom tool: it is listed to every session and its method executes even when no user is logged in (`context.user` may be empty). Access control is entirely the method's responsibility — to restrict a tool to authenticated users or specific roles, check `context.user` (or rely on the per-record `allow*` predicates its data access triggers) inside the method and throw when the caller doesn't qualify.
 
+### Custom `mcpResources` opt-in
+
+A component author can expose arbitrary content — documentation pages, rendered reports, any `text` or `blob` payload — as MCP resources under author-chosen URIs by declaring a static `mcpResources` array (5.1.18+):
+
+```ts
+class DocsPages extends Resource {
+	static mcpResources = [
+		{
+			uri: 'docs:///index',
+			name: 'docs index',
+			description: 'List of all documentation pages',
+			mimeType: 'text/markdown',
+			method: 'readIndex',
+		},
+		{
+			uriTemplate: 'docs:///{+path}',
+			name: 'docs page',
+			description: 'A documentation page by path',
+			mimeType: 'text/markdown',
+			method: 'readPage',
+			completions: { path: ['guides/install.md', 'guides/deploy.md'] },
+		},
+	];
+
+	async readIndex() {
+		return { text: '- docs:///guides/install.md\n…', mimeType: 'text/markdown' };
+	}
+
+	async readPage(params) {
+		return { text: loadPage(params.path), mimeType: 'text/markdown' };
+	}
+}
+```
+
+Each entry declares exactly one of `uri` (fixed — listed by `resources/list`) or `uriTemplate` (listed by `resources/templates/list`). Templates use `{name}` to match a single path segment and `{+name}` to match across segments; `resources/read` extracts the parameters and passes them to the named instance method as its first argument. The method returns a string (text content), `{ text, mimeType? }`, `{ blob, mimeType? }` (base64 binary), or any other object (serialized as JSON).
+
+Notes:
+
+- Reads dispatch on the **live** registry class, so an exported `resources.js` subclass's method (and its access control) always wins — the same rule as custom `mcpTools`. Custom resources are served to **any** MCP session, including anonymous, unauthenticated ones (the public-docs case this feature targets) — the MCP layer performs no auth check for them; to restrict one, check `context.user` in the `read` method and throw.
+- `completions` optionally declares candidate values per template parameter, served by `completion/complete`.
+- Custom URIs must use an author-chosen scheme (`docs:///…` above). The reserved schemes — `harper:`, `harper+rest:`, `http:`, `https:` — are rejected at registration so custom entries cannot shadow the built-in surfaces.
+- A read error from the method surfaces to the client as a sanitized JSON-RPC error; the raw error is written to the server log.
+
 ### `exportTypes` gating
 
 The MCP surface mirrors the public REST surface. A Resource is filtered out of MCP enumeration entirely when its registration sets `exportTypes.mcp = false`:
@@ -135,13 +178,13 @@ Both profiles serve `resources/list`, `resources/read`, and `resources/templates
 
 The schema URIs honor each user's `permission[db].tables[table]` walk — a user with no `read` or `describe` perm on a table gets a "permission denied" response from `resources/read`.
 
-### `https://` URIs
+### `harper+rest://` URIs
 
-The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as an `https://<host>:<port>/<path>` URI. These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
+The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as a `harper+rest://<host>:<port>/<path>` URI (5.1.18+ — earlier releases listed these under `http(s)://`, which the MCP spec reserves for resources a client can fetch directly from the web; legacy `http(s)://` URIs continue to work for `resources/read` and `resources/subscribe`). These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
 
 ```json
 {
-	"uri": "https://node.example.com:9926/Product",
+	"uri": "harper+rest://node.example.com:9926/Product",
 	"path": "Product",
 	"database": "data",
 	"table": "product",
@@ -150,6 +193,10 @@ The application profile additionally exposes every exported `Resource` (that pas
 ```
 
 Per-record reads go through the tools surface, where each Resource's `allow{Read,…}` predicates run. The `resources/read` descriptor itself is a fast, side-effect-free hint — not a capability.
+
+### Custom content URIs
+
+Author-declared `mcpResources` entries (see [Custom `mcpResources` opt-in](#custom-mcpresources-opt-in)) appear alongside the built-in surfaces: fixed URIs in `resources/list`, templates in `resources/templates/list`. A registered custom URI always wins over the discovered surfaces on `resources/read`.
 
 ## `notifications/*/list_changed`
 
