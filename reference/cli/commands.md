@@ -294,6 +294,8 @@ Database files are stored in the `hdb/database` directory. As long as the snapsh
 - Cloud provider volume snapshots (AWS EBS, Azure Disk, GCP Persistent Disk)
 - Enterprise backup solutions with snapshot capabilities
 
+Harper also has a built-in backup system — managed incremental backups and snapshot downloads, runnable from the CLI under their operation names (e.g. `harper create_backup`). See [Backups](../backups/overview.md).
+
 ## Remote Operations
 
 The CLI supports executing commands on remote Harper instances. For details, see [CLI Overview - Remote Operations](./overview.md#remote-operations).

@@ -431,6 +431,24 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'Backups',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'backups/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'backups/operations',
+					label: 'Operations',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Logging',
 			collapsible: false,
 			className: 'reference-category-header',
