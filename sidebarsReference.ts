@@ -125,6 +125,11 @@ const sidebars: SidebarsConfig = {
 					id: 'models/analytics',
 					label: 'Analytics',
 				},
+				{
+					type: 'doc',
+					id: 'models/local-development',
+					label: 'Local Development',
+				},
 			],
 		},
 		{
