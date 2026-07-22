@@ -88,6 +88,16 @@ loadEnv:
 
 Files are loaded in the order specified.
 
+## Config-Shaping Variables Are Not Honored
+
+<VersionBadge type="changed" version="v5.2.0" />
+
+The three configuration env vars — `HARPER_DEFAULT_CONFIG`, `HARPER_CONFIG`, and `HARPER_SET_CONFIG` (see [Configuration](../configuration/overview.md)) — shape Harper's root configuration, which is composed once at startup, **before components load**. Delivering one of them through a `loadEnv` `.env` file therefore has **no effect**: configuration is strictly top-down (the instance's configuration controls components, never the reverse), so a component cannot shape instance-wide config.
+
+As of 5.2.0 (and 5.1.x patch releases from 5.1.18) this is no longer silent: Harper logs a prominent warning at startup for each config-shaping variable found in a component `.env` file — naming the variable and the file — and again at component load time (which also covers components deployed after startup). Earlier versions ignored these variables without any message.
+
+To configure the instance, use the supported channels instead: set the variable in the process environment (container env, service unit, shell), or put the equivalent keys in the instance's `harper-config.yaml`.
+
 ## Related
 
 - [Components Overview](../components/overview.md)
