@@ -397,7 +397,7 @@ type Network @table @export {
 
 ### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
 
-Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. Cardinality follows the same rule as the `to`-only form above: a scalar `to` attribute gives a many-to-one join (as below); an array `to` attribute gives a many-to-many join, using the array pattern shown in `@relationship(from: attribute)` above.
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. Cardinality is determined by the target (`to`) attribute: a scalar `to` attribute gives a many-to-one join (as below), while an array `to` attribute gives a many-to-many join.
 
 ```graphql
 type OrderItem @table @export {
