@@ -169,6 +169,25 @@ Harper automatically tracks the following metrics for all services. Applications
 | `bytes-received`      | node.database       | `replication` | `blob`    | bytes | Bytes received for blob replication                        |
 | `replication-latency` | node.database.table |               | `ingest`  | ms    | Time difference from source commit timestamp to local time |
 
+### Storage Metrics
+
+| `metric`                  | `path` | `method` | `type` | Unit | Description                                                       |
+| ------------------------- | ------ | -------- | ------ | ---- | ----------------------------------------------------------------- |
+| `transaction-commit-time` |        |          |        | ms   | Time a write transaction is outstanding (submit → durable commit) |
+
+`transaction-commit-time` is recorded as a distribution (`mean`, `median`, `p90`, `p95`, `p99`,
+`p999`, `count`) per write commit. It measures the same interval the storage engine's overload guard
+uses: when the oldest outstanding commit exceeds `storage.maxTransactionQueueTime` (default 45s),
+Harper rejects new write transactions with `Outstanding write transactions have too long of queue,
+please try again later` (HTTP 503).
+
+Because it is measured on that same clock, it is the leading indicator for that rejection: a rising
+`p99`/`p999` means commits are taking longer to drain — from write volume, large transactions, or a
+saturated storage volume — and is the signal to shed or throttle write load before commits start
+timing out. Unlike an in-flight transaction count, this reflects transaction size and the shared
+write path rather than per-thread submission concurrency, so alert on the upper percentiles trending
+toward `maxTransactionQueueTime`. Tune the threshold against a baseline for your workload.
+
 ### Resource Usage Metrics
 
 | `metric`                  | Key attributes                                                                                   | Other               | Unit    | Description                                                                       |
