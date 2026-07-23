@@ -329,6 +329,29 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'Web Application Firewall',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'web-application-firewall/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'web-application-firewall/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'web-application-firewall/operations',
+					label: 'Operations & Rule Schema',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Users & Roles',
 			collapsible: false,
 			className: 'reference-category-header',
