@@ -148,7 +148,7 @@ export class ProductInventory extends Resource {
 }
 ```
 
-MCP `tools/list` returns the same shape a table-backed Resource produces — types, per-property descriptions, and the `enum` — rather than an untyped `{ "type": "object" }`:
+MCP `tools/list` returns the same shape a table-backed Resource produces — types, per-property descriptions, and the `enum` — instead of an empty property set:
 
 ```json
 {
@@ -157,8 +157,12 @@ MCP `tools/list` returns the same shape a table-backed Resource produces — typ
 	"inputSchema": {
 		"type": "object",
 		"properties": {
-			"id": { "type": "string", "description": "Stock keeping unit; matches Product.sku." },
-			"get_attributes": { "type": "array", "items": { "type": "string" } }
+			"id": { "type": "string", "description": "Primary key (sku)." },
+			"get_attributes": {
+				"type": "array",
+				"items": { "type": "string" },
+				"description": "Attribute names to project; defaults to all readable attributes."
+			}
 		},
 		"required": ["id"]
 	},
@@ -173,27 +177,40 @@ MCP `tools/list` returns the same shape a table-backed Resource produces — typ
 				"enum": ["in_stock", "out_of_stock", "backorder"],
 				"description": "Derived from onHand vs reserved."
 			}
-		}
+		},
+		"required": ["sku"],
+		"additionalProperties": false
 	},
 	"annotations": { "readOnlyHint": true }
 }
 ```
 
-`/openapi.json` picks up the same properties, and the `harper://schema` MCP resource reports them for introspection.
+`/openapi.json` picks up the same properties. Two things this does _not_ reach: `harper://schema/{db}/{table}` is keyed by database and table name, so a Resource with no backing table never appears there; and only `get_*` carries a record-shaped `outputSchema` — `search_*` has none, and the write verbs advertise fixed `{ id }` / `{ ok }` / `{ deleted }` envelopes.
+
+The `"record by sku"` phrasing above and the OpenAPI path parameter both come from the class-level `static primaryKey`, not from the fragment's `primaryKey: true`. Declare both:
+
+```typescript
+export class ProductInventory extends Resource {
+	static primaryKey = 'sku';
+	static properties = { sku: { type: 'string', primaryKey: true /* ... */ } };
+}
+```
+
+Without `static primaryKey` you get `/ProductInventory/{id}` and "…record by id" while MCP's `id` argument still describes itself as the `sku`.
 
 ### Watch the vocabulary: lowercase JSON Schema, not GraphQL
 
-`static properties` is JSON Schema. Types are lowercase — `string`, `integer`, `number`, `boolean`, `object`, `array`, `null` — not the capitalized GraphQL names (`String`, `Int`, `Long`) you write in a `.graphql` schema. Writing `type: 'String'` in a `static properties` fragment is the most common mistake here; Harper can't map it and the property degrades to an untyped entry.
+`static properties` is JSON Schema. Types are lowercase — `string`, `integer`, `number`, `boolean`, `object`, `array`, `null`. Harper also recognizes the capitalized GraphQL names (`String`, `Int`, `Long`) you write in a `.graphql` schema, so those still map correctly. The hazard is a name in neither vocabulary — `'Text'`, `'Object'`, `'Array'` — where MCP quietly coerces to `{ type: 'string' }` and OpenAPI emits an untyped `{}`. Sticking to the lowercase names keeps the two surfaces in agreement.
 
-Beyond `type` and `description`, the fragments carry `enum` / `format` / `const` for value constraints, `items` for arrays (including arrays of objects), and `properties` / `required` / `additionalProperties` for nested objects. See the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) for the full key list and how unions and item-less arrays resolve.
+Beyond `type` and `description`, the fragments carry `enum` / `format` / `const` for value constraints, `items` for arrays (including arrays of objects), and `properties` / `required` / `additionalProperties` for nested objects. Those hints reach both surfaces at the top level; inside a nested object or an array's `items`, MCP keeps them and OpenAPI drops them. See the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) for the full key list and how unions and item-less arrays resolve.
 
 ### Authoring rubric, Path B edition
 
 - **Describe every property.** The rubric from Path A applies verbatim — meaning over type, units and formats spelled out, short.
 - **Use `enum` wherever the value set is closed.** It's the single highest-leverage hint for an LLM: it turns "pass a status string" into "pass one of these four."
 - **Add `format`** (`date-time`, `uuid`, `email`, ...) where it applies. It reaches Swagger UI and gives the LLM a concrete shape to emit.
-- **Declare a `primaryKey` property.** It's what the `get_*` / `delete_*` tools bind their `id` argument to and what the OpenAPI path parameter is derived from.
-- **Reach for `static outputSchemas`** when a verb returns a projection rather than the full record — otherwise the output schema mirrors `static properties`.
+- **Declare a `primaryKey` property _and_ `static primaryKey`.** The fragment flag types and describes the `id` argument on `get_*` / `update_*` / `delete_*`; the class static drives the OpenAPI path parameter and the tool-description sentence.
+- **Reach for `static outputSchemas`** when a verb returns something other than the full record — `get_*` is the only verb whose output schema is derived from `static properties`, so this is how you describe what `create_*` or a custom `search_*` actually returns.
 
 See the [Resource API reference](/reference/v5/resources/resource-api#class-level-metadata-for-mcp-and-openapi) for the full surface, including `static outputSchemas` for per-verb projection overrides, `static hidden` for full suppression, and `static mcp` for narrow MCP-only annotation overrides.
 
@@ -239,7 +256,7 @@ type Customer @table @export {
 
 ## RBAC and per-user filtering
 
-For MCP tool descriptors, `attribute_permissions` already filters the schema per-user — an attribute the caller cannot read is dropped from that user's view of the tool descriptor, along with its description. The new metadata flows through the existing pipeline.
+MCP tool schemas are derived once at registration time and are the same for every caller — `attribute_permissions` is enforced when the tool is called, not reflected in the advertised `inputSchema` / `outputSchema`. What RBAC does filter is the tool _list_: `tools/list` omits tools the caller has no permission for on the backing table. Treat a descriptor's property descriptions as visible to any authenticated MCP client, and use `@hidden` for anything that shouldn't be.
 
 For OpenAPI, the document is global and not per-user filtered. Use `@hidden` (or `static hidden`) to control what surfaces there.
 
@@ -250,4 +267,4 @@ For OpenAPI, the document is global and not per-user filtered. Use `@hidden` (or
 3. Hit `/openapi.json` on the application HTTP port — confirm the path-level descriptions and per-property descriptions show up in Swagger UI / Redoc.
 4. Add `@hidden` to an attribute — confirm it disappears from both surfaces while remaining queryable via direct REST/SQL.
 
-For a programmatic Resource, an untyped `{ "type": "object" }` in step 2 usually means the fragments never resolved — check that the types are lowercase JSON Schema names and that `static properties` is a `Record` keyed by property name, not an array.
+Two things to check for a programmatic Resource in step 2. An empty `properties: {}` on the `get_*` output schema means the fragments never resolved — most often because the class also carries a non-empty `attributes` Array, which wins. Properties named `0`, `1`, `2`… mean `static properties` was declared as an array instead of a `Record` keyed by property name. And if the tools don't appear in `tools/list` at all, check whether you're authenticated as a super-user — see the listing-visibility note in the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment).

@@ -538,42 +538,49 @@ export class ProductInventory extends Resource {
 }
 ```
 
-As of v5.2.0, a Resource that declares `static properties` with no table backing gets the same rich schemas a table-backed Resource gets, on all three introspection surfaces:
+As of v5.2.0, a Resource that declares `static properties` with no table backing drives the same schema derivation a table-backed Resource gets:
 
-- **MCP verb tools** — `inputSchema` and `outputSchema` on `get_*` / `search_*` / `create_*` / `update_*` / `patch_*` / `delete_*`
-- **OpenAPI** — the resource's `components.schemas` entry and its per-path query parameters
-- **`harper://schema/{db}/{table}`** — the MCP schema-introspection resource
+- **MCP verb tools** — the `inputSchema` on every registered verb tool, and the `outputSchema` on `get_*` (the full record shape). `search_*` has no `outputSchema`; `create_*` / `update_*` / `patch_*` / `delete_*` advertise fixed result envelopes (`{ id }`, `{ ok }`, `{ deleted }`) that don't vary with your properties. A Resource implementing both `put` and `patch` registers `update_*` only — `patch_*` appears when it implements `patch` without `put`.
+- **OpenAPI** — the resource's `components.schemas` entry and its per-path query parameters.
 
-Before v5.2.0 these surfaces read only the internal `attributes` Array, so a bare `static properties` declaration produced a skeletal `{ type: 'object' }` schema.
+Before v5.2.0 these surfaces read only the internal `attributes` Array, so a bare `static properties` declaration yielded an empty property set.
+
+The `harper://schema/{db}/{table}` MCP resource is **not** included: it is keyed by database and table name, so only Resources that identify a table are enumerated there. A purely programmatic Resource never gets such a URI.
+
+> **Listing visibility.** MCP `tools/list` has no static permission gate to apply to a Resource with no backing table, so Harper conservatively lists its verb tools for super-users only. Other users can still call the tools by name — the Resource's own `allowRead` / `allowUpdate` / etc. predicates enforce access at call time.
 
 #### JSON Schema vocabulary
 
-`static properties` speaks JSON Schema, not GraphQL. Types are **lowercase** (`string`, `integer`, `number`, `boolean`, `object`, `array`, `null`) — distinct from the capitalized Harper/GraphQL type names (`String`, `Int`, `Long`, `Float`, `Boolean`, `Date`, `Bytes`, `BigInt`) that appear on the internal `Class.attributes` Array. Harper maps the GraphQL names to their JSON Schema equivalents when projecting a table-backed schema, and passes lowercase names through unchanged.
+`static properties` speaks JSON Schema, not GraphQL. Types are **lowercase** (`string`, `integer`, `number`, `boolean`, `object`, `array`, `null`) — distinct from the capitalized Harper/GraphQL type names (`String`, `Int`, `Long`, `Float`, `Boolean`, `Date`, `Bytes`, `BigInt`) that appear on the internal `Class.attributes` Array. Harper recognizes both vocabularies: it maps the GraphQL names to their JSON Schema equivalents and passes lowercase names through unchanged.
+
+A name in neither vocabulary (`'Text'`, `'Object'`, `'Array'`) is where the surfaces diverge — MCP coerces it to `{ type: 'string' }` while OpenAPI emits an untyped `{}`. Use the lowercase JSON Schema names so the two agree.
 
 Fragment keys Harper reads:
 
-| Key                                              | Purpose                                                                                                                      |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `type`                                           | JSON Schema type, or an array of types for a union                                                                           |
-| `description`                                    | Per-property prose; flows to MCP `properties[*].description` and OpenAPI                                                     |
-| `primaryKey`                                     | Marks the identifying property (drives the `id` argument on verb tools and the OpenAPI path parameter)                       |
-| `enum`, `format`, `const`                        | Value constraints; emitted onto both the MCP and OpenAPI property schema                                                     |
-| `items`                                          | Element schema for `type: 'array'` — including arrays of objects                                                             |
-| `properties`, `required`, `additionalProperties` | Nested object shape and its object-level constraints                                                                         |
-| `nullable`                                       | Emitted as-is; also inferred when `type` is a union containing `'null'`                                                      |
-| `hidden`                                         | Suppresses this property from MCP and OpenAPI (see [`static hidden`](#static-hidden-boolean) for the whole-class equivalent) |
-| `assignCreatedTime`, `assignUpdatedTime`         | Marks a Harper-assigned timestamp: dropped from write-verb input schemas, and always present on output                       |
+| Key                                              | Purpose                                                                                                                                                   |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`                                           | JSON Schema type, or an array of types for a union                                                                                                        |
+| `description`                                    | Per-property prose; flows to MCP `properties[*].description` and OpenAPI                                                                                  |
+| `primaryKey`                                     | Marks the identifying property. Types and describes the `id` argument on `get_*` / `update_*` / `delete_*` — see the caveat below                         |
+| `enum`, `format`, `const`                        | Value constraints. Emitted on both surfaces for a top-level property; inside a nested object or an array's `items`, MCP keeps them and OpenAPI drops them |
+| `items`                                          | Element schema for `type: 'array'` — including arrays of objects                                                                                          |
+| `properties`, `required`, `additionalProperties` | Nested object shape and its object-level constraints                                                                                                      |
+| `nullable`                                       | Marks the property nullable; also inferred when `type` is a union containing `'null'`. See the note below on how each surface emits it                    |
+| `hidden`                                         | Suppresses a **top-level** property from MCP and OpenAPI (see [`static hidden`](#static-hidden-boolean) for the whole-class equivalent)                   |
+| `assignCreatedTime`, `assignUpdatedTime`         | Marks a Harper-assigned timestamp: dropped from the MCP write-verb input schemas and marked `required` on the `get_*` output schema                       |
 
 Notes on how a few of these resolve:
 
-- A **union type** folds a `'null'` member into `nullable` and keeps the remaining type: `type: ['string', 'null']` emits `{ type: 'string', nullable: true }`. A union of two non-null types isn't expressible on the attribute form, so the first member wins — prefer a single type where you can.
+- **Nullability is emitted differently per surface.** A `'null'` member in a union folds into the same internal flag `nullable: true` sets. MCP then re-expands it — `type: ['string', 'null']` emits `{ "type": ["string", "null"] }`, never a `nullable` keyword. OpenAPI 3.0.3 emits `{ "type": "string" }` for a top-level property (the flag isn't represented there) and `{ "type": "string", "nullable": true }` for a property inside a nested object. A union of two non-null types isn't expressible on the attribute form, so the first member wins — prefer a single type where you can.
 - `{ type: 'array' }` with no `items` is valid and means "array of anything"; it emits a bare array schema rather than guessing an element type.
-- `enum` / `format` / `const` are surfaced for properties you declare here. They are deliberately **not** emitted from a table's derived properties, where the GraphQL/code-first schema is the source of truth.
+- `hidden` and `assignCreatedTime` / `assignUpdatedTime` are honored only at the top level, and the timestamp keys only by MCP — OpenAPI request bodies reference one shared component schema per resource, so a Harper-assigned property still appears there.
 - **Optional properties need `nullable: true`.** On the `create_*` input schema every visible property is `required` unless it is the primary key or is marked nullable — the same rule GraphQL's `String` vs `String!` expresses. Mark genuinely optional properties `nullable: true` (or give `type` a `'null'` member) or an MCP client will believe it must supply them.
+- **Declare `static primaryKey` as well.** `primaryKey: true` on a fragment is what MCP's `id` argument is typed and described from, but the OpenAPI path parameter and the verb-tool description sentence read the class-level `static primaryKey`, which defaults to `'id'`. Without it you get `/OrderSummary/{id}` and "…record by id" even though the record is keyed by `orderId`.
 
 ```typescript
 export class OrderSummary extends Resource {
 	static description = 'Rolled-up order totals with line items, computed per customer order.';
+	static primaryKey = 'orderId';
 
 	static properties = {
 		orderId: { type: 'string', primaryKey: true, description: 'Order identifier (ULID).' },

@@ -73,7 +73,7 @@ Returns records matching `name=Harper`. See [Querying](./querying.md) for the fu
 GET /MyTable/123.propertyName
 ```
 
-Returns a single property of a record. Only works for declared properties — a table's schema attributes, or a programmatic Resource's [`static properties`](../resources/resource-api.md#static-properties-recordstring-jsonschemafragment) <VersionBadge type="changed" version="v5.2.0" />. An undeclared name is treated as part of the record id instead.
+Returns a single property of a record. Only works for declared properties — a table's schema attributes, or a programmatic Resource's [`static properties`](../resources/resource-api.md#static-properties-recordstring-jsonschemafragment) <VersionBadge type="changed" version="v5.2.0" />. An undeclared name is treated as part of the record id instead. The suffixes `.json`, `.cbor`, `.msgpack`, and `.csv` are reserved as content-type selectors and take precedence, so a property with one of those names is not reachable this way.
 
 #### Conditional Requests and Caching
 
