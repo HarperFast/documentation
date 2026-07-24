@@ -82,19 +82,26 @@ server.http(
 
 ### Host-based routing
 
-To route by hostname instead of path—serving `listings.example.com` and `admin.example.com` from the same instance—branch on the `host` property of the request inside a middleware handler:
+To route by hostname—serving `listings.example.com` and `admin.example.com` from the same instance—declare `host` in the application's `config.yaml`, the same way you declare `urlPath`:
 
-```js
-server.http(
-	(request, next) => {
-		if (request.host === 'admin.example.com') return handleAdmin(request);
-		return next(request);
-	},
-	{ runFirst: true }
-);
+```yaml
+# admin-dashboard/config.yaml
+host: admin.example.com
+fastifyRoutes:
+  files: 'routes/*.js'
 ```
 
-When serving multiple domains over HTTPS, configure a certificate per domain with [SNI](/reference/v5/http/tls#multi-domain-certificates-sni): define `tls` as an array with a `host` entry for each domain. SNI selects the certificate; the middleware handler selects the application.
+Harper's scoped `server` API automatically carries that `host` into every `server.http()`, `server.ws()`, and `server.upgrade()` call the application makes, so its entire middleware chain runs only for requests to that host—no manual branching required. This is the primary way to host multiple domains on one instance, and it composes with `urlPath`: a component can scope by host, by path, or both, and Harper matches the most specific chain first (host and path together, then host alone, then path alone).
+
+The declarative `host` config is equivalent to passing `host` directly to [`server.http()`](/reference/v5/http/api#serverhttplistener-options):
+
+```js
+server.http(handleAdmin, { host: 'admin.example.com' });
+```
+
+Reach for that direct form, or for branching on `request.host` inside a handler, only when the routing decision needs logic beyond a fixed host—for example, resolving the target host at runtime instead of at deploy time.
+
+When serving multiple domains over HTTPS, configure a certificate per domain with [SNI](/reference/v5/http/tls#multi-domain-certificates-sni): define `tls` as an array with a `host` entry for each domain. SNI selects the certificate; `host` selects the application's middleware chain—the two are independent.
 
 ## Isolating data
 
