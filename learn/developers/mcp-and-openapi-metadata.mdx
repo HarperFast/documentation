@@ -116,8 +116,6 @@ For `search_Product`, the `conditions[].attribute` field becomes a closed `enum`
 
 ## Path B: Programmatic Resources via class-level statics
 
-<VersionBadge type="changed" version="v5.2.0" />
-
 For Resources without `@table @export` backing — Resource subclasses that override `get`/`post`/`put`/`delete` directly, or that aggregate across multiple tables — there's no GraphQL schema to derive from. Declare the same metadata directly on the class as JSON-Schema-shaped statics. The MCP and OpenAPI layers read both surfaces uniformly.
 
 ```typescript
@@ -127,6 +125,10 @@ export class ProductInventory extends Resource {
 	static description =
 		'Aggregate inventory analytics computed over the Product catalog. ' +
 		'Read-only; the underlying Product table is the system of record.';
+
+	// The fragment flag below types MCP's `id` argument; this class static is what the
+	// OpenAPI path parameter and the tool-description sentence read. Declare both.
+	static primaryKey = 'sku';
 
 	static properties = {
 		sku: { type: 'string', primaryKey: true, description: 'Stock keeping unit; matches Product.sku.' },
@@ -148,7 +150,8 @@ export class ProductInventory extends Resource {
 }
 ```
 
-MCP `tools/list` returns the same shape a table-backed Resource produces — types, per-property descriptions, and the `enum` — instead of an empty property set:
+<VersionBadge type="changed" version="v5.2.0" /> — MCP `tools/list` returns the same shape a table-backed Resource
+produces — types, per-property descriptions, and the `enum` — instead of an empty property set:
 
 ```json
 {
@@ -187,16 +190,7 @@ MCP `tools/list` returns the same shape a table-backed Resource produces — typ
 
 `/openapi.json` picks up the same properties. Two things this does _not_ reach: `harper://schema/{db}/{table}` is keyed by database and table name, so a Resource with no backing table never appears there; and only `get_*` carries a record-shaped `outputSchema` — `search_*` has none, and the write verbs advertise fixed `{ id }` / `{ ok }` / `{ deleted }` envelopes.
 
-The `"record by sku"` phrasing above and the OpenAPI path parameter both come from the class-level `static primaryKey`, not from the fragment's `primaryKey: true`. Declare both:
-
-```typescript
-export class ProductInventory extends Resource {
-	static primaryKey = 'sku';
-	static properties = { sku: { type: 'string', primaryKey: true /* ... */ } };
-}
-```
-
-Without `static primaryKey` you get `/ProductInventory/{id}` and "…record by id" while MCP's `id` argument still describes itself as the `sku`.
+The `"record by sku"` phrasing above and the OpenAPI path parameter both come from that `static primaryKey`, not from the fragment's `primaryKey: true`. Omit it and you get `/ProductInventory/{id}` and "…record by id" while MCP's `id` argument still describes itself as the `sku`.
 
 ### Watch the vocabulary: lowercase JSON Schema, not GraphQL
 

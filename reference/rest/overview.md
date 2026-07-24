@@ -47,7 +47,7 @@ The REST interface follows a consistent URL structure:
 | `/my-resource/record-id/`                    | Trailing slash — the collection of records with the given id prefix                               |
 | `/my-resource/record-id/with/multiple/parts` | Record id with multiple path segments                                                             |
 
-<VersionBadge type="changed" version="v4.5.0" /> — Resources can be defined with nested paths and accessed by exact path without a trailing slash. The `id.property` dot syntax for accessing properties via URL is only applied to properties declared in a schema.
+<VersionBadge type="changed" version="v4.5.0" /> — Resources can be defined with nested paths and accessed by exact path without a trailing slash. The `id.property` dot syntax for accessing properties via URL is only applied to declared properties (see [below](#get)).
 
 ## HTTP Methods
 
