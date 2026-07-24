@@ -514,6 +514,8 @@ export class ProductInventory extends Resource {
 
 ### `static properties?: Record<string, JsonSchemaFragment>`
 
+<VersionBadge type="changed" version="v5.2.0" />
+
 JSON-Schema-shaped attribute map keyed by name. This is the canonical public API for class-level metadata. For `@table @export` Resources it's auto-derived from the GraphQL schema. For programmatic Resources, declare it directly:
 
 ```typescript
@@ -536,7 +538,73 @@ export class ProductInventory extends Resource {
 }
 ```
 
-For complex types and nested structures, JSON Schema vocabulary applies (`type`, `enum`, `required`, `additionalProperties`, etc.). Per-property `description` flows into both MCP `inputSchema.properties[*].description` and OpenAPI `components.schemas[*].properties[*].description`.
+As of v5.2.0, a Resource that declares `static properties` with no table backing gets the same rich schemas a table-backed Resource gets, on all three introspection surfaces:
+
+- **MCP verb tools** — `inputSchema` and `outputSchema` on `get_*` / `search_*` / `create_*` / `update_*` / `patch_*` / `delete_*`
+- **OpenAPI** — the resource's `components.schemas` entry and its per-path query parameters
+- **`harper://schema/{db}/{table}`** — the MCP schema-introspection resource
+
+Before v5.2.0 these surfaces read only the internal `attributes` Array, so a bare `static properties` declaration produced a skeletal `{ type: 'object' }` schema.
+
+#### JSON Schema vocabulary
+
+`static properties` speaks JSON Schema, not GraphQL. Types are **lowercase** (`string`, `integer`, `number`, `boolean`, `object`, `array`, `null`) — distinct from the capitalized Harper/GraphQL type names (`String`, `Int`, `Long`, `Float`, `Boolean`, `Date`, `Bytes`, `BigInt`) that appear on the internal `Class.attributes` Array. Harper maps the GraphQL names to their JSON Schema equivalents when projecting a table-backed schema, and passes lowercase names through unchanged.
+
+Fragment keys Harper reads:
+
+| Key                                              | Purpose                                                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `type`                                           | JSON Schema type, or an array of types for a union                                                                           |
+| `description`                                    | Per-property prose; flows to MCP `properties[*].description` and OpenAPI                                                     |
+| `primaryKey`                                     | Marks the identifying property (drives the `id` argument on verb tools and the OpenAPI path parameter)                       |
+| `enum`, `format`, `const`                        | Value constraints; emitted onto both the MCP and OpenAPI property schema                                                     |
+| `items`                                          | Element schema for `type: 'array'` — including arrays of objects                                                             |
+| `properties`, `required`, `additionalProperties` | Nested object shape and its object-level constraints                                                                         |
+| `nullable`                                       | Emitted as-is; also inferred when `type` is a union containing `'null'`                                                      |
+| `hidden`                                         | Suppresses this property from MCP and OpenAPI (see [`static hidden`](#static-hidden-boolean) for the whole-class equivalent) |
+| `assignCreatedTime`, `assignUpdatedTime`         | Marks a Harper-assigned timestamp: dropped from write-verb input schemas, and always present on output                       |
+
+Notes on how a few of these resolve:
+
+- A **union type** folds a `'null'` member into `nullable` and keeps the remaining type: `type: ['string', 'null']` emits `{ type: 'string', nullable: true }`. A union of two non-null types isn't expressible on the attribute form, so the first member wins — prefer a single type where you can.
+- `{ type: 'array' }` with no `items` is valid and means "array of anything"; it emits a bare array schema rather than guessing an element type.
+- `enum` / `format` / `const` are surfaced for properties you declare here. They are deliberately **not** emitted from a table's derived properties, where the GraphQL/code-first schema is the source of truth.
+- **Optional properties need `nullable: true`.** On the `create_*` input schema every visible property is `required` unless it is the primary key or is marked nullable — the same rule GraphQL's `String` vs `String!` expresses. Mark genuinely optional properties `nullable: true` (or give `type` a `'null'` member) or an MCP client will believe it must supply them.
+
+```typescript
+export class OrderSummary extends Resource {
+	static description = 'Rolled-up order totals with line items, computed per customer order.';
+
+	static properties = {
+		orderId: { type: 'string', primaryKey: true, description: 'Order identifier (ULID).' },
+		placedAt: { type: 'string', format: 'date-time', description: 'ISO 8601 timestamp the order was placed.' },
+		status: {
+			type: 'string',
+			enum: ['pending', 'shipped', 'delivered', 'cancelled'],
+			description: 'Fulfillment state.',
+		},
+		note: { type: ['string', 'null'], description: 'Free-text note; null when the customer left none.' },
+		lineItems: {
+			type: 'array',
+			description: 'One entry per SKU on the order.',
+			items: {
+				type: 'object',
+				properties: {
+					sku: { type: 'string', description: 'Stock keeping unit.' },
+					quantity: { type: 'integer', description: 'Units ordered.' },
+					unitPriceCents: { type: 'integer', description: 'Price per unit in cents (USD).' },
+				},
+				required: ['sku', 'quantity'],
+				additionalProperties: false,
+			},
+		},
+	};
+
+	async get(id) {
+		/* ... */
+	}
+}
+```
 
 **Inheritance composes naturally.** Extend a `@table @export` Resource and override individual entries with spread:
 

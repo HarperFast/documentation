@@ -116,6 +116,8 @@ For `search_Product`, the `conditions[].attribute` field becomes a closed `enum`
 
 ## Path B: Programmatic Resources via class-level statics
 
+<VersionBadge type="changed" version="v5.2.0" />
+
 For Resources without `@table @export` backing — Resource subclasses that override `get`/`post`/`put`/`delete` directly, or that aggregate across multiple tables — there's no GraphQL schema to derive from. Declare the same metadata directly on the class as JSON-Schema-shaped statics. The MCP and OpenAPI layers read both surfaces uniformly.
 
 ```typescript
@@ -145,6 +147,53 @@ export class ProductInventory extends Resource {
 	}
 }
 ```
+
+MCP `tools/list` returns the same shape a table-backed Resource produces — types, per-property descriptions, and the `enum` — rather than an untyped `{ "type": "object" }`:
+
+```json
+{
+	"name": "get_ProductInventory",
+	"description": "Aggregate inventory analytics computed over the Product catalog. Read-only; the underlying Product table is the system of record.\n\nFetches a single ProductInventory record by sku. Runtime RBAC (allowGet) enforces per-record access at call time.",
+	"inputSchema": {
+		"type": "object",
+		"properties": {
+			"id": { "type": "string", "description": "Stock keeping unit; matches Product.sku." },
+			"get_attributes": { "type": "array", "items": { "type": "string" } }
+		},
+		"required": ["id"]
+	},
+	"outputSchema": {
+		"type": "object",
+		"properties": {
+			"sku": { "type": "string", "description": "Stock keeping unit; matches Product.sku." },
+			"onHand": { "type": "integer", "description": "Current warehouse count." },
+			"reserved": { "type": "integer", "description": "Units allocated to open orders but not yet shipped." },
+			"stockStatus": {
+				"type": "string",
+				"enum": ["in_stock", "out_of_stock", "backorder"],
+				"description": "Derived from onHand vs reserved."
+			}
+		}
+	},
+	"annotations": { "readOnlyHint": true }
+}
+```
+
+`/openapi.json` picks up the same properties, and the `harper://schema` MCP resource reports them for introspection.
+
+### Watch the vocabulary: lowercase JSON Schema, not GraphQL
+
+`static properties` is JSON Schema. Types are lowercase — `string`, `integer`, `number`, `boolean`, `object`, `array`, `null` — not the capitalized GraphQL names (`String`, `Int`, `Long`) you write in a `.graphql` schema. Writing `type: 'String'` in a `static properties` fragment is the most common mistake here; Harper can't map it and the property degrades to an untyped entry.
+
+Beyond `type` and `description`, the fragments carry `enum` / `format` / `const` for value constraints, `items` for arrays (including arrays of objects), and `properties` / `required` / `additionalProperties` for nested objects. See the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) for the full key list and how unions and item-less arrays resolve.
+
+### Authoring rubric, Path B edition
+
+- **Describe every property.** The rubric from Path A applies verbatim — meaning over type, units and formats spelled out, short.
+- **Use `enum` wherever the value set is closed.** It's the single highest-leverage hint for an LLM: it turns "pass a status string" into "pass one of these four."
+- **Add `format`** (`date-time`, `uuid`, `email`, ...) where it applies. It reaches Swagger UI and gives the LLM a concrete shape to emit.
+- **Declare a `primaryKey` property.** It's what the `get_*` / `delete_*` tools bind their `id` argument to and what the OpenAPI path parameter is derived from.
+- **Reach for `static outputSchemas`** when a verb returns a projection rather than the full record — otherwise the output schema mirrors `static properties`.
 
 See the [Resource API reference](/reference/v5/resources/resource-api#class-level-metadata-for-mcp-and-openapi) for the full surface, including `static outputSchemas` for per-verb projection overrides, `static hidden` for full suppression, and `static mcp` for narrow MCP-only annotation overrides.
 
@@ -196,7 +245,9 @@ For OpenAPI, the document is global and not per-user filtered. Use `@hidden` (or
 
 ## Verifying the end-to-end flow
 
-1. Add `"""docstrings"""` to a `@table @export` type and save your component.
+1. Add `"""docstrings"""` to a `@table @export` type — or `static description` + `static properties` to a programmatic Resource — and save your component.
 2. Hit MCP `tools/list` for the application profile — confirm `get_*`, `search_*`, etc. descriptions include the type docstring and per-attribute descriptions are present in the `inputSchema` and `outputSchema`.
 3. Hit `/openapi.json` on the application HTTP port — confirm the path-level descriptions and per-property descriptions show up in Swagger UI / Redoc.
 4. Add `@hidden` to an attribute — confirm it disappears from both surfaces while remaining queryable via direct REST/SQL.
+
+For a programmatic Resource, an untyped `{ "type": "object" }` in step 2 usually means the fragments never resolved — check that the types are lowercase JSON Schema names and that `static properties` is a `Record` keyed by property name, not an array.
