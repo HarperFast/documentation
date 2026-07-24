@@ -506,7 +506,7 @@ export class ProductInventory extends Resource {
 		'Aggregate inventory analytics computed over the Product catalog. ' +
 		'Read-only; the underlying Product table is the system of record.';
 
-	async get(id) {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -532,7 +532,7 @@ export class ProductInventory extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -607,7 +607,7 @@ export class OrderSummary extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -654,7 +654,7 @@ export class ProductInventory extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* returns the projection above */
 	}
 }
@@ -667,7 +667,7 @@ When `true`, the Resource is dropped from MCP tool registration and OpenAPI path
 ```typescript
 export class InternalDiagnostics extends Resource {
 	static hidden = true;
-	async get() {
+	static async get(target) {
 		/* ... */
 	}
 }

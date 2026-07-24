@@ -141,10 +141,10 @@ export class ProductInventory extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* returns { sku, onHand, reserved, stockStatus } */
 	}
-	async search(query) {
+	static async search(query) {
 		/* ... */
 	}
 }
