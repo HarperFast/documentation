@@ -101,7 +101,7 @@ MCP `tools/list` now returns:
 }
 ```
 
-And `/openapi.json` picks up the same data: schema-level `description`, per-property `description`, and prepended path-level descriptions for every verb on `/Product`.
+And `/openapi` picks up the same data: schema-level `description`, per-property `description`, and prepended path-level descriptions for every verb on `/Product`.
 
 ### `search_*` gets typed and described too
 
@@ -188,7 +188,7 @@ produces — types, per-property descriptions, and the `enum` — instead of an 
 }
 ```
 
-`/openapi.json` picks up the same properties. Two things this does _not_ reach: `harper://schema/{db}/{table}` is keyed by database and table name, so a Resource with no backing table never appears there; and only `get_*` carries a record-shaped `outputSchema` — `search_*` has none, and the write verbs advertise fixed `{ id }` / `{ ok }` / `{ deleted }` envelopes.
+`/openapi` picks up the same properties. Two things this does _not_ reach: `harper://schema/{db}/{table}` is keyed by database and table name, so a Resource with no backing table never appears there; and only `get_*` carries a record-shaped `outputSchema` — `search_*` has none, and the write verbs advertise fixed `{ id }` / `{ ok }` / `{ deleted }` envelopes.
 
 The `"record by sku"` phrasing above and the OpenAPI path parameter both come from that `static primaryKey`, not from the fragment's `primaryKey: true`. Omit it and you get `/ProductInventory/{id}` and "…record by id" while MCP's `id` argument still describes itself as the `sku`.
 
@@ -230,7 +230,7 @@ The author writes against the canonical `properties` API. Internal code paths th
 
 ## Hiding sensitive fields with `@hidden`
 
-OpenAPI is typically exposed to anyone reachable on the HTTP port — there's no per-user filtering on `/openapi.json`. A docstring on a sensitive field publishes that text to anyone who can hit the endpoint. The `@hidden` directive suppresses a field (or an entire type) from both MCP and OpenAPI without affecting data access:
+The OpenAPI document is global: there is no per-user filtering on `/openapi`, so every caller who can fetch it sees the same schemas and the same docstrings. Whether an unauthenticated caller can fetch it at all depends on your instance's authentication configuration — a default `prod` install returns `403` without credentials — but treat any field you document as visible to every user who can reach the endpoint, not just those with permission to read it. The `@hidden` directive suppresses a field (or an entire type) from both MCP and OpenAPI without affecting data access:
 
 ```graphql
 type Customer @table @export {
@@ -258,7 +258,7 @@ For OpenAPI, the document is global and not per-user filtered. Use `@hidden` (or
 
 1. Add `"""docstrings"""` to a `@table @export` type — or `static description` + `static properties` to a programmatic Resource — and save your component.
 2. Hit MCP `tools/list` for the application profile — confirm `get_*`, `search_*`, etc. descriptions include the type docstring and per-attribute descriptions are present in the `inputSchema` and `outputSchema`.
-3. Hit `/openapi.json` on the application HTTP port — confirm the path-level descriptions and per-property descriptions show up in Swagger UI / Redoc.
+3. Hit `/openapi` on the application HTTP port — confirm the path-level descriptions and per-property descriptions show up in Swagger UI / Redoc.
 4. Add `@hidden` to an attribute — confirm it disappears from both surfaces while remaining queryable via direct REST/SQL.
 
 Two things to check for a programmatic Resource in step 2. An empty `properties: {}` on the `get_*` output schema means the fragments never resolved — most often because the class also carries a non-empty `attributes` Array, which wins. Properties named `0`, `1`, `2`… mean `static properties` was declared as an array instead of a `Record` keyed by property name. And if the tools don't appear in `tools/list` at all, check whether you're authenticated as a super-user — see the listing-visibility note in the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment).
