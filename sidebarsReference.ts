@@ -325,6 +325,11 @@ const sidebars: SidebarsConfig = {
 					id: 'security/impersonation',
 					label: 'Impersonation',
 				},
+				{
+					type: 'doc',
+					id: 'security/secrets',
+					label: 'Secrets',
+				},
 			],
 		},
 		{
