@@ -192,7 +192,7 @@ jobs:
             restart=true
           echo "Cleaning up preview for PR #${{ github.event.pull_request.number }}"
 
-      - name: Update deployment status and delete environment
+      - name: Update deployment status
         uses: actions/github-script@v8
         with:
           script: |
@@ -216,7 +216,26 @@ jobs:
               });
             }
 
-            // Delete the environment
+            // Add cleanup comment to PR
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## 🧹 Preview Cleanup\n\nThe preview deployment for this PR has been removed.`
+            });
+
+      # Deleting an environment requires repository *administration* permission,
+      # which can never be granted to the workflow's GITHUB_TOKEN (it is not an
+      # available scope in the `permissions:` block). This step therefore uses
+      # PREVIEW_CLEANUP_TOKEN: a fine-grained PAT (or GitHub App token) scoped to
+      # this repository with "Administration: read and write".
+      - name: Delete GitHub environment
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+          script: |
+            const environmentName = `pr-${context.payload.pull_request.number}`;
+
             try {
               await github.rest.repos.deleteAnEnvironment({
                 owner: context.repo.owner,
@@ -225,13 +244,8 @@ jobs:
               });
               console.log(`Deleted environment: ${environmentName}`);
             } catch (error) {
-              console.log(`Could not delete environment ${environmentName}: ${error.message}`);
+              core.warning(
+                `Could not delete environment ${environmentName}: ${error.message}. ` +
+                'Ensure the PREVIEW_CLEANUP_TOKEN secret is set to a token with repository Administration write access.'
+              );
             }
-
-            // Add cleanup comment to PR
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: `## 🧹 Preview Cleanup\n\nThe preview deployment for this PR has been removed.`
-            });
