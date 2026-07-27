@@ -196,7 +196,9 @@ The `"record by sku"` phrasing above and the OpenAPI path parameter both come fr
 
 `static properties` is JSON Schema. Types are lowercase — `string`, `integer`, `number`, `boolean`, `object`, `array`, `null`. Harper also recognizes the capitalized GraphQL names (`String`, `Int`, `Long`) you write in a `.graphql` schema, so those still map correctly. The hazard is a name in neither vocabulary — `'Text'`, `'Object'`, `'Array'` — where MCP quietly coerces to `{ type: 'string' }` and OpenAPI emits an untyped `{}`. Sticking to the lowercase names keeps the two surfaces in agreement.
 
-Beyond `type` and `description`, the fragments carry `enum` / `format` / `const` for value constraints, `items` for arrays (including arrays of objects), and `properties` / `required` / `additionalProperties` for nested objects. Those hints reach both surfaces at the top level; inside a nested object or an array's `items`, MCP keeps them and OpenAPI drops them. See the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) for the full key list and how unions and item-less arrays resolve.
+Beyond `type` and `description`, the fragments carry `enum` / `format` / `const` for value constraints, `items` for arrays (including arrays of objects), and `properties` / `required` / `additionalProperties` for nested objects. Those hints reach both surfaces at the top level; inside a nested object or an array's `items`, MCP keeps them and OpenAPI drops them.
+
+One spelling difference worth knowing: Harper's OpenAPI document declares 3.0.3, which predates JSON Schema's `const` keyword, so a `const` fragment reaches Swagger UI as an equivalent single-value `enum`. Write `const`; expect `enum: [value]` in the OpenAPI output. See the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) for the full key list and how unions and item-less arrays resolve.
 
 ### Authoring rubric, Path B edition
 
