@@ -97,9 +97,9 @@ jobs:
           echo "Contents of $PR_DIR:"
           ls -la "$PR_DIR"
 
-      - name: Install HarperDB CLI
+      - name: Install Harper CLI
         run: |
-          npm install -g harperdb
+          npm install -g harper
 
       - name: Deploy to HarperDB
         env:
@@ -176,9 +176,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'package-lock.json'
 
-      - name: Install HarperDB CLI
+      - name: Install Harper CLI
         run: |
-          npm install -g harperdb
+          npm install -g harper
 
       - name: Remove preview deployment
         env:
