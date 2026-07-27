@@ -226,26 +226,29 @@ jobs:
 
       # Deleting an environment requires repository *administration* permission,
       # which can never be granted to the workflow's GITHUB_TOKEN (it is not an
-      # available scope in the `permissions:` block). This step therefore uses
-      # PREVIEW_CLEANUP_TOKEN: a fine-grained PAT (or GitHub App token) scoped to
-      # this repository with "Administration: read and write".
+      # available scope in the `permissions:` block). These steps mint an
+      # installation token for an org-owned GitHub App that has
+      # "Administration: read and write" on this repository. If the App isn't
+      # configured (no PREVIEW_CLEANUP_APP_ID variable), both steps are skipped.
+      - name: Generate environment-cleanup token
+        id: cleanup-token
+        if: ${{ vars.PREVIEW_CLEANUP_APP_ID != '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PREVIEW_CLEANUP_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_CLEANUP_APP_PRIVATE_KEY }}
+
       - name: Delete GitHub environment
+        if: ${{ vars.PREVIEW_CLEANUP_APP_ID != '' }}
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+          github-token: ${{ steps.cleanup-token.outputs.token }}
           script: |
             const environmentName = `pr-${context.payload.pull_request.number}`;
 
-            try {
-              await github.rest.repos.deleteAnEnvironment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                environment_name: environmentName
-              });
-              console.log(`Deleted environment: ${environmentName}`);
-            } catch (error) {
-              core.warning(
-                `Could not delete environment ${environmentName}: ${error.message}. ` +
-                'Ensure the PREVIEW_CLEANUP_TOKEN secret is set to a token with repository Administration write access.'
-              );
-            }
+            await github.rest.repos.deleteAnEnvironment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              environment_name: environmentName
+            });
+            console.log(`Deleted environment: ${environmentName}`);
