@@ -85,8 +85,8 @@ jobs:
 
           cp -r build docs-site/
 
-      - name: Install HarperDB CLI
-        run: npm install -g harperdb
+      - name: Install Harper CLI
+        run: npm install -g harper
 
       - name: Deploy to Harper Fabric
         env:
