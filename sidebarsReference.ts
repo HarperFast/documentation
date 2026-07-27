@@ -165,6 +165,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'components/scheduler',
+					label: 'Scheduler',
+				},
+				{
+					type: 'doc',
 					id: 'components/nextjs',
 					label: 'Next.js Plugin',
 				},
