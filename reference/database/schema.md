@@ -397,14 +397,14 @@ type Network @table @export {
 
 ### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
 
-Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. Cardinality is determined by the target (`to`) attribute: a scalar `to` attribute gives a many-to-one join (as below), while an array `to` attribute gives a many-to-many join.
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. As with the `to`-only form above, the result type must be an array: Harper resolves it by searching the target table's `to` attribute for matches, using this record's `from` attribute (instead of its primary key) as the search value.
 
 ```graphql
 type OrderItem @table @export {
 	id: Long @primaryKey
 	orderId: Long @indexed
 	productSku: Long @indexed
-	product: Product @relationship(from: productSku, to: sku) # many-to-one join on sku, not primary key
+	products: [Product] @relationship(from: productSku, to: sku) # matches products by sku, not primary key
 }
 
 type Product @table @export {
