@@ -32,6 +32,9 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
   - `table` — table name
   - `subscribe` — if `true`, transactions on the remote table are replicated locally
   - `publish` — if `true`, transactions on the local table are replicated to the remote node
+- `sendsTo` / `receivesFrom` _(optional)_ — database-scoped controlled-flow entries for this node, mirroring the config-route `replicates.sendsTo` / `replicates.receivesFrom` syntax (see [Controlling Replication Flow](./overview.md#controlling-replication-flow)). Each entry is a database name or an object: `{ database, excludeTables? }`. When provided, replication with this node is restricted to the listed databases; to replicate all databases except specific tables, use a wildcard entry (`excludeTables` with no `database`). Mutually exclusive with `subscriptions`.
+
+  > **Note**: `sendsTo` / `receivesFrom` here scope only the connection to _this_ node — they don't change how the local node advertises itself to the rest of the cluster. A node's own directional (non-mesh) `hdb_nodes` self-record is derived solely from its `harper-config.yaml` routes, so replicating `system` without collapsing to a full mesh requires directional routes in config, not just `add_node`/`set_node` scoping (see [Replicating the `system` database with controlled flow](./overview.md#replicating-the-system-database-with-controlled-flow)).
 
 **Request**:
 
