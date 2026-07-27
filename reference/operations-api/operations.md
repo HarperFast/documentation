@@ -699,6 +699,8 @@ Returns the raw tarball for a deployment. Useful for inspecting or re-deploying 
 
 The response is the raw tarball bytes (`Content-Type: application/octet-stream`, with a `Content-Disposition` download filename) - not JSON and not base64-encoded, so payloads of any size stream without inflation. Returns `404` if the deployment does not exist or its payload has already been reclaimed (by payload retention or `delete_deployment_payload`).
 
+Unlike most other `super_user` operations, this check is enforced directly in the handler and cannot be satisfied by granting the operation through a role's `operations` allowlist - only an actual `super_user` role can call it.
+
 ### `delete_deployment_payload`
 
 Removes the tarball blob from a deployment record. The deployment record itself is retained; only the binary payload is deleted. Use this to reclaim storage after confirming a deployment is stable. The deletion replicates, so one call frees the payload's storage on every node in the cluster.
