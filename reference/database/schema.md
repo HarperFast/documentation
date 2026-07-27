@@ -336,7 +336,7 @@ type Session @table {
 }
 ```
 
-The `@expiresAt` field is authoritative over the table-level [`expiration`](#table) default, in both directions — a per-record value may extend a record past, or expire it before, the table default. When a record omits the field, the table default (if any) applies.
+The `@expiresAt` field is authoritative over the table-level [`expiration`](#table) default, in both directions — a per-record value may extend a record's expiration past (since 5.2), or expire it before, the table default. When a record omits the field, the table default (if any) applies.
 
 - The field must be an absolute timestamp (Unix epoch milliseconds), not a duration. Negative values are ignored and fall back to the table default.
 - A full-record `put` that omits the field **clears** it (the record then follows the table default, or never expires if there is none). A `patch` of other fields preserves it — so a session-renewal write must re-include `expiresAt`.
