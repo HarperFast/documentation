@@ -61,6 +61,11 @@ const sidebarsLearn: SidebarsConfig = {
 					id: 'developers/write-through-caching',
 					label: 'Write-Through Caching',
 				},
+				{
+					type: 'doc',
+					id: 'developers/deploying-from-ci',
+					label: 'Deploying from a CI/CD Pipeline',
+				},
 			],
 		},
 		{
