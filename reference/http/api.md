@@ -42,16 +42,16 @@ To continue the middleware chain, call `next(request)`. To short-circuit, return
 
 <VersionBadge version="v5.2.0" /> (`name`, `before`, `after`, `urlPath`, and `host`)
 
-| Property     | Type    | Default                      | Description                                                                                                                   |
-| ------------ | ------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `name`       | string  | Registering component's name | Name this middleware entry so other entries can position themselves relative to it                                            |
-| `before`     | string  | -                            | Run this entry before the named middleware entry                                                                              |
-| `after`      | string  | -                            | Run this entry after the named middleware entry                                                                               |
-| `urlPath`    | string  | -                            | Only handle requests whose pathname matches this prefix. Harper removes the prefix before passing the request to the handler. |
-| `host`       | string  | -                            | Only handle requests whose `Host` header matches this virtual hostname                                                        |
-| `runFirst`   | boolean | `false`                      | Deprecated. Insert this handler at the front of the chain. Use `before` or `after` for explicit ordering.                     |
-| `port`       | number  | `http.port`                  | Target the HTTP server on this port                                                                                           |
-| `securePort` | number  | `http.securePort`            | Target the HTTPS server on this port                                                                                          |
+| Property     | Type    | Default                      | Description                                                                                                                                                                                              |
+| ------------ | ------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | string  | Registering component's name | Name this middleware entry so other entries can position themselves relative to it                                                                                                                       |
+| `before`     | string  | -                            | Run this entry before the named middleware entry                                                                                                                                                         |
+| `after`      | string  | -                            | Run this entry after the named middleware entry                                                                                                                                                          |
+| `urlPath`    | string  | -                            | Only handle requests whose pathname matches this prefix on a segment boundary (`/api` matches `/api` and `/api/x`, not `/apinews`). Harper removes the prefix before passing the request to the handler. |
+| `host`       | string  | -                            | Only handle requests whose `Host` header matches this virtual hostname (case-sensitive, port ignored)                                                                                                    |
+| `runFirst`   | boolean | `false`                      | Deprecated. Insert this handler at the front of the chain. Use `before` or `after` for explicit ordering.                                                                                                |
+| `port`       | number  | `http.port`                  | Target the HTTP server on this port                                                                                                                                                                      |
+| `securePort` | number  | `http.securePort`            | Target the HTTPS server on this port                                                                                                                                                                     |
 
 `host` and `urlPath` create a routed middleware chain. When both are present, both must match. Harper selects the most specific matching chain in this order: host and path, host only, then path only. Longer path prefixes take precedence. A request that matches no routed chain uses the default chain.
 
