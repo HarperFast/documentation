@@ -123,8 +123,6 @@ If the request body includes a nested object, that entire sub-object is **replac
 
 **Example:**
 
-**Example:**
-
 - **Existing record:** `{"settings": {"theme": "light", "notifications": {"email": true}}}`
 - **PATCH request body:** `{"settings": {"theme": "dark"}}`
 - **Resulting record:** `{"settings": {"theme": "dark"}}` (the `notifications` object is lost)
