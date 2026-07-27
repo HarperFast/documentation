@@ -42,12 +42,17 @@ jobs:
 
     steps:
       - name: Checkout PR code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          # checkout v7 blocks fork-PR checkout under pull_request_target by
+          # default. We opt in deliberately: fork PRs are gated behind the
+          # 'preview' environment (see the job's `environment:` above), which
+          # requires manual approval before secrets are exposed.
+          allow-unsafe-pr-checkout: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -66,7 +71,7 @@ jobs:
           npm run build
 
       - name: Upload build artifact for local testing
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pr-${{ github.event.pull_request.number }}-build
           path: build/
@@ -116,7 +121,7 @@ jobs:
       - name: Create deployment
         env:
           HARPER_PREVIEW_TARGET: ${{ secrets.HARPER_PREVIEW_TARGET }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -163,10 +168,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -192,8 +197,8 @@ jobs:
             restart=true
           echo "Cleaning up preview for PR #${{ github.event.pull_request.number }}"
 
-      - name: Update deployment status and delete environment
-        uses: actions/github-script@v8
+      - name: Update deployment status
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -216,18 +221,6 @@ jobs:
               });
             }
 
-            // Delete the environment
-            try {
-              await github.rest.repos.deleteAnEnvironment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                environment_name: environmentName
-              });
-              console.log(`Deleted environment: ${environmentName}`);
-            } catch (error) {
-              console.log(`Could not delete environment ${environmentName}: ${error.message}`);
-            }
-
             // Add cleanup comment to PR
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -235,3 +228,32 @@ jobs:
               issue_number: prNumber,
               body: `## 🧹 Preview Cleanup\n\nThe preview deployment for this PR has been removed.`
             });
+
+      # Deleting an environment requires repository *administration* permission,
+      # which can never be granted to the workflow's GITHUB_TOKEN (it is not an
+      # available scope in the `permissions:` block). These steps mint an
+      # installation token for an org-owned GitHub App that has
+      # "Administration: read and write" on this repository. If the App isn't
+      # configured (no PREVIEW_CLEANUP_APP_ID variable), both steps are skipped.
+      - name: Generate environment-cleanup token
+        id: cleanup-token
+        if: ${{ vars.PREVIEW_CLEANUP_APP_ID != '' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.PREVIEW_CLEANUP_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_CLEANUP_APP_PRIVATE_KEY }}
+
+      - name: Delete GitHub environment
+        if: ${{ vars.PREVIEW_CLEANUP_APP_ID != '' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ steps.cleanup-token.outputs.token }}
+          script: |
+            const environmentName = `pr-${context.payload.pull_request.number}`;
+
+            await github.rest.repos.deleteAnEnvironment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              environment_name: environmentName
+            });
+            console.log(`Deleted environment: ${environmentName}`);
