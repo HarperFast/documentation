@@ -216,7 +216,7 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the change goes on the **middle-tier node's** route to the roadside node, with `receivesFrom: [{ database: system }]` (middle receives `system` from roadside), not on the roadside node's route to middle.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer, and — because a directional route also gates what it's willing to send — both sides normally need a matching entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`, and the **middle-tier** node's route to roadside needs the matching `receivesFrom: [{ database: system }]`. If either side is missing its half, the middle-tier node's subscription request is rejected as unauthorized.
 
 ### Replicating the `system` database with controlled flow
 
@@ -232,6 +232,7 @@ Notes and current limitations:
 - This constrains replication subscriptions only. On-demand residency/retrieval connections (for example, sharded or invalidated-cache reads) use a separate mechanism governed by data residency, not by this registry record, and can still open a direct socket to a non-neighbor node.
 - Central visibility of every node is not guaranteed: an aggregation node may not list every distant leaf in its `hdb_nodes` registry (the registry relay differs from data relay). This does not open a connection either way.
 - Route changes to a node's own directionality take effect on restart.
+- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a role or user created — or a compromised edge node's route table altered — anywhere on the upstream path reaches every node it flows to. Weigh this against your trust boundary for edge nodes before routing `system` upstream from them.
 
 ### Explicit Subscriptions
 
