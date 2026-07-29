@@ -218,7 +218,7 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer, and — because a directional route also gates what it's willing to send — both sides normally need a matching entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`, and the **middle-tier** node's route to roadside needs the matching `receivesFrom: [{ database: system }]`. If either side is missing its half, the middle-tier node's subscription request is rejected as unauthorized.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer, and — because a directional route also gates what it's willing to send — both sides normally need a matching entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`, and the **middle-tier** node's route to roadside needs the matching `receivesFrom: [{ database: system }]`. If the middle tier is missing its `receivesFrom` half, it never attempts the subscription; if roadside is missing its `sendsTo` half, middle's subscription attempt is rejected as unauthorized.
 
 ### Replicating the `system` database with controlled flow
 
