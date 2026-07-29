@@ -84,7 +84,7 @@ Now the internal `Table.get` will automatically use the current transaction, whi
 
 ```javascript
 import { setTimeout as delay } from 'node:timers/promises';
-import { getContext } from 'harper';
+import { getContext, transaction } from 'harper';
 class MyResource {
 	static async get(target) {
 		// this function is still within a transaction, with a consistent snapshot of data that won't change, but we should
