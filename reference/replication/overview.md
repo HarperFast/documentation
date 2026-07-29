@@ -216,7 +216,7 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
-Direction is per hop and per database: to aggregate a database upstream instead of pushing it downstream — for example, so `system` changes made on a leaf node (like a new role) reach a central node — put that `database` under `receivesFrom` on the upstream-facing route instead of `sendsTo`.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the change goes on the **middle-tier node's** route to the roadside node, with `receivesFrom: [{ database: system }]` (middle receives `system` from roadside), not on the roadside node's route to middle.
 
 ### Replicating the `system` database with controlled flow
 
