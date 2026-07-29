@@ -51,6 +51,8 @@ You can also manage nodes dynamically through the [Operations API](./clustering.
 
 Harper automatically replicates node information to other nodes in the cluster using [gossip-style discovery](https://highscalability.com/gossip-protocol-explained/). This means you only need to connect to one existing node in a cluster, and Harper will automatically detect and connect to all other nodes bidirectionally.
 
+This full-mesh, bidirectional auto-connect behavior applies to nodes with no directional routes. A node configured with [directional routes](#controlling-replication-flow) advertises a constrained registry record instead, so discovered non-neighbor nodes do not receive a replication connection — see [Controlling Replication Flow](#controlling-replication-flow).
+
 ### Data Selection
 
 By default, Harper replicates all data in all databases. You can narrow replication to specific databases:
@@ -313,7 +315,7 @@ The following data operations are replicated across the cluster:
 
 **Destructive schema operations are not replicated**: `drop_database`, `drop_table`, and `drop_attribute` must be run on each node independently.
 
-Users and roles are not replicated across the cluster.
+Users and roles are not replicated across the cluster by default. As of v5.2, they do propagate when the `system` database (where `hdb_user` and `hdb_role` live) is included in replication — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow).
 
 Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
 

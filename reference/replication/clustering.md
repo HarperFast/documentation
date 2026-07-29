@@ -15,7 +15,7 @@ All clustering operations require `super_user` role.
 
 ### Add Node
 
-Adds a new Harper instance to the cluster. If `subscriptions` are provided, it creates the specified replication relationships between the nodes. Without `subscriptions`, a fully replicating system is created (all data in all databases).
+Adds a new Harper instance to the cluster. If `subscriptions` or `sendsTo`/`receivesFrom` are provided, they create the specified (or database-scoped) replication relationships between the nodes. Without any of these, a fully replicating system is created (all data in all databases).
 
 **Parameters**:
 
