@@ -218,6 +218,8 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
+Direction is per hop and per database: to aggregate a database upstream instead of pushing it downstream — for example, so `system` changes made on a leaf node (like a new role) reach a central node — put that `database` under `receivesFrom` on the upstream-facing route instead of `sendsTo`.
+
 ### Replicating the `system` database with controlled flow
 
 <VersionBadge type="changed" version="v5.2.0" />
