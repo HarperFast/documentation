@@ -609,6 +609,10 @@ Across a cluster, `deploy_component` runs in two phases so a deploy is all-or-no
 
 If a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on every node, rather than leaving part of the cluster half-updated. The request and response shape are unchanged; the two phases are internal.
 
+:::note
+Deploying a **brand-new** component without a restart (`"restart": false`, or omitting `restart`) marks a restart as required — `get_status` reports `restartRequired: true`, and requests to the new component's routes return an actionable 404 explaining that a restart is needed. A never-loaded component can't serve its routes until Harper restarts, so this makes that state visible instead of silent. Each node reports this for itself, since whether the component was already active can differ per node. Redeploying a component that is **already** live does not set the flag: that component's own file watcher requests a restart only if the update actually needs one.
+:::
+
 Additional parameters:
 
 - `urlPath` — override the HTTP URL path the component is mounted at (e.g. `"/api/v2"`)
@@ -730,20 +734,31 @@ This supports customer-driven rollback: deploy a new version, run your own healt
 
 Harper records every `deploy_component` call in the `system.hdb_deployment` table, capturing the full lifecycle of a deployment including phase transitions (`stage` → `activate` → `restart` → `success`/`failed`, or `prepare` → `replicate` → `restart` on the legacy single-phase path), per-node outcomes, and a bounded event log of install output.
 
-**Staged-build retention.** Deployments staged with `activate: false` leave their built files on disk until they are activated. Harper keeps only the most recent staged builds per component (default 5, configurable via the `deployment_stagingRetention_maxCount` configuration option); older not-yet-activated staged builds are evicted automatically when a new stage lands. Activating a `deployment_id` that has aged out of this window fails with "no staged build found." The `hdb_deployment` records themselves are retained as an audit trail; large payload tarballs are reclaimed automatically after a successful deploy (see `deployment_payloadRetention_maxSize`).
+**Staged-build retention.** Deployments staged with `activate: false` leave their built files on disk until they are activated. Harper keeps only the most recent staged builds per component (default 5, configurable via the `deployment_stagingRetention_maxCount` configuration option); older not-yet-activated staged builds are evicted automatically when a new stage lands. Activating a `deployment_id` that has aged out of this window fails with "no staged build found."
+
+**Payload retention.** The `hdb_deployment` records themselves are always retained as the audit trail — retention only ever reclaims the stored tarball (`payload_blob`), never the row. Two configuration options bound it, and they answer different questions:
+
+| Option                                 | Default | Effect                                                                                                                            |
+| -------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `deployment_payloadRetention_maxSize`  | 10 MiB  | Reclaims **this** deploy's tarball right after it succeeds, if the tarball was larger than this. Bounds any single payload.       |
+| `deployment_payloadRetention_maxCount` | 1       | Keeps at most this many stored tarballs **per project**, newest first, dropping the rest after a successful deploy. Bounds total. |
+
+The default of `maxCount: 1` means only the current version's tarball is kept. It is deliberately conservative: retained payloads share the instance's disk with your own data, so several copies of a large application payload can quietly consume quota. Raise it if you want a wider window of deployments whose payload is still downloadable; set it to `0` to keep none.
+
+Pruning is automatic and best-effort — it never fails a deploy — and is skipped when a peer failed, since the older payloads are still the retry artifact in that case. A deployment whose payload has been reclaimed (automatically, or explicitly via [`delete_deployment_payload`](#delete_deployment_payload)) reports `payload_blob_present: false` and can no longer serve [`get_deployment_payload`](#get_deployment_payload); everything else about the record stays intact.
 
 ### `list_deployments`
 
 Returns a list of deployment records, newest first. All filter parameters are optional.
 
-| Parameter | Type   | Description                                                               |
-| --------- | ------ | ------------------------------------------------------------------------- |
-| `project` | string | Filter to a specific component project                                    |
-| `status`  | string | Filter by status: `pending`, `staged`, `success`, `failed`, `rolled_back` |
-| `since`   | number | Start of time range (Unix timestamp ms)                                   |
-| `until`   | number | End of time range (Unix timestamp ms)                                     |
-| `limit`   | number | Maximum number of results (default: 100)                                  |
-| `offset`  | number | Pagination offset                                                         |
+| Parameter | Type   | Description                              |
+| --------- | ------ | ---------------------------------------- |
+| `project` | string | Filter to a specific component project   |
+| `status`  | string | Filter by status (see below)             |
+| `since`   | number | Start of time range (Unix timestamp ms)  |
+| `until`   | number | End of time range (Unix timestamp ms)    |
+| `limit`   | number | Maximum number of results (default: 100) |
+| `offset`  | number | Pagination offset                        |
 
 ```json
 {
@@ -755,6 +770,11 @@ Returns a list of deployment records, newest first. All filter parameters are op
 ```
 
 Response includes a `deployments` array and a `total` count. The `payload_blob` field is stripped from list responses for size; use `get_deployment_payload` to retrieve the tarball.
+
+Deployment statuses fall into two groups:
+
+- **Terminal** — `success`, `failed`, `rolled_back`, and `staged` (an `activate: false` stage-and-stop resting until it is activated or ages out of the staging-retention window).
+- **In flight** — `pending`, `extracting`, `installing`, `staging`, `loading`, `replicating`, `activating`, `reverting`, `restarting`. These are the phase the deployment is currently in; a record only stays in one of them while the deploy is running.
 
 ### `get_deployment`
 
@@ -826,7 +846,11 @@ The deployment must be in a terminal status (`success`, `failed`, or `rolled_bac
 
 ### `add_ssh_key`
 
-Adds an SSH key (must be ed25519) for authenticating deployments from private repositories.
+Adds an SSH key (must be ed25519) for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
+
+The stored private key is encrypted at rest and only ever crosses the cluster as ciphertext; `list_ssh_keys` and the logs never return key material.
+
+Adding an existing key:
 
 ```json
 {
@@ -837,6 +861,37 @@ Adds an SSH key (must be ed25519) for authenticating deployments from private re
 	"hostname": "github.com"
 }
 ```
+
+#### Server-side key generation (`generate`)
+
+With `generate: true`, Harper mints an ed25519 keypair on the node handling the request and returns only the **public** half. The private key is created inside the cluster and never travels from a client, so it can't be captured in a shell history, CI log, or request body on the way in:
+
+```json
+{
+	"operation": "add_ssh_key",
+	"name": "my-key",
+	"generate": true,
+	"host": "my-key.github.com",
+	"hostname": "github.com"
+}
+```
+
+Response:
+
+```json
+{
+	"message": "Added ssh key: my-key",
+	"public_key": "ssh-ed25519 AAAAC3Nza... harper:my-key"
+}
+```
+
+Register that `public_key` with your git host (e.g. as a GitHub deploy key) to authorize the deploy. The generated key is commented `harper:<name>` so it's identifiable in the host's key list.
+
+`key` and `generate` are mutually exclusive — sending both is rejected. Generation runs `ssh-keygen` on the node; if it isn't available on the PATH the operation fails with an actionable error rather than storing a partial key.
+
+:::note
+`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the sealed private key and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
+:::
 
 ---
 

@@ -237,6 +237,12 @@ harper activate project=my-app deployment_id=a3f8c2d1...
 harper revert project=my-app
 ```
 
+**Mint a deploy key for a private repository** (Harper generates the ed25519 keypair server-side and returns only the public half — register it with your git host):
+
+```bash
+harper add_ssh_key name=my-key generate=true host=my-key.github.com hostname=github.com
+```
+
 :::tip
 For more information on components and applications, see the [Components Reference](../components/overview.md).
 :::
