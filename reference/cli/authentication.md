@@ -71,6 +71,10 @@ The CLI supports loading environment variables from your shell environment (or o
 - `HARPER_CLI_TARGET` (or `CLI_TARGET`) - Sets the default `target` for CLI commands.
 - `HARPER_CLI_USERNAME` (or `CLI_TARGET_USERNAME`) - Harper admin username for the target.
 - `HARPER_CLI_PASSWORD` (or `CLI_TARGET_PASSWORD`) - Harper admin password for the target.
+- `HARPER_CLI_REFRESH_TOKEN` (or `CLI_TARGET_REFRESH_TOKEN`) - Long-lived token the CLI exchanges for an operation token on each run. Available since v5.2.0.
+- `HARPER_CLI_OPERATION_TOKEN` (or `CLI_TARGET_OPERATION_TOKEN`) - Short-lived operation token, if you would rather supply one directly. Available since v5.2.0.
+
+**Prefer tokens over a password in CI.** A refresh token is scoped to authentication, can be revoked without changing the account password, and — unlike `HARPER_CLI_PASSWORD` — cannot be reused to log in interactively. See [Token credentials for CI/CD](#token-credentials-for-cicd) below.
 
 **Example `.env` file**:
 
@@ -128,6 +132,51 @@ export HARPER_CLI_PASSWORD=$SECURE_PASSWORD  # from secret manager
 harper deploy target=https://prod-server.com:9925 replicated=true
 harper restart target=https://prod-server.com:9925 replicated=true
 ```
+
+##### Token credentials for CI/CD
+
+Available since: v5.2.0
+
+Rather than storing an admin password in your CI provider, log in once locally and hand CI a **refresh token**. The CLI mints a fresh, short-lived operation token from it on every run, so the only durable secret CI holds is a revocable token.
+
+`harper login --for-ci` writes the two variables to **stdout** in `.env` format — and nothing else, so it pipes cleanly. Everything a human reads (the banner, prompts, status) goes to stderr:
+
+```bash
+# Set both GitHub Actions secrets in one command — the token is never displayed
+harper login --for-ci | gh secret set --env-file -
+
+# Or copy them to the clipboard to paste in by hand
+harper login --for-ci | pbcopy
+```
+
+The block it emits:
+
+```bash
+HARPER_CLI_TARGET=https://example.com:9925/
+HARPER_CLI_REFRESH_TOKEN=eyJhbGciOi...
+```
+
+Because stdout carries only these lines, the token never appears on screen or in your shell history — which is not true of copying it out of terminal output by hand.
+
+Expose the two values to the deploy step and no other credentials are needed:
+
+```yaml
+- name: Deploy
+  run: harper deploy project=my-app restart=true replicated=true
+  env:
+    HARPER_CLI_TARGET: ${{ secrets.HARPER_CLI_TARGET }}
+    HARPER_CLI_REFRESH_TOKEN: ${{ secrets.HARPER_CLI_REFRESH_TOKEN }}
+```
+
+**Precedence**: an explicitly supplied username (arguments or `HARPER_CLI_USERNAME`/`HARPER_CLI_PASSWORD`) wins; otherwise env-var tokens are used; otherwise the token saved by `harper login`. Env-var tokens deliberately outrank the saved credentials file so a runner that has both behaves predictably. A token refreshed from an env var is held in memory for that invocation only — nothing is written to `~/.harperdb/credentials.json`.
+
+**Lifetimes**: operation tokens expire after `authentication.operationTokenTimeout` (default `1d`) and refresh tokens after `authentication.refreshTokenTimeout` (default `30d`). CI needs re-provisioning when the refresh token expires.
+
+:::warning
+**Each user has only one valid refresh token at a time.** Logging in again as that user issues a new one and invalidates the previous one, so a routine local `harper login` will break a pipeline holding an older token for the same account.
+
+Create a **dedicated CI user** and run `harper login --for-ci` as that user. This also scopes the pipeline's permissions and lets you revoke its access — by logging in again as that user, or by changing its password — without disturbing anyone else.
+:::
 
 #### Method 3: Command Parameters
 

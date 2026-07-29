@@ -155,6 +155,7 @@ harper login <URL>
 **Optional Parameters**:
 
 - `<URL>` - The URL of the Harper instance to log in to.
+- `--for-ci` - Print CI/CD credentials to stdout after logging in. Available since v5.2.0.
 
 **Prompts**:
 
@@ -163,6 +164,20 @@ You'll be asked to type in the following information:
 - `<URL>` - If a URL parameter is not provided, you'll be prompted to enter the URL of the Harper instance to log in to.
 - `<username>` - Harper admin username.
 - `<password>` - Harper admin password.
+
+**`--for-ci`**:
+
+Prints `HARPER_CLI_TARGET` and `HARPER_CLI_REFRESH_TOKEN` to **stdout** in `.env` format — and nothing else, so the output pipes directly into a secret store without the token being displayed. Everything else (banner, prompts, status) goes to stderr:
+
+```bash
+# Set both GitHub Actions secrets in one command
+harper login --for-ci | gh secret set --env-file -
+
+# Or copy them to paste in by hand
+harper login --for-ci | pbcopy
+```
+
+See [Token credentials for CI/CD](authentication.md#token-credentials-for-cicd) for how the CLI consumes these variables, and for why a pipeline should use a dedicated user.
 
 ### `harper logout`
 
