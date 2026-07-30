@@ -130,6 +130,79 @@ Harper generates a `package.json` from component configurations and uses a form 
 
 For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to register keys first.
 
+### Deploying by Reference
+
+Available since: v5.2.0
+
+Omitting `package` uploads a snapshot of your working directory. The result is an anonymous artifact: nothing records _which_ commit it came from, so reproducing it later — or stepping back to a previous release — means finding those exact files again.
+
+Deploying by **reference** sends a pinned git reference instead, and the cluster fetches that exact commit. Redeploying the same reference is an exact redeploy, and rolling back is deploying an older one.
+
+`harper deploy by_ref=true` builds that reference from the local git repository, so you don't assemble the URL yourself:
+
+```sh
+harper deploy by_ref=true restart=true replicated=true
+```
+
+This resolves the repository's `origin` remote and the current commit, then deploys `package=git+https://github.com/<owner>/<repo>.git#<full commit SHA>`.
+
+**Parameters**:
+
+- `by_ref` - Build the package reference from the local repository.
+- `ref` _(optional)_ - Deploy a specific commit, tag, or branch instead of `HEAD`. Implies `by_ref`.
+- `credential` _(optional)_ - Git host whose stored credential authenticates the clone, e.g. `github.com`. Omit for public repositories.
+
+```sh
+# Deploy a specific tag
+harper deploy ref=v1.2.0 restart=true replicated=true
+
+# Roll back by deploying an older commit
+harper deploy ref=9f8c2a1 restart=true replicated=true
+```
+
+**A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved locally and the full commit SHA is what ships. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
+
+**Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns when the working tree is dirty, since uncommitted changes won't be part of the deploy.
+
+#### Private repositories
+
+Pass `credential=<host>` for a private repository. The CLI attaches a `credentials` reference naming a secret that the cluster resolves in memory at clone time, so no token travels in the operation body or lands on disk:
+
+```sh
+harper deploy by_ref=true credential=github.com restart=true replicated=true
+```
+
+Provision that credential once with [`harper deploy setup=true`](#provisioning-a-deploy-credential). See [Private-source deploy credentials](../security/secrets.md#private-source-deploy-credentials) for how the secret is named and resolved, and [`add_ssh_key`](#add_ssh_key) for the SSH-key alternative.
+
+:::note
+Deploying by reference means the **cluster** installs and builds the component from source. If your application needs a build step that can't run on the node, keep shipping the built output as a payload deploy instead.
+:::
+
+### Provisioning a Deploy Credential
+
+Available since: v5.2.0
+
+`harper deploy setup=true` provisions the credential a private deploy needs. It's interactive, and runs once per component and source:
+
+```sh
+harper deploy setup=true
+```
+
+It asks which private source needs a credential (a GitHub repository or an npm registry) and sources a token — from your `gh` CLI session, or one you paste — then:
+
+1. Fetches the cluster's public key with `get_secrets_public_key`.
+2. **Encrypts the token locally** into an `enc:v1:` envelope.
+3. Stores only the ciphertext via `set_secret`, granted to the component.
+4. Prints the `credentials` reference for the deploy to use.
+
+The plaintext never leaves your machine: the operations API, its logs, and replication only ever carry the envelope, and the cluster decrypts it in memory at deploy time. This requires a cluster with secrets custody (Harper Pro / Fabric) — see [Client-side encryption](../security/secrets.md#client-side-encryption-encrypt-before-it-leaves-the-client).
+
+Because the stored token is durable, later deploys — including re-fetching an older reference — reuse it without re-entering anything.
+
+:::note
+Rolling back to the **immediately previous** version needs no credential at all: [`revert_component`](../operations-api/operations.md#revert_component) swaps in the retained previous build without re-fetching from the source.
+:::
+
 ## Dependency Management
 
 Harper uses `npm` and `package.json` for dependency management.
