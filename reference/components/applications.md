@@ -162,7 +162,7 @@ harper deploy ref=9f8c2a1 restart=true replicated=true
 
 **A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved locally and the full commit SHA is what ships. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
 
-**Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns when the working tree is dirty, since uncommitted changes won't be part of the deploy.
+**Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns in both directions: when the working tree is dirty (those changes won't be part of the deploy) and when the commit being deployed isn't on any remote branch (the cluster won't be able to clone it). The second check reads your local remote-tracking refs, so run `git fetch` if you get it for a commit you know you pushed.
 
 #### Private repositories
 
