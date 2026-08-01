@@ -175,8 +175,9 @@ Harper automatically tracks the following metrics for all services. Applications
 | ------------------------- | ------ | -------- | ------ | ---- | ------------------------------------------------------------------- |
 | `transaction-commit-time` |        |          |        | ms   | RocksDB write-commit duration, submit to settle, per commit attempt |
 
-`transaction-commit-time` is recorded on the RocksDB write path only; it is not emitted for
-LMDB-backed databases. Each sample covers one commit attempt, not one logical write transaction — a
+`transaction-commit-time` is recorded on the RocksDB asynchronous commit path only; it is not
+emitted for LMDB-backed databases, and not for the synchronous `commitSync()` path used during
+transaction-log replay. Each sample covers one commit attempt, not one logical write transaction — a
 transient-conflict retry re-issues the commit and records its own sample, so `count` can exceed the
 number of logical writes. A sample is only recorded once an attempt settles, so a commit that is
 still outstanding contributes nothing yet. Raw entries (`hdb_raw_analytics`) carry `mean`,
