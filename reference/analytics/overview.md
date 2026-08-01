@@ -55,10 +55,8 @@ Example raw entry:
 			"metric": "bytes-sent",
 			"path": "search_by_conditions",
 			"type": "operation",
-			"median": 202,
 			"mean": 202,
-			"p95": 202,
-			"p90": 202,
+			"distribution": [202],
 			"count": 1
 		},
 		{
@@ -180,22 +178,27 @@ Harper automatically tracks the following metrics for all services. Applications
 `transaction-commit-time` is recorded on the RocksDB write path only; it is not emitted for
 LMDB-backed databases. Each sample covers one commit attempt, not one logical write transaction — a
 transient-conflict retry re-issues the commit and records its own sample, so `count` can exceed the
-number of logical writes — and a sample is only recorded once an attempt settles, so a commit that is
+number of logical writes. A sample is only recorded once an attempt settles, so a commit that is
 still outstanding contributes nothing yet. Raw entries (`hdb_raw_analytics`) carry `mean`,
 `distribution`, and `count`; percentiles (`median`, `p90`, `p95`, `p99`, `p999`) are only available on
 the per-minute aggregate (`hdb_analytics`) once raw entries are rolled up — query the aggregate table
-for percentile-based alerting. It measures the same clock the storage engine's overload guard uses:
-when a tracked outstanding commit on a thread exceeds `storage.maxTransactionQueueTime` (default
-45s), Harper rejects new write transactions on that thread with `Outstanding write transactions have
-too long of queue, please try again later` (HTTP 503).
+for percentile-based alerting. It shares a timebase with the RocksDB storage engine's overload guard,
+which times only the commit attempt it arms: when a tracked outstanding commit on a thread exceeds
+`storage.maxTransactionQueueTime` (default 45s), Harper rejects new record updates and publishes on
+that thread with `Outstanding write transactions have too long of queue, please try again later`
+(HTTP 503) — deletes and writes applied from a canonical source (e.g. replication or a caching
+source) bypass this check. The guard tracks at most one outstanding commit per thread: a retry
+issued while the prior attempt still holds that slot (a coordinated retry, or an early backoff
+retry) recommits before the slot clears and is never armed, so a wedge there won't trip the 503; a
+later, backoff-delayed retry recommits after the slot clears and is tracked like a fresh attempt.
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and is a useful early warning to shed or throttle write
-load. But because it only records on settle, a wedged commit — the case the overload guard exists to
-catch — can sit outstanding and about to trip the 503 while contributing no sample; don't treat this
-distribution as a leading indicator on its own. Watch the server log for the "Rejecting writes on this
-thread" error the guard emits once it trips, and don't rely solely on percentiles trending toward
-`storage.maxTransactionQueueTime`. Tune the
+load. But the metric shares only a timebase with the guard, not its population: a wedged commit
+contributes no sample until it settles, and an early retry that wedges can go untracked by the guard
+entirely (see above). Don't treat this distribution as a leading indicator on its own — watch the
+server log for the "Rejecting writes on this thread" error the guard emits when it does trip, and
+don't rely solely on percentiles trending toward `storage.maxTransactionQueueTime`. Tune the
 threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
