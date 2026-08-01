@@ -1,0 +1,116 @@
+name: Deploy Docusaurus to Harper Fabric
+
+# Deploys the docs site to the production Harper fabric instance on every
+# commit to main, in parallel with the GitHub Pages deployment (deploy.yaml).
+# Pages remains the canonical deployment until fabric production is validated;
+# once it is, deploy.yaml can be retired and the notify-skills job moved here.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'fabric/**'
+      - 'learn/**'
+      - 'release-notes/**'
+      - 'src/**'
+      - 'static/**'
+      - 'versioned_docs/**'
+      - 'versioned_sidebars/**'
+      - 'docusaurus.config.ts'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'redirects.ts'
+      - 'sidebars*.ts'
+      - 'versions.json'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: fabric-production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and Deploy to Harper Fabric
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No DOCUSAURUS_BASE_URL override: the site is served from the fabric
+      # instance's root path, unlike PR previews which live under /pr-<n>.
+      - name: Build Docusaurus site
+        env:
+          DOCUSAURUS_ROUTE_BASE_PATH: ${{ vars.DOCUSAURUS_ROUTE_BASE_PATH }}
+          DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
+          ALGOLIA_APP_ID: ${{ secrets.ALGOLIA_APP_ID }}
+          ALGOLIA_SEARCH_KEY: ${{ secrets.ALGOLIA_SEARCH_KEY }}
+          ALGOLIA_INDEX_NAME: ${{ secrets.ALGOLIA_INDEX_NAME }}
+          GA4_TRACKING_ID: ${{ secrets.GA4_TRACKING_ID }}
+        run: npm run build
+
+      - name: Upload npm logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-logs
+          path: |
+            ~/.npm/_logs/
+
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p docs-site
+
+          # Serve the built site from the instance root
+          cat > docs-site/config.yaml << 'EOF'
+          static:
+            files: 'build/**'
+            urlPath: '/'
+            extensions: ['html']
+            index: true
+          EOF
+
+          cp -r build docs-site/
+
+      - name: Install Harper CLI
+        run: npm install -g harper
+
+      - name: Deploy to Harper Fabric
+        env:
+          HARPER_PRODUCTION_TARGET: ${{ secrets.HARPER_PRODUCTION_TARGET }}
+          HARPER_PRODUCTION_USERNAME: ${{ secrets.HARPER_PRODUCTION_USERNAME }}
+          HARPER_PRODUCTION_PASSWORD: ${{ secrets.HARPER_PRODUCTION_PASSWORD }}
+        run: |
+          cd docs-site
+          harper deploy \
+            target=${HARPER_PRODUCTION_TARGET}:9925 \
+            username=$HARPER_PRODUCTION_USERNAME \
+            password=$HARPER_PRODUCTION_PASSWORD \
+            project=docs-site \
+            restart=true \
+            replicated=true
+
+      - name: Smoke-test deployment
+        env:
+          HARPER_PRODUCTION_TARGET: ${{ secrets.HARPER_PRODUCTION_TARGET }}
+        run: |
+          # Give the instance a moment to restart, then verify the site root
+          # responds with HTML. --retry-all-errors covers connection refusals
+          # while the restart completes.
+          curl --silent --fail --show-error --location \
+            --retry 10 --retry-delay 6 --retry-all-errors \
+            "$HARPER_PRODUCTION_TARGET/" | grep -qi '<html' \
+            && echo "✓ Site root responding with HTML"

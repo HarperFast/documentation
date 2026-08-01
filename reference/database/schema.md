@@ -324,6 +324,24 @@ type Event @table {
 }
 ```
 
+### `@expiresAt`
+
+Marks a field as the record's absolute expiration time (Unix epoch milliseconds). Once the timestamp is in the past, the record is treated as expired: it is hidden from reads and physically removed by the eviction sweep. Useful for session, token, or per-record cache-entry tables where each record carries its own expiry.
+
+```graphql
+type Session @table {
+	id: ID @primaryKey
+	token: String
+	expiresAt: Long @expiresAt
+}
+```
+
+The `@expiresAt` field is authoritative over the table-level [`expiration`](#table) default, in both directions — a per-record value may extend a record's expiration past (since 5.2), or expire it before, the table default. When a record omits the field, the table default (if any) applies.
+
+- The field must be an absolute timestamp (Unix epoch milliseconds), not a duration. Negative values are ignored and fall back to the table default.
+- A full-record `put` that omits the field **clears** it (the record then follows the table default, or never expires if there is none). A `patch` of other fields preserves it — so a session-renewal write must re-include `expiresAt`.
+- On caching tables (with a [source](../resources/resource-api.md#sourcedfromresource-options)), set the per-record TTL via `context.expiresAt` in the source `get()` rather than an `@expiresAt` field.
+
 ### `@hidden` (Field Directive)
 
 Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table; data is still queryable through other interfaces subject to RBAC. Use this for fields that should not appear in introspectable surfaces.
@@ -397,14 +415,14 @@ type Network @table @export {
 
 ### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
 
-Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. This is useful for many-to-many relationships that join on non-primary-key attributes.
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. As with the `to`-only form above, the result type must be an array: Harper resolves it by searching the target table's `to` attribute for matches, using this record's `from` attribute (instead of its primary key) as the search value.
 
 ```graphql
 type OrderItem @table @export {
 	id: Long @primaryKey
 	orderId: Long @indexed
 	productSku: Long @indexed
-	product: Product @relationship(from: productSku, to: sku) # join on sku, not primary key
+	products: [Product] @relationship(from: productSku, to: sku) # matches products by sku, not primary key
 }
 
 type Product @table @export {
@@ -507,6 +525,74 @@ let results = Document.search({
 });
 ```
 
+<VersionBadge type="changed" version="v5.2.0" /> — Conditions combined with a vector sort are evaluated _during_ graph traversal (predicate-aware search): the search keeps exploring until it has enough _matching_ nearest neighbors, instead of finding the nearest candidates first and then dropping the ones that fail the filter. With a selective filter this is the difference between a full result set and an under-filled one. When a companion condition is very selective, Harper instead computes exact distances over just the records matching that condition, which is both exact and faster than traversing the graph.
+
+### Filtered Vector Search with a Function Predicate
+
+<VersionBadge version="v5.2.0" />
+
+A `vectorFilter` function on the query participates in the traversal the same way, for predicates that are not expressible as conditions:
+
+```javascript
+let results = Document.search(
+	{
+		sort: { attribute: 'textEmbeddings', target: searchVector },
+		vectorFilter: (record) => record.tenantId === context.user.tenantId && record.status === 'published',
+		limit: 10,
+	},
+	context
+);
+```
+
+`vectorFilter` is available from the JavaScript API only (it cannot be expressed in a REST query string). The function receives the candidate record and must return a boolean — `true` to include the record in results, `false` to exclude it (it still routes traversal either way). It must be synchronous, side-effect free, and fast — it can run once per candidate record visited during traversal (verdicts are memoized per query). Records passed to it are frozen.
+
+### Record-Level Access Control (Record-Scoped `allowRead`)
+
+<VersionBadge version="v5.2.0" />
+
+Overriding `allowRead(user, target, context)` on a table resource makes it a **record-scoped** check: during query execution it is evaluated once per record with `this` bound to the record, so row-level logic reads naturally from `this`. For vector queries the check participates in the graph traversal, so a restricted user receives the k nearest records _they are allowed to see_ rather than "nearest k, minus redacted" (which under-fills results and reveals that nearby restricted records exist):
+
+```javascript
+export class Reports extends tables.Reports {
+	allowRead(user, target, context) {
+		// Compose the table/RBAC grant first, so losing the role's read denies (at request entry and
+		// when a live subscription is re-authorized). super.allowRead is safe to call at any scope.
+		if (!super.allowRead(user, target, context)) return false;
+		if (user.role.permission.super_user) return true;
+		// Collection scope — a whole-table subscribe or the subscription re-auth check — has no record
+		// loaded (`this.ownerId` is undefined). Return true to open the connection; rows are filtered
+		// per record during delivery / query execution.
+		if (this.ownerId == null) return true;
+		return this.ownerId === user.id; // per record
+	}
+}
+```
+
+How the one definition applies at each scope (when permission checking is active, e.g. any external request):
+
+- **Collection queries** (REST collection `GET`, `search()`, including vector sorts) — evaluated per record; rows failing the check are filtered out of results. The default (non-overridden) `allowRead` is a table-level RBAC check and continues to run once at request entry with no per-record cost.
+- **Single-record `get(id)`** — evaluated at request entry with the record loaded (attribute reads like `this.ownerId` resolve against the record); a denied record returns a 403.
+- **Subscriptions** (SSE, WebSocket, MQTT) — the entry check grants the connection at subscribe time (evaluated at collection scope — return the base grant to open), then delivery is filtered per event so a subscriber receives only the row-change events for records the check permits. A live subscription is periodically re-authorized by re-running this same `allowRead` against the current user, so revoking the role's read (or, for a connection-level override, its grant) tears the subscription down. Delete tombstones and published message payloads do not carry the full record, so an override keyed on row fields will deny those event types.
+
+Constraints: the check must be synchronous, side-effect free, and fast — it can run once per candidate record visited during traversal (verdicts are memoized per query). `this` is the frozen record during per-record evaluation. A thrown exception denies that record (fail closed). On caching tables the check is enforced against the record actually returned, after any source revalidation.
+
+### Tuning Filtered Traversal
+
+Filtered traversal is bounded by a visit budget of `ef * filterExpansion` nodes (`filterExpansion` defaults to 24). If the budget is exhausted before the result list fills — which happens when the filter matches only a tiny fraction of records — the search returns the matches found so far rather than erroring. Both knobs can be set per query:
+
+```javascript
+let results = Document.search(
+	{
+		sort: { attribute: 'textEmbeddings', target: searchVector, ef: 200, filterExpansion: 40 },
+		vectorFilter: (record) => record.category === 'rare',
+		limit: 10,
+	},
+	context
+);
+```
+
+Raise `filterExpansion` (or `ef`) to trade latency for recall under selective function predicates. Condition-based filters rarely need tuning: very selective conditions are automatically diverted to the exact-scan strategy instead of graph traversal.
+
 ### Filtering by Distance Threshold
 
 To return only records whose distance to a target vector is below a threshold, place `target` directly on the condition (alongside `comparator` and `value`). This returns matches within the threshold without using `sort`:
@@ -565,6 +651,7 @@ let results = Document.search({
 | `mL`                   | computed from `M` | Normalization factor for level generation                                                                                                                |
 | `efConstructionSearch` | auto-scaled       | Max nodes explored during search. When unset, auto-scales with index size (see above); setting it (or `efConstruction`, which seeds it) fixes the budget |
 | `quantization`         | —                 | `"int8"` stores vectors quantized to int8 (added in v5.1.0, see below)                                                                                   |
+| `filterExpansion`      | `24`              | Visit-budget multiplier for filtered (predicate-aware) search: a filtered query visits at most `ef * filterExpansion` nodes (added in v5.2.0, see above) |
 
 Example with custom parameters:
 

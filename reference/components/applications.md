@@ -97,18 +97,24 @@ harper deploy \
   replicated=true
 ```
 
-Or directly via command parameters (not recommended for production):
+### Dedicated Authentication Parameters
+
+<VersionBadge version="v5.2.0" />
+
+For one-off remote commands, dedicated authentication parameters are also available (not recommended for production):
 
 ```sh
 harper deploy \
   project=<name> \
   package=<package> \
-  username=<username> \
-  password=<password> \
+  auth_username=<username> \
+  auth_password=<password> \
   target=<remote> \
   restart=true \
   replicated=true
 ```
+
+Dedicated authentication parameters take precedence over environment variables and saved login tokens. See [CLI Authentication](../cli/authentication.md#authentication-precedence) for the full order and security guidance.
 
 ### Package Sources
 
@@ -213,7 +219,7 @@ Creates a new component project in the component root directory using a template
 - `template` _(optional)_ — Git URL of a template repository. Defaults to `https://github.com/HarperFast/application-template`
 - `install_command` _(optional)_ — Install command. Defaults to `npm install`
 - `install_timeout` _(optional)_ — Install timeout in milliseconds. Defaults to `300000` (5 minutes)
-- `install_allowInstallScripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
+- `install_allow_scripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
 - `replicated` _(optional)_ — Replicate to all cluster nodes
 
 ```json
@@ -235,7 +241,7 @@ Deploys a component using a package reference or a base64-encoded `.tar` payload
 - `replicated` _(optional)_ — Replicate to all cluster nodes
 - `install_command` _(optional)_ — Install command override
 - `install_timeout` _(optional)_ — Install timeout override in milliseconds
-- `install_allowInstallScripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
+- `install_allow_scripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
 
 ```json
 {

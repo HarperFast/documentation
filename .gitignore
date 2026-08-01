@@ -40,3 +40,5 @@ Thumbs.db
 
 # Old site directory (cleanup)
 site/
+
+.claude/

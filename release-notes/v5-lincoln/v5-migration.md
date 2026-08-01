@@ -73,7 +73,7 @@ class MyResource {
 		// this function is within a transaction, with a consistent snapshot of data that won't change, but previous code could
 		// call Table.get without a context, it would not use the current transaction and would instead get the latest data
 		while ((await Table.get(target)).status !== 'ready') {
-			delay(100);
+			await delay(100);
 		}
 		return Table.get(target);
 	}
@@ -84,7 +84,7 @@ Now the internal `Table.get` will automatically use the current transaction, whi
 
 ```javascript
 import { setTimeout as delay } from 'node:timers/promises';
-import { getContext } from 'harper';
+import { getContext, transaction } from 'harper';
 class MyResource {
 	static async get(target) {
 		// this function is still within a transaction, with a consistent snapshot of data that won't change, but we should
@@ -93,7 +93,7 @@ class MyResource {
 		// now we can call Table.get and it will read the latest data.
 		// we could also explicitly start a new transaction here for each get:
 		while ((await transaction(() => Table.get(target))).status !== 'ready') {
-			delay(100);
+			await delay(100);
 		}
 		return Table.get(target);
 	}
