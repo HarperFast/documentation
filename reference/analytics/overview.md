@@ -193,8 +193,9 @@ A rising `p99`/`p999` signals commits are taking longer to drain — from write 
 transactions, or a saturated storage volume — and is a useful early warning to shed or throttle write
 load. But because it only records on settle, a wedged commit — the case the overload guard exists to
 catch — can sit outstanding and about to trip the 503 while contributing no sample; don't treat this
-distribution as a leading indicator on its own, pair it with queue-depth or stuck-commit observability
-before alerting solely on percentiles trending toward `storage.maxTransactionQueueTime`. Tune the
+distribution as a leading indicator on its own. Watch the server log for the "Rejecting writes on this
+thread" error the guard emits once it trips, and don't rely solely on percentiles trending toward
+`storage.maxTransactionQueueTime`. Tune the
 threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
