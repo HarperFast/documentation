@@ -171,9 +171,9 @@ Harper automatically tracks the following metrics for all services. Applications
 
 ### Storage Metrics
 
-| `metric`                  | `path` | `method` | `type` | Unit | Description                                                       |
-| ------------------------- | ------ | -------- | ------ | ---- | ----------------------------------------------------------------- |
-| `transaction-commit-time` |        |          |        | ms   | Time a write transaction is outstanding (submit → durable commit) |
+| `metric`                  | `path` | `method` | `type` | Unit | Description                                                                   |
+| ------------------------- | ------ | -------- | ------ | ---- | ----------------------------------------------------------------------------- |
+| `transaction-commit-time` |        |          |        | ms   | Time a write transaction is outstanding (submit → settle, success or failure) |
 
 `transaction-commit-time` is recorded as a distribution (`mean`, `median`, `p90`, `p95`, `p99`,
 `p999`, `count`) per write commit. It measures the same interval the storage engine's overload guard
@@ -186,7 +186,7 @@ Because it is measured on that same clock, it is the leading indicator for that 
 saturated storage volume — and is the signal to shed or throttle write load before commits start
 timing out. Unlike an in-flight transaction count, this reflects transaction size and the shared
 write path rather than per-thread submission concurrency, so alert on the upper percentiles trending
-toward `maxTransactionQueueTime`. Tune the threshold against a baseline for your workload.
+toward `storage.maxTransactionQueueTime`. Tune the threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
 
