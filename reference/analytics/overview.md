@@ -173,19 +173,21 @@ Harper automatically tracks the following metrics for all services. Applications
 
 <VersionBadge version="v5.2.0" />
 
-| `metric`                  | `path` | `method` | `type` | Unit | Description                                                        |
-| ------------------------- | ------ | -------- | ------ | ---- | ------------------------------------------------------------------ |
-| `transaction-commit-time` |        |          |        | ms   | RocksDB write-commit duration, submit → settle, per commit attempt |
+| `metric`                  | `path` | `method` | `type` | Unit | Description                                                         |
+| ------------------------- | ------ | -------- | ------ | ---- | ------------------------------------------------------------------- |
+| `transaction-commit-time` |        |          |        | ms   | RocksDB write-commit duration, submit to settle, per commit attempt |
 
-`transaction-commit-time` is recorded as a distribution (`mean`, `median`, `p90`, `p95`, `p99`,
-`p999`, `count`) on the RocksDB write path only; it is not emitted for LMDB-backed databases. Each
-sample covers one commit attempt, not one logical write transaction — a transient-conflict retry
-re-issues the commit and records its own sample, so `count` can exceed the number of logical writes —
-and a sample is only recorded once an attempt settles, so a commit that is still outstanding
-contributes nothing yet. It measures the same clock the storage engine's overload guard uses: when
-the oldest outstanding commit on a thread exceeds `storage.maxTransactionQueueTime` (default 45s),
-Harper rejects new write transactions on that thread with `Outstanding write transactions have too
-long of queue, please try again later` (HTTP 503).
+`transaction-commit-time` is recorded on the RocksDB write path only; it is not emitted for
+LMDB-backed databases. Each sample covers one commit attempt, not one logical write transaction — a
+transient-conflict retry re-issues the commit and records its own sample, so `count` can exceed the
+number of logical writes — and a sample is only recorded once an attempt settles, so a commit that is
+still outstanding contributes nothing yet. Raw entries (`hdb_raw_analytics`) carry `mean`,
+`distribution`, and `count`; percentiles (`median`, `p90`, `p95`, `p99`, `p999`) are only available on
+the per-minute aggregate (`hdb_analytics`) once raw entries are rolled up — query the aggregate table
+for percentile-based alerting. It measures the same clock the storage engine's overload guard uses:
+when a tracked outstanding commit on a thread exceeds `storage.maxTransactionQueueTime` (default
+45s), Harper rejects new write transactions on that thread with `Outstanding write transactions have
+too long of queue, please try again later` (HTTP 503).
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and is a useful early warning to shed or throttle write
