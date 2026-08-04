@@ -27,22 +27,15 @@ Static methods are defined on a Resource class and are the preferred way to inte
 
 ### `static loadAsInstance?: boolean`
 
-> **You do not need this flag when you override static methods — which is the recommended approach.** `loadAsInstance` is a legacy compatibility flag that only affects how Harper's **built-in** dispatch calls a resource's **instance** methods. It does not change the signature or behavior of a static method you define yourself.
+> **New v5 code does not need this flag.** It is a v4-era compatibility flag that selects between two behavioral modes for a resource's **instance** methods. It has no effect on a static method you define yourself.
 >
-> When you override a static verb (`static get`, `static post`, …), your method _replaces_ the built-in dispatch — including the code that reads `loadAsInstance`. Your static method always receives `(target, data)`, so the flag is irrelevant to it. This is the main reason static methods are the recommended shape for custom endpoints: they sidestep the flag entirely.
+> When you override a static verb (`static get`, `static post`, …), your method _replaces_ Harper's built-in dispatch — including the code that reads `loadAsInstance`. Your static method always receives `(target, data)`, so the flag is irrelevant to it. This is a large part of why static methods are the recommended shape for custom endpoints: they sidestep the flag entirely.
 >
-> Where the flag still matters is the legacy pattern of defining REST-mirroring **instance** methods (instance `get`, `put`, `patch`, `post`, `delete`, `publish`, `search`). Harper's built-in static dispatch instantiates the resource and calls those instance methods, and `loadAsInstance` decides how:
+> The flag does still apply in v5 to the legacy pattern of defining REST-mirroring **instance** verbs (instance `get`, `put`, `patch`, `post`, `delete`, `publish`, `search`), where it selects the argument order those methods receive and whether the record is preloaded onto the instance. Because that behavior is live rather than inert, **`static loadAsInstance = false;` cannot simply be deleted** from an existing resource — dropping the line reverses the argument order for those instance methods and will break them. Remove it only as part of converting them to static methods.
 >
-> |                              | `loadAsInstance` unset (default)                               | `loadAsInstance = false`        |
-> | ---------------------------- | -------------------------------------------------------------- | ------------------------------- |
-> | Instance verb arguments      | `(data, target)`                                               | `(target, data)`                |
-> | Record pre-loading           | instance is pre-loaded with the record before your method runs | not pre-loaded; read explicitly |
-> | Instance `get('someString')` | treated as `getProperty('someString')`                         | treated as an id/target read    |
-> | Records passed to your code  | mutable                                                        | frozen                          |
+> The two modes are documented in full in the v4 reference — see [API Versions](../../reference_versioned_docs/version-v4/resources/resource-api.md#api-versions).
 >
-> **This is still live behavior in v5, not a no-op — so removing the line is not automatically safe.** Deleting `static loadAsInstance = false;` from a resource that still defines REST-mirroring instance methods silently flips the argument order and re-enables record pre-loading, which will break those methods. Remove it only as part of converting those instance methods to static methods.
->
-> For new code, prefer static methods and skip the flag. Reserve instance methods for record mutation via `update()` and for `validate()` — see [Resource Instance Methods](#resource-instance-methods).
+> For new code, prefer static methods and omit the flag. Reserve instance methods for record mutation via `update()` and for `validate()` — see [Resource Instance Methods](#resource-instance-methods).
 
 ---
 
@@ -874,7 +867,7 @@ The following instances are also implemented on Resource instances for [backward
 - `create`
 - `subscribe`
 
-How Harper's built-in dispatch passes arguments to these instance methods, and whether the record is pre-loaded first, depends on [`static loadAsInstance`](#static-loadasinstance-boolean). Overriding the equivalent static method avoids that dependency entirely and is preferred for new code.
+The arguments these instance methods receive depend on [`static loadAsInstance`](#static-loadasinstance-boolean). Overriding the equivalent static method avoids that dependency entirely and is preferred for new code.
 
 ## Concurrency and Safe Concurrent Writes
 
