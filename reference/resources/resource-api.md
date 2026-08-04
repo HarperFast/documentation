@@ -27,6 +27,8 @@ Static methods are defined on a Resource class and are the preferred way to inte
 
 ### `static loadAsInstance?: boolean` (deprecated)
 
+<VersionBadge type="changed" version="v5.0.0" />
+
 > **Deprecated — do not set this in v5.** In v4, `static loadAsInstance = false` opted a resource's overridden static methods (`get`, `put`, `patch`, `post`, `delete`) into the "endpoint" behavior documented throughout this section: `target` as the first argument, `data` as a promise, and `getContext()` called as a top-level function rather than `this.getContext()`. **In v5, that behavior is unconditional** — static methods always work this way regardless of whether `loadAsInstance` is set to `true`, `false`, or omitted. Adding `static loadAsInstance = false;` to a new v5 resource has no effect; it's a no-op left over from v4.
 >
 > If you find this flag in an existing resource, or an AI coding agent adds it (older example code, including some still circulating internally, uses this pattern), it's safe to delete. If the surrounding method also uses instance-style access — `this.getId()`, `this.getContext()` — inside a `static` method, convert those to the v5 equivalents: read from the `target` parameter, and call the top-level `getContext()` (imported from `harper`) instead of `this.getContext()`. Reserve actual instance methods for record mutations reached via `update()` — see [Resource Instance Methods](#resource-instance-methods) below.
