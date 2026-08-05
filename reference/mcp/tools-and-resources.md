@@ -72,7 +72,7 @@ The Resource's path is sanitized into a valid tool name: `/` and `.` become `_`.
 
 ### Input schema derivation
 
-Input schemas come from `Table.attributes`:
+Input schemas come from `Table.attributes` — or, for a programmatic Resource that declares no attributes, from its [`static properties`](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) <VersionBadge type="changed" version="v5.2.0" />, whose JSON Schema types pass through unchanged:
 
 - Harper types map to JSON Schema primitive types (`Int`/`Long`/`BigInt` → `integer`, `Float` → `number`, `String`/`ID` → `string`, `Boolean` → `boolean`, `Date` → `[string, number]`, `Bytes`/`Blob` → `string` with `contentEncoding: base64`).
 - Nested `Object` and `Array` attributes recurse into their `properties` / `elements`.
