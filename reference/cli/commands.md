@@ -250,8 +250,8 @@ harper copy-db <source-database> <target-database-path>
 
 **Parameters**:
 
-- `<source-database>` - Name of the source database
-- `<target-database-path>` - Full path to the target database file
+- `<source-database>` - Name of the source database (a name, not a file path)
+- `<target-database-path>` - Full path to the target database file, which must not already exist
 
 **Example**:
 
@@ -260,6 +260,8 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 ```
 
 This copies the default `data` database to a new location with compaction applied.
+
+The database's file-backed blobs are copied to `<target-database-path>-blobs/<rootIndex>/`, since blob files live outside the database file and are addressed by database name. The copy cannot be restored without that directory — see [Database Compaction](../database/compaction.md#file-backed-blobs-travel-separately) for the restore steps. LMDB databases only; RocksDB databases compact themselves.
 
 **Use Cases**:
 

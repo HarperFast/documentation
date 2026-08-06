@@ -27,7 +27,7 @@ Run using the [CLI](../cli/commands.md):
 harper copy-db <source-database> <target-database-path>
 ```
 
-The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written.
+The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written, and it must not already exist — `copy-db` refuses to write into an existing file rather than merging the copy into whatever it holds.
 
 To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped.
 
@@ -36,6 +36,29 @@ To replace the original database with the compacted copy, move or rename the out
 ```bash
 harper copy-db data /home/user/hdb/database/copy.mdb
 ```
+
+Copy compaction applies to LMDB databases. RocksDB databases compact themselves and are skipped.
+
+### File-backed blobs travel separately
+
+A database's file-backed blob values (`Blob` and large `Bytes` attributes) are not stored inside the database file. They live in the configured blob roots — `storage.blobPaths[n]`, or `<rootPath>/blobs/<database>` when `blobPaths` is not configured — and are addressed by **database name**, not by the path of the database file.
+
+`copy-db` therefore writes them alongside the copy:
+
+```
+<target-database-path>-blobs/<rootIndex>/…
+```
+
+`<rootIndex>` is the position of the source root in the database's blob-root list, preserved so a multi-root database restores each root to its original slot. A `README.md` in that directory records the mapping.
+
+**The copy is not restorable without this directory.** To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
+
+```bash
+cp -r /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
+cp -r /home/user/hdb/database/copy.mdb-blobs/0/. /home/user/hdb/blobs/archive/
+```
+
+Restoring the copy under its original database name in the same installation needs only the database file, since the blob roots it already references are untouched.
 
 ## Compact on Start
 
