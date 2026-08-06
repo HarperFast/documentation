@@ -15,7 +15,7 @@ All clustering operations require `super_user` role.
 
 ### Add Node
 
-Adds a new Harper instance to the cluster. If `subscriptions` are provided, it creates the specified replication relationships between the nodes. Without `subscriptions`, a fully replicating system is created (all data in all databases).
+Adds a new Harper instance to the cluster. If `subscriptions` or `sendsTo`/`receivesFrom` are provided, they create the specified (or database-scoped) replication relationships between the nodes. Without any of these, a fully replicating system is created (all data in all databases).
 
 **Parameters**:
 
@@ -32,6 +32,9 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
   - `table` — table name
   - `subscribe` — if `true`, transactions on the remote table are replicated locally
   - `publish` — if `true`, transactions on the local table are replicated to the remote node
+- `sendsTo` / `receivesFrom` _(optional)_ <VersionBadge version="v5.2.0" /> — database-scoped controlled-flow entries for this node (see [Controlling Replication Flow](./overview.md#controlling-replication-flow)). Each entry is an object `{ database?, excludeTables? }`, or (less usefully) a bare string naming a peer, intended to authorize all databases for that peer rather than match a database name. **Only the unscoped object form — `{ database }`, with no `target`/`source` — is reliable today.** Harper's reciprocal `add_node_back` registration to the added peer carries the array over without rewriting each entry's peer reference for the new direction, so a bare string or a `target`/`source` value that's correct for your side of the connection ends up wrong on the peer's copy, and the peer's send-authority check silently rejects the subscription — replication doesn't happen. Use [config routes](./overview.md#controlling-replication-flow) for anything that needs to be scoped to one peer. Unlike a config route's `replicates.sendsTo` / `replicates.receivesFrom`, which describes the _local_ node's own direction, these describe the **added node's** perspective: `sendsTo` lists what the added node sends (what this node receives from it), and `receivesFrom` lists what the added node receives (what this node sends to it). If both `subscriptions` and `sendsTo`/`receivesFrom` are provided, `subscriptions` takes precedence and `sendsTo`/`receivesFrom` are ignored. To replicate all databases while excluding specific tables, use a wildcard entry (`excludeTables` with no `database`).
+
+  > **Note**: Because these entries aren't scoped to one peer, the resulting `hdb_nodes` record for the added node isn't restricted to the connection that created it — any other node that also holds the listed database(s) can match against it too. This also doesn't change how the local node advertises itself to the rest of the cluster: a node's own directional (non-mesh) `hdb_nodes` self-record is derived solely from its `harper-config.yaml` routes, so replicating `system` without collapsing to a full mesh requires directional routes in config, not just `add_node`/`set_node` scoping (see [Replicating the `system` database with controlled flow](./overview.md#replicating-the-system-database-with-controlled-flow)).
 
 **Request**:
 
