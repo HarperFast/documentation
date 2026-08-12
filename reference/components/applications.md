@@ -149,8 +149,8 @@ This resolves the repository's `origin` remote and the current commit, then depl
 **Parameters**:
 
 - `by_ref` - Build the package reference from the local repository.
-- `ref` _(optional)_ - Deploy a specific commit, tag, or branch instead of `HEAD`. Implies `by_ref`.
-- `credential` _(optional)_ - Git host whose stored credential authenticates the clone, e.g. `github.com`. Omit for public repositories.
+- `ref` _(optional)_ - Deploy a specific commit, tag, or branch instead of `HEAD`. Resolved to a commit SHA before it ships. Implies `by_ref`.
+- `credential` _(optional)_ - Set to `true` to authenticate the clone with the stored credential for the repository's host. Omit for public repositories.
 
 ```sh
 # Deploy a specific tag
@@ -160,17 +160,27 @@ harper deploy ref=v1.2.0 restart=true replicated=true
 harper deploy ref=9f8c2a1 restart=true replicated=true
 ```
 
-**A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved locally and the full commit SHA is what ships. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
+**A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved to a full commit SHA before the deploy is sent — from your local checkout when it has the ref, and from the remote when it doesn't (a shallow CI clone usually doesn't). Annotated tags resolve to the commit they point at. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
+
+If a `ref` can't be resolved either way, the deploy stops rather than sending the name for the cluster to resolve. Run `git fetch` and retry, or pass a full commit SHA — that needs no resolution and is always accepted.
 
 **Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns in both directions: when the working tree is dirty (those changes won't be part of the deploy) and when the commit being deployed isn't on any remote branch (the cluster won't be able to clone it). The second check reads your local remote-tracking refs, so run `git fetch` if you get it for a commit you know you pushed.
 
-#### Private repositories
-
-Pass `credential=<host>` for a private repository. The CLI attaches a `credentials` reference naming a secret that the cluster resolves in memory at clone time, so no token travels in the operation body or lands on disk:
+**In GitHub Actions**, `by_ref` deploys the commit the workflow is running on. On a `pull_request` run that is the pull request's **head** commit rather than the merge commit the runner checks out: the merge commit lives under `refs/pull/<n>/merge`, which a plain clone can't fetch, so the cluster would have no way to resolve it. For a pull request from a fork, the head repository is the fork, and the CLI names it before deploying. If the event payload isn't readable, the deploy stops and asks for the commit explicitly:
 
 ```sh
-harper deploy by_ref=true credential=github.com restart=true replicated=true
+harper deploy ref=${{ github.event.pull_request.head.sha }} restart=true replicated=true
 ```
+
+#### Private repositories
+
+Pass `credential=true` for a private repository. The CLI attaches a `credentials` reference naming a secret that the cluster resolves in memory at clone time, so no token travels in the operation body or lands on disk:
+
+```sh
+harper deploy by_ref=true credential=true restart=true replicated=true
+```
+
+The host comes from the package being deployed, so the credential always matches the clone it authenticates. Naming the host explicitly (`credential=github.com`) still works, but one that doesn't match the package's host is rejected instead of deployed — the clone would never ask for it, and the deploy would fail as though no credential were configured.
 
 Provision that credential once with [`harper deploy setup=true`](#provisioning-a-deploy-credential). See [Private-source deploy credentials](../security/secrets.md#private-source-deploy-credentials) for how the secret is named and resolved, and [`add_ssh_key`](#add_ssh_key) for the SSH-key alternative.
 
