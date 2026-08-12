@@ -619,9 +619,11 @@ Additional parameters:
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
 - `activate` — set to `false` to **stage only** and stop before go-live. The build is prepared and verified on every node and the response returns a `deployment_id` in a `staged` state; nothing goes live. Activate it later by calling `deploy_component` again with that `deployment_id` (see below). Useful for pre-staging a release and flipping it live in a separate, fast step.
 - `deployment_id` — activate a previously-staged deployment (from an `activate: false` call). No new payload is fetched or installed; the already-staged build is swapped live cluster-wide. `project` is still required. For a `package` deploy you do not need to repeat `package` here: the identifier and credential references recorded when it was staged are recovered from the deployment and persisted to root config at activation, on every node — so a later restart or a newly joined peer reinstalls the version you activated.
-- `revert_on_failure` — if the activate phase fails on some nodes (leaving the cluster split across versions), automatically swap the nodes that did activate back to their previous version so the cluster reconverges. Off by default. Applies to both a full deploy and a `deployment_id` activate.
 - `ignore_replication_errors` — treat replication/peer failures as non-fatal (best-effort deploy to a partially-available cluster). This also opts out of the stage barrier. Applies to both a full deploy and a `deployment_id` activate.
 - `deployment_timeout` — per-deploy budget (ms) for peers to receive the replicated deployment row; defaults to 120000.
+
+If the activate phase fails on some nodes after others have already gone live, the deploy reports the split nodes and the deployment stays in an `activating` state rather than being rolled back automatically. Recover by rolling forward (stage and activate a known-good version) or by rolling back explicitly with [`revert_component`](#revert_component). There is deliberately no automatic rollback: once a node is past the activation barrier, a peer reporting failure does not prove that peer did not activate — it can complete its swap and then fail, or die before replying — so automatically reverting "the failed nodes" risks rolling an untouched node an extra version back and leaving the cluster split three ways instead of converging it.
+
 - `two_phase` — set to `false` to force the legacy single-phase (in-place) deploy instead of stage-then-activate.
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
 
@@ -719,25 +721,36 @@ Stage now, activate later:
 
 ### `revert_component`
 
-Swaps a component's live version back to its **retained previous version** across the cluster, then restarts. Every `deploy_component` activation retains the version it replaced (one previous version is kept per component), so `revert_component` is a fast rollback that does not re-fetch or re-install. The swap is bidirectional — reverting a revert rolls forward again.
+Puts a component's **retained previous version** back in service across the cluster, then restarts. Every `deploy_component` activation retains the version it replaced, so this is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
 
-This supports customer-driven rollback: deploy a new version, run your own health checks against it, and revert if you are not happy — even when the cluster otherwise looks healthy.
+This is the rollback for the bad release you just shipped: deploy a new version, run your own health checks against it, and put the old one back if you are not happy — even when the cluster otherwise looks healthy.
+
+`to_deployment_id` is **required**, and names the deployment you expect to be live once the call returns:
 
 ```json
 {
 	"operation": "revert_component",
 	"project": "my-app",
+	"to_deployment_id": "a3f8c2d1-...",
 	"restart": "rolling"
 }
 ```
 
-`revert_component` fails with "no previous version is retained" for a component that has only ever been deployed once (nothing to revert to).
+Naming the target is what makes the operation safe to retry. If that version is **already live**, the call succeeds without changing anything — so a client that loses the response and retries cannot flip the rejected release back in. If it matches the retained previous version, the swap happens and the version it displaced becomes the new retained previous, so an explicitly targeted revert of a revert rolls forward again.
 
-:::caution
-Reverting swaps the **live directories** on the nodes currently in the cluster; it does not rewrite the component's stored `package:` reference in `harperdb-config.yaml`. For a `package` deploy that means a revert is not a config-level rollback: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs from the stored package reference at boot, so it comes up on the version you reverted away from rather than the one every other node is running.
+| Parameter                   | Description                                                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `project`                   | **Required.** The component to revert.                                                                                           |
+| `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it. |
+| `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart.                                                             |
+| `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                |
+| `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                             |
 
-To roll back durably for a `package` deploy, deploy the older version explicitly (`deploy_component` with the previous `package` reference) instead of, or after, reverting. `revert_component` is the fast live-instance swap; an explicit deploy is what changes what a future node will install.
-:::
+The response reports `reverted` (`false` when the target was already live), `to_deployment_id`, and `from_deployment_id` — the version taken out of service, which is also recorded as `rollback_of` on the new `hdb_deployment` row for the audit trail.
+
+**Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails for a component that has only ever been deployed once ("no previous version is retained"), and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
+
+Reverting also rewrites the component's stored `package:` reference in `harperdb-config.yaml` and its entry in the boot-time application lock, as part of the same operation. So a revert is a config-level rollback too: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs the version the cluster is actually running, not the one you reverted away from. Reverting away from a `package` deploy to a payload-deployed version removes the package reference entirely, for the same reason.
 
 ### Deployment Operations
 

@@ -200,7 +200,7 @@ The plaintext never leaves your machine: the operations API, its logs, and repli
 Because the stored token is durable, later deploys — including re-fetching an older reference — reuse it without re-entering anything.
 
 :::note
-Rolling back to the **immediately previous** version needs no credential at all: [`revert_component`](../operations-api/operations.md#revert_component) swaps in the retained previous build without re-fetching from the source.
+Rolling back to the **immediately previous** version needs no credential at all: [`revert_component`](../operations-api/operations.md#revert_component) puts the retained previous build back in service without re-fetching from the source, and updates the stored `package:` reference to match so a rebuilt node installs the version the cluster is running. It takes a required `to_deployment_id`, so re-running it is safe.
 :::
 
 ## Dependency Management
