@@ -897,7 +897,7 @@ Response:
 
 Register that `public_key` with your git host (e.g. as a GitHub deploy key) to authorize the deploy. The generated key is commented `harper:<name>` so it's identifiable in the host's key list.
 
-`key` and `generate` are mutually exclusive — sending both is rejected. Generation runs `ssh-keygen` on the node; if it isn't available on the PATH the operation fails with an actionable error rather than storing a partial key.
+`key` and `generate` are mutually exclusive — sending both is rejected. Generation happens in-process, so it requires no `ssh-keygen` binary on the host and the minted private key is never written to a temporary file on its way into storage.
 
 :::note
 `public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the sealed private key and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
