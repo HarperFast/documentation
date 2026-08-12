@@ -92,6 +92,69 @@ harper dev /path/to/app
 - Uses a single thread for simpler debugging
 - Auto-restart on file changes
 
+### `harper deploy`
+
+<VersionBadge version="v4.4.18" />
+
+Package and deploy a Harper component (application). With no `package`, `harper deploy` packages the current working directory into a tarball and deploys it; with `package=<reference>` it deploys from an npm, GitHub, or tarball reference instead of packaging local files. It deploys to the local Harper instance by default, or to a remote instance with `target=<url>`.
+
+`harper deploy` is a shorthand for the [`deploy_component`](../operations-api/operations.md#deploy_component) operation run against the current directory. See that operation for the full server-side behavior (deployment records, credentials, replication semantics); this page covers CLI-specific usage.
+
+**Deploy the current directory to the local instance**:
+
+```bash
+harper deploy
+```
+
+The project name defaults to the current directory's name. Override it with `project=<name>`.
+
+**Deploy a package reference**:
+
+```bash
+harper deploy package=HarperDB/application-template
+```
+
+**Deploy to a remote instance and restart it afterward**:
+
+```bash
+harper deploy target=https://server.com:9925 restart=true
+```
+
+Remote deploys authenticate the same way as any other remote CLI operation (stored login token, `auth_username`/`auth_password`, or environment variables). See [Remote Operations](./overview.md#remote-operations).
+
+#### Live progress
+
+<VersionBadge type="changed" version="v5.1.0" />
+
+Deploys stream live progress: an upload progress bar followed by real-time install output, as the deploy advances through its phases (prepare → load → replicate → restart). Against Harper servers older than 5.1, the CLI automatically falls back to a non-streaming deploy without live progress.
+
+Every deploy is recorded in the `system.hdb_deployment` table and the response includes a `deployment_id` you can use to query the deployment record. See [Deployment Operations](../operations-api/operations.md#deployment-operations).
+
+#### Parameters
+
+All parameters are passed as `key=value` arguments. Every parameter is optional.
+
+- `project=<name>` - Component project name. Defaults to the current directory's name for a directory deploy, or is derived from the package for a package deploy.
+- `package=<reference>` - An npm, GitHub, or tarball reference to deploy instead of the current directory (e.g. `HarperDB/app#semver:v1.0.0`).
+- `target=<url>` - Remote Harper instance to deploy to. Omit to deploy to the local instance. A bare host defaults to `https://<host>:9925`.
+- `restart=true` or `restart=rolling` - Restart Harper after deploying. Use `rolling` for a staggered, zero-downtime restart across a cluster.
+- `replicated=true` - Replicate the deploy to cluster peers.
+- `install_command=<command>` - Override the install command run for the component.
+- `install_timeout=<ms>` - Maximum time, in milliseconds, to allow the install to run.
+- `install_allow_scripts=true` - Allow npm pre/post-install scripts to run (disabled by default).
+- `deployment_timeout=<ms>` - How long, in milliseconds, a peer waits to receive the replicated payload before failing.
+- `ignore_replication_errors=true` - Treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation.
+- `force=true` - Allow deploying over a protected core component name.
+- `urlPath=<path>` - HTTP path the component is mounted at (e.g. `/api/v2`). Requires `package`.
+- `host=<hostname>` - Virtual hostname the component is served on (e.g. `api.example.com`). Requires `package`.
+- `credentials=<json>` - Authentication for installing from a private npm registry or git repository. See [`deploy_component` credentials](../operations-api/operations.md#deploy-credentials-credentials).
+- `json=true` - Print output as JSON instead of the default YAML.
+
+**Packaging options** (directory deploy only):
+
+- `skip_node_modules=false` - Include the `node_modules` directory in the packaged tarball. Excluded by default.
+- `skip_symlinks=true` - Exclude symlinks from the packaged tarball. Included by default; broken (dangling) symlinks are always skipped with a warning.
+
 ### `harper restart`
 
 Available since: v4.1.0
