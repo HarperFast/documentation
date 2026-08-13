@@ -100,7 +100,7 @@ kill -0 $(cat /path/to/hdb/hdb.pid)  # Check if process is running
 | `harper`                           | Run Harper in foreground mode (default behavior)                | v4.1.0          |
 | `harper run <path/to/app>`         | Run Harper application from any directory                       | v4.2.0          |
 | `harper dev <path/to/app>`         | Run Harper in dev mode with auto-restart and console logging    | v4.2.0          |
-| `harper deploy`                    | Package and deploy the current directory or a package reference | v4.4.18         |
+| `harper deploy`                    | Package and deploy the current directory or a package reference | v4.3.0          |
 | `harper restart`                   | Restart Harper                                                  | v4.1.0          |
 | `harper start`                     | Start Harper in background (daemon mode)                        | v4.1.0          |
 | `harper stop`                      | Stop a running Harper instance                                  | v4.1.0          |

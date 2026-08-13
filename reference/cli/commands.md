@@ -94,9 +94,11 @@ harper dev /path/to/app
 
 ### `harper deploy`
 
-<VersionBadge version="v4.4.18" />
+<VersionBadge version="v4.3.0" />
 
 Package and deploy a Harper component (application). With no `package`, `harper deploy` packages the current working directory into a tarball and deploys it; with `package=<reference>` it deploys from an npm, GitHub, or tarball reference instead of packaging local files. It deploys to the local Harper instance by default, or to a remote instance with `target=<url>`.
+
+`deploy` is an alias for the `deploy_component` operation, available through the CLI since v4.3.0. Deploying from a package reference was added in v4.4.18.
 
 `harper deploy` is a shorthand for the [`deploy_component`](../operations-api/operations.md#deploy_component) operation run against the current directory. See that operation for the full server-side behavior (deployment records, credentials, replication semantics); this page covers CLI-specific usage.
 
@@ -120,7 +122,7 @@ harper deploy package=HarperDB/application-template
 harper deploy target=https://server.com:9925 restart=true
 ```
 
-Remote deploys authenticate the same way as any other remote CLI operation (stored login token, `auth_username`/`auth_password`, or environment variables). See [Remote Operations](./overview.md#remote-operations).
+Remote deploys authenticate the same way as any other remote CLI operation (stored login token, `auth_username`/`auth_password` or the legacy `username`/`password`, or environment variables). See [Remote Operations](./overview.md#remote-operations).
 
 #### Live progress
 
@@ -142,13 +144,14 @@ All parameters are passed as `key=value` arguments. Every parameter is optional.
 - `install_command=<command>` - Override the install command run for the component.
 - `install_timeout=<ms>` - Maximum time, in milliseconds, to allow the install to run.
 - `install_allow_scripts=true` - Allow npm pre/post-install scripts to run (disabled by default).
-- `deployment_timeout=<ms>` - How long, in milliseconds, a peer waits to receive the replicated payload before failing.
-- `ignore_replication_errors=true` - Treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation.
+- `deployment_timeout=<ms>` - How long, in milliseconds, a peer waits to receive the replicated payload before failing (default: `120000`). (Added in: v5.2.0)
+- `ignore_replication_errors=true` - Treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. (Added in: v5.2.0)
 - `force=true` - Allow deploying over a protected core component name.
 - `urlPath=<path>` - HTTP path the component is mounted at (e.g. `/api/v2`). Requires `package`.
-- `host=<hostname>` - Virtual hostname the component is served on (e.g. `api.example.com`). Requires `package`.
-- `credentials=<json>` - Authentication for installing from a private npm registry or git repository. See [`deploy_component` credentials](../operations-api/operations.md#deploy-credentials-credentials).
+- `host=<hostname>` - Virtual hostname the component is served on (e.g. `api.example.com`). Requires `package`. (Added in: v5.2.0)
 - `json=true` - Print output as JSON instead of the default YAML.
+
+Deploying from a private npm registry or git repository requires the `deploy_component` operation's `credentials` field (added in v5.2.0), which is an array of credential objects. The CLI's `key=value` arguments [do not support array-of-object parameters](./operations-api-commands.md#object-parameters), so supply `credentials` through the [Operations API](../operations-api/operations.md#deploy-credentials-credentials) over HTTP instead.
 
 **Packaging options** (directory deploy only):
 
