@@ -163,7 +163,7 @@ jobs:
                 return { state: 'failure', description: `${closed.ref} closed without merging` };
               const missing = states.find((s) => s.state === 'missing');
               if (missing)
-                return { state: 'failure', description: `${missing.ref} not found (typo?)` };
+                return { state: 'failure', description: `${missing.ref} not found (typo, or token lacks access?)` };
               const unreadable = states.find((s) => s.state.startsWith('unreadable'));
               if (unreadable)
                 return {
