@@ -7,11 +7,16 @@ const yaml = readFileSync(
 	process.argv[2] || new URL('../.github/workflows/companion-check.yaml', import.meta.url),
 	'utf8'
 );
-const script = yaml
-	.split('\n')
-	.filter((l) => /^ {12}/.test(l) || l.trim() === '')
-	.map((l) => l.slice(12))
-	.join('\n');
+const scriptLines = [];
+let inScript = false;
+for (const line of yaml.split('\n')) {
+	if (!inScript) {
+		if (/^\s*script: \|/.test(line)) inScript = true;
+	} else if (line.trim() === '' || line.startsWith('            ')) {
+		scriptLines.push(line.slice(12));
+	} else break;
+}
+const script = scriptLines.join('\n');
 assert(script.includes('parseDeps'), 'script extraction failed');
 
 const OWN = 'HarperFast/documentation';
@@ -180,6 +185,7 @@ assert.equal(fetched.length, 0, 'secret must not be sent for foreign orgs');
 assert.equal(foreignBySha.mmm.state, 'failure');
 
 // fork PR: secret withheld even for same-org refs
+fetched = [];
 const fork = makeEnv('pull_request_target', [], {
 	number: 732,
 	body: 'Depends-on: HarperFast/harper-pro#512',
@@ -190,6 +196,7 @@ assert.equal(fetched.length, 0, 'secret must not be sent for fork PRs');
 assert.equal(forkBySha.nnn.state, 'failure', 'blocks without leaking; message explains');
 
 // non-fork same-org: secret used; token-confirmed 404 -> failure
+fetched = [];
 const typo = makeEnv('pull_request_target', [], pr(733, 'Depends-on: HarperFast/ghost#1', 'ooo'));
 const typoBySha = await run(typo);
 assert.equal(fetched.length, 1, 'secret used for same-org non-fork refs');
