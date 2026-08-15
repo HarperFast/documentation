@@ -114,13 +114,13 @@ assert.equal(bySha.bbb.state, 'success', 'sweep backfills no-marker PRs');
 assert.equal(bySha.ccc.state, 'success');
 assert.match(bySha.ccc.description, /harper#2000.*documentation#600/);
 assert.equal(bySha.ddd, undefined, 'unchanged status must not repost');
-assert.equal(bySha.eee.state, 'pending');
-assert.match(bySha.eee.description, /Cannot read HarperFast\/harper-pro#512.*404.*TOKEN needed/);
+assert.equal(bySha.eee.state, 'failure', 'definitive 404 without secret blocks as not-found');
+assert.match(bySha.eee.description, /not found or inaccessible/);
 assert.equal(bySha.fff.state, 'success', 'repo#N shorthand resolves in own org');
 assert.equal(bySha.ggg.state, 'failure', 'unparseable marker fails closed');
 assert.match(bySha.ggg.description, /unparseable/i);
 assert.equal(bySha.hhh.state, 'pending', 'HTTP 500 must degrade, not crash');
-assert.match(bySha.hhh.description, /Cannot read HarperFast\/harper#666 \(500\)/);
+assert.match(bySha.hhh.description, /^Cannot read HarperFast\/harper#666 \(500\)$/);
 assert.equal(bySha.iii.state, 'failure', 'dep cap enforced');
 assert.equal(bySha.jjj.state, 'success', 'duplicates deduped');
 assert.match(bySha.jjj.description, /^All companion PRs merged \(HarperFast\/harper#1500\)$/);
@@ -177,7 +177,7 @@ const foreign2 = makeEnv('pull_request_target', [], {
 });
 const foreignBySha = await run(foreign2);
 assert.equal(fetched.length, 0, 'secret must not be sent for foreign orgs');
-assert.equal(foreignBySha.mmm.state, 'pending');
+assert.equal(foreignBySha.mmm.state, 'failure');
 
 // fork PR: secret withheld even for same-org refs
 const fork = makeEnv('pull_request_target', [], {
@@ -187,7 +187,7 @@ const fork = makeEnv('pull_request_target', [], {
 });
 const forkBySha = await run(fork);
 assert.equal(fetched.length, 0, 'secret must not be sent for fork PRs');
-assert.equal(forkBySha.nnn.state, 'pending');
+assert.equal(forkBySha.nnn.state, 'failure', 'blocks without leaking; message explains');
 
 // non-fork same-org: secret used; token-confirmed 404 -> failure
 const typo = makeEnv('pull_request_target', [], pr(733, 'Depends-on: HarperFast/ghost#1', 'ooo'));
