@@ -5,19 +5,23 @@
 #   Depends-on: https://github.com/HarperFast/harper-pro/pull/512
 #
 # The `companion-check` commit status stays pending until every referenced PR
-# is merged, and fails if one closes without merging. With `companion-check`
+# is merged, and fails if one closes without merging (or if a marker is
+# present but unparseable — the gate fails closed). With `companion-check`
 # configured as a required status check, approving a PR and arming auto-merge
 # queues it to merge automatically once its companions land.
 #
 # PRs without a marker get an immediate `success` status, so the required
-# check never blocks ordinary PRs.
+# check never blocks ordinary PRs. The cron sweep only re-evaluates PRs that
+# carry a marker; a full pass over every open PR (e.g. to backfill statuses
+# right after this workflow first lands) is a manual workflow_dispatch run.
 #
 # Referencing a private repo requires a `COMPANION_CHECK_TOKEN` secret with
 # pull-request read access to that repo; public repos work with GITHUB_TOKEN.
+# The secret is only ever used for repos in this repo's own org.
 #
-# `pull_request_target` is safe here: the workflow never checks out or
-# executes PR code, and the PR body is only ever handled as data inside
-# github-script.
+# Maintenance rule for `pull_request_target`: never add a checkout step and
+# never interpolate PR-controlled text into `run:` or expressions — the PR
+# body must only be handled as data inside github-script.
 
 name: Companion Check
 
@@ -35,7 +39,7 @@ permissions:
 
 concurrency:
   group: companion-check-${{ github.event.pull_request.number || 'sweep' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 jobs:
   evaluate:
@@ -48,25 +52,41 @@ jobs:
         with:
           script: |
             const STATUS_CONTEXT = 'companion-check';
+            const MAX_DEPS = 10;
             const { owner, repo } = context.repo;
             const crossToken = process.env.COMPANION_CHECK_TOKEN || '';
+            const isSweep = context.eventName !== 'pull_request_target';
 
             function parseDeps(body) {
               const deps = [];
-              const lineRe = /^\s*depends-on:\s*(.+)$/gim;
+              let unparseable = false;
+              const lineRe = /^[^\S\r\n]*depends[- ]on:[ \t]*(.+)$/gim;
               const refRe =
-                /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)|([\w.-]+)\/([\w.-]+)#(\d+)|(?:^|[\s,])#(\d+)/g;
+                /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)|([\w.-]+)\/([\w.-]+)#(\d+)|([\w.-]+)#(\d+)|(?:^|[\s,])#(\d+)/g;
               for (const [, refs] of (body || '').matchAll(lineRe)) {
+                let matched = 0;
                 for (const m of refs.matchAll(refRe)) {
+                  matched++;
                   if (m[3]) deps.push({ owner: m[1], repo: m[2], number: +m[3] });
                   else if (m[6]) deps.push({ owner: m[4], repo: m[5], number: +m[6] });
-                  else deps.push({ owner, repo, number: +m[7] });
+                  else if (m[8]) deps.push({ owner, repo: m[7], number: +m[8] });
+                  else deps.push({ owner, repo, number: +m[9] });
                 }
+                if (!matched) unparseable = true;
               }
-              return deps;
+              const seen = new Set();
+              const unique = deps.filter((dep) => {
+                const key = `${dep.owner}/${dep.repo}#${dep.number}`.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              return { deps: unique, unparseable };
             }
 
             const refOf = (dep) => `${dep.owner}/${dep.repo}#${dep.number}`;
+            const stateOf = (data) =>
+              data.merged ? 'merged' : data.state === 'open' ? 'open' : 'closed';
 
             async function depState(dep) {
               try {
@@ -75,40 +95,57 @@ jobs:
                   repo: dep.repo,
                   pull_number: dep.number,
                 });
-                return data.merged ? 'merged' : data.state === 'open' ? 'open' : 'closed';
+                return stateOf(data);
               } catch (e) {
-                if (e.status !== 404) throw e;
+                if (e.status !== 404) return `unreadable (${e.status || e.message})`;
               }
-              if (crossToken) {
-                const res = await fetch(
-                  `https://api.github.com/repos/${dep.owner}/${dep.repo}/pulls/${dep.number}`,
-                  {
-                    headers: {
-                      authorization: `Bearer ${crossToken}`,
-                      accept: 'application/vnd.github+json',
-                    },
-                  }
-                );
-                if (res.ok) {
-                  const data = await res.json();
-                  return data.merged ? 'merged' : data.state === 'open' ? 'open' : 'closed';
+              // The secret only accompanies requests for repos in our own org.
+              if (crossToken && dep.owner.toLowerCase() === owner.toLowerCase()) {
+                try {
+                  const res = await fetch(
+                    `https://api.github.com/repos/${dep.owner}/${dep.repo}/pulls/${dep.number}`,
+                    {
+                      headers: {
+                        authorization: `Bearer ${crossToken}`,
+                        accept: 'application/vnd.github+json',
+                        'user-agent': 'companion-check',
+                      },
+                    }
+                  );
+                  if (res.ok) return stateOf(await res.json());
+                  return `unreadable (${res.status})`;
+                } catch (e) {
+                  return `unreadable (${e.message})`;
                 }
               }
-              return 'unreadable';
+              return 'unreadable (404)';
             }
 
-            async function evaluate(deps) {
-              if (!deps.length) return { state: 'success', description: 'No companion dependencies' };
+            async function evaluate({ deps, unparseable }) {
+              if (unparseable)
+                return {
+                  state: 'failure',
+                  description: 'Unparseable Depends-on marker (use owner/repo#N or a PR URL)',
+                };
+              if (!deps.length)
+                return { state: 'success', description: 'No companion dependencies' };
+              if (deps.length > MAX_DEPS)
+                return {
+                  state: 'failure',
+                  description: `More than ${MAX_DEPS} companion PRs referenced`,
+                };
               const states = [];
               for (const dep of deps) states.push({ ref: refOf(dep), state: await depState(dep) });
               const closed = states.find((s) => s.state === 'closed');
               if (closed)
                 return { state: 'failure', description: `${closed.ref} closed without merging` };
-              const unreadable = states.find((s) => s.state === 'unreadable');
+              const unreadable = states.find((s) => s.state.startsWith('unreadable'));
               if (unreadable)
                 return {
                   state: 'pending',
-                  description: `Cannot read ${unreadable.ref} - COMPANION_CHECK_TOKEN needed?`,
+                  description:
+                    `Cannot read ${unreadable.ref} ${unreadable.state.slice(11)}` +
+                    (crossToken ? '' : ' - COMPANION_CHECK_TOKEN needed?'),
                 };
               const open = states.filter((s) => s.state === 'open');
               if (open.length)
@@ -133,6 +170,16 @@ jobs:
               const current = statuses.find((s) => s.context === STATUS_CONTEXT);
               if (current && current.state === desired.state && current.description === description)
                 return;
+              if (isSweep) {
+                // A sweep races PR events: re-read the PR and let the fresher
+                // event (or the next sweep) handle anything that moved.
+                const { data: fresh } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                });
+                if (fresh.head.sha !== pr.head.sha || fresh.body !== pr.body) return;
+              }
               await github.rest.repos.createCommitStatus({
                 owner,
                 repo,
@@ -154,4 +201,16 @@ jobs:
                     state: 'open',
                     per_page: 100,
                   });
-            for (const pr of prs) await postIfChanged(pr, await evaluate(parseDeps(pr.body)));
+            let failures = 0;
+            for (const pr of prs) {
+              try {
+                const parsed = parseDeps(pr.body);
+                if (context.eventName === 'schedule' && !parsed.deps.length && !parsed.unparseable)
+                  continue;
+                await postIfChanged(pr, await evaluate(parsed));
+              } catch (e) {
+                failures++;
+                core.warning(`PR #${pr.number}: ${e.message}`);
+              }
+            }
+            if (failures) core.setFailed(`${failures} PR(s) could not be updated`);
