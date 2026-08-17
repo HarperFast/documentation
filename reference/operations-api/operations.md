@@ -532,10 +532,14 @@ Operations for JWT token creation and refresh.
 
 Detailed documentation: [JWT Authentication](../security/jwt-authentication.md)
 
-| Operation                      | Description                                             | Role Required          |
-| ------------------------------ | ------------------------------------------------------- | ---------------------- |
-| `create_authentication_tokens` | Creates an operation token and refresh token for a user | none (unauthenticated) |
-| `refresh_operation_token`      | Creates a new operation token from a refresh token      | any                    |
+| Operation                      | Description                                                   | Role Required          |
+| ------------------------------ | ------------------------------------------------------------- | ---------------------- |
+| `create_authentication_tokens` | Creates an operation token and refresh token for a user       | none (unauthenticated) |
+| `refresh_operation_token`      | Creates a new operation token from a refresh token            | any                    |
+| `exchange_oidc_token`          | Trades a CI workload identity token for an operation token    | none (unauthenticated) |
+| `add_oidc_trust`               | Creates or replaces an OIDC trust policy                      | super_user             |
+| `list_oidc_trust`              | Lists all OIDC trust policies, including disabled ones        | super_user             |
+| `drop_oidc_trust`              | Deletes an OIDC trust policy                                  | super_user             |
 
 ### `create_authentication_tokens`
 
@@ -558,6 +562,150 @@ Creates a new operation token from an existing refresh token.
 	"operation": "refresh_operation_token",
 	"refresh_token": "EXISTING_REFRESH_TOKEN"
 }
+```
+
+### OIDC Trusted Publishing
+
+<VersionBadge version="v5.3.0" />
+
+A CI runner can authenticate to Harper with **no stored credential**. It presents an identity token minted by its own provider; if that token verifies against a stored **trust policy**, Harper returns a one-hour operation token for the user the policy names. This is the same exchange npm, PyPI, and AWS STS `AssumeRoleWithWebIdentity` use.
+
+The alternative is a `HARPER_CLI_REFRESH_TOKEN` secret: a 30-day credential, one per user, that expires on a schedule nobody tracks. A trust policy replaces it with a rule you configure once, and revoke with `drop_oidc_trust`.
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+environment: production
+steps:
+  - run: harper deploy by_ref=true
+    env:
+      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }} # a var, not a secret
+```
+
+No secret at all — `HARPER_CLI_TARGET` is not sensitive. See [CLI Authentication](../cli/authentication.md#workload-identity-oidc) for the client half and where the exchange sits in credential precedence.
+
+Policies live in the replicated `system.hdb_oidc_trust` table, so configuring one on any node applies cluster-wide.
+
+#### `add_oidc_trust`
+
+Creates or replaces a trust policy. **super_user only** — a policy lets an external system authenticate as a Harper user, so granting one is equivalent to handing out a credential.
+
+```json
+{
+	"operation": "add_oidc_trust",
+	"id": "my-app-prod",
+	"issuer": "https://token.actions.githubusercontent.com",
+	"audience": "https://my-instance.harperdb.io:9925/",
+	"user": "ci-deploy",
+	"claims": {
+		"repository_id": "67890",
+		"workflow_ref": "HarperFast/my-app/.github/workflows/deploy.yml@refs/heads/main",
+		"environment": "production"
+	}
+}
+```
+
+| Parameter     | Description                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `id`          | **Required.** Policy identifier, 1–128 characters of letters, numbers, `_`, `-`, and `.`.                                      |
+| `issuer`      | **Required.** The token issuer (`iss`) this policy trusts.                                                                     |
+| `audience`    | **Required.** The audience the token must be addressed to. Must identify **this instance** — see below.                        |
+| `claims`      | **Required.** The claim constraints a token must satisfy. At least one, and specific enough for the issuer's profile.           |
+| `user`        | **Required.** The Harper user a matching run authenticates as. Must already exist and be active.                               |
+| `enabled`     | Defaults to `true`. A disabled policy is kept but never matched.                                                              |
+| `description` | Optional free text, up to 1024 characters.                                                                                     |
+
+This **replaces** the policy rather than merging into it. A partial update is how an over-broad policy gets created by accident, and the point of `claims` is that every constraint in it was written deliberately.
+
+`user` is resolved at write time. A policy naming a user that does not exist, or one that is inactive, is rejected — otherwise it would fail only at exchange time, inside CI, with nothing to point at. If the named user is a **super_user**, the policy is still created but the response carries a `warning`: any run matching it gains full administrative access.
+
+**Claim constraints** are exact string matches. A value may be a string, or an array of strings meaning any-of:
+
+```json
+{ "claims": { "repository": "HarperFast/my-app", "ref": ["refs/heads/main", "refs/heads/release"] } }
+```
+
+A constrained claim that is **absent** from the token fails rather than passes, so a policy cannot be weakened by an issuer that stops emitting a claim.
+
+**The audience must be instance-specific.** For GitHub Actions, `https://github.com/<owner>` is rejected: that is the provider's default, shared by every repository under the owner, so accepting it would make a token minted by any of them valid here — the exact thing the audience field exists to prevent.
+
+##### Policy specificity for GitHub Actions
+
+For `https://token.actions.githubusercontent.com`, a policy must satisfy all three of these, each closing a distinct way a policy can be accidentally broad:
+
+| Requirement            | Satisfied by one of                                                     | Left open otherwise                          |
+| ---------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| **Pin the repository** | `repository_id`, `repository`                                           | Any repository                                |
+| **Pin the workflow**   | `workflow_ref`, `workflow_path`, `job_workflow_ref`, `job_workflow_path` | Any workflow in that repository               |
+| **Gate the ref**       | `workflow_ref`, `job_workflow_ref`, `ref`, `environment`                | Any branch that can be pushed to the repository |
+
+The ref gate is the one worth understanding, and it is stricter than npm's model. Pinning repository and workflow without also pinning a ref is not safe: anyone who can push a branch can add the trusted workflow to that branch and mint a token. npm accepts that shape and relies on environment protection instead.
+
+Consequences worth planning around:
+
+- **`repository_id` is preferred over `repository`** because it is immutable — it survives a repository rename, and is immune to org-name recycling.
+- **A tag-triggered release cannot pin `workflow_ref`**, since the tag is unknown when the policy is written. Pin `workflow_path` instead — Harper derives it from `workflow_ref` by removing the ref — and gate on `environment`.
+- **`ref_type: tag` is deliberately not accepted as a ref gate.** Anyone with push access can create a tag.
+- **`sub` is not accepted as a pin.** It varies by trigger, and its format changed for repositories created after 2026-07-15 (immutable subjects embed owner and repository ids), so a policy pinning it would have to handle two shapes indefinitely.
+- **`pull_request_target` runs are denied** unless the policy explicitly constrains `event_name`. Such a run executes the base repository's workflow, with its secrets, while a fork controls the checked-out code. A plain `pull_request` run from a fork cannot mint at all, since it gets no `id-token: write`.
+
+##### Other issuers
+
+An issuer with no registered profile gets a strict generic profile: the policy must pin **`sub`**. That is the one claim every OIDC issuer defines as identifying a single principal, and it makes workload identity work with no provider-specific code — a Kubernetes service-account token (`system:serviceaccount:<namespace>:<name>`), a GCP service account, and a SPIFFE SVID all carry a stable canonical subject.
+
+GitHub Actions needs its own profile precisely because its `sub` is the one claim you should *not* pin.
+
+#### `exchange_oidc_token`
+
+Trades an identity token for a Harper operation token. **Unauthenticated by design** — this operation *is* the authentication, the way `create_authentication_tokens` is against a password. The CLI calls it for you; you would call it directly only from a client that mints its own requests.
+
+```json
+{
+	"operation": "exchange_oidc_token",
+	"token": "eyJhbGciOi..."
+}
+```
+
+Response:
+
+```json
+{
+	"operation_token": "eyJhbGciOi...",
+	"expires_in": 3600,
+	"username": "ci-deploy",
+	"policy": "my-app-prod"
+}
+```
+
+The operation token is valid for **one hour** — long enough to cover a slow deploy, short enough to be worthless by the time it reaches a log. No refresh token is issued; a subsequent run performs a new exchange.
+
+:::note
+**Every rejection returns the same message.** The endpoint is unauthenticated, so a caller told which check failed could enumerate a policy one claim at a time. The specific reason is written to the `oidc-trust` logger, which is where to look when a workflow that should match does not.
+:::
+
+**An identity token can be exchanged once.** Harper records a SHA-256 fingerprint of each spent token in `system.hdb_oidc_token_use`, expiring with the token itself, so the table stays proportional to in-flight tokens and never holds a credential. The record is written *before* the operation token is minted: if minting then fails the identity token is burned, costing a CI re-run, where the reverse order would leave a spendable token behind.
+
+That replay check is replicated, but replication is asynchronous, so two simultaneous replays against **different nodes** can both succeed. This is not a privilege escalation — whoever holds the token could obtain one operation token regardless — and what it does stop is the realistic case: a token that leaks after a legitimate run and is reused inside its window.
+
+Exchanges are recorded in the authentication audit stream alongside Basic, Bearer, and mTLS events, for failures as well as successes — a run repeatedly failing to authenticate is what an audit trail is for. Enable it with `logging.auditAuthEvents.logSuccessful` and `logging.auditAuthEvents.logFailed`.
+
+#### `list_oidc_trust`
+
+Lists every policy, **including disabled ones**, sorted by `id`. **super_user only** — the policy set names exactly which repository and workflow are worth compromising.
+
+```json
+{ "operation": "list_oidc_trust" }
+```
+
+Returns `{ "policies": [ ... ] }`. Each entry carries `id`, `issuer`, `audience`, `claims`, `user`, `enabled`, `description`, `updated_by`, and timestamps.
+
+#### `drop_oidc_trust`
+
+Deletes a policy, revoking every workflow that matched it. **super_user only.** Fails with `404` if no policy has that `id`.
+
+```json
+{ "operation": "drop_oidc_trust", "id": "my-app-prod" }
 ```
 
 ---

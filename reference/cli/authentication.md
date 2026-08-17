@@ -45,6 +45,7 @@ For remote Operations API commands, the CLI uses the first complete authenticati
 5. `HARPER_CLI_OPERATION_TOKEN` and `HARPER_CLI_REFRESH_TOKEN` environment variables, or their legacy `CLI_TARGET_` equivalents — see [Token credentials for CI/CD](#token-credentials-for-cicd)
 6. A token saved by `harper login`
 7. `username=` and `password=` operation parameters (legacy fallback)
+8. A [workload identity token](#workload-identity-oidc) exchanged with the runtime's OIDC provider <VersionBadge version="v5.3.0" />
 
 Credentials are resolved as a pair and are never combined across sources. An incomplete pair supplied with dedicated authentication parameters or in the target URL causes the command to fail. An incomplete environment-variable pair is skipped with a warning so that a saved login token can still be used.
 
@@ -217,6 +218,40 @@ Expose the two values to the deploy step and no other credentials are needed:
 
 Create a **dedicated CI user** and run `harper login --for-ci` as that user. That scopes the pipeline's permissions to what it actually needs, and lets you revoke its access without disturbing anyone else.
 :::
+
+##### Workload identity (OIDC)
+
+<VersionBadge version="v5.3.0" />
+
+On a runner that can prove its own identity, the CLI needs **no stored credential at all**. It asks the runtime for an identity token addressed to your instance and trades it for a one-hour operation token. Nothing durable is stored in your CI provider, and there is no 30-day token to rotate.
+
+Configure the instance to trust the workflow once with [`add_oidc_trust`](../operations-api/operations.md#add_oidc_trust), then grant the token permission in the workflow:
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+environment: production
+steps:
+  - run: harper deploy by_ref=true restart=true replicated=true
+    env:
+      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }} # a var, not a secret
+```
+
+`HARPER_CLI_TARGET` is the only variable the step needs, and it is not sensitive — hence `vars` rather than `secrets`.
+
+**This ranks last, below every configured credential.** Adding `id-token: write` to a workflow that still sets `HARPER_CLI_REFRESH_TOKEN` does not change which identity deploys; the stored token keeps winning. That is deliberate — enabling a new capability should not silently re-point an existing pipeline at a different user. Remove the secret when you want the exchange to take over.
+
+The exchange is attempted only when the runtime actually offers an identity. GitHub Actions sets `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` together on a job that declares `id-token: write`; without both, the CLI falls through to its other credential sources rather than reporting a failure. An unrecognized runtime falls through the same way.
+
+On success the CLI prints, to stderr, which policy authenticated it and as whom:
+
+```
+Requesting a GitHub Actions identity token for https://my-instance.harperdb.io:9925/...
+Authenticated as 'ci-deploy' via OIDC trust policy 'my-app-prod'.
+```
+
+If Harper rejects the token it says so and continues unauthenticated, which surfaces as a 401 on the operation itself. The server deliberately does not report which check failed — see [`exchange_oidc_token`](../operations-api/operations.md#exchange_oidc_token) — so diagnose with `list_oidc_trust` and the instance's `oidc-trust` log.
 
 #### Method 3: Dedicated Authentication Parameters
 
