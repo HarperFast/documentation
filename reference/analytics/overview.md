@@ -184,9 +184,10 @@ Harper automatically tracks the following metrics for all services. Applications
 `transaction-commit-time` is recorded on the RocksDB asynchronous commit path only; it is not
 emitted for LMDB-backed databases, and not for the synchronous `commitSync()` path used during
 transaction-log replay. Each sample covers one commit attempt, not one logical write transaction — a
-transient-conflict retry re-issues the commit and records its own sample, so `count` can exceed the
-number of logical writes. A sample is only recorded once an attempt settles, so a commit that is
-still outstanding contributes nothing yet. Raw entries (`hdb_raw_analytics`) carry `mean`,
+sample is recorded whether the attempt succeeds or fails, and a transient-conflict retry records its
+own sample, so `count` can exceed the number of logical writes. A sample is only recorded once an
+attempt settles, so a commit that is still outstanding contributes nothing yet. Raw entries
+(`hdb_raw_analytics`) carry `mean`,
 `distribution`, and `count`; percentiles (`p1`, `p10`, `p25`, `median`, `p75`, `p90`, `p95`, `p99`,
 `p999`) are only available on the aggregate (`hdb_analytics`) once raw entries are rolled up. Query
 the aggregate table for percentile-based alerting. With the default
@@ -203,9 +204,9 @@ bypass this check.
 
 <VersionBadge type="changed" version="v5.2.1" />
 
-Beginning with v5.2.1, the guard tracks every outstanding commit attempt on the thread, so a conflict
-retry or chained commit that wedges is caught on its own timer rather than hiding behind an earlier
-attempt.
+Beginning with v5.2.1, the guard tracks every outstanding commit attempt on the thread, including
+conflict retries and chained commits. It rejects once the oldest tracked attempt exceeds the limit,
+so later attempts can no longer be omitted from overload detection.
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and provides an early warning to shed or throttle
