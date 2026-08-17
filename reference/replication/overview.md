@@ -216,7 +216,7 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer, and — because a directional route also gates what it's willing to send — both sides normally need a matching entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`, and the **middle-tier** node's route to roadside needs the matching `receivesFrom: [{ database: system }]`. If the middle tier is missing its `receivesFrom` half, it never attempts the subscription; if roadside is missing its `sendsTo` half, middle's subscription attempt is rejected as unauthorized.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. Because a directional route also gates what a node is willing to send, the **sending** side always needs the matching `sendsTo` entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. The **receiving** side needs a matching `receivesFrom` only when it has its own directional route for that peer: a middle-tier node with a directional route to roadside is gated by that route, so omitting `receivesFrom` there means it never attempts the subscription. If middle has no route to roadside at all — or only a plain, non-directional one — it falls back to roadside's advertised registry record and subscribes on the strength of roadside's `sendsTo` alone. Omitting `receivesFrom` is therefore not a way to block inbound replication.
 
 ### Replicating the `system` database with controlled flow
 
@@ -232,7 +232,7 @@ Notes and current limitations:
 - This constrains replication subscriptions only. On-demand residency/retrieval connections (for example, sharded or invalidated-cache reads) use a separate mechanism governed by data residency, not by this registry record, and can still open a direct socket to a non-neighbor node.
 - Central visibility of every node is not guaranteed: an aggregation node may not list every distant leaf in its `hdb_nodes` registry (the registry relay differs from data relay). This does not open a connection either way.
 - Route changes to a node's own directionality take effect on restart.
-- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a role or user created — or a compromised edge node's route table altered — anywhere on the upstream path reaches every node it flows to. Weigh this against your trust boundary for edge nodes before routing `system` upstream from them.
+- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a role or user created — or a compromised edge node's `hdb_nodes` registry rows altered — anywhere on the upstream path reaches every node it flows to. Weigh this against your trust boundary for edge nodes before routing `system` upstream from them.
 
 ### Explicit Subscriptions
 
@@ -316,7 +316,7 @@ The following data operations are replicated across the cluster:
 
 **Destructive schema operations are not replicated**: `drop_database`, `drop_table`, and `drop_attribute` must be run on each node independently.
 
-Users and roles are not replicated across the cluster.
+Users and roles are not replicated across the cluster by default. They do propagate when the `system` database (where `hdb_user` and `hdb_role` live) is included in replication; as of v5.2 this no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow).
 
 Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
 
