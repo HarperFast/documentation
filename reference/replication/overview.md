@@ -51,6 +51,8 @@ You can also manage nodes dynamically through the [Operations API](./clustering.
 
 Harper automatically replicates node information to other nodes in the cluster using [gossip-style discovery](https://highscalability.com/gossip-protocol-explained/). This means you only need to connect to one existing node in a cluster, and Harper will automatically detect and connect to all other nodes bidirectionally.
 
+As of v5.2, this full-mesh, bidirectional auto-connect behavior applies to nodes with no directional routes. A node configured with [directional routes](#controlling-replication-flow) advertises a constrained registry record instead, so discovered non-neighbor nodes do not receive a replication connection — see [Controlling Replication Flow](#controlling-replication-flow).
+
 ### Data Selection
 
 By default, Harper replicates all data in all databases. You can narrow replication to specific databases:
@@ -216,7 +218,26 @@ replication:
           - database: cardata # aggregate telemetry upstream
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. Because a directional route also gates what a node is willing to send, the **sending** side always needs the matching `sendsTo` entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. The **receiving** side needs a matching `receivesFrom` only when it has its own directional route for that peer: a middle-tier node with a directional route to roadside is gated by that route, so omitting `receivesFrom` there means it never attempts the subscription. If middle has no route to roadside at all — or only a plain, non-directional one — it falls back to roadside's advertised registry record and subscribes on the strength of roadside's `sendsTo` alone. Omitting `receivesFrom` is therefore not a way to block inbound replication.
+If this is `node-one`'s configuration, `node-two` needs the inverse directional route:
+
+```yaml
+replication:
+  hostname: node-two
+  databases:
+    - cardata
+    - config
+    - system
+  routes:
+    - hostname: node-one
+      replicates:
+        sendsTo:
+          - database: cardata
+        receivesFrom:
+          - database: config
+          - database: system
+```
+
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. Because a directional route also gates what a node is willing to send, the **sending** side always needs the matching `sendsTo` entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. The **receiving** side needs a matching `receivesFrom` only when it has its own directional route for that peer: a middle-tier node with a directional route to roadside is gated by that route, so omitting `receivesFrom` there means it never attempts the subscription. If middle has no route to roadside at all — or only a plain, non-directional one — it falls back to roadside's advertised `hdb_nodes` self-record and subscribes only when roadside's peer-qualified `sendsTo` entry names middle and the `system` database. A non-neighbor does not match that entry. On a receiver with no directional route for the peer, omitting `receivesFrom` is therefore not a way to block inbound replication.
 
 ### Replicating the `system` database with controlled flow
 
@@ -232,7 +253,7 @@ Notes and current limitations:
 - This constrains replication subscriptions only. On-demand residency/retrieval connections (for example, sharded or invalidated-cache reads) use a separate mechanism governed by data residency, not by this registry record, and can still open a direct socket to a non-neighbor node.
 - Central visibility of every node is not guaranteed: an aggregation node may not list every distant leaf in its `hdb_nodes` registry (the registry relay differs from data relay). This does not open a connection either way.
 - Route changes to a node's own directionality take effect on restart.
-- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a role or user created — or a compromised edge node's `hdb_nodes` registry rows altered — anywhere on the upstream path reaches every node it flows to. Weigh this against your trust boundary for edge nodes before routing `system` upstream from them.
+- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a compromised edge node can create a user or role with cluster-wide privileges or alter its advertised directionality in `hdb_nodes`, and those changes reach every node on the upstream path. If edge nodes are outside your trust boundary, route `system` downstream only: include `system` in the central node's `sendsTo`, include it in the edge node's `receivesFrom` when the edge has a directional route back, and omit it from the edge node's `sendsTo`.
 
 ### Explicit Subscriptions
 
