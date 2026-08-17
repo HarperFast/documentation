@@ -109,10 +109,16 @@ Example aggregate entry:
 	"metric": "bytes-sent",
 	"method": "connack",
 	"type": "mqtt",
-	"median": 4,
 	"mean": 4,
-	"p95": 4,
+	"p1": 4,
+	"p10": 4,
+	"p25": 4,
+	"median": 4,
+	"p75": 4,
 	"p90": 4,
+	"p95": 4,
+	"p99": 4,
+	"p999": 4,
 	"count": 1,
 	"id": 1688589569646,
 	"time": 1688589569646
@@ -181,26 +187,28 @@ transaction-log replay. Each sample covers one commit attempt, not one logical w
 transient-conflict retry re-issues the commit and records its own sample, so `count` can exceed the
 number of logical writes. A sample is only recorded once an attempt settles, so a commit that is
 still outstanding contributes nothing yet. Raw entries (`hdb_raw_analytics`) carry `mean`,
-`distribution`, and `count`; percentiles (`median`, `p90`, `p95`, `p99`, `p999`) are only available on
-the per-minute aggregate (`hdb_analytics`) once raw entries are rolled up — query the aggregate table
-for percentile-based alerting. It shares a timebase with the RocksDB storage engine's overload guard,
-which times only the commit attempt it arms: when a tracked outstanding commit on a thread exceeds
-`storage.maxTransactionQueueTime` (default 45s), Harper rejects new record updates and publishes on
-that thread with `Outstanding write transactions have too long of queue, please try again later`
-(HTTP 503) — deletes and writes applied from a canonical source (e.g. replication or a caching
-source) bypass this check. The guard tracks at most one outstanding commit per thread: a retry
-issued while the prior attempt still holds that slot (a coordinated retry, or an early backoff
-retry) recommits before the slot clears and is never armed, so a wedge there won't trip the 503; a
-later, backoff-delayed retry recommits after the slot clears and is tracked like a fresh attempt.
+`distribution`, and `count`; percentiles (`p1`, `p10`, `p25`, `median`, `p75`, `p90`, `p95`, `p99`,
+`p999`) are only available on the aggregate (`hdb_analytics`) once raw entries are rolled up. Query
+the aggregate table for percentile-based alerting. With the default
+[`analytics.aggregatePeriod`](#analyticsaggregateperiod) of 60 seconds, those alerts can observe new
+aggregate values no more than once per minute.
+
+The metric shares a timebase with the RocksDB storage engine's overload guard. When the oldest
+tracked outstanding commit on a thread exceeds
+[`storage.maxTransactionQueueTime`](../database/storage-tuning.md#storagemaxtransactionqueuetime)
+(default 45s), Harper rejects new record updates on that thread with
+`Outstanding write transactions have too long of queue, please try again later` (HTTP 503). Deletes
+and writes applied from a canonical source (e.g. replication or a caching source) bypass this check.
+Beginning with v5.2.1, the guard tracks every outstanding commit attempt on the thread, so a conflict
+retry or chained commit that wedges is caught on its own timer rather than hiding behind an earlier
+attempt.
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
-transactions, or a saturated storage volume — and is a useful early warning to shed or throttle write
-load. But the metric shares only a timebase with the guard, not its population: a wedged commit
-contributes no sample until it settles, and an early retry that wedges can go untracked by the guard
-entirely (see above). Don't treat this distribution as a leading indicator on its own — watch the
-server log for the "Rejecting writes on this thread" error the guard emits when it does trip, and
-don't rely solely on percentiles trending toward `storage.maxTransactionQueueTime`. Tune the
-threshold against a baseline for your workload.
+transactions, or a saturated storage volume — and provides an early warning to shed or throttle
+write load. However, a wedged commit contributes no sample until it settles. Use this distribution
+with `write-transaction-queue-depth`, which remains elevated while commits are outstanding, and
+watch the server log for the "Rejecting writes on this thread" error the guard emits when it trips.
+Tune the threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
 
