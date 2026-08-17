@@ -44,7 +44,6 @@ Detailed documentation: [Database Overview](../database/overview.md)
 | `drop_table`        | Drops a table and all its records                                   | super_user    |
 | `create_attribute`  | Adds a new attribute to a table                                     | super_user    |
 | `drop_attribute`    | Removes an attribute and all its values from a table                | super_user    |
-| `get_backup`        | Returns a binary snapshot of a database for backup purposes         | super_user    |
 
 ### `describe_all`
 
@@ -131,14 +130,6 @@ Drops an attribute and all its values from the specified table.
 	"table": "dog",
 	"attribute": "is_adorable"
 }
-```
-
-### `get_backup`
-
-Returns a binary snapshot of the specified database (or individual table). Safe for backup while Harper is running. Specify `"table"` for a single table or `"tables"` for a set.
-
-```json
-{ "operation": "get_backup", "database": "dev" }
 ```
 
 ---
@@ -615,7 +606,8 @@ Deploying a **brand-new** component without a restart (`"restart": false`, or om
 
 Additional parameters:
 
-- `urlPath` — override the HTTP URL path the component is mounted at (e.g. `"/api/v2"`)
+- `urlPath` — the HTTP URL path the component is mounted at (e.g. `"/api/v2"`). Must not contain `..` or `.` path segments. Persisted on the component's root-config entry; see [HTTP middleware routing](../http/overview.md#middleware-routing).
+- `host` <VersionBadge version="v5.2.0" /> — the virtual hostname the component is served on (e.g. `"api.example.com"`). Must be a bare hostname or IPv6 literal — no scheme, port, path, or brackets. Persisted alongside `urlPath`.
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
 - `activate` — set to `false` to **stage only** and stop before go-live. The build is prepared and verified on every node and the response returns a `deployment_id` in a `staged` state; nothing goes live. Activate it later by calling `deploy_component` again with that `deployment_id` (see below). Useful for pre-staging a release and flipping it live in a separate, fast step.
 - `deployment_id` — activate a previously-staged deployment (from an `activate: false` call). No new payload is fetched or installed; the already-staged build is swapped live cluster-wide. `project` is still required. For a `package` deploy you do not need to repeat `package` here: the identifier and credential references recorded when it was staged are recovered from the deployment and persisted to root config at activation, on every node — so a later restart or a newly joined peer reinstalls the version you activated.
@@ -626,6 +618,8 @@ If the activate phase fails on some nodes after others have already gone live, t
 
 - `two_phase` — set to `false` to force the legacy single-phase (in-place) deploy instead of stage-then-activate.
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
+
+`urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
 
 #### Deploy credentials (`credentials`)
 
@@ -1185,6 +1179,80 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 
 ---
 
+## Backup & Restore
+
+Operations for backing up and restoring databases. Managed backups <VersionBadge version="v5.2.0" /> require the RocksDB storage engine; `get_backup` works with both RocksDB and LMDB.
+
+Detailed documentation: [Backup Operations](../backups/operations.md)
+
+| Operation        | Description                                                         | Role Required |
+| ---------------- | ------------------------------------------------------------------- | ------------- |
+| `create_backup`  | Creates a managed, incremental directory backup of a database (job) | super_user    |
+| `list_backups`   | Lists the managed backups for a database                            | super_user    |
+| `verify_backup`  | Verifies a managed backup's integrity (job)                         | super_user    |
+| `delete_backup`  | Deletes a single managed backup                                     | super_user    |
+| `purge_backups`  | Deletes all but the newest `keep_count` managed backups             | super_user    |
+| `restore_backup` | Restores a database from a managed backup (job)                     | super_user    |
+| `get_backup`     | Streams a full snapshot of a database in the response for download  | super_user    |
+
+### `create_backup`
+
+Creates an incremental directory backup of the database under the configured backup root. Runs as a background [job](#jobs) that reports the new `backup_id`.
+
+```json
+{ "operation": "create_backup", "database": "dev" }
+```
+
+### `list_backups`
+
+Returns the managed backups for a database, each with its `backup_id`, `timestamp`, `size`, and `file_count`.
+
+```json
+{ "operation": "list_backups", "database": "dev" }
+```
+
+### `verify_backup`
+
+Verifies a managed backup's integrity, including checksums when `verify_checksum` is `true` (slower). Runs as a background [job](#jobs).
+
+```json
+{ "operation": "verify_backup", "database": "dev", "backup_id": 1, "verify_checksum": true }
+```
+
+### `delete_backup`
+
+Deletes a single managed backup.
+
+```json
+{ "operation": "delete_backup", "database": "dev", "backup_id": 1 }
+```
+
+### `purge_backups`
+
+Deletes all but the newest `keep_count` managed backups.
+
+```json
+{ "operation": "purge_backups", "database": "dev", "keep_count": 3 }
+```
+
+### `restore_backup`
+
+Restores a database in place from a managed backup, as a background [job](#jobs). `backup_id` defaults to the latest backup. Restoring the `system` database, or a database a loaded component keeps open, requires the server to be stopped — see [when can a database be restored?](../backups/overview.md#when-can-a-database-be-restored)
+
+```json
+{ "operation": "restore_backup", "database": "dev", "backup_id": 1 }
+```
+
+### `get_backup`
+
+Streams a full snapshot of the specified database in the HTTP response for download. For RocksDB <VersionBadge type="changed" version="v5.2.0" />, a `tar` archive of the current state (including file-backed blobs unless `exclude_blobs` is set), gzipped by default; for LMDB, the `.mdb` file.
+
+```json
+{ "operation": "get_backup", "database": "dev" }
+```
+
+---
+
 ## Jobs
 
 Operations for querying background job status.
@@ -1224,13 +1292,13 @@ Operations for reading Harper logs.
 
 Detailed documentation: [Logging Operations](../logging/operations.md)
 
-| Operation                        | Description                                                            | Role Required |
-| -------------------------------- | ---------------------------------------------------------------------- | ------------- |
-| `read_log`                       | Returns entries from the primary `hdb.log`                             | super_user    |
-| `read_transaction_log`           | Returns transaction history for a table                                | super_user    |
-| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp                 | super_user    |
-| `read_audit_log`                 | Returns verbose audit history for a table (requires audit log enabled) | super_user    |
-| `delete_audit_logs_before`       | Deletes audit log entries older than a timestamp                       | super_user    |
+| Operation                        | Description                                                                                                              | Role Required |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| `read_log`                       | Returns entries from the primary `hdb.log`                                                                               | super_user    |
+| `read_transaction_log`           | Returns transaction history for a table                                                                                  | super_user    |
+| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp                                                                   | super_user    |
+| `read_audit_log`                 | Returns verbose transaction history for a table, including original record values (requires transaction logging enabled) | super_user    |
+| `delete_audit_logs_before`       | Deletes transaction log entries older than a timestamp (deprecated alias of `delete_transaction_logs_before`)            | super_user    |
 
 ### `read_log`
 
@@ -1260,7 +1328,7 @@ Returns transaction history for a specific table. Optionally filter by `from`/`t
 
 ### `read_audit_log`
 
-Returns verbose audit history including original record state. Requires `logging.auditLog: true` in configuration. Filter by `search_type`: `hash_value`, `timestamp`, or `username`.
+Returns verbose transaction history including original record state. Requires transaction logging (`logging.auditLog: true`) in configuration. Filter by `search_type`: `hash_value`, `timestamp`, or `username`.
 
 ```json
 {
