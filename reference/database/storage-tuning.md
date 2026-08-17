@@ -41,7 +41,7 @@ Default: `45s`
 
 The maximum time a tracked write commit may remain unsettled before Harper rejects new application-originated record updates and publishes on that thread with HTTP 503. This is a per-commit duration check, not a queue-length threshold — it acts as backpressure when downstream disk I/O cannot keep up with incoming writes. Deletes and writes applied from a canonical source (e.g. replication or a caching source) bypass this check.
 
-Beginning with v5.2.1, Harper tracks every outstanding commit attempt for this check. In v5.2.0, a retry or chained commit submitted while another attempt was already tracked could be omitted from overload detection.
+Beginning with v5.2.1, Harper tracks every outstanding commit attempt for this check. In v5.2.0, only one commit per thread was tracked at a time, so any commit - including a conflict retry or a chained commit - submitted while another was already outstanding could be omitted from overload detection.
 
 The [`transaction-commit-time` metric](../analytics/overview.md#storage-metrics) provides the corresponding commit-latency distribution, but only records each attempt after it settles.
 
