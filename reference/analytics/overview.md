@@ -196,9 +196,13 @@ aggregate values no more than once per minute.
 The metric shares a timebase with the RocksDB storage engine's overload guard. When the oldest
 tracked outstanding commit on a thread exceeds
 [`storage.maxTransactionQueueTime`](../database/storage-tuning.md#storagemaxtransactionqueuetime)
-(default 45s), Harper rejects new record updates on that thread with
-`Outstanding write transactions have too long of queue, please try again later` (HTTP 503). Deletes
-and writes applied from a canonical source (e.g. replication or a caching source) bypass this check.
+(default 45s), Harper rejects new record updates and publishes from new application requests on that
+thread with `Outstanding write transactions have too long of queue, please try again later` (HTTP
+503). Deletes and writes applied from a canonical source (e.g. replication or a caching source)
+bypass this check.
+
+<VersionBadge type="changed" version="v5.2.1" />
+
 Beginning with v5.2.1, the guard tracks every outstanding commit attempt on the thread, so a conflict
 retry or chained commit that wedges is caught on its own timer rather than hiding behind an earlier
 attempt.
@@ -206,9 +210,8 @@ attempt.
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and provides an early warning to shed or throttle
 write load. However, a wedged commit contributes no sample until it settles. Use this distribution
-with `write-transaction-queue-depth`, which remains elevated while commits are outstanding, and
-watch the server log for the "Rejecting writes on this thread" error the guard emits when it trips.
-Tune the threshold against a baseline for your workload.
+with the server log: the "Rejecting writes on this thread" error is the authoritative signal when the
+guard trips. Tune the threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
 
