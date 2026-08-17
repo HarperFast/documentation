@@ -138,7 +138,7 @@ For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to re
 
 ### Deploying by Reference
 
-Available since: v5.2.0
+<VersionBadge version="v5.3.0" />
 
 Omitting `package` uploads a snapshot of your working directory. The result is an anonymous artifact: nothing records _which_ commit it came from, so reproducing it later — or stepping back to a previous release — means finding those exact files again.
 
@@ -186,7 +186,7 @@ Deploying by reference means the **cluster** installs and builds the component f
 
 ### Provisioning a Deploy Credential
 
-Available since: v5.2.0
+<VersionBadge version="v5.3.0" />
 
 `harper deploy setup=true` provisions the credential a private deploy needs. It's interactive, and runs once per component and source:
 

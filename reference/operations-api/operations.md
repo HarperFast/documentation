@@ -572,6 +572,7 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | --------------------------- | ----------------------------------------------------------------------- | ------------- |
 | `add_component`             | Creates a new component project from a template                         | super_user    |
 | `deploy_component`          | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
+| `revert_component`          | Puts a component's retained previous version back in service            | super_user    |
 | `package_component`         | Packages a component project into a base64-encoded tar                  | super_user    |
 | `drop_component`            | Deletes a component or a file within a component                        | super_user    |
 | `get_components`            | Lists all component files and config                                    | super_user    |
@@ -590,6 +591,8 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | `install_node_modules`      | _(Deprecated)_ Run npm install on component projects                    | super_user    |
 
 ### `deploy_component`
+
+<VersionBadge type="changed" version="v5.3.0" />
 
 Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
 
@@ -714,6 +717,8 @@ Stage now, activate later:
 ```
 
 ### `revert_component`
+
+<VersionBadge version="v5.3.0" />
 
 Puts a component's **retained previous version** back in service across the cluster, then restarts. Every `deploy_component` activation retains the version it replaced, so this is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
 
@@ -880,6 +885,8 @@ Adding an existing key:
 ```
 
 #### Server-side key generation (`generate`)
+
+<VersionBadge version="v5.3.0" />
 
 With `generate: true`, Harper mints an ed25519 keypair on the node handling the request and returns only the **public** half. The private key is created inside the cluster and never travels from a client, so it can't be captured in a shell history, CI log, or request body on the way in:
 
