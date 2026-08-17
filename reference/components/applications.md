@@ -170,7 +170,11 @@ harper deploy ref=9f8c2a1 restart=true replicated=true
 
 If a `ref` can't be resolved either way, the deploy stops rather than sending the name for the cluster to resolve. Run `git fetch` and retry, or pass a full commit SHA — that needs no resolution and is always accepted.
 
+A `ref` must also name something a clone can fetch: `refs/heads/*` and `refs/tags/*`, or a bare branch or tag name. Anything else — `refs/pull/123/head`, say — is rejected up front, even if your own checkout can resolve it, because the cluster could resolve that commit and still never check it out.
+
 **Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns in both directions: when the working tree is dirty (those changes won't be part of the deploy) and when the commit being deployed isn't on any remote branch (the cluster won't be able to clone it). The second check reads your local remote-tracking refs, so run `git fetch` if you get it for a commit you know you pushed.
+
+The unpushed-commit check is **skipped under GitHub Actions**, where the runner's checkout is not a branch a `git branch -r --contains` can see; the dirty-tree warning still applies. On a `pull_request` run the commit is resolved from the event payload instead, as described below.
 
 **In GitHub Actions**, `by_ref` deploys the commit the workflow is running on. On a `pull_request` run that is the pull request's **head** commit rather than the merge commit the runner checks out: the merge commit lives under `refs/pull/<n>/merge`, which a plain clone can't fetch, so the cluster would have no way to resolve it. For a pull request from a fork, the head repository is the fork, and the CLI names it before deploying. If the event payload isn't readable, the deploy stops and asks for the commit explicitly:
 
