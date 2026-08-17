@@ -596,12 +596,20 @@ Detailed documentation: [Components Overview](../components/overview.md)
 
 Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
 
-Across a cluster, `deploy_component` runs in two phases so a deploy is all-or-nothing at go-live:
+Across a cluster, `deploy_component` runs in two phases separated by an **all-nodes staging barrier**:
 
 1. **Stage** — the incoming version is downloaded/packed, extracted, and `npm install`ed into a hidden staging directory on **every** node, without touching the live component.
-2. **Activate** — only after every node reports a successful stage does any node atomically swap the staged copy into the live path and restart.
+2. **Activate** — only after every node reports a successful stage does any node atomically swap the staged copy into the live path.
 
-If a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on every node, rather than leaving part of the cluster half-updated. The request and response shape are unchanged; the two phases are internal.
+The barrier is what the two phases buy you: if a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on **every** node, rather than leaving part of the cluster half-updated. That is the class of failure — by far the most common one — that a two-phase deploy eliminates.
+
+It is not, however, all-or-nothing at go-live. Activation still happens per node, so a swap that fails on one node after others have already gone live leaves the cluster running mixed versions until you resolve it, and there is deliberately no automatic rollback — see [activation failures](#activation-failures) below. The request and response shape are unchanged; the two phases are internal.
+
+:::note
+Two-phase deploy requires operation replication **and** replication of the `system` database, because the staging barrier is coordinated through a replicated deployment row.
+
+A deploy on a cluster where `system` is excluded from replication silently takes the legacy one-shot path instead: no staging barrier, and no retained previous version for [`revert_component`](#revert_component) to roll back to. The staged-phase parameters are not silently downgraded that way — `activate: false` and `deployment_id` are **rejected** with an explanatory error rather than going live unexpectedly, as is `two_phase: true` itself.
+:::
 
 :::note
 Deploying a **brand-new** component without a restart (`"restart": false`, or omitting `restart`) marks a restart as required — `get_status` reports `restartRequired: true`, and requests to the new component's routes return an actionable 404 explaining that a restart is needed. A never-loaded component can't serve its routes until Harper restarts, so this makes that state visible instead of silent. Each node reports this for itself, since whether the component was already active can differ per node. Redeploying a component that is **already** live does not set the flag: that component's own file watcher requests a restart only if the update actually needs one.
@@ -616,13 +624,33 @@ Additional parameters:
 - `deployment_id` — activate a previously-staged deployment (from an `activate: false` call). No new payload is fetched or installed; the already-staged build is swapped live cluster-wide. `project` is still required. For a `package` deploy you do not need to repeat `package` here: the identifier and credential references recorded when it was staged are recovered from the deployment and persisted to root config at activation, on every node — so a later restart or a newly joined peer reinstalls the version you activated.
 - `ignore_replication_errors` — treat replication/peer failures as non-fatal (best-effort deploy to a partially-available cluster). This also opts out of the stage barrier. Applies to both a full deploy and a `deployment_id` activate.
 - `deployment_timeout` — per-deploy budget (ms) for peers to receive the replicated deployment row; defaults to 120000.
-
-If the activate phase fails on some nodes after others have already gone live, the deploy reports the split nodes and the deployment stays in an `activating` state rather than being rolled back automatically. Recover by rolling forward (stage and activate a known-good version) or by rolling back explicitly with [`revert_component`](#revert_component). There is deliberately no automatic rollback: once a node is past the activation barrier, a peer reporting failure does not prove that peer did not activate — it can complete its swap and then fail, or die before replying — so automatically reverting "the failed nodes" risks rolling an untouched node an extra version back and leaving the cluster split three ways instead of converging it.
-
 - `two_phase` — set to `false` to force the legacy single-phase (in-place) deploy instead of stage-then-activate.
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
 
 `urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
+
+#### Deploy modes
+
+`activate`, `deployment_id`, `two_phase`, and `replicated` are not independent knobs — a request that asks for a staged phase without the machinery to support it is rejected rather than quietly doing something else. The valid combinations:
+
+| Request | Result |
+| --- | --- |
+| No mode parameters, `system` replicated | Two-phase stage → barrier → activate |
+| No mode parameters, `system` **not** replicated | Legacy one-shot deploy, no retained previous version |
+| `two_phase: false` | Legacy one-shot deploy, no retained previous version |
+| `activate: false` | Stage only; returns a `staged` `deployment_id` |
+| `deployment_id` | Activate that staged deployment cluster-wide |
+| `activate: false` or `deployment_id`, with `two_phase: false`, `replicated: false`, or `system` not replicated | **Rejected** |
+| `two_phase: true` with `replicated: false` or `system` not replicated | **Rejected** |
+| `revert_on_failure` (any value) | **Rejected** — see [activation failures](#activation-failures) |
+
+`revert_on_failure` was part of an earlier draft of this operation and is now refused outright rather than accepted and ignored, so a caller that was relying on it finds out.
+
+#### Activation failures
+
+If the activate phase fails on some nodes after others have already gone live, the deploy reports the split nodes and the deployment stays in an `activating` state rather than being rolled back automatically. Recover by rolling forward (stage and activate a known-good version) or by rolling back explicitly with [`revert_component`](#revert_component).
+
+There is deliberately no automatic rollback. Once a node is past the activation barrier, a peer reporting failure does not prove that peer did not activate — it can complete its swap and then fail, or die before replying — so automatically reverting "the failed nodes" risks rolling an untouched node an extra version back and leaving the cluster split three ways instead of converging it. A human deciding to roll forward or back is the only step that reliably converges the cluster.
 
 #### Deploy credentials (`credentials`)
 
@@ -720,9 +748,15 @@ Stage now, activate later:
 
 <VersionBadge version="v5.3.0" />
 
-Puts a component's **retained previous version** back in service across the cluster, then restarts. Every `deploy_component` activation retains the version it replaced, so this is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
+Puts a component's **retained previous version** back in service across the cluster. This is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
 
 This is the rollback for the bad release you just shipped: deploy a new version, run your own health checks against it, and put the old one back if you are not happy — even when the cluster otherwise looks healthy.
+
+:::caution
+**Only a two-phase activation retains a previous version.** The retained copy is created by the activate phase, so `revert_component` can only roll back to a version that went live that way.
+
+A version deployed with `two_phase: false`, or deployed on a cluster where the `system` database is excluded from replication, leaves nothing to revert to — and the call fails, no matter how many times that component has been deployed. If rollback matters, confirm the deploy took the two-phase path rather than assuming repeated deploys have built up a rollback target.
+:::
 
 `to_deployment_id` is **required**, and names the deployment you expect to be live once the call returns:
 
@@ -741,13 +775,16 @@ Naming the target is what makes the operation safe to retry. If that version is 
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `project`                   | **Required.** The component to revert.                                                                                           |
 | `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it. |
-| `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart.                                                             |
+| `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart. **Optional** — omitted, the files are swapped but Harper is not restarted. |
 | `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                |
 | `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                             |
+| `force`                     | Bypass the safety checks on the revert target. Reserved for recovering a component whose retained state is inconsistent.          |
+
+`restart` being optional matters more here than on a deploy: a reverted component whose code is already loaded keeps serving the version you just rolled away from until something restarts it. Pass `restart: "rolling"` unless you are deliberately batching the restart yourself.
 
 The response reports `reverted` (`false` when the target was already live), `to_deployment_id`, and `from_deployment_id` — the version taken out of service, which is also recorded as `rollback_of` on the new `hdb_deployment` row for the audit trail.
 
-**Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails for a component that has only ever been deployed once ("no previous version is retained"), and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
+**Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails with "no previous version is retained" whenever there is no retained copy — a component deployed only once, or one whose deploys took the one-shot path described above — and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
 
 Reverting also rewrites the component's stored `package:` reference in `harperdb-config.yaml` and its entry in the boot-time application lock, as part of the same operation. So a revert is a config-level rollback too: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs the version the cluster is actually running, not the one you reverted away from. Reverting away from a `package` deploy to a payload-deployed version removes the package reference entirely, for the same reason.
 
@@ -870,7 +907,15 @@ The deployment must be in a terminal status (`success`, `failed`, or `rolled_bac
 
 Adds an SSH key (must be ed25519) for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
 
-The stored private key is encrypted at rest and only ever crosses the cluster as ciphertext; `list_ssh_keys` and the logs never return key material.
+`list_ssh_keys` and the logs never return key material.
+
+The stored private key is encrypted at rest and crosses the cluster as ciphertext **when secret custody is configured**. Custody is present by default — the file tier generates a cluster keypair on first boot — so this is the normal case.
+
+:::warning
+On a node with **no** secret custody registered, `add_ssh_key` stores and replicates the private key in **plaintext**. It logs a WARN saying so and the operation still succeeds, because SSH keys predate custody and must keep working on a node that has none.
+
+That means encryption at rest is a property of your configuration, not a guarantee of the operation. If you are relying on it — and `generate: true` in particular reads as though the key can never be exposed — verify `secretCustody` is configured on every node in the cluster, and check the logs for that warning after adding a key. See [Secrets](../security/secrets.md).
+:::
 
 Adding an existing key:
 
@@ -914,7 +959,7 @@ Register that `public_key` with your git host (e.g. as a GitHub deploy key) to a
 `key` and `generate` are mutually exclusive — sending both is rejected. Generation happens in-process, so it requires no `ssh-keygen` binary on the host and the minted private key is never written to a temporary file on its way into storage.
 
 :::note
-`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the sealed private key and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
+`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the private key (sealed, subject to the custody caveat above) and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
 :::
 
 ---
