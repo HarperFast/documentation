@@ -212,7 +212,7 @@ replication:
     - hostname: node-two
       replicates:
         sendsTo:
-          - database: config # push central config downstream
+          - database: config
           - database: system # push central config (users, roles, schemas) downstream
         receivesFrom:
           - database: cardata # aggregate telemetry upstream
@@ -237,7 +237,7 @@ replication:
           - database: system
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. Because a directional route also gates what a node is willing to send, the **sending** side always needs the matching `sendsTo` entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. The **receiving** side needs a matching `receivesFrom` only when it has its own directional route for that peer: a middle-tier node with a directional route to roadside is gated by that route, so omitting `receivesFrom` there means it never attempts the subscription. If middle has no route to roadside at all — or only a plain, non-directional one — it falls back to roadside's advertised `hdb_nodes` self-record and subscribes only when roadside's peer-qualified `sendsTo` entry names middle and the `system` database. A non-neighbor does not match that entry. On a receiver with no directional route for the peer, omitting `receivesFrom` is therefore not a way to block inbound replication.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. Because a directional route also gates what a node is willing to send, the **sending** side always needs the matching `sendsTo` entry. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. The **receiving** side needs a matching `receivesFrom` only when it has its own directional route for that peer: a middle-tier node with a directional route to roadside is gated by that route, so omitting `receivesFrom` there means it never attempts the subscription. If middle has no route to roadside at all — or only a plain, non-directional one — it falls back to roadside's advertised `hdb_nodes` self-record. That self-record qualifies each `sendsTo` entry with the hostname of the route that produced it: middle subscribes because roadside's route to middle carries `database: system`, while core appears in no such route and matches no entry. On a receiver with no directional route for the peer, omitting `receivesFrom` is therefore not a way to block inbound replication.
 
 ### Replicating the `system` database with controlled flow
 
