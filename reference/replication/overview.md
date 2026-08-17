@@ -200,6 +200,10 @@ replication:
 
 In this example, the local node only receives from `node-two` (one-way inbound) and only sends to `node-three` (one-way outbound).
 
+### Per-database controlled flow
+
+<VersionBadge version="v5.2.0" />
+
 You can also scope flow per database, so different databases flow in different directions between the same two nodes. Use `sendsTo` / `receivesFrom` entries with a `database`:
 
 ```yaml
@@ -237,7 +241,7 @@ replication:
           - database: system
 ```
 
-`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. An object-shaped directional route is authoritative on each side; a plain or absent route falls back to the peer's advertised `hdb_nodes` self-record.
+`sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. A route that declares `replicates` with `sends`, `receives`, `sendsTo`, or `receivesFrom` is authoritative on each side; a route without those fields — or no route at all — falls back to the peer's advertised `hdb_nodes` self-record.
 
 The **sending** side needs the matching `sendsTo` entry when it has a directional route for that peer. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's directional route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. If roadside has no directional route to middle, it instead authorizes the send from middle's advertised `receivesFrom` and may serve `system` without a local `sendsTo` entry.
 
