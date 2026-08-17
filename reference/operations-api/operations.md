@@ -44,7 +44,6 @@ Detailed documentation: [Database Overview](../database/overview.md)
 | `drop_table`        | Drops a table and all its records                                   | super_user    |
 | `create_attribute`  | Adds a new attribute to a table                                     | super_user    |
 | `drop_attribute`    | Removes an attribute and all its values from a table                | super_user    |
-| `get_backup`        | Returns a binary snapshot of a database for backup purposes         | super_user    |
 
 ### `describe_all`
 
@@ -131,14 +130,6 @@ Drops an attribute and all its values from the specified table.
 	"table": "dog",
 	"attribute": "is_adorable"
 }
-```
-
-### `get_backup`
-
-Returns a binary snapshot of the specified database (or individual table). Safe for backup while Harper is running. Specify `"table"` for a single table or `"tables"` for a set.
-
-```json
-{ "operation": "get_backup", "database": "dev" }
 ```
 
 ---
@@ -541,10 +532,14 @@ Operations for JWT token creation and refresh.
 
 Detailed documentation: [JWT Authentication](../security/jwt-authentication.md)
 
-| Operation                      | Description                                             | Role Required          |
-| ------------------------------ | ------------------------------------------------------- | ---------------------- |
-| `create_authentication_tokens` | Creates an operation token and refresh token for a user | none (unauthenticated) |
-| `refresh_operation_token`      | Creates a new operation token from a refresh token      | any                    |
+| Operation                      | Description                                                   | Role Required          |
+| ------------------------------ | ------------------------------------------------------------- | ---------------------- |
+| `create_authentication_tokens` | Creates an operation token and refresh token for a user       | none (unauthenticated) |
+| `refresh_operation_token`      | Creates a new operation token from a refresh token            | any                    |
+| `exchange_oidc_token`          | Trades a CI workload identity token for an operation token    | none (unauthenticated) |
+| `add_oidc_trust`               | Creates or replaces an OIDC trust policy                      | super_user             |
+| `list_oidc_trust`              | Lists all OIDC trust policies, including disabled ones        | super_user             |
+| `drop_oidc_trust`              | Deletes an OIDC trust policy                                  | super_user             |
 
 ### `create_authentication_tokens`
 
@@ -569,6 +564,150 @@ Creates a new operation token from an existing refresh token.
 }
 ```
 
+### OIDC Trusted Publishing
+
+<VersionBadge version="v5.3.0" />
+
+A CI runner can authenticate to Harper with **no stored credential**. It presents an identity token minted by its own provider; if that token verifies against a stored **trust policy**, Harper returns a one-hour operation token for the user the policy names. This is the same exchange npm, PyPI, and AWS STS `AssumeRoleWithWebIdentity` use.
+
+The alternative is a `HARPER_CLI_REFRESH_TOKEN` secret: a 30-day credential, one per user, that expires on a schedule nobody tracks. A trust policy replaces it with a rule you configure once, and revoke with `drop_oidc_trust`.
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+environment: production
+steps:
+  - run: harper deploy by_ref=true
+    env:
+      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }} # a var, not a secret
+```
+
+No secret at all — `HARPER_CLI_TARGET` is not sensitive. See [CLI Authentication](../cli/authentication.md#workload-identity-oidc) for the client half and where the exchange sits in credential precedence.
+
+Policies live in the replicated `system.hdb_oidc_trust` table, so configuring one on any node applies cluster-wide.
+
+#### `add_oidc_trust`
+
+Creates or replaces a trust policy. **super_user only** — a policy lets an external system authenticate as a Harper user, so granting one is equivalent to handing out a credential.
+
+```json
+{
+	"operation": "add_oidc_trust",
+	"id": "my-app-prod",
+	"issuer": "https://token.actions.githubusercontent.com",
+	"audience": "https://my-instance.harperdb.io:9925/",
+	"user": "ci-deploy",
+	"claims": {
+		"repository_id": "67890",
+		"workflow_ref": "HarperFast/my-app/.github/workflows/deploy.yml@refs/heads/main",
+		"environment": "production"
+	}
+}
+```
+
+| Parameter     | Description                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `id`          | **Required.** Policy identifier, 1–128 characters of letters, numbers, `_`, `-`, and `.`.                                      |
+| `issuer`      | **Required.** The token issuer (`iss`) this policy trusts.                                                                     |
+| `audience`    | **Required.** The audience the token must be addressed to. Must identify **this instance** — see below.                        |
+| `claims`      | **Required.** The claim constraints a token must satisfy. At least one, and specific enough for the issuer's profile.           |
+| `user`        | **Required.** The Harper user a matching run authenticates as. Must already exist and be active.                               |
+| `enabled`     | Defaults to `true`. A disabled policy is kept but never matched.                                                              |
+| `description` | Optional free text, up to 1024 characters.                                                                                     |
+
+This **replaces** the policy rather than merging into it. A partial update is how an over-broad policy gets created by accident, and the point of `claims` is that every constraint in it was written deliberately.
+
+`user` is resolved at write time. A policy naming a user that does not exist, or one that is inactive, is rejected — otherwise it would fail only at exchange time, inside CI, with nothing to point at. If the named user is a **super_user**, the policy is still created but the response carries a `warning`: any run matching it gains full administrative access.
+
+**Claim constraints** are exact string matches. A value may be a string, or an array of strings meaning any-of:
+
+```json
+{ "claims": { "repository": "HarperFast/my-app", "ref": ["refs/heads/main", "refs/heads/release"] } }
+```
+
+A constrained claim that is **absent** from the token fails rather than passes, so a policy cannot be weakened by an issuer that stops emitting a claim.
+
+**The audience must be instance-specific.** For GitHub Actions, `https://github.com/<owner>` is rejected: that is the provider's default, shared by every repository under the owner, so accepting it would make a token minted by any of them valid here — the exact thing the audience field exists to prevent.
+
+##### Policy specificity for GitHub Actions
+
+For `https://token.actions.githubusercontent.com`, a policy must satisfy all three of these, each closing a distinct way a policy can be accidentally broad:
+
+| Requirement            | Satisfied by one of                                                     | Left open otherwise                          |
+| ---------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| **Pin the repository** | `repository_id`, `repository`                                           | Any repository                                |
+| **Pin the workflow**   | `workflow_ref`, `workflow_path`, `job_workflow_ref`, `job_workflow_path` | Any workflow in that repository               |
+| **Gate the ref**       | `workflow_ref`, `job_workflow_ref`, `ref`, `environment`                | Any branch that can be pushed to the repository |
+
+The ref gate is the one worth understanding, and it is stricter than npm's model. Pinning repository and workflow without also pinning a ref is not safe: anyone who can push a branch can add the trusted workflow to that branch and mint a token. npm accepts that shape and relies on environment protection instead.
+
+Consequences worth planning around:
+
+- **`repository_id` is preferred over `repository`** because it is immutable — it survives a repository rename, and is immune to org-name recycling.
+- **A tag-triggered release cannot pin `workflow_ref`**, since the tag is unknown when the policy is written. Pin `workflow_path` instead — Harper derives it from `workflow_ref` by removing the ref — and gate on `environment`.
+- **`ref_type: tag` is deliberately not accepted as a ref gate.** Anyone with push access can create a tag.
+- **`sub` is not accepted as a pin.** It varies by trigger, and its format changed for repositories created after 2026-07-15 (immutable subjects embed owner and repository ids), so a policy pinning it would have to handle two shapes indefinitely.
+- **`pull_request_target` runs are denied** unless the policy explicitly constrains `event_name`. Such a run executes the base repository's workflow, with its secrets, while a fork controls the checked-out code. A plain `pull_request` run from a fork cannot mint at all, since it gets no `id-token: write`.
+
+##### Other issuers
+
+An issuer with no registered profile gets a strict generic profile: the policy must pin **`sub`**. That is the one claim every OIDC issuer defines as identifying a single principal, and it makes workload identity work with no provider-specific code — a Kubernetes service-account token (`system:serviceaccount:<namespace>:<name>`), a GCP service account, and a SPIFFE SVID all carry a stable canonical subject.
+
+GitHub Actions needs its own profile precisely because its `sub` is the one claim you should *not* pin.
+
+#### `exchange_oidc_token`
+
+Trades an identity token for a Harper operation token. **Unauthenticated by design** — this operation *is* the authentication, the way `create_authentication_tokens` is against a password. The CLI calls it for you; you would call it directly only from a client that mints its own requests.
+
+```json
+{
+	"operation": "exchange_oidc_token",
+	"token": "eyJhbGciOi..."
+}
+```
+
+Response:
+
+```json
+{
+	"operation_token": "eyJhbGciOi...",
+	"expires_in": 3600,
+	"username": "ci-deploy",
+	"policy": "my-app-prod"
+}
+```
+
+The operation token is valid for **one hour** — long enough to cover a slow deploy, short enough to be worthless by the time it reaches a log. No refresh token is issued; a subsequent run performs a new exchange.
+
+:::note
+**Every rejection returns the same message.** The endpoint is unauthenticated, so a caller told which check failed could enumerate a policy one claim at a time. The specific reason is written to the `oidc-trust` logger, which is where to look when a workflow that should match does not.
+:::
+
+**An identity token can be exchanged once.** Harper records a SHA-256 fingerprint of each spent token in `system.hdb_oidc_token_use`, expiring with the token itself, so the table stays proportional to in-flight tokens and never holds a credential. The record is written *before* the operation token is minted: if minting then fails the identity token is burned, costing a CI re-run, where the reverse order would leave a spendable token behind.
+
+That replay check is replicated, but replication is asynchronous, so two simultaneous replays against **different nodes** can both succeed. This is not a privilege escalation — whoever holds the token could obtain one operation token regardless — and what it does stop is the realistic case: a token that leaks after a legitimate run and is reused inside its window.
+
+Exchanges are recorded in the authentication audit stream alongside Basic, Bearer, and mTLS events, for failures as well as successes — a run repeatedly failing to authenticate is what an audit trail is for. Enable it with `logging.auditAuthEvents.logSuccessful` and `logging.auditAuthEvents.logFailed`.
+
+#### `list_oidc_trust`
+
+Lists every policy, **including disabled ones**, sorted by `id`. **super_user only** — the policy set names exactly which repository and workflow are worth compromising.
+
+```json
+{ "operation": "list_oidc_trust" }
+```
+
+Returns `{ "policies": [ ... ] }`. Each entry carries `id`, `issuer`, `audience`, `claims`, `user`, `enabled`, `description`, `updated_by`, and timestamps.
+
+#### `drop_oidc_trust`
+
+Deletes a policy, revoking every workflow that matched it. **super_user only.** Fails with `404` if no policy has that `id`.
+
+```json
+{ "operation": "drop_oidc_trust", "id": "my-app-prod" }
+```
+
 ---
 
 ## Components
@@ -581,6 +720,7 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | --------------------------- | ----------------------------------------------------------------------- | ------------- |
 | `add_component`             | Creates a new component project from a template                         | super_user    |
 | `deploy_component`          | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
+| `revert_component`          | Puts a component's retained previous version back in service            | super_user    |
 | `package_component`         | Packages a component project into a base64-encoded tar                  | super_user    |
 | `drop_component`            | Deletes a component or a file within a component                        | super_user    |
 | `get_components`            | Lists all component files and config                                    | super_user    |
@@ -600,14 +740,24 @@ Detailed documentation: [Components Overview](../components/overview.md)
 
 ### `deploy_component`
 
+<VersionBadge type="changed" version="v5.3.0" />
+
 Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
 
-Across a cluster, `deploy_component` runs in two phases so a deploy is all-or-nothing at go-live:
+Across a cluster, `deploy_component` runs in two phases separated by an **all-nodes staging barrier**:
 
 1. **Stage** — the incoming version is downloaded/packed, extracted, and `npm install`ed into a hidden staging directory on **every** node, without touching the live component.
-2. **Activate** — only after every node reports a successful stage does any node atomically swap the staged copy into the live path and restart.
+2. **Activate** — only after every node reports a successful stage does any node atomically swap the staged copy into the live path.
 
-If a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on every node, rather than leaving part of the cluster half-updated. The request and response shape are unchanged; the two phases are internal.
+The barrier is what the two phases buy you: if a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on **every** node, rather than leaving part of the cluster half-updated. That is the class of failure — by far the most common one — that a two-phase deploy eliminates.
+
+It is not, however, all-or-nothing at go-live. Activation still happens per node, so a swap that fails on one node after others have already gone live leaves the cluster running mixed versions until you resolve it, and there is deliberately no automatic rollback — see [activation failures](#activation-failures) below. The request and response shape are unchanged; the two phases are internal.
+
+:::note
+Two-phase deploy requires operation replication **and** replication of the `system` database, because the staging barrier is coordinated through a replicated deployment row.
+
+A deploy on a cluster where `system` is excluded from replication silently takes the legacy one-shot path instead: no staging barrier, and no retained previous version for [`revert_component`](#revert_component) to roll back to. The staged-phase parameters are not silently downgraded that way — `activate: false` and `deployment_id` are **rejected** with an explanatory error rather than going live unexpectedly, as is `two_phase: true` itself.
+:::
 
 :::note
 Deploying a **brand-new** component without a restart (`"restart": false`, or omitting `restart`) marks a restart as required — `get_status` reports `restartRequired: true`, and requests to the new component's routes return an actionable 404 explaining that a restart is needed. A never-loaded component can't serve its routes until Harper restarts, so this makes that state visible instead of silent. Each node reports this for itself, since whether the component was already active can differ per node. Redeploying a component that is **already** live does not set the flag: that component's own file watcher requests a restart only if the update actually needs one.
@@ -615,15 +765,40 @@ Deploying a **brand-new** component without a restart (`"restart": false`, or om
 
 Additional parameters:
 
-- `urlPath` — override the HTTP URL path the component is mounted at (e.g. `"/api/v2"`)
+- `urlPath` — the HTTP URL path the component is mounted at (e.g. `"/api/v2"`). Must not contain `..` or `.` path segments. Persisted on the component's root-config entry; see [HTTP middleware routing](../http/overview.md#middleware-routing).
+- `host` <VersionBadge version="v5.2.0" /> — the virtual hostname the component is served on (e.g. `"api.example.com"`). Must be a bare hostname or IPv6 literal — no scheme, port, path, or brackets. Persisted alongside `urlPath`.
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
 - `activate` — set to `false` to **stage only** and stop before go-live. The build is prepared and verified on every node and the response returns a `deployment_id` in a `staged` state; nothing goes live. Activate it later by calling `deploy_component` again with that `deployment_id` (see below). Useful for pre-staging a release and flipping it live in a separate, fast step.
 - `deployment_id` — activate a previously-staged deployment (from an `activate: false` call). No new payload is fetched or installed; the already-staged build is swapped live cluster-wide. `project` is still required. For a `package` deploy you do not need to repeat `package` here: the identifier and credential references recorded when it was staged are recovered from the deployment and persisted to root config at activation, on every node — so a later restart or a newly joined peer reinstalls the version you activated.
-- `revert_on_failure` — if the activate phase fails on some nodes (leaving the cluster split across versions), automatically swap the nodes that did activate back to their previous version so the cluster reconverges. Off by default. Applies to both a full deploy and a `deployment_id` activate.
 - `ignore_replication_errors` — treat replication/peer failures as non-fatal (best-effort deploy to a partially-available cluster). This also opts out of the stage barrier. Applies to both a full deploy and a `deployment_id` activate.
 - `deployment_timeout` — per-deploy budget (ms) for peers to receive the replicated deployment row; defaults to 120000.
 - `two_phase` — set to `false` to force the legacy single-phase (in-place) deploy instead of stage-then-activate.
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
+
+`urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
+
+#### Deploy modes
+
+`activate`, `deployment_id`, `two_phase`, and `replicated` are not independent knobs — a request that asks for a staged phase without the machinery to support it is rejected rather than quietly doing something else. The valid combinations:
+
+| Request | Result |
+| --- | --- |
+| No mode parameters, `system` replicated | Two-phase stage → barrier → activate |
+| No mode parameters, `system` **not** replicated | Legacy one-shot deploy, no retained previous version |
+| `two_phase: false` | Legacy one-shot deploy, no retained previous version |
+| `activate: false` | Stage only; returns a `staged` `deployment_id` |
+| `deployment_id` | Activate that staged deployment cluster-wide |
+| `activate: false` or `deployment_id`, with `two_phase: false`, `replicated: false`, or `system` not replicated | **Rejected** |
+| `two_phase: true` with `replicated: false` or `system` not replicated | **Rejected** |
+| `revert_on_failure` (any value) | **Rejected** — see [activation failures](#activation-failures) |
+
+`revert_on_failure` was part of an earlier draft of this operation and is now refused outright rather than accepted and ignored, so a caller that was relying on it finds out.
+
+#### Activation failures
+
+If the activate phase fails on some nodes after others have already gone live, the deploy reports the split nodes and the deployment stays in an `activating` state rather than being rolled back automatically. Recover by rolling forward (stage and activate a known-good version) or by rolling back explicitly with [`revert_component`](#revert_component).
+
+There is deliberately no automatic rollback. Once a node is past the activation barrier, a peer reporting failure does not prove that peer did not activate — it can complete its swap and then fail, or die before replying — so automatically reverting "the failed nodes" risks rolling an untouched node an extra version back and leaving the cluster split three ways instead of converging it. A human deciding to roll forward or back is the only step that reliably converges the cluster.
 
 #### Deploy credentials (`credentials`)
 
@@ -719,25 +894,47 @@ Stage now, activate later:
 
 ### `revert_component`
 
-Swaps a component's live version back to its **retained previous version** across the cluster, then restarts. Every `deploy_component` activation retains the version it replaced (one previous version is kept per component), so `revert_component` is a fast rollback that does not re-fetch or re-install. The swap is bidirectional — reverting a revert rolls forward again.
+<VersionBadge version="v5.3.0" />
 
-This supports customer-driven rollback: deploy a new version, run your own health checks against it, and revert if you are not happy — even when the cluster otherwise looks healthy.
+Puts a component's **retained previous version** back in service across the cluster. This is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
+
+This is the rollback for the bad release you just shipped: deploy a new version, run your own health checks against it, and put the old one back if you are not happy — even when the cluster otherwise looks healthy.
+
+:::caution
+**Only a two-phase activation retains a previous version.** The retained copy is created by the activate phase, so `revert_component` can only roll back to a version that went live that way.
+
+A version deployed with `two_phase: false`, or deployed on a cluster where the `system` database is excluded from replication, leaves nothing to revert to — and the call fails, no matter how many times that component has been deployed. If rollback matters, confirm the deploy took the two-phase path rather than assuming repeated deploys have built up a rollback target.
+:::
+
+`to_deployment_id` is **required**, and names the deployment you expect to be live once the call returns:
 
 ```json
 {
 	"operation": "revert_component",
 	"project": "my-app",
+	"to_deployment_id": "a3f8c2d1-...",
 	"restart": "rolling"
 }
 ```
 
-`revert_component` fails with "no previous version is retained" for a component that has only ever been deployed once (nothing to revert to).
+Naming the target is what makes the operation safe to retry. If that version is **already live**, the call succeeds without changing anything — so a client that loses the response and retries cannot flip the rejected release back in. If it matches the retained previous version, the swap happens and the version it displaced becomes the new retained previous, so an explicitly targeted revert of a revert rolls forward again.
 
-:::caution
-Reverting swaps the **live directories** on the nodes currently in the cluster; it does not rewrite the component's stored `package:` reference in `harperdb-config.yaml`. For a `package` deploy that means a revert is not a config-level rollback: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs from the stored package reference at boot, so it comes up on the version you reverted away from rather than the one every other node is running.
+| Parameter                   | Description                                                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `project`                   | **Required.** The component to revert.                                                                                           |
+| `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it. |
+| `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart. **Optional** — omitted, the files are swapped but Harper is not restarted. |
+| `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                |
+| `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                             |
+| `force`                     | Bypass the safety checks on the revert target. Reserved for recovering a component whose retained state is inconsistent.          |
 
-To roll back durably for a `package` deploy, deploy the older version explicitly (`deploy_component` with the previous `package` reference) instead of, or after, reverting. `revert_component` is the fast live-instance swap; an explicit deploy is what changes what a future node will install.
-:::
+`restart` being optional matters more here than on a deploy: a reverted component whose code is already loaded keeps serving the version you just rolled away from until something restarts it. Pass `restart: "rolling"` unless you are deliberately batching the restart yourself.
+
+The response reports `reverted` (`false` when the target was already live), `to_deployment_id`, and `from_deployment_id` — the version taken out of service, which is also recorded as `rollback_of` on the new `hdb_deployment` row for the audit trail.
+
+**Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails with "no previous version is retained" whenever there is no retained copy — a component deployed only once, or one whose deploys took the one-shot path described above — and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
+
+Reverting also rewrites the component's stored `package:` reference in `harperdb-config.yaml` and its entry in the boot-time application lock, as part of the same operation. So a revert is a config-level rollback too: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs the version the cluster is actually running, not the one you reverted away from. Reverting away from a `package` deploy to a payload-deployed version removes the package reference entirely, for the same reason.
 
 ### Deployment Operations
 
@@ -858,7 +1055,15 @@ The deployment must be in a terminal status (`success`, `failed`, or `rolled_bac
 
 Adds an SSH key (must be ed25519) for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
 
-The stored private key is encrypted at rest and only ever crosses the cluster as ciphertext; `list_ssh_keys` and the logs never return key material.
+`list_ssh_keys` and the logs never return key material.
+
+The stored private key is encrypted at rest and crosses the cluster as ciphertext **when secret custody is configured**. Custody is present by default — the file tier generates a cluster keypair on first boot — so this is the normal case.
+
+:::warning
+On a node with **no** secret custody registered, `add_ssh_key` stores and replicates the private key in **plaintext**. It logs a WARN saying so and the operation still succeeds, because SSH keys predate custody and must keep working on a node that has none.
+
+That means encryption at rest is a property of your configuration, not a guarantee of the operation. If you are relying on it — and `generate: true` in particular reads as though the key can never be exposed — verify `secretCustody` is configured on every node in the cluster, and check the logs for that warning after adding a key. See [Secrets](../security/secrets.md).
+:::
 
 Adding an existing key:
 
@@ -873,6 +1078,8 @@ Adding an existing key:
 ```
 
 #### Server-side key generation (`generate`)
+
+<VersionBadge version="v5.3.0" />
 
 With `generate: true`, Harper mints an ed25519 keypair on the node handling the request and returns only the **public** half. The private key is created inside the cluster and never travels from a client, so it can't be captured in a shell history, CI log, or request body on the way in:
 
@@ -897,10 +1104,10 @@ Response:
 
 Register that `public_key` with your git host (e.g. as a GitHub deploy key) to authorize the deploy. The generated key is commented `harper:<name>` so it's identifiable in the host's key list.
 
-`key` and `generate` are mutually exclusive — sending both is rejected. Generation runs `ssh-keygen` on the node; if it isn't available on the PATH the operation fails with an actionable error rather than storing a partial key.
+`key` and `generate` are mutually exclusive — sending both is rejected. Generation happens in-process, so it requires no `ssh-keygen` binary on the host and the minted private key is never written to a temporary file on its way into storage.
 
 :::note
-`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the sealed private key and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
+`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the private key (sealed, subject to the custody caveat above) and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
 :::
 
 ---
@@ -1172,6 +1379,80 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 
 ---
 
+## Backup & Restore
+
+Operations for backing up and restoring databases. Managed backups <VersionBadge version="v5.2.0" /> require the RocksDB storage engine; `get_backup` works with both RocksDB and LMDB.
+
+Detailed documentation: [Backup Operations](../backups/operations.md)
+
+| Operation        | Description                                                         | Role Required |
+| ---------------- | ------------------------------------------------------------------- | ------------- |
+| `create_backup`  | Creates a managed, incremental directory backup of a database (job) | super_user    |
+| `list_backups`   | Lists the managed backups for a database                            | super_user    |
+| `verify_backup`  | Verifies a managed backup's integrity (job)                         | super_user    |
+| `delete_backup`  | Deletes a single managed backup                                     | super_user    |
+| `purge_backups`  | Deletes all but the newest `keep_count` managed backups             | super_user    |
+| `restore_backup` | Restores a database from a managed backup (job)                     | super_user    |
+| `get_backup`     | Streams a full snapshot of a database in the response for download  | super_user    |
+
+### `create_backup`
+
+Creates an incremental directory backup of the database under the configured backup root. Runs as a background [job](#jobs) that reports the new `backup_id`.
+
+```json
+{ "operation": "create_backup", "database": "dev" }
+```
+
+### `list_backups`
+
+Returns the managed backups for a database, each with its `backup_id`, `timestamp`, `size`, and `file_count`.
+
+```json
+{ "operation": "list_backups", "database": "dev" }
+```
+
+### `verify_backup`
+
+Verifies a managed backup's integrity, including checksums when `verify_checksum` is `true` (slower). Runs as a background [job](#jobs).
+
+```json
+{ "operation": "verify_backup", "database": "dev", "backup_id": 1, "verify_checksum": true }
+```
+
+### `delete_backup`
+
+Deletes a single managed backup.
+
+```json
+{ "operation": "delete_backup", "database": "dev", "backup_id": 1 }
+```
+
+### `purge_backups`
+
+Deletes all but the newest `keep_count` managed backups.
+
+```json
+{ "operation": "purge_backups", "database": "dev", "keep_count": 3 }
+```
+
+### `restore_backup`
+
+Restores a database in place from a managed backup, as a background [job](#jobs). `backup_id` defaults to the latest backup. Restoring the `system` database, or a database a loaded component keeps open, requires the server to be stopped — see [when can a database be restored?](../backups/overview.md#when-can-a-database-be-restored)
+
+```json
+{ "operation": "restore_backup", "database": "dev", "backup_id": 1 }
+```
+
+### `get_backup`
+
+Streams a full snapshot of the specified database in the HTTP response for download. For RocksDB <VersionBadge type="changed" version="v5.2.0" />, a `tar` archive of the current state (including file-backed blobs unless `exclude_blobs` is set), gzipped by default; for LMDB, the `.mdb` file.
+
+```json
+{ "operation": "get_backup", "database": "dev" }
+```
+
+---
+
 ## Jobs
 
 Operations for querying background job status.
@@ -1211,13 +1492,13 @@ Operations for reading Harper logs.
 
 Detailed documentation: [Logging Operations](../logging/operations.md)
 
-| Operation                        | Description                                                            | Role Required |
-| -------------------------------- | ---------------------------------------------------------------------- | ------------- |
-| `read_log`                       | Returns entries from the primary `hdb.log`                             | super_user    |
-| `read_transaction_log`           | Returns transaction history for a table                                | super_user    |
-| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp                 | super_user    |
-| `read_audit_log`                 | Returns verbose audit history for a table (requires audit log enabled) | super_user    |
-| `delete_audit_logs_before`       | Deletes audit log entries older than a timestamp                       | super_user    |
+| Operation                        | Description                                                                                                              | Role Required |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| `read_log`                       | Returns entries from the primary `hdb.log`                                                                               | super_user    |
+| `read_transaction_log`           | Returns transaction history for a table                                                                                  | super_user    |
+| `delete_transaction_logs_before` | Deletes transaction log entries older than a timestamp                                                                   | super_user    |
+| `read_audit_log`                 | Returns verbose transaction history for a table, including original record values (requires transaction logging enabled) | super_user    |
+| `delete_audit_logs_before`       | Deletes transaction log entries older than a timestamp (deprecated alias of `delete_transaction_logs_before`)            | super_user    |
 
 ### `read_log`
 
@@ -1247,7 +1528,7 @@ Returns transaction history for a specific table. Optionally filter by `from`/`t
 
 ### `read_audit_log`
 
-Returns verbose audit history including original record state. Requires `logging.auditLog: true` in configuration. Filter by `search_type`: `hash_value`, `timestamp`, or `username`.
+Returns verbose transaction history including original record state. Requires transaction logging (`logging.auditLog: true`) in configuration. Filter by `search_type`: `hash_value`, `timestamp`, or `username`.
 
 ```json
 {

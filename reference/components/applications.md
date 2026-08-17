@@ -97,18 +97,24 @@ harper deploy \
   replicated=true
 ```
 
-Or directly via command parameters (not recommended for production):
+### Dedicated Authentication Parameters
+
+<VersionBadge version="v5.2.0" />
+
+For one-off remote commands, dedicated authentication parameters are also available (not recommended for production):
 
 ```sh
 harper deploy \
   project=<name> \
   package=<package> \
-  username=<username> \
-  password=<password> \
+  auth_username=<username> \
+  auth_password=<password> \
   target=<remote> \
   restart=true \
   replicated=true
 ```
+
+Dedicated authentication parameters take precedence over environment variables and saved login tokens. See [CLI Authentication](../cli/authentication.md#authentication-precedence) for the full order and security guidance.
 
 ### Package Sources
 
@@ -132,7 +138,7 @@ For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to re
 
 ### Deploying by Reference
 
-Available since: v5.2.0
+<VersionBadge version="v5.3.0" />
 
 Omitting `package` uploads a snapshot of your working directory. The result is an anonymous artifact: nothing records _which_ commit it came from, so reproducing it later — or stepping back to a previous release — means finding those exact files again.
 
@@ -190,7 +196,7 @@ Deploying by reference means the **cluster** installs and builds the component f
 
 ### Provisioning a Deploy Credential
 
-Available since: v5.2.0
+<VersionBadge version="v5.3.0" />
 
 `harper deploy setup=true` provisions the credential a private deploy needs. It's interactive, and runs once per component and source:
 
@@ -198,19 +204,24 @@ Available since: v5.2.0
 harper deploy setup=true
 ```
 
-It asks which private source needs a credential (a GitHub repository or an npm registry) and sources a token — from your `gh` CLI session, or one you paste — then:
+It asks which private source needs a credential (a GitHub repository or an npm registry), sources a token, and then:
 
 1. Fetches the cluster's public key with `get_secrets_public_key`.
 2. **Encrypts the token locally** into an `enc:v1:` envelope.
-3. Stores only the ciphertext via `set_secret`, granted to the component.
-4. Prints the `credentials` reference for the deploy to use.
+3. Stores only the ciphertext with `set_secret`, in the component-scoped tier.
+4. Grants this component permission to resolve it with `grant_secret`.
+5. Prints the `credentials` reference for the deploy to use.
 
 The plaintext never leaves your machine: the operations API, its logs, and replication only ever carry the envelope, and the cluster decrypts it in memory at deploy time. This requires a cluster with secrets custody (Harper Pro / Fabric) — see [Client-side encryption](../security/secrets.md#client-side-encryption-encrypt-before-it-leaves-the-client).
+
+**Prefer a fine-grained PAT.** For a GitHub repository the prompt offers, and defaults to, pasting a fine-grained personal access token with **Contents: Read-only on that one repository**. If you have the `gh` CLI authenticated it also offers its session token, which is one keypress cheaper but typically carries `repo`, `read:org`, `gist`, and `workflow` scopes across your whole account; choosing it prints a warning. What this flow seals is durable and replayed on every cold deploy and rollback, so it is worth being the narrowest credential that does the job.
+
+The secret is stored **scoped to the component**, never in the global `processEnv` tier that every component and child process can read. If a global secret already exists at the derived name, it is converted to the scoped tier — the name is derived from the component, so a global secret there was never serving anything the scoped one doesn't. Existing grants on the row are preserved.
 
 Because the stored token is durable, later deploys — including re-fetching an older reference — reuse it without re-entering anything.
 
 :::note
-Rolling back to the **immediately previous** version needs no credential at all: [`revert_component`](../operations-api/operations.md#revert_component) swaps in the retained previous build without re-fetching from the source.
+Rolling back to the **immediately previous** version needs no credential at all: [`revert_component`](../operations-api/operations.md#revert_component) puts the retained previous build back in service without re-fetching from the source, and updates the stored `package:` reference to match so a rebuilt node installs the version the cluster is running. It takes a required `to_deployment_id`, so re-running it is safe.
 :::
 
 ## Dependency Management
