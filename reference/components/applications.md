@@ -194,14 +194,19 @@ Deploying by reference means the **cluster** installs and builds the component f
 harper deploy setup=true
 ```
 
-It asks which private source needs a credential (a GitHub repository or an npm registry) and sources a token — from your `gh` CLI session, or one you paste — then:
+It asks which private source needs a credential (a GitHub repository or an npm registry), sources a token, and then:
 
 1. Fetches the cluster's public key with `get_secrets_public_key`.
 2. **Encrypts the token locally** into an `enc:v1:` envelope.
-3. Stores only the ciphertext via `set_secret`, granted to the component.
-4. Prints the `credentials` reference for the deploy to use.
+3. Stores only the ciphertext with `set_secret`, in the component-scoped tier.
+4. Grants this component permission to resolve it with `grant_secret`.
+5. Prints the `credentials` reference for the deploy to use.
 
 The plaintext never leaves your machine: the operations API, its logs, and replication only ever carry the envelope, and the cluster decrypts it in memory at deploy time. This requires a cluster with secrets custody (Harper Pro / Fabric) — see [Client-side encryption](../security/secrets.md#client-side-encryption-encrypt-before-it-leaves-the-client).
+
+**Prefer a fine-grained PAT.** For a GitHub repository the prompt offers, and defaults to, pasting a fine-grained personal access token with **Contents: Read-only on that one repository**. If you have the `gh` CLI authenticated it also offers its session token, which is one keypress cheaper but typically carries `repo`, `read:org`, `gist`, and `workflow` scopes across your whole account; choosing it prints a warning. What this flow seals is durable and replayed on every cold deploy and rollback, so it is worth being the narrowest credential that does the job.
+
+The secret is stored **scoped to the component**, never in the global `processEnv` tier that every component and child process can read. If a global secret already exists at the derived name, it is converted to the scoped tier — the name is derived from the component, so a global secret there was never serving anything the scoped one doesn't. Existing grants on the row are preserved.
 
 Because the stored token is durable, later deploys — including re-fetching an older reference — reuse it without re-entering anything.
 
