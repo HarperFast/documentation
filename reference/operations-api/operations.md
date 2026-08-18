@@ -532,14 +532,14 @@ Operations for JWT token creation and refresh.
 
 Detailed documentation: [JWT Authentication](../security/jwt-authentication.md)
 
-| Operation                      | Description                                                   | Role Required          |
-| ------------------------------ | ------------------------------------------------------------- | ---------------------- |
-| `create_authentication_tokens` | Creates an operation token and refresh token for a user       | none (unauthenticated) |
-| `refresh_operation_token`      | Creates a new operation token from a refresh token            | any                    |
-| `exchange_oidc_token`          | Trades a CI workload identity token for an operation token    | none (unauthenticated) |
-| `add_oidc_trust`               | Creates or replaces an OIDC trust policy                      | super_user             |
-| `list_oidc_trust`              | Lists all OIDC trust policies, including disabled ones        | super_user             |
-| `drop_oidc_trust`              | Deletes an OIDC trust policy                                  | super_user             |
+| Operation                      | Description                                                | Role Required          |
+| ------------------------------ | ---------------------------------------------------------- | ---------------------- |
+| `create_authentication_tokens` | Creates an operation token and refresh token for a user    | none (unauthenticated) |
+| `refresh_operation_token`      | Creates a new operation token from a refresh token         | any                    |
+| `exchange_oidc_token`          | Trades a CI workload identity token for an operation token | none (unauthenticated) |
+| `add_oidc_trust`               | Creates or replaces an OIDC trust policy                   | super_user             |
+| `list_oidc_trust`              | Lists all OIDC trust policies, including disabled ones     | super_user             |
+| `drop_oidc_trust`              | Deletes an OIDC trust policy                               | super_user             |
 
 ### `create_authentication_tokens`
 
@@ -606,15 +606,15 @@ Creates or replaces a trust policy. **super_user only** — a policy lets an ext
 }
 ```
 
-| Parameter     | Description                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `id`          | **Required.** Policy identifier, 1–128 characters of letters, numbers, `_`, `-`, and `.`.                                      |
-| `issuer`      | **Required.** The token issuer (`iss`) this policy trusts.                                                                     |
-| `audience`    | **Required.** The audience the token must be addressed to. Must identify **this instance** — see below.                        |
-| `claims`      | **Required.** The claim constraints a token must satisfy. At least one, and specific enough for the issuer's profile.           |
-| `user`        | **Required.** The Harper user a matching run authenticates as. Must already exist and be active.                               |
-| `enabled`     | Defaults to `true`. A disabled policy is kept but never matched.                                                              |
-| `description` | Optional free text, up to 1024 characters.                                                                                     |
+| Parameter     | Description                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | **Required.** Policy identifier, 1–128 characters of letters, numbers, `_`, `-`, and `.`.                                  |
+| `issuer`      | **Required.** The token issuer (`iss`) this policy trusts.                                                                 |
+| `audience`    | **Required.** The audience the token must be addressed to. Should identify **this instance**; enforced for GitHub Actions. |
+| `claims`      | **Required.** The claim constraints a token must satisfy. At least one, and specific enough for the issuer's profile.      |
+| `user`        | **Required.** The Harper user a matching run authenticates as. Must already exist and be active.                           |
+| `enabled`     | Defaults to `true`. A disabled policy is kept but never matched.                                                           |
+| `description` | Optional free text, up to 1024 characters.                                                                                 |
 
 This **replaces** the policy rather than merging into it. A partial update is how an over-broad policy gets created by accident, and the point of `claims` is that every constraint in it was written deliberately.
 
@@ -628,17 +628,17 @@ This **replaces** the policy rather than merging into it. A partial update is ho
 
 A constrained claim that is **absent** from the token fails rather than passes, so a policy cannot be weakened by an issuer that stops emitting a claim.
 
-**The audience must be instance-specific.** For GitHub Actions, `https://github.com/<owner>` is rejected: that is the provider's default, shared by every repository under the owner, so accepting it would make a token minted by any of them valid here — the exact thing the audience field exists to prevent.
+**The audience should be instance-specific.** For GitHub Actions this is enforced: `https://github.com/<owner>` is rejected, because that is the provider's default, shared by every repository under the owner, so accepting it would make a token minted by any of them valid here — the exact thing the audience field exists to prevent. For an issuer with no registered profile the audience is not checked for specificity, and the required `sub` pin is what binds the policy to one principal instead.
 
 ##### Policy specificity for GitHub Actions
 
 For `https://token.actions.githubusercontent.com`, a policy must satisfy all three of these, each closing a distinct way a policy can be accidentally broad:
 
-| Requirement            | Satisfied by one of                                                     | Left open otherwise                          |
-| ---------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| **Pin the repository** | `repository_id`, `repository`                                           | Any repository                                |
-| **Pin the workflow**   | `workflow_ref`, `workflow_path`, `job_workflow_ref`, `job_workflow_path` | Any workflow in that repository               |
-| **Gate the ref**       | `workflow_ref`, `job_workflow_ref`, `ref`, `environment`                | Any branch that can be pushed to the repository |
+| Requirement            | Satisfied by one of                                                      | Left open otherwise                             |
+| ---------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
+| **Pin the repository** | `repository_id`, `repository`                                            | Any repository                                  |
+| **Pin the workflow**   | `workflow_ref`, `workflow_path`, `job_workflow_ref`, `job_workflow_path` | Any workflow in that repository                 |
+| **Gate the ref**       | `workflow_ref`, `job_workflow_ref`, `ref`, `environment`                 | Any branch that can be pushed to the repository |
 
 The ref gate is the one worth understanding, and it is stricter than npm's model. Pinning repository and workflow without also pinning a ref is not safe: anyone who can push a branch can add the trusted workflow to that branch and mint a token. npm accepts that shape and relies on environment protection instead.
 
@@ -654,11 +654,11 @@ Consequences worth planning around:
 
 An issuer with no registered profile gets a strict generic profile: the policy must pin **`sub`**. That is the one claim every OIDC issuer defines as identifying a single principal, and it makes workload identity work with no provider-specific code — a Kubernetes service-account token (`system:serviceaccount:<namespace>:<name>`), a GCP service account, and a SPIFFE SVID all carry a stable canonical subject.
 
-GitHub Actions needs its own profile precisely because its `sub` is the one claim you should *not* pin.
+GitHub Actions needs its own profile precisely because its `sub` is the one claim you should _not_ pin.
 
 #### `exchange_oidc_token`
 
-Trades an identity token for a Harper operation token. **Unauthenticated by design** — this operation *is* the authentication, the way `create_authentication_tokens` is against a password. The CLI calls it for you; you would call it directly only from a client that mints its own requests.
+Trades an identity token for a Harper operation token. **Unauthenticated by design** — this operation _is_ the authentication, the way `create_authentication_tokens` is against a password. The CLI calls it for you; you would call it directly only from a client that mints its own requests.
 
 ```json
 {
@@ -684,7 +684,7 @@ The operation token is valid for **one hour** — long enough to cover a slow de
 **Every rejection returns the same message.** The endpoint is unauthenticated, so a caller told which check failed could enumerate a policy one claim at a time. The specific reason is written to the `oidc-trust` logger, which is where to look when a workflow that should match does not.
 :::
 
-**An identity token can be exchanged once.** Harper records a SHA-256 fingerprint of each spent token in `system.hdb_oidc_token_use`, expiring with the token itself, so the table stays proportional to in-flight tokens and never holds a credential. The record is written *before* the operation token is minted: if minting then fails the identity token is burned, costing a CI re-run, where the reverse order would leave a spendable token behind.
+**An identity token can be exchanged once.** Harper records a SHA-256 fingerprint of each spent token in `system.hdb_oidc_token_use`, expiring with the token itself, so the table stays proportional to in-flight tokens and never holds a credential. The record is written _before_ the operation token is minted: if minting then fails the identity token is burned, costing a CI re-run, where the reverse order would leave a spendable token behind.
 
 That replay check is replicated, but replication is asynchronous, so two simultaneous replays against **different nodes** can both succeed. This is not a privilege escalation — whoever holds the token could obtain one operation token regardless — and what it does stop is the realistic case: a token that leaks after a legitimate run and is reused inside its window.
 
@@ -781,16 +781,18 @@ Additional parameters:
 
 `activate`, `deployment_id`, `two_phase`, and `replicated` are not independent knobs — a request that asks for a staged phase without the machinery to support it is rejected rather than quietly doing something else. The valid combinations:
 
-| Request | Result |
-| --- | --- |
-| No mode parameters, `system` replicated | Two-phase stage → barrier → activate |
-| No mode parameters, `system` **not** replicated | Legacy one-shot deploy, no retained previous version |
-| `two_phase: false` | Legacy one-shot deploy, no retained previous version |
-| `activate: false` | Stage only; returns a `staged` `deployment_id` |
-| `deployment_id` | Activate that staged deployment cluster-wide |
-| `activate: false` or `deployment_id`, with `two_phase: false`, `replicated: false`, or `system` not replicated | **Rejected** |
-| `two_phase: true` with `replicated: false` or `system` not replicated | **Rejected** |
-| `revert_on_failure` (any value) | **Rejected** — see [activation failures](#activation-failures) |
+| Request                                                                                                        | Result                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| No mode parameters, `system` replicated                                                                        | Two-phase stage → barrier → activate                                                    |
+| No mode parameters, `system` **not** replicated                                                                | Legacy one-shot deploy, no retained previous version                                    |
+| `two_phase: false`                                                                                             | Legacy one-shot deploy, no retained previous version                                    |
+| `replicated: false`                                                                                            | Legacy one-shot deploy on this node only, no retained previous version                  |
+| `ignore_replication_errors: true`                                                                              | Stage barrier **not enforced** — a node that fails to stage no longer blocks activation |
+| `activate: false`                                                                                              | Stage only; returns a `staged` `deployment_id`                                          |
+| `deployment_id`                                                                                                | Activate that staged deployment cluster-wide                                            |
+| `activate: false` or `deployment_id`, with `two_phase: false`, `replicated: false`, or `system` not replicated | **Rejected**                                                                            |
+| `two_phase: true` with `replicated: false` or `system` not replicated                                          | **Rejected**                                                                            |
+| `revert_on_failure` (any value)                                                                                | **Rejected** — see [activation failures](#activation-failures)                          |
 
 `revert_on_failure` was part of an earlier draft of this operation and is now refused outright rather than accepted and ignored, so a caller that was relying on it finds out.
 
@@ -919,14 +921,14 @@ A version deployed with `two_phase: false`, or deployed on a cluster where the `
 
 Naming the target is what makes the operation safe to retry. If that version is **already live**, the call succeeds without changing anything — so a client that loses the response and retries cannot flip the rejected release back in. If it matches the retained previous version, the swap happens and the version it displaced becomes the new retained previous, so an explicitly targeted revert of a revert rolls forward again.
 
-| Parameter                   | Description                                                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `project`                   | **Required.** The component to revert.                                                                                           |
-| `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it. |
+| Parameter                   | Description                                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project`                   | **Required.** The component to revert.                                                                                                          |
+| `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it.                |
 | `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart. **Optional** — omitted, the files are swapped but Harper is not restarted. |
-| `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                |
-| `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                             |
-| `force`                     | Bypass the safety checks on the revert target. Reserved for recovering a component whose retained state is inconsistent.          |
+| `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                               |
+| `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                                            |
+| `force`                     | Permit the operation on a protected core component name. Does **not** relax the `to_deployment_id` checks.                                      |
 
 `restart` being optional matters more here than on a deploy: a reverted component whose code is already loaded keeps serving the version you just rolled away from until something restarts it. Pass `restart: "rolling"` unless you are deliberately batching the restart yourself.
 
