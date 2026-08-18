@@ -253,7 +253,9 @@ Requesting a GitHub Actions identity token for https://my-instance.harperdb.io:9
 Authenticated as 'ci-deploy' via OIDC trust policy 'my-app-prod'.
 ```
 
-If Harper rejects the token it says so and continues unauthenticated, which surfaces as a 401 on the operation itself. The server deliberately does not report which check failed — see [`exchange_oidc_token`](../operations-api/operations.md#exchange_oidc_token) — so diagnose with `list_oidc_trust` and the instance's `oidc-trust` log.
+If Harper rejects the token, the CLI reports that and carries on down the precedence list rather than aborting. Usually nothing is left, so the operation returns 401 — but if the command also passes `username=` and `password=`, the legacy fallback applies them and the operation **succeeds as that user instead**. A policy mismatch can therefore look like a working deploy under the wrong identity, so don't leave a payload credential pair on a command you expect the exchange to authenticate.
+
+The server deliberately does not report which check failed — see [`exchange_oidc_token`](../operations-api/operations.md#exchange_oidc_token) — so diagnose with `list_oidc_trust` and the instance's `oidc-trust` log.
 
 #### Method 3: Dedicated Authentication Parameters
 

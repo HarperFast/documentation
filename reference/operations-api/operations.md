@@ -613,10 +613,39 @@ Creates or replaces a trust policy. **super_user only** — a policy lets an ext
 | `audience`    | **Required.** The audience the token must be addressed to. Should identify **this instance**; enforced for GitHub Actions. |
 | `claims`      | **Required.** The claim constraints a token must satisfy. At least one, and specific enough for the issuer's profile.      |
 | `user`        | **Required.** The Harper user a matching run authenticates as. Must already exist and be active.                           |
+| `operations`  | Narrow the minted token to these operations, 1–100 unique names. Omit for the user's full role — see below.                |
 | `enabled`     | Defaults to `true`. A disabled policy is kept but never matched.                                                           |
 | `description` | Optional free text, up to 1024 characters.                                                                                 |
 
 This **replaces** the policy rather than merging into it. A partial update is how an over-broad policy gets created by accident, and the point of `claims` is that every constraint in it was written deliberately.
+
+##### Narrowing what the token may do (`operations`)
+
+The user the policy names is the privilege boundary: a matching run gets that user's role. `operations` narrows it further, so one CI user can back several policies that each do less than the role allows:
+
+```json
+{
+	"operation": "add_oidc_trust",
+	"id": "my-app-prod",
+	"issuer": "https://token.actions.githubusercontent.com",
+	"audience": "https://my-instance.harperdb.io:9925/",
+	"user": "ci-deploy",
+	"operations": ["deploy_component", "get_deployment", "restart_service"],
+	"claims": { "repository_id": "67890", "environment": "production" }
+}
+```
+
+It is **narrowing only** — never widening. An operation the role forbids stays forbidden, so the scope cannot be used to grant something the user does not already have. Omit `operations` and the token carries the user's full role.
+
+Names are validated when the policy is written, against the same registry `add_role` and `alter_role` use, so a typo is rejected there rather than failing later inside CI with nothing to point at. One consequence: an operation a component registered at runtime with `server.registerOperation` is **not** recognized, because that registry is process-local, so a policy naming one is rejected. It fails closed — a rejected policy, never a widened one — and the same gap applies to `add_role` and `alter_role`.
+
+:::warning
+**The scope covers the Operations API and SQL, not the application data path.** It is enforced at the `verifyPerms` / `verifyPermsAST` gate, so a scoped token still carries the role's full table-level CRUD when it reaches an application's REST or GraphQL resources, which authorize through `checkPermission` instead.
+
+So `operations` bounds what a CI credential can _administer_, not what data it can read or write. If that matters, point the policy's `user` at a role that is itself least-privilege for the data the token can reach, rather than relying on the scope alone.
+:::
+
+A scoped token also cannot trade itself for a browser session: `create_authentication_tokens` with `purpose: "login"` is refused, because a session carries no operation scope and would silently restore the user's full role.
 
 `user` is resolved at write time. A policy naming a user that does not exist, or one that is inactive, is rejected — otherwise it would fail only at exchange time, inside CI, with nothing to point at. If the named user is a **super_user**, the policy is still created but the response carries a `warning`: any run matching it gains full administrative access.
 
@@ -628,7 +657,9 @@ This **replaces** the policy rather than merging into it. A partial update is ho
 
 A constrained claim that is **absent** from the token fails rather than passes, so a policy cannot be weakened by an issuer that stops emitting a claim.
 
-**The audience should be instance-specific.** For GitHub Actions this is enforced: `https://github.com/<owner>` is rejected, because that is the provider's default, shared by every repository under the owner, so accepting it would make a token minted by any of them valid here — the exact thing the audience field exists to prevent. For an issuer with no registered profile the audience is not checked for specificity, and the required `sub` pin is what binds the policy to one principal instead.
+**The audience should identify this instance.** For GitHub Actions, Harper rejects the provider's shared default — anything shaped like `https://github.com/<owner>` — because that value is shared by every repository under the owner, so accepting it would make a token minted by any of them valid here.
+
+That check is a guard against the one known-dangerous value, not a proof of correctness: Harper does not compare the audience against its own identity, so an arbitrary or mistyped value is accepted at write time and instead fails to match at exchange time, when the CLI derives the audience from its target URL. Use the instance URL your CI targets. For an issuer with no registered profile the audience is not checked for specificity at all, and the required `sub` pin is what binds the policy to one principal.
 
 ##### Policy specificity for GitHub Actions
 
@@ -638,7 +669,7 @@ For `https://token.actions.githubusercontent.com`, a policy must satisfy all thr
 | ---------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
 | **Pin the repository** | `repository_id`, `repository`                                            | Any repository                                  |
 | **Pin the workflow**   | `workflow_ref`, `workflow_path`, `job_workflow_ref`, `job_workflow_path` | Any workflow in that repository                 |
-| **Gate the ref**       | `workflow_ref`, `job_workflow_ref`, `ref`, `environment`                 | Any branch that can be pushed to the repository |
+| **Gate the ref**       | `workflow_ref`, `ref`, `environment`                                     | Any branch that can be pushed to the repository |
 
 The ref gate is the one worth understanding, and it is stricter than npm's model. Pinning repository and workflow without also pinning a ref is not safe: anyone who can push a branch can add the trusted workflow to that branch and mint a token. npm accepts that shape and relies on environment protection instead.
 
@@ -648,6 +679,7 @@ Consequences worth planning around:
 - **A tag-triggered release cannot pin `workflow_ref`**, since the tag is unknown when the policy is written. Pin `workflow_path` instead — Harper derives it from `workflow_ref` by removing the ref — and gate on `environment`.
 - **`ref_type: tag` is deliberately not accepted as a ref gate.** Anyone with push access can create a tag.
 - **`sub` is not accepted as a pin.** It varies by trigger, and its format changed for repositories created after 2026-07-15 (immutable subjects embed owner and repository ids), so a policy pinning it would have to handle two shapes indefinitely.
+- **`job_workflow_ref` pins the workflow but does not gate the ref.** In a reusable workflow it names the reusable workflow that ran, not the caller that invoked it, and its `@ref` suffix is that workflow's own branch — constant however it is called. Accepting it as a ref gate would admit any branch of any repository that references the reusable workflow. Pin the workflow with it if you like, then gate the ref with `workflow_ref`, `ref`, or `environment`.
 - **`pull_request_target` runs are denied** unless the policy explicitly constrains `event_name`. Such a run executes the base repository's workflow, with its secrets, while a fork controls the checked-out code. A plain `pull_request` run from a fork cannot mint at all, since it gets no `id-token: write`.
 
 ##### Other issuers
@@ -678,7 +710,7 @@ Response:
 }
 ```
 
-The operation token is valid for **one hour** — long enough to cover a slow deploy, short enough to be worthless by the time it reaches a log. No refresh token is issued; a subsequent run performs a new exchange.
+The operation token is valid for **one hour** — long enough to cover a slow deploy, short enough to bound the exposure if it leaks. That is a reduced window, not safety: within the hour it is a live credential carrying the policy's identity, so treat it like any other secret and keep it out of logs and step outputs. No refresh token is issued; a subsequent run performs a new exchange.
 
 :::note
 **Every rejection returns the same message.** The endpoint is unauthenticated, so a caller told which check failed could enumerate a policy one claim at a time. The specific reason is written to the `oidc-trust` logger, which is where to look when a workflow that should match does not.
@@ -698,15 +730,21 @@ Lists every policy, **including disabled ones**, sorted by `id`. **super_user on
 { "operation": "list_oidc_trust" }
 ```
 
-Returns `{ "policies": [ ... ] }`. Each entry carries `id`, `issuer`, `audience`, `claims`, `user`, `enabled`, `description`, `updated_by`, and timestamps.
+Returns `{ "policies": [ ... ] }`. Each entry carries `id`, `issuer`, `audience`, `claims`, `user`, `operations` (`null` when unscoped), `enabled`, `description`, `updated_by`, and timestamps.
 
 #### `drop_oidc_trust`
 
-Deletes a policy, revoking every workflow that matched it. **super_user only.** Fails with `404` if no policy has that `id`.
+Stops every workflow that matched the policy from exchanging again. **super_user only.** Fails with `404` if no policy has that `id`.
 
 ```json
 { "operation": "drop_oidc_trust", "id": "my-app-prod" }
 ```
+
+:::caution
+**This does not revoke operation tokens already issued.** The minted token is a stateless JWT valid until its one-hour expiry, so a token obtained moments before the policy was dropped keeps authorizing for the rest of that hour.
+
+Dropping the policy is therefore containment against _future_ runs. If you are responding to a suspected compromise rather than doing routine cleanup, also deactivate or re-role the user the policy named (`alter_user`), which is what stops a token that is already in someone's hands.
+:::
 
 ---
 

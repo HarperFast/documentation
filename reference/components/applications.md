@@ -142,7 +142,9 @@ For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to re
 
 Omitting `package` uploads a snapshot of your working directory. The result is an anonymous artifact: nothing records _which_ commit it came from, so reproducing it later — or stepping back to a previous release — means finding those exact files again.
 
-Deploying by **reference** sends a pinned git reference instead, and the cluster fetches that exact commit. Redeploying the same reference is an exact redeploy, and rolling back is deploying an older one.
+Deploying by **reference** sends a pinned git reference instead, and the cluster fetches that exact commit. Redeploying the same reference deploys the same source revision, and rolling back is deploying an older one.
+
+A pinned SHA fixes the _source_, not the built artifact. The cluster installs and builds from that source on each node, so unpinned dependency ranges, a mutable registry artifact, install scripts, or a different toolchain can still produce different bytes — or a failure — from the same commit. Commit your lockfile if you need the build itself to be reproducible.
 
 `harper deploy by_ref=true` builds that reference from the local git repository, so you don't assemble the URL yourself:
 
@@ -166,7 +168,7 @@ harper deploy ref=v1.2.0 restart=true replicated=true
 harper deploy ref=9f8c2a1 restart=true replicated=true
 ```
 
-**A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved locally and the full commit SHA is what ships. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
+**A reference is pinned to a SHA, not to the name you typed.** Tags and branches are resolved to a full commit SHA before the deploy is sent — from your local checkout when it has the ref, and from the remote when it doesn't, which is the usual case in a shallow CI clone. If neither can name a commit the deploy stops rather than sending the name for peers to resolve. This matters on a cluster: peers resolve the package independently, so a tag that moves mid-deploy — or a branch that advances — could otherwise leave nodes running different code.
 
 **Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns when the working tree is dirty, since uncommitted changes won't be part of the deploy.
 
