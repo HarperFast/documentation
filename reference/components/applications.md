@@ -190,7 +190,7 @@ Deploying by reference means the **cluster** installs and builds the component f
 
 <VersionBadge version="v5.3.0" />
 
-`harper deploy setup=true` provisions the credential a private deploy needs. It's interactive, and runs once per component and source:
+`harper deploy setup=true` provisions the credential a private deploy needs. It's interactive, and runs once per component and source. It calls `get_secrets_public_key` and `set_secret`, both of which require **super_user**, so run it with an administrative credential rather than the CI identity it provisions for:
 
 ```sh
 harper deploy setup=true

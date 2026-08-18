@@ -44,7 +44,7 @@ For remote Operations API commands, the CLI uses the first complete authenticati
 4. Legacy `CLI_TARGET_USERNAME` and `CLI_TARGET_PASSWORD` environment variables
 5. `HARPER_CLI_OPERATION_TOKEN` and `HARPER_CLI_REFRESH_TOKEN` environment variables, or their legacy `CLI_TARGET_` equivalents — see [Token credentials for CI/CD](#token-credentials-for-cicd)
 6. A token saved by `harper login`
-7. A [workload identity token](#workload-identity-oidc) exchanged with the runtime's OIDC provider <VersionBadge version="v5.3.0" />
+7. A [workload identity token](#workload-identity-oidc) exchanged with the runtime's OIDC provider (v5.3.0)
 8. `username=` and `password=` operation parameters (legacy fallback)
 
 Credentials are resolved as a pair and are never combined across sources. An incomplete pair supplied with dedicated authentication parameters or in the target URL causes the command to fail. An incomplete environment-variable pair is skipped with a warning so that a saved login token can still be used.
