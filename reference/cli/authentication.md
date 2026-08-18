@@ -44,12 +44,12 @@ For remote Operations API commands, the CLI uses the first complete authenticati
 4. Legacy `CLI_TARGET_USERNAME` and `CLI_TARGET_PASSWORD` environment variables
 5. `HARPER_CLI_OPERATION_TOKEN` and `HARPER_CLI_REFRESH_TOKEN` environment variables, or their legacy `CLI_TARGET_` equivalents — see [Token credentials for CI/CD](#token-credentials-for-cicd)
 6. A token saved by `harper login`
-7. `username=` and `password=` operation parameters (legacy fallback)
-8. A [workload identity token](#workload-identity-oidc) exchanged with the runtime's OIDC provider <VersionBadge version="v5.3.0" />
+7. A [workload identity token](#workload-identity-oidc) exchanged with the runtime's OIDC provider <VersionBadge version="v5.3.0" />
+8. `username=` and `password=` operation parameters (legacy fallback)
 
 Credentials are resolved as a pair and are never combined across sources. An incomplete pair supplied with dedicated authentication parameters or in the target URL causes the command to fail. An incomplete environment-variable pair is skipped with a warning so that a saved login token can still be used.
 
-Entries 5 and 6 authenticate with a bearer token and apply to **remote targets only**. A local operation goes over the domain socket, which the server already trusts, so token environment variables are deliberately ignored there — a token minted for one instance would otherwise be attached to every local `harper` command in that shell and rejected.
+Entries 5 through 7 authenticate with a bearer token and apply to **remote targets only**. A local operation goes over the domain socket, which the server already trusts, so token environment variables are deliberately ignored there — a token minted for one instance would otherwise be attached to every local `harper` command in that shell and rejected.
 
 Before v5.2.0, `username=` and `password=` operation parameters took precedence over environment variables and saved login tokens. This could authenticate an operation as the wrong user when those fields were part of the operation payload, such as the user being created by `add_user`.
 
@@ -209,7 +209,7 @@ Expose the two values to the deploy step and no other credentials are needed:
 
 **Refresh behavior.** The CLI mints an operation token from the refresh token when none is supplied, and again whenever the supplied one has expired. A token refreshed from an environment variable is held in memory for that invocation only — nothing is written to `~/.harperdb/credentials.json`, because there is no file entry for an environment-supplied credential. If the refresh token itself is rejected, the command reports that and exits non-zero rather than falling back to another identity.
 
-**A blank token variable is an error, not a fallback.** If a namespace is set but empty — the usual shape of a misconfigured CI secret — the CLI says so and falls back to saved login credentials. It does not silently run as whoever last logged in on that machine.
+**A blank token variable is reported, then skipped.** If a namespace is set but empty — the usual shape of a misconfigured CI secret — the CLI warns and continues down the precedence list, so the run proceeds under the saved `harper login` token if that machine has one. The warning is the only thing separating this from silently deploying as whoever last logged in, so treat it as a failure signal in CI rather than assuming a blank secret stops the run.
 
 **Lifetimes.** Operation tokens expire after `authentication.operationTokenTimeout` (default `1d`) and refresh tokens after `authentication.refreshTokenTimeout` (default `30d`). The pipeline needs a new refresh token when that window closes.
 
@@ -240,7 +240,9 @@ steps:
 
 `HARPER_CLI_TARGET` is the only variable the step needs, and it is not sensitive — hence `vars` rather than `secrets`.
 
-**This ranks last, below every configured credential.** Adding `id-token: write` to a workflow that still sets `HARPER_CLI_REFRESH_TOKEN` does not change which identity deploys; the stored token keeps winning. That is deliberate — enabling a new capability should not silently re-point an existing pipeline at a different user. Remove the secret when you want the exchange to take over.
+**This ranks below every configured credential**, and above only the legacy `username=`/`password=` payload fallback. Adding `id-token: write` to a workflow that still sets `HARPER_CLI_REFRESH_TOKEN` does not change which identity deploys; the stored token keeps winning. That is deliberate — enabling a new capability should not silently re-point an existing pipeline at a different user. Remove the secret when you want the exchange to take over.
+
+Note the one case where the exchange _does_ take over: because it outranks the legacy fallback, a command that passes `username=` and `password=` as operation parameters on a runner with no configured credential authenticates as the trust policy's user, not as the pair in the payload. That is the intended reading of those fields — for `add_user` they describe the user being created — but it means a script relying on them as credentials changes identity the moment a policy matches.
 
 The exchange is attempted only when the runtime actually offers an identity. GitHub Actions sets `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` together on a job that declares `id-token: write`; without both, the CLI falls through to its other credential sources rather than reporting a failure. An unrecognized runtime falls through the same way.
 
