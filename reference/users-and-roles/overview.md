@@ -79,6 +79,14 @@ The `operations` field in a permission object restricts which Operations API cal
 
 Operations normally restricted to `super_user` can be selectively granted by including them in the list. If `operations` is not set, the role can call any non-`super_user` operation, subject to table CRUD permissions.
 
+Gate one runs ahead of every other privilege check on the role. <VersionBadge type="changed" version="v5.3.0" /> Before v5.3.0 the `structure_user` carve-out and the SQL path were both reached without consulting the list, so a role could call operations its list omitted; both are now gated. Three consequences are worth stating directly, because the field scopes an ordinary role and is not a way to narrow an administrator:
+
+- **`super_user` and `cluster_user` roles cannot carry an allowlist at all.** `add_role` and `alter_role` reject any permission that sets either flag to `true` alongside other keys, so the combination is a validation error rather than a restricted administrator. Grant the operations you want to delegate to an ordinary role instead.
+- **`structure_user` narrows which databases DDL reaches; it does not widen which operations are reachable.** `create_table`, `create_attribute`, `drop_table`, and `drop_attribute` must appear in the list like anything else, and `structure_user` then restricts them to its named databases, or to every database when it is `true`. `create_database` and `drop_database` additionally require `structure_user: true`. A role whose list omits an operation cannot perform it whatever `structure_user` is set to.
+- **`sql` must be listed for a role to run SQL.** Listing it grants the SQL interface, not unrestricted DML through it: statements are still authorized against table CRUD permissions, which is what separates `read_only` (no writes) from `standard_user`. Both groups include `sql`, so a role built from either keeps it.
+
+The value must be an array of strings, and a non-array value is rejected on write. A role that already holds one — for example a pre-5.0 role that granted a database named `operations`, before the key became reserved — can prevent the instance from loading its user cache; see [HarperFast/harper#2194](https://github.com/HarperFast/harper/issues/2194).
+
 **Permission Groups**
 
 Groups expand to a predefined set of operations and can be mixed with individual operation names:
