@@ -142,7 +142,9 @@ For SSH-based private repos, use the [Add SSH Key](#add_ssh_key) operation to re
 
 Omitting `package` uploads a snapshot of your working directory. The result is an anonymous artifact: nothing records _which_ commit it came from, so reproducing it later — or stepping back to a previous release — means finding those exact files again.
 
-Deploying by **reference** sends a pinned git reference instead, and the cluster fetches that exact commit. Redeploying the same reference is an exact redeploy, and rolling back is deploying an older one.
+Deploying by **reference** sends a pinned git reference instead, and the cluster fetches that exact commit. Redeploying the same reference deploys the same source revision, and rolling back is deploying an older one.
+
+A pinned SHA fixes the _source_, not the built artifact. The cluster installs and builds from that source on each node, so unpinned dependency ranges, a mutable registry artifact, install scripts, or a different toolchain can still produce different bytes — or a failure — from the same commit. Commit your lockfile if you need the build itself to be reproducible.
 
 `harper deploy by_ref=true` builds that reference from the local git repository, so you don't assemble the URL yourself:
 

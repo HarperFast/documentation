@@ -54,6 +54,7 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 
 - Tag minor-version availability inline: `<VersionBadge version="vX.Y.0" />` for new surface, `<VersionBadge type="changed" version="vX.Y.0" />` for behavior changes to existing surface.
 - Derive the version from the core release the change ships in, stripping prerelease suffixes (`5.1.0-beta.1` → `v5.1.0`).
+- **Determine that release from the core repo's git tags, not from the feature branch's `package.json`.** A branch reading `5.2.0-beta.3` says which release was open when the branch started, not which one the change lands in — if a release is cut before the feature merges, the badge is silently wrong. Check `git tag --sort=-creatordate` for the newest release, and `git tag --contains <merge-commit>` for whether the change is in one; a merged-but-untagged feature ships in the _next_ version, which may be a minor bump. Re-check on every refresh pass of a long-lived docs PR, because a release cut between passes invalidates a badge that was correct when written.
 - Each minor release gets a file under `release-notes/<major-codename>/` (e.g. `release-notes/v5-lincoln/5.1.md`); the sidebar picks it up automatically.
 - Absolute links from `release-notes/` (or `learn/`) into current reference docs use the versioned path `/reference/v5/...` — the reference plugin maps the current version to the `v5` URL path.
 - When documenting a change from a core/pro PR, cross-link the feature PR and the docs PR in both descriptions.
