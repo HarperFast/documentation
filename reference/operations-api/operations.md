@@ -1119,7 +1119,7 @@ Adding an existing key:
 
 #### Server-side key generation (`generate`)
 
-<VersionBadge version="v5.3.0" />
+<VersionBadge version="v5.2.4" />
 
 With `generate: true`, Harper mints an ed25519 keypair on the node handling the request and returns only the **public** half. The private key is created inside the cluster and never travels from a client, so it can't be captured in a shell history, CI log, or request body on the way in:
 
