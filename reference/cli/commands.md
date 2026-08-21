@@ -144,19 +144,58 @@ All parameters are passed as `key=value` arguments. Every parameter is optional.
 - `install_command=<command>` - Override the install command run for the component.
 - `install_timeout=<ms>` - Maximum time, in milliseconds, to allow the install to run.
 - `install_allow_scripts=true` - Allow npm pre/post-install scripts to run (disabled by default).
-- `deployment_timeout=<ms>` - How long, in milliseconds, a peer waits to receive the replicated payload before failing (default: `120000`). (Added in: v5.2.0)
-- `ignore_replication_errors=true` - Treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. (Added in: v5.2.0)
+- `deployment_timeout=<ms>` - How long, in milliseconds, a peer waits to receive the replicated payload before failing (default: `120000`). (Added in: v5.1.4)
+- `ignore_replication_errors=true` - Treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. (Added in: v5.1.4)
 - `force=true` - Allow deploying over a protected core component name.
 - `urlPath=<path>` - HTTP path the component is mounted at (e.g. `/api/v2`). Requires `package`.
 - `host=<hostname>` - Virtual hostname the component is served on (e.g. `api.example.com`). Requires `package`. (Added in: v5.2.0)
 - `json=true` - Print output as JSON instead of the default YAML.
 
-Deploying from a private npm registry or git repository requires the `deploy_component` operation's `credentials` field (added in v5.2.0), which is an array of credential objects. The CLI's `key=value` arguments [do not support array-of-object parameters](./operations-api-commands.md#object-parameters), so supply `credentials` through the [Operations API](../operations-api/operations.md#deploy-credentials-credentials) over HTTP instead.
-
 **Packaging options** (directory deploy only):
 
 - `skip_node_modules=false` - Include the `node_modules` directory in the packaged tarball. Excluded by default.
 - `skip_symlinks=true` - Exclude symlinks from the packaged tarball. Included by default; broken (dangling) symlinks are always skipped with a warning.
+
+**Deploy-by-reference options** (see [Deploy by reference](#deploy-by-reference)):
+
+- `by_ref=true` - Deploy the current project from its GitHub `origin` remote as a pinned commit (`git+https`) instead of uploading a packaged tarball. (Added in: v5.2.3)
+- `ref=<committish>` - The branch, tag, or commit to deploy. Resolved to an immutable commit SHA so every cluster node deploys the same commit. Defaults to the current `HEAD`; implies `by_ref`. (Added in: v5.2.3)
+- `credential=true` - Attach the sealed credential reference so the cluster can clone a private repository. Provision it first with `harper deploy setup=true`. (Added in: v5.2.3)
+- `setup=true` - Provision (seal) a durable encrypted credential for a private deploy source instead of deploying. Interactive. (Added in: v5.2.3)
+
+#### Deploy by reference
+
+<VersionBadge version="v5.2.3" />
+
+Instead of packaging and uploading the working directory, `harper deploy by_ref=true` deploys a pinned git commit by reference: it resolves the project's GitHub `origin` remote and commit (from the local checkout or the GitHub Actions environment) and hands the cluster a `git+https://github.com/<owner>/<repo>.git#<sha>` package to clone. The commit is pinned to an immutable SHA so every cluster node deploys the same code.
+
+```bash
+# Deploy the current HEAD by reference
+harper deploy by_ref=true
+
+# Deploy a specific branch, tag, or commit
+harper deploy by_ref=true ref=v1.2.3
+```
+
+The commit must be pushed to the remote before deploying, so the cluster can clone it; the CLI warns if the working tree is dirty or the commit is not on any remote branch. Only GitHub `origin` remotes are supported.
+
+#### Private deploy sources
+
+<VersionBadge version="v5.2.3" />
+
+Installing a component from a private npm registry or a private git repository requires the `deploy_component` operation's [`credentials`](../operations-api/operations.md#deploy-credentials-credentials) field, an array of credential objects. The CLI's `key=value` arguments [do not support array-of-object parameters](./operations-api-commands.md#object-parameters), so there are two supported paths:
+
+- **Private git repository** - Provision the credential once with `harper deploy setup=true`, which seals an encrypted token (from `gh auth token` or a pasted PAT) on your machine using the cluster's public key and stores only the ciphertext. Then deploy with `credential=true`, which attaches the sealed credential reference for the clone:
+
+  ```bash
+  # One-time: seal a durable credential for the private repo
+  harper deploy setup=true
+
+  # Deploy the private repo by reference, using the sealed credential
+  harper deploy by_ref=true credential=true
+  ```
+
+- **Private npm registry** - Supply the `credentials` array through the [Operations API](../operations-api/operations.md#deploy-credentials-credentials) over HTTP, which can represent the nested object shape the CLI arguments cannot.
 
 ### `harper restart`
 
