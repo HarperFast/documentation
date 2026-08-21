@@ -69,6 +69,8 @@ Returns the definition of a specific table.
 { "operation": "describe_table", "table": "dog", "database": "dev" }
 ```
 
+<VersionBadge type="changed" version="v5.2.5" />
+
 Alongside the schema, the response carries the size of the table's **record-structure dictionaries**
 — the physical record layouts Harper has seen for this table:
 
