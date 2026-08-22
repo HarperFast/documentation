@@ -215,13 +215,13 @@ The substitution happens in Harper's module loader, so it only reaches code that
 | How the module is reached                                                                                                                                          | What you get                |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
 | `import` from component source under `applications.moduleLoader: vm-current-context` (the default) or `vm`                                                         | Harper's constrained module |
-| Dynamic `import('node:child_process')`, including from CommonJS component source                                                                                   | Harper's constrained module |
+| Dynamic `import('node:child_process')` from component source under those same loaders, including from CommonJS                                                     | Harper's constrained module |
 | `require('node:child_process')`                                                                                                                                    | Node's unmodified module    |
 | Any import under `applications.moduleLoader: compartment`                                                                                                          | Node's unmodified module    |
 | Any import under `applications.moduleLoader: native`                                                                                                               | Node's unmodified module    |
 | A dependency loaded by the native loader — with the default `applications.dependencyLoader: auto` that is any package which does not list `harper` as a dependency | Node's unmodified module    |
 
-Two consequences are worth planning around. A supervisor factored into an npm package that does not depend on `harper` receives the real `child_process`: no allowlist, no lock, and one child per worker thread rather than one per node. And under `compartment` the allowlist is not applied at all, because that loader resolves built-ins through Node directly. Keep process-spawning code in component source, reached with `import`, and if the substitution is load-bearing for your component, probe for it at startup rather than assuming it.
+Two consequences are worth planning around. A supervisor factored into an npm package that does not depend on `harper` receives the real `child_process`: no allowlist, no lock, and one child per worker thread rather than one per node. And under `compartment` the substitute is bypassed entirely — that loader resolves built-ins through Node directly, so the allowlist, the mandatory `name`, the single-process lock, and the `execSync` block all disappear together. Keep process-spawning code in component source, reached with `import`, under one of the VM loaders.
 
 ### Which functions are usable
 
@@ -250,8 +250,9 @@ Harper runs a pool of worker threads, and component code runs on each of them. W
 - **`name` (string, required).** Spawning without it throws, on `fork` as well as the allowlisted functions.
 - The lock file is `<rootPath>/pids/<name>.pid`. Line 1 is the child's PID; line 2, when `version` was passed, is the version.
 - Exactly one caller wins the lock and spawns a real child process. Every other caller — other threads, and later calls with the same name — receives an `ExistingProcessWrapper` for the already-running process.
-- The name is the whole key. It is not namespaced per component and is not sanitized, so two independently installed components that both pick `agent` will share one lock and adopt each other's process. Prefix the name with your component's name.
+- The name is the whole key. It is not namespaced per component and it is interpolated into the path unsanitized, so two independently installed components that both pick `agent` share one lock and adopt each other's process, and a name containing `../` places the lock file outside `<rootPath>/pids/` entirely. Use a literal, path-safe name prefixed with your component's name — never one derived from configuration or any other input.
 - When the real child exits, the thread that spawned it removes the PID file, so the next spawn call starts a fresh process.
+- If a PID file survives an unclean shutdown, Harper recovers it by checking whether the recorded PID is still alive: if it is not, the stale file is removed and the next caller spawns normally. If the operating system has recycled that PID onto an unrelated process, Harper adopts it instead — and a `version` mismatch would signal it. Another reason to keep the name unique.
 
 ### Replacing a running process: the `version` option
 
@@ -277,7 +278,7 @@ The lock winner gets a real [`ChildProcess`](https://nodejs.org/api/child_proces
 | `unref()`       | Stops the liveness poll — see below                         |
 | `'exit'` event  | Emitted with `(null, null)` once the process is gone        |
 
-It does **not** have `stdout`, `stderr`, `stdin`, or `spawnargs`. Code that reaches for them throws a `TypeError` on exactly the threads that lost the race, which is most of them — so a component that reads the child's output must do so only on the thread that owns the real `ChildProcess`. `spawnargs` is the practical way to tell the two apart:
+It does **not** have `stdout`, `stderr`, `stdin`, or `spawnargs` — those properties are simply absent, so reading one yields `undefined` and using it (`child.stdout.on(...)`) throws a `TypeError` on exactly the threads that lost the race, which is most of them. A component that reads the child's output must do so only on the thread that owns the real `ChildProcess`. Because `spawnargs` reads as `undefined` rather than throwing, it is the practical way to tell the two apart:
 
 ```javascript
 const child = spawn('datadog-agent', ['run'], { name: 'datadog-agent', version: 3 });

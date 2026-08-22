@@ -347,7 +347,7 @@ Added in: v5.0.0
 ```yaml
 applications:
   lockdown: freeze
-  moduleLoader: vm
+  moduleLoader: vm-current-context
   dependencyLoader: auto
   allowedSpawnCommands:
     - npm
