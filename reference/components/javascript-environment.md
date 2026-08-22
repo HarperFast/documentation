@@ -194,3 +194,83 @@ Returns the outgoing `Response` object for the current request, or `undefined` i
 ### Current Working Directory
 
 Harper has a multi-threaded server architecture and uses the harper data root path as the current working directory. Components should not and cannot change the current working directory, and must not use `process.chdir()` or any package that does.
+
+## Child Processes
+
+Harper substitutes its own `child_process` module into components that need to launch a helper binary or a sidecar process. The substitute adds two things on top of Node's API: an allowlist, and a node-wide single-process lock keyed by a name you supply.
+
+```javascript
+import { spawn } from 'node:child_process';
+
+const agent = spawn('datadog-agent', ['run'], {
+	name: 'datadog-agent',
+	version: 3,
+});
+```
+
+### Which imports get the substitute
+
+The substitution happens in Harper's module loader, so it only reaches code that loader handles:
+
+| How the module is reached                                                                                                                                                       | What you get                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| ESM `import` from component source (`applications.moduleLoader: vm`, the default, or `compartment`)                                                                             | Harper's constrained module |
+| CommonJS `require('node:child_process')`                                                                                                                                        | Node's unmodified module    |
+| Any import under `applications.moduleLoader: native`                                                                                                                            | Node's unmodified module    |
+| A dependency loaded by the native loader — the default `applications.dependencyLoader: auto` uses the native loader for any package that does not list `harper` as a dependency | Node's unmodified module    |
+
+A supervisor factored into an npm package that does not depend on `harper` therefore receives the real `child_process`: no allowlist, no lock, and one child per worker thread rather than one per node. Keep process-spawning code in component source (or in a package that depends on `harper`), and if the substitution is load-bearing for your component, probe for it at startup rather than assuming it.
+
+### Allowlist
+
+Every call is checked against [`applications.allowedSpawnCommands`](../configuration/options.md#applications) before anything else:
+
+- The check is an exact match on the first space-separated token of `command`. `'node'` matches an allowlisted `node`; `'/usr/local/bin/node'` does not, and a path containing a space can never match.
+- The list is read once at startup. Changing it requires a restart.
+- `exec`, `execFile`, and `spawn` are all subject to it. `fork` is exempt, because it launches Node itself.
+- `execSync` always throws — Harper does not permit synchronous spawning.
+
+### One process per node: the `name` option
+
+Harper runs a pool of worker threads, and component code runs on each of them. Without coordination, a component that spawns a sidecar would start one per thread. Harper prevents that with a PID-file lock, which is why `name` is mandatory:
+
+- **`name` (string, required).** Spawning without it throws. It is also the lock filename, so it must be unique per logical process within the node.
+- The lock file is `<rootPath>/pids/<name>.pid`. Line 1 is the child's PID; line 2, when `version` was passed, is the version.
+- Exactly one caller wins the lock and spawns a real child process. Every other caller — other threads, and later calls with the same name — receives an `ExistingProcessWrapper` for the already-running process.
+- When the real child exits, the thread that spawned it removes the PID file, so the next spawn call starts a fresh process.
+
+### Replacing a running process: the `version` option
+
+<VersionBadge version="v5.0.2" />
+
+`version` lets a component replace a process it started earlier — after an upgrade, for example — instead of adopting it.
+
+- **`version` must be an integer.** Line 2 of the PID file is parsed with `parseInt`, and the comparison is a strict `!==` against the value you pass. A string `'3'` never equals the parsed `3`, so every call kills the running child and respawns it, forever. There is no validation of this; pass a number.
+- The comparison is equality, not ordering: a version lower than the recorded one also triggers replacement.
+- On a mismatch Harper signals the running process (`SIGTERM`), removes the PID file, and re-acquires the lock so the new version spawns.
+- Omitting `version` means "adopt whatever is running under this name".
+
+### What `spawn` returns
+
+The lock winner gets a real [`ChildProcess`](https://nodejs.org/api/child_process.html#class-childprocess). Everyone else gets an `ExistingProcessWrapper`, which is deliberately narrow:
+
+| Member          | Notes                                                       |
+| --------------- | ----------------------------------------------------------- |
+| `pid`           | PID of the process that is actually running                 |
+| `kill(signal?)` | Signals that process; returns `false` if it is already gone |
+| `unref()`       | Stops the liveness poll — see below                         |
+| `'exit'` event  | Emitted with `(null, null)` once the process is gone        |
+
+It does **not** have `stdout`, `stderr`, `stdin`, or `spawnargs`. Code that reaches for them throws a `TypeError` on exactly the threads that lost the race, which is most of them — so a component that reads the child's output must do so only on the thread that owns the real `ChildProcess`. `spawnargs` is the practical way to tell the two apart:
+
+```javascript
+const child = spawn('datadog-agent', ['run'], { name: 'datadog-agent', version: 3 });
+
+if (child.spawnargs) {
+	child.stdout.on('data', (chunk) => logger.info(chunk.toString()));
+} else {
+	child.unref(); // adopted an existing process; release the liveness timer
+}
+```
+
+The wrapper polls the process once a second with a `setInterval` that Harper does not unref, so a thread that never calls `unref()` keeps its event loop alive and delays shutdown. Call `unref()` on any wrapper you do not intend to watch.
