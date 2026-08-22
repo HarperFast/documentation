@@ -1064,9 +1064,9 @@ All six operations are `super_user` by default. They participate in the role [`o
 Anyone who can call `agent_prompt` can direct whatever the agent does. Understand the boundary before enabling it:
 
 - `agent.user` (default: a `super_user` bootstrap identity) governs only the **operations** tools. Setting it to a restricted user narrows those, and nothing else.
-- The agent's other tools — scoped filesystem access, outbound `http_fetch`, followup scheduling, and the V8 inspector — are always present and run at the Harper process's own privilege, whatever `agent.user` is. `http_fetch` reaches any `http`/`https` host except cloud-metadata and link-local addresses, so an enabled agent is an egress path.
+- The agent's other tools — scoped filesystem access, outbound `http_fetch`, followup scheduling, and the V8 inspector — run at the Harper process's own privilege, whatever `agent.user` is. `http_fetch` blocks only the known cloud-metadata endpoints and the IPv4 link-local range `169.254.0.0/16`; every other host, including anything private or internal that the server can route to, is reachable. An enabled agent is an egress path. (The inspector tools additionally need `threads.debug`, and fail with an explanatory error without it.)
 - With the default `agent.allowDestructive: false`, destructive tools (including filesystem writes) are removed from the toolset entirely. Turning it on admits component writes, and component code is executed by the Harper process — a write is effectively code execution at process privilege.
-- Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action).
+- Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes and the inspector's code-evaluation tools. `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
   :::
 
 | Operation              | Description                                                   | Role Required |
@@ -1190,6 +1190,8 @@ Response:
 
 `cancelled` is `false` if the session had already reached a terminal state (`completed`, `aborted`, `error`). `signalledLiveRun` reports whether there was an in-flight run to abort — a paused session yields `false` while still being marked aborted.
 
+One gap is worth knowing: changing `allowDestructive` with [`set_agent_config`](#set_agent_config) rebuilds the toolset, and followups scheduled before that change are no longer tracked, so a later cancel does not clear them. A stray followup starts a fresh run even after a cancel and even with `enabled` set to `false`. If a run has scheduled followups, avoid toggling `allowDestructive` mid-session, and restart the node if one escapes.
+
 ### `set_agent_config`
 
 Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent).
@@ -1206,7 +1208,7 @@ Three limits are worth knowing:
 
 ### MCP access
 
-When the [MCP server](../mcp/overview.md) is enabled, `agent_prompt`, `get_agent_session`, `list_agent_sessions`, `approve_agent_action`, and `cancel_agent_run` are also exposed as MCP tools, with no allow-list entry required. They dispatch through the same authorization path as the operations above, and are listed only for users whose role could call them. `set_agent_config` is deliberately not exposed over MCP — it is an operator action.
+When the [MCP server](../mcp/overview.md) is enabled with the operations profile, `agent_prompt`, `get_agent_session`, `list_agent_sessions`, `approve_agent_action`, and `cancel_agent_run` are also exposed as MCP tools, with no allow-list entry required. They dispatch through the same authorization path as the operations above, and are listed only for users whose role could call them. `set_agent_config` is deliberately not exposed over MCP — it is an operator action.
 
 ---
 

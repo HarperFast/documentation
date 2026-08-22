@@ -360,7 +360,7 @@ agent:
 - `provider` - Recorded on the session but **not yet used to route the model call** — only `model` reaches the provider. Set the provider through the [`models`](../models/overview.md#configuration) configuration instead
 - `model` - Model id override, passed through to the model call; _Default_: the [`models`](../models/overview.md#configuration) generative default
 - `maxTurns` - Maximum tool-call iterations in a single run; _Default_: `50`
-- `maxCostUsd` - Per-session cost budget. Recorded but **not yet enforced**; _Default_: `5.00`
+- `maxCostUsd` - Intended per-run cost ceiling. **Not enforced** — it is a stored setting only, and nothing checks spend against it; _Default_: `5.00`
 - `autoApprove` - Run without per-action approval gates; _Default_: `false`
 - `allowDestructive` - Include destructive tools (`drop_component`, `restart`, `set_configuration`, ...) in the agent's toolset. When `false` they are removed entirely rather than gated; _Default_: `false`
 - `user` - Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
