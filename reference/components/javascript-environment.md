@@ -197,7 +197,7 @@ Harper has a multi-threaded server architecture and uses the harper data root pa
 
 ## Child Processes
 
-Harper substitutes its own `child_process` module into components that need to launch a helper binary or a sidecar process. The substitute adds two things on top of Node's API: an allowlist, and a node-wide single-process lock keyed by a name you supply.
+Harper substitutes its own `child_process` module into components that need to launch a helper binary or a sidecar process. The substitute adds two things on top of Node's API: a command allowlist, and a node-wide single-process lock keyed by a name you supply.
 
 ```javascript
 import { spawn } from 'node:child_process';
@@ -212,31 +212,45 @@ const agent = spawn('datadog-agent', ['run'], {
 
 The substitution happens in Harper's module loader, so it only reaches code that loader handles:
 
-| How the module is reached                                                                                                                                                       | What you get                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| ESM `import` from component source (`applications.moduleLoader: vm`, the default, or `compartment`)                                                                             | Harper's constrained module |
-| CommonJS `require('node:child_process')`                                                                                                                                        | Node's unmodified module    |
-| Any import under `applications.moduleLoader: native`                                                                                                                            | Node's unmodified module    |
-| A dependency loaded by the native loader — the default `applications.dependencyLoader: auto` uses the native loader for any package that does not list `harper` as a dependency | Node's unmodified module    |
+| How the module is reached                                                                                                                                          | What you get                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| `import` from component source under `applications.moduleLoader: vm-current-context` (the default) or `vm`                                                         | Harper's constrained module |
+| Dynamic `import('node:child_process')`, including from CommonJS component source                                                                                   | Harper's constrained module |
+| `require('node:child_process')`                                                                                                                                    | Node's unmodified module    |
+| Any import under `applications.moduleLoader: compartment`                                                                                                          | Node's unmodified module    |
+| Any import under `applications.moduleLoader: native`                                                                                                               | Node's unmodified module    |
+| A dependency loaded by the native loader — with the default `applications.dependencyLoader: auto` that is any package which does not list `harper` as a dependency | Node's unmodified module    |
 
-A supervisor factored into an npm package that does not depend on `harper` therefore receives the real `child_process`: no allowlist, no lock, and one child per worker thread rather than one per node. Keep process-spawning code in component source (or in a package that depends on `harper`), and if the substitution is load-bearing for your component, probe for it at startup rather than assuming it.
+Two consequences are worth planning around. A supervisor factored into an npm package that does not depend on `harper` receives the real `child_process`: no allowlist, no lock, and one child per worker thread rather than one per node. And under `compartment` the allowlist is not applied at all, because that loader resolves built-ins through Node directly. Keep process-spawning code in component source, reached with `import`, and if the substitution is load-bearing for your component, probe for it at startup rather than assuming it.
+
+### Which functions are usable
+
+| Function   | Status                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `spawn`    | Supported. Subject to the allowlist and the `name` lock.                                       |
+| `execFile` | Supported. Subject to the allowlist and the `name` lock.                                       |
+| `fork`     | Supported and exempt from the allowlist, since it launches Node itself. Still requires `name`. |
+| `exec`     | Not usable. See below.                                                                         |
+| `execSync` | Always throws. Harper does not permit synchronous spawning.                                    |
+
+The substitute takes `(command, args, options, callback)` positionally for every wrapped function, but Node's `exec` signature is `exec(command[, options][, callback])`. So `exec('ffmpeg -version', { name: 'ffmpeg' })` puts the options object in the `args` slot and throws for a missing `name`, while shifting it into the `options` slot to satisfy that check produces a call Node's own `exec` rejects with `ERR_INVALID_ARG_TYPE`. Use `execFile` (whose signature does line up) or `spawn` instead.
 
 ### Allowlist
 
-Every call is checked against [`applications.allowedSpawnCommands`](../configuration/options.md#applications) before anything else:
+Every call except `fork` is checked against [`applications.allowedSpawnCommands`](../configuration/options.md#applications) before anything else:
 
 - The check is an exact match on the first space-separated token of `command`. `'node'` matches an allowlisted `node`; `'/usr/local/bin/node'` does not, and a path containing a space can never match.
 - The list is read once at startup. Changing it requires a restart.
-- `exec`, `execFile`, and `spawn` are all subject to it. `fork` is exempt, because it launches Node itself.
-- `execSync` always throws — Harper does not permit synchronous spawning.
+- Because only the first token is matched, the allowlist is not an argument or injection barrier. If you pass `shell: true`, everything after the first token reaches a shell unchecked — treat the command string as trusted input regardless of the allowlist.
 
 ### One process per node: the `name` option
 
 Harper runs a pool of worker threads, and component code runs on each of them. Without coordination, a component that spawns a sidecar would start one per thread. Harper prevents that with a PID-file lock, which is why `name` is mandatory:
 
-- **`name` (string, required).** Spawning without it throws. It is also the lock filename, so it must be unique per logical process within the node.
+- **`name` (string, required).** Spawning without it throws, on `fork` as well as the allowlisted functions.
 - The lock file is `<rootPath>/pids/<name>.pid`. Line 1 is the child's PID; line 2, when `version` was passed, is the version.
 - Exactly one caller wins the lock and spawns a real child process. Every other caller — other threads, and later calls with the same name — receives an `ExistingProcessWrapper` for the already-running process.
+- The name is the whole key. It is not namespaced per component and is not sanitized, so two independently installed components that both pick `agent` will share one lock and adopt each other's process. Prefix the name with your component's name.
 - When the real child exits, the thread that spawned it removes the PID file, so the next spawn call starts a fresh process.
 
 ### Replacing a running process: the `version` option
@@ -249,6 +263,8 @@ Harper runs a pool of worker threads, and component code runs on each of them. W
 - The comparison is equality, not ordering: a version lower than the recorded one also triggers replacement.
 - On a mismatch Harper signals the running process (`SIGTERM`), removes the PID file, and re-acquires the lock so the new version spawns.
 - Omitting `version` means "adopt whatever is running under this name".
+
+The handoff is not graceful, and replacement is the least robust part of this contract. Harper does not wait for the outgoing process to exit before starting the replacement, so a sidecar that holds a listening socket or an exclusive file lock must tolerate an overlapping predecessor. The outgoing process's exit handler also removes the PID file by path rather than by PID, so it can delete the lock the replacement just wrote — after which a later spawn call sees no lock and starts a second process alongside it. Prefer restarting the component (or the node) over relying on in-place version replacement for anything that cannot tolerate a duplicate.
 
 ### What `spawn` returns
 
@@ -269,8 +285,8 @@ const child = spawn('datadog-agent', ['run'], { name: 'datadog-agent', version: 
 if (child.spawnargs) {
 	child.stdout.on('data', (chunk) => logger.info(chunk.toString()));
 } else {
-	child.unref(); // adopted an existing process; release the liveness timer
+	child.unref();
 }
 ```
 
-The wrapper polls the process once a second with a `setInterval` that Harper does not unref, so a thread that never calls `unref()` keeps its event loop alive and delays shutdown. Call `unref()` on any wrapper you do not intend to watch.
+The wrapper detects the process going away by polling it once a second with a `setInterval` that Harper does not unref, so a thread that never calls `unref()` keeps its event loop alive and delays shutdown. That same interval is the only source of the `'exit'` event, so the two members are mutually exclusive: once you call `unref()`, the wrapper will never emit `'exit'`. Pick one — watch the process, or release the timer.
