@@ -1054,7 +1054,7 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 
 <VersionBadge version="v5.2.0" />
 
-Operations for driving Harper's built-in agent — an LLM loop that runs on the main thread and operates the instance through Harper's own operations, scoped filesystem access, followup scheduling, the V8 inspector, and outbound HTTP.
+Operations for driving Harper's built-in agent — an LLM loop that operates the instance through Harper's own operations, scoped filesystem access, followup scheduling, the V8 inspector, and outbound HTTP. The loop runs on the main thread, so an active run competes with Harper's other main-thread work; prefer running exploratory prompts against a node that is not serving production traffic.
 
 The agent component is **disabled by default**. Enable it with `agent.enabled: true` in `harper-config.yaml` (see [`agent`](../configuration/options.md#agent)) and configure a generative model under [`models`](../models/overview.md#configuration). With the component disabled at startup none of these operations are registered, so calling one is an unknown-operation error rather than a permission or state error.
 
@@ -1124,7 +1124,7 @@ A session that is `running` or `awaiting_approval` rejects a new prompt with a 4
 
 ### `get_agent_session`
 
-Returns the full session record: `status`, `user`, the `messages` transcript (user, assistant, and tool messages, including tool calls and their observations), `pendingApprovals`, `model`, `provider`, `createdAt`/`updatedAt`, and `lastError`. This is the polling endpoint for a run in flight.
+Returns the full session record: `status`, `user` (the Operations API caller who created the session, falling back to `agent.user`), the `messages` transcript (user, assistant, and tool messages, including tool calls and their observations), `pendingApprovals`, `model`, `provider`, `createdAt`/`updatedAt`, and `lastError`. This is the polling endpoint for a run in flight.
 
 ```json
 { "operation": "get_agent_session", "session_id": "3f7c..." }
@@ -1204,7 +1204,7 @@ Updates agent settings and returns the resulting configuration. Accepts any of `
 Three limits are worth knowing:
 
 - **The change is in-memory and not persisted.** It applies for the life of the process and is lost on restart; edit `harper-config.yaml` for a durable change.
-- **A run already in flight keeps the toolset and `autoApprove` setting it started with.** Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
+- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
 - **`enabled` is not a kill switch.** It cannot turn the agent on — if it was off at startup, this operation does not exist. Setting it to `false` only makes subsequent `agent_prompt` calls return 409; a run already in flight continues, and `approve_agent_action` still resumes a paused one. Use `cancel_agent_run` to stop a run.
 
 ### MCP access
