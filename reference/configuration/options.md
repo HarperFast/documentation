@@ -340,6 +340,37 @@ rootPath: /var/lib/harper
 
 ---
 
+## `agent`
+
+Added in: v5.1.0
+
+Built-in Harper agent — an LLM loop that operates this instance through Harper's own operations, scoped filesystem access, and HTTP fetch against itself. Disabled by default, so it never incurs LLM cost unless you turn it on. Driven through the [Agent operations](../operations-api/operations.md#agent).
+
+```yaml
+agent:
+  enabled: true
+  model: default
+  maxTurns: 50
+  autoApprove: false
+  allowDestructive: false
+  user: hdb_agent
+```
+
+- `enabled` - Enable the agent component; _Default_: `false`
+- `provider` - Model provider override; _Default_: the [`models`](../models/overview.md#configuration) generative default
+- `model` - Model id override; _Default_: the [`models`](../models/overview.md#configuration) generative default
+- `maxTurns` - Maximum tool-call iterations in a single run; _Default_: `50`
+- `maxCostUsd` - Per-session cost budget. Recorded but **not yet enforced**; _Default_: `5.00`
+- `autoApprove` - Run without per-action approval gates; _Default_: `false`
+- `allowDestructive` - Include destructive tools (`drop_component`, `restart`, `set_configuration`, ...) in the agent's toolset. When `false` they are removed entirely rather than gated; _Default_: `false`
+- `user` - Harper user the agent's actions run as. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
+- `componentsScope` - Filesystem write scope for component edits, relative to `rootPath`; _Default_: the full `componentsRoot`
+- `systemPromptAppend` - Operator text appended to the agent's system prompt
+
+`enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only.
+
+---
+
 ## `applications`
 
 Added in: v5.0.0

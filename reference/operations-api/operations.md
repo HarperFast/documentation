@@ -1048,6 +1048,156 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 { "operation": "set_status", "id": "primary", "status": "active" }
 ```
 
+## Agent
+
+<VersionBadge version="v5.1.0" />
+
+Operations for driving Harper's built-in agent — an LLM loop that runs on the main thread and operates the instance through Harper's own operations, scoped filesystem access, and HTTP fetch against itself.
+
+The agent component is **disabled by default**. Enable it with `agent.enabled: true` in `harper-config.yaml` (see [`agent`](../configuration/options.md#agent)) and configure a generative model under [`models`](../models/overview.md#configuration). With the component disabled at startup none of these operations are registered, so calling one is an unknown-operation error rather than a permission or state error.
+
+All six operations are `super_user` by default. They participate in the role [`operations` allowlist](../users-and-roles/overview.md#operation-permissions), so a non-`super_user` role can be granted a scoped subset (for example `operations: ['agent_prompt', 'get_agent_session']`) without granting full `super_user`.
+
+:::warning
+The agent acts as the Harper user named by `agent.user`, which defaults to a `super_user` bootstrap identity. Anyone who can call `agent_prompt` can direct actions taken at that privilege level. Set `agent.user` to a restricted user to narrow the surface, and leave `agent.autoApprove` off so destructive tool calls pause for [approval](#approve_agent_action).
+:::
+
+| Operation              | Description                                                   | Role Required |
+| ---------------------- | ------------------------------------------------------------- | ------------- |
+| `agent_prompt`         | Starts or continues an agent session and kicks off a run      | super_user    |
+| `get_agent_session`    | Returns a session: status, full transcript, pending approvals | super_user    |
+| `list_agent_sessions`  | Lists agent sessions                                          | super_user    |
+| `approve_agent_action` | Approves or denies a gated tool call and resumes the run      | super_user    |
+| `cancel_agent_run`     | Cancels a run and marks the session aborted                   | super_user    |
+| `set_agent_config`     | Updates agent settings in memory for the life of the process  | super_user    |
+
+### Sessions and run status
+
+Each conversation is a session, persisted to `system.hdb_agent_session` so transcripts survive a restart. Runs are asynchronous: `agent_prompt` returns as soon as the run is started, and you poll `get_agent_session` for progress and results.
+
+A session's `status` is one of:
+
+| Status              | Meaning                                                              |
+| ------------------- | -------------------------------------------------------------------- |
+| `idle`              | Created, or resumable — no run in flight                             |
+| `running`           | A run is in progress                                                 |
+| `awaiting_approval` | Paused on one or more destructive tool calls; see `pendingApprovals` |
+| `completed`         | The model produced a final answer with no further tool calls         |
+| `aborted`           | Cancelled by an operator via `cancel_agent_run`                      |
+| `error`             | The run failed; `lastError` carries the message                      |
+
+`completed` also covers hitting the `agent.maxTurns` ceiling — in that case `lastError` reads `Reached maxTurns=<n> without a final answer.`, so check it before treating a completed session as finished.
+
+### `agent_prompt`
+
+Sends a prompt to the agent. Omit `session_id` to start a new session; supply one to continue an existing conversation. Returns immediately with the session id and `"status": "running"`.
+
+| Parameter    | Type   | Description                                                     |
+| ------------ | ------ | --------------------------------------------------------------- |
+| `message`    | string | The instruction for the agent. **Required**, must be non-empty. |
+| `session_id` | string | Existing session to continue. Omit to create a new session.     |
+
+```json
+{
+	"operation": "agent_prompt",
+	"message": "Create a component called inventory with a Product table keyed by sku, then verify it responds over REST."
+}
+```
+
+Response:
+
+```json
+{ "session_id": "3f7c...", "status": "running" }
+```
+
+A session that is `running` or `awaiting_approval` rejects a new prompt with a 409 — resolve the pending approval or cancel the run first.
+
+### `get_agent_session`
+
+Returns the full session record: `status`, the `messages` transcript (user, assistant, and tool messages, including tool calls and their observations), `pendingApprovals`, `model`, `provider`, `createdAt`/`updatedAt`, and `lastError`. This is the polling endpoint for a run in flight.
+
+```json
+{ "operation": "get_agent_session", "session_id": "3f7c..." }
+```
+
+Unknown `session_id` returns a 404.
+
+### `list_agent_sessions`
+
+Lists agent sessions.
+
+| Parameter | Type    | Description                              |
+| --------- | ------- | ---------------------------------------- |
+| `limit`   | integer | Maximum sessions to return. Default 100. |
+
+```json
+{ "operation": "list_agent_sessions", "limit": 20 }
+```
+
+Response:
+
+```json
+{ "sessions": [{ "session_id": "3f7c...", "status": "completed", "...": "..." }] }
+```
+
+The result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order. Sort on `updatedAt` or `createdAt` if you need recency.
+
+### `approve_agent_action`
+
+When `agent.autoApprove` is off (the default), any tool call the agent makes to a destructive operation pauses the run and lands in the session's `pendingApprovals` with a generated `approval_id`. This operation resolves one of them and resumes the run.
+
+| Parameter     | Type    | Description                                                  |
+| ------------- | ------- | ------------------------------------------------------------ |
+| `session_id`  | string  | **Required.**                                                |
+| `approval_id` | string  | From `get_agent_session`'s `pendingApprovals`. **Required.** |
+| `approved`    | boolean | `true` to approve (default). `false` denies the call.        |
+
+```json
+{
+	"operation": "approve_agent_action",
+	"session_id": "3f7c...",
+	"approval_id": "9b21...",
+	"approved": true
+}
+```
+
+Both decisions resume the loop: an approval executes the saved tool call, and a denial hands the refusal back to the model as an observation so it can adjust. Neither ends the run — use `cancel_agent_run` for that. If a single turn produced several gated calls, the session stays `awaiting_approval` until every one of them is resolved. Resolving an already-resolved approval is an error.
+
+Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated.
+
+### `cancel_agent_run`
+
+Cancels a session's run, clears any followups it scheduled, and marks the session `aborted`. Works on a paused (`awaiting_approval`) or `idle` session as well as an actively running one.
+
+```json
+{ "operation": "cancel_agent_run", "session_id": "3f7c..." }
+```
+
+Response:
+
+```json
+{ "cancelled": true, "signalledLiveRun": true }
+```
+
+`cancelled` is `false` if the session had already reached a terminal state (`completed`, `aborted`, `error`). `signalledLiveRun` reports whether there was an in-flight run to abort — a paused session yields `false` while still being marked aborted.
+
+### `set_agent_config`
+
+Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent).
+
+```json
+{ "operation": "set_agent_config", "autoApprove": false, "maxTurns": 20 }
+```
+
+Two limits are worth knowing:
+
+- **The change is in-memory and not persisted.** It applies for the life of the process and is lost on restart; edit `harper-config.yaml` for a durable change.
+- **A run already in flight keeps the toolset and `autoApprove` setting it started with.** Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
+
+### MCP access
+
+When the [MCP server](../mcp/overview.md) is enabled, `agent_prompt`, `get_agent_session`, `list_agent_sessions`, `approve_agent_action`, and `cancel_agent_run` are also exposed as MCP tools, with no allow-list entry required. They dispatch through the same authorization path as the operations above, and are listed only for users whose role could call them. `set_agent_config` is deliberately not exposed over MCP — it is an operator action.
+
 ---
 
 ## Backup & Restore
