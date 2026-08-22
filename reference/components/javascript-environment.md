@@ -233,6 +233,8 @@ Two consequences are worth planning around. A supervisor factored into an npm pa
 | `exec`     | Not usable. See below.                                                                         |
 | `execSync` | Always throws. Harper does not permit synchronous spawning.                                    |
 
+Nothing else Node's `child_process` exports is present — `spawnSync`, `execFileSync`, `ChildProcess`, and the rest are simply absent from the substituted module, so importing one yields `undefined`.
+
 The substitute takes `(command, args, options, callback)` positionally for every wrapped function, but Node's `exec` signature is `exec(command[, options][, callback])`. So `exec('ffmpeg -version', { name: 'ffmpeg' })` puts the options object in the `args` slot and throws for a missing `name`, while shifting it into the `options` slot to satisfy that check produces a call Node's own `exec` rejects with `ERR_INVALID_ARG_TYPE`. Use `execFile` (whose signature does line up) or `spawn` instead.
 
 ### Allowlist
