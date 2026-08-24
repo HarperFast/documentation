@@ -82,7 +82,7 @@ Optional arguments:
 | `scanInterval`       | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                              |
 | `replicate`          | `Boolean` | true                          | Enable replication of this table                                                            |
 | `cacheControl`       | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table |
-| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | Pin this table's record encoding                                                            |
+| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                     |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
@@ -134,7 +134,7 @@ Eviction removes non-indexed record data, but it does _not_ remove a record from
 
 Encodes this table's records as typed random-access structures, so a single field can be read without decoding the whole record. It suits tables whose records carry a stable set of fields with stable types, and should be left off for wide, sparse, or variably typed schemas. See [Storage Tuning — Record Encoding](./storage-tuning.md#storagerandomaccessfields) for the trade-off and for how to check where a table sits against the structure bound.
 
-Declaring the argument _pins_ this table's encoding: the table keeps it regardless of the [`storage.randomAccessFields`](../configuration/options.md#storage) setting, which otherwise applies to every table that does not declare it. Omit the argument to follow the global setting.
+Declaring the argument _pins_ this table's encoding: the table keeps it regardless of the [`storage.randomAccessFields`](../configuration/options.md#storage) setting, which otherwise applies to every table that does not declare it. That cuts both ways — a fleet-wide change to the global setting will not move a table that pins its own encoding. Omit the argument to follow the global setting instead.
 
 ```graphql
 type Reading @table(randomAccessFields: true) {

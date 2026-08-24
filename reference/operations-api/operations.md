@@ -84,11 +84,14 @@ room it has left before novel layouts stop receiving it:
 | `typed_structure_limit`    | Bound past which novel record shapes are stored without random-access field encoding |
 | `classic_structure_count`  | Structures in the classic named-record dictionary                                    |
 
-A structure is minted per distinct _shape_, where shape means the ordered list of fields plus each
-field's value width class — so `{a, b}` and `{b, a}` are different shapes, and so are `{v: 1}` and
-`{v: 70000}`. Dictionary size therefore tracks the variety of shapes a table has ever written, not
-its column count, and it only grows: structures are never pruned, because stored records,
-transaction-log entries, and replication backlogs all reference them by id.
+A typed structure is minted per distinct _shape_, where shape means the ordered list of fields plus
+the encoded type and width each field's value takes — so `{a, b}` and `{b, a}` are different shapes,
+and so are `{v: 1}`, `{v: 70000}`, and `{v: "ok"}`. Dictionary size therefore tracks the variety of
+shapes a table has ever written, not its column count, and it only grows: structures are never
+pruned, because stored records, transaction-log entries, and replication backlogs all reference them
+by id. A classic structure keys on the ordered field names alone, so `classic_structure_count` moves
+only when a table writes a field-name set it has not written before, and it stops at 32 — the
+classic dictionary's own bound, which is why the response carries no limit field for it.
 
 [`storage.randomAccessFields`](../configuration/options.md#storage) defaults to off, so `typed_structures_enabled: false` with
 `typed_structure_count: 0` is the normal state for most tables — that is typed encoding being
@@ -98,10 +101,10 @@ random-access field encoding, which makes reading individual fields of large rec
 logs a warning when a thread first observes the bound, but that depends on which thread served the
 writes and whether it has loaded the dictionary — the counts here are the reliable signal.
 
-To keep the dictionary small, write records in a consistent field order, avoid making the _set_ of
-present fields vary per write (nest volatile or optional fields inside one sub-object rather than
-adding and removing top-level fields), and expect a small fixed number of extra shapes from numeric
-fields whose values cross a width boundary.
+To keep the typed dictionary small, write records in a consistent field order, avoid making the _set_
+of present fields vary per write (nest volatile or optional fields inside one sub-object rather than
+adding and removing top-level fields), keep a given field to one value type across records, and
+expect a small fixed number of extra shapes from numeric fields whose values cross a width boundary.
 
 ### `create_database`
 
