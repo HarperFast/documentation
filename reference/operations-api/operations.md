@@ -72,7 +72,10 @@ Returns the definition of a specific table.
 <VersionBadge type="changed" version="v5.2.5" />
 
 Alongside the schema, the response carries the size of the table's **record-structure dictionaries**
-— the physical record layouts Harper has seen for this table:
+— the physical record layouts Harper has seen for this table. They are how you check whether a table
+is getting
+[random-access field encoding](../database/storage-tuning.md#storagerandomaccessfields) and how much
+room it has left before novel layouts stop receiving it:
 
 | Field                      | Description                                                                          |
 | -------------------------- | ------------------------------------------------------------------------------------ |
@@ -87,7 +90,7 @@ field's value width class — so `{a, b}` and `{b, a}` are different shapes, and
 its column count, and it only grows: structures are never pruned, because stored records,
 transaction-log entries, and replication backlogs all reference them by id.
 
-`storage.randomAccessFields` defaults to off, so `typed_structures_enabled: false` with
+[`storage.randomAccessFields`](../configuration/options.md#storage) defaults to off, so `typed_structures_enabled: false` with
 `typed_structure_count: 0` is the normal state for most tables — that is typed encoding being
 disabled, not spare headroom. Where it is enabled, reaching `typed_structure_limit` is not an error:
 records with novel shapes past that point still write and read correctly, but are stored without

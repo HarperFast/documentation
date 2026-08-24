@@ -159,6 +159,43 @@ Default: `true`
 
 In-memory record caching of decoded records. Disable to reduce heap usage when records are large and unlikely to be re-read in the same process.
 
+## Record Encoding
+
+### `storage.randomAccessFields`
+
+<VersionBadge version="v5.1.0" />
+
+Type: `boolean`
+
+Default: `false`
+
+Chooses how Harper lays out a table's records on disk.
+
+Either way, a record does not store its own field names: they live in a shared **structure** that the record references by id. What differs is what else the structure captures and how the values are laid out. Under the default _classic_ encoding the structure holds just the ordered field names, and the values follow packed one after another, each carrying its own type tag — so reading any single field means decoding the values ahead of it. Under _random-access (typed)_ encoding the structure also fixes each field's type and width, so a record becomes a fixed-width slot per field followed by a section holding the variable-length values (strings, nested objects). Reading a field is then an offset lookup into the stored bytes instead of a decode of the record, and untagged slots sized to the field make a stable scalar schema somewhat smaller on disk.
+
+The trade is that a structure is minted per distinct record _shape_, where shape means the ordered list of fields plus each field's value width class — so `{a, b}` and `{b, a}` are different shapes, and so are `{v: 1}` and `{v: 70000}`. A table whose records vary in shape mints many structures, and the dictionary only ever grows.
+
+Enable it when:
+
+- Records are large and requests read only part of them — the fields a request does not touch are never decoded.
+- The fields are mostly scalars (numbers, booleans, dates, short strings) with types that do not vary from record to record.
+- Records are written in a consistent shape: the same fields, in the same order, with values in a stable magnitude range.
+
+Leave it off when:
+
+- The schema is wide, sparse, or variably typed — a table where each write carries a different subset of fields, or where a field holds a small integer in one record and a large one in the next, mints a new structure for each variation.
+- Records are small, or reads generally deserialize the whole record anyway. There is little to skip past, so the layout has little to give back.
+- The table stores mostly nested objects or long strings, which land in the variable-length section either way.
+
+```yaml
+storage:
+  randomAccessFields: true
+```
+
+The global setting applies to each table as its store is opened, so toggling it is safe at runtime: records already written keep decoding under whichever encoding wrote them, and only new writes change. To pin one table's encoding regardless of the global setting, use the [`@table(randomAccessFields:)`](./schema.md#randomaccessfields) directive; tables that carry the directive ignore this option.
+
+The dictionary is bounded at 256 structures per encoder. Reaching the bound is not an error — records with novel shapes past that point still write and read correctly, they are simply stored without random-access field encoding. [`describe_table`](../operations-api/operations.md#describe_table) reports the current counts and the bound, which is the reliable way to see whether a table's shapes are staying within it.
+
 ## RocksDB Memory
 
 RocksDB exposes two large native memory pools that Harper makes tunable: a shared **block cache** for hot SST blocks and a **WriteBufferManager** (enabled by default) that caps total memtable memory across every database in the process. These options apply only when `storage.engine` is `rocksdb`.
@@ -354,6 +391,7 @@ storage:
 
 - [Configuration Options](../configuration/options.md) — full list of `storage` options
 - [Storage Algorithm](./storage-algorithm.md) — how Harper stores records and indexes on disk
+- [Schema — `@table(randomAccessFields:)`](./schema.md#randomaccessfields) — pinning one table's record encoding
 - [Compaction](./compaction.md) — reclaiming space inside existing database files
 - [Resource API — `sourcedFrom`](../resources/resource-api.md#sourcedfromresource-options) — caching tables that interact with reclamation
 - [Database API — `createBlob`](./api.md) — creating blobs that live under `blobPaths`
