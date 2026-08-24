@@ -210,23 +210,23 @@ so later attempts can no longer be omitted from overload detection.
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and provides an early warning to shed or throttle
-write load. However, a wedged commit contributes no sample until it settles. Use this distribution
-with the server log: the "Rejecting writes on this thread" error is the authoritative signal when the
-guard trips. Tune the threshold against a baseline for your workload.
+write load. However, a wedged commit contributes no sample until it settles —
+[`write-transaction-queue-depth`](#transaction-queue-depth-metrics) stays elevated instead. Use this
+distribution with the server log: the "Rejecting writes on this thread" error is the authoritative
+signal when the guard trips. Tune the threshold against a baseline for your workload.
 
 ### Resource Usage Metrics
 
-| `metric`                        | Key attributes                                                                                   | Other               | Unit    | Description                                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `database-size`                 | `size`, `used`, `free`, `audit`                                                                  | `database`          | bytes   | Database file size breakdown                                                                                          |
-| `main-thread-utilization`       | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers` | `time`              | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown                                     |
-| `read-transaction-queue-depth`  | `depth`, `maxDepth`                                                                              |                     | count   | Open tracked transactions holding a read handle (see [transaction queue depth](#transaction-queue-depth-metrics))     |
-| `resource-usage`                | (see below)                                                                                      |                     | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))                                         |
-| `storage-volume`                | `available`, `free`, `size`                                                                      | `database`          | bytes   | Storage volume size breakdown                                                                                         |
-| `table-size`                    | `size`                                                                                           | `database`, `table` | bytes   | Table file size                                                                                                       |
-| `transaction-commit-time`       | `mean`, `median`, `p90`, `p95`, `p99`, `p999`                                                    |                     | ms      | Duration from write commit submission to settlement (see [transaction queue depth](#transaction-queue-depth-metrics)) |
-| `utilization`                   |                                                                                                  |                     | %       | Percentage of time the worker thread was processing requests                                                          |
-| `write-transaction-queue-depth` | `depth`, `maxDepth`                                                                              |                     | count   | In-flight write transaction commits (see [transaction queue depth](#transaction-queue-depth-metrics))                 |
+| `metric`                        | Key attributes                                                                                   | Other               | Unit    | Description                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `database-size`                 | `size`, `used`, `free`, `audit`                                                                  | `database`          | bytes   | Database file size breakdown                                                                                      |
+| `main-thread-utilization`       | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers` | `time`              | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown                                 |
+| `read-transaction-queue-depth`  | `depth`, `maxDepth`                                                                              |                     | count   | Open tracked transactions holding a read handle (see [transaction queue depth](#transaction-queue-depth-metrics)) |
+| `resource-usage`                | (see below)                                                                                      |                     | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))                                     |
+| `storage-volume`                | `available`, `free`, `size`                                                                      | `database`          | bytes   | Storage volume size breakdown                                                                                     |
+| `table-size`                    | `size`                                                                                           | `database`, `table` | bytes   | Table file size                                                                                                   |
+| `utilization`                   |                                                                                                  |                     | %       | Percentage of time the worker thread was processing requests                                                      |
+| `write-transaction-queue-depth` | `depth`, `maxDepth`                                                                              |                     | count   | In-flight write transaction commits (see [transaction queue depth](#transaction-queue-depth-metrics))             |
 
 #### Transaction Queue Depth Metrics
 
@@ -240,11 +240,10 @@ any single one is approaching the
 [`storage.maxTransactionQueueTime`](../database/storage-tuning.md#storagemaxtransactionqueuetime)
 duration limit (default 45s) that actually trips the 503.
 
-`transaction-commit-time` records each commit's submit-to-settle duration on that same clock, and a
-rising `p99`/`p999` (in the `hdb_analytics` aggregate table, where percentiles are computed — they
-aren't present on `hdb_raw_analytics`) is a leading indicator of _gradual_ slowdowns approaching that
-limit. It doesn't help with a single commit that hangs indefinitely, though: the metric only records
-once a commit settles, so a genuinely wedged commit contributes no sample at all, while
+[`transaction-commit-time`](#storage-metrics) records each commit's submit-to-settle duration on
+that same clock, and a rising `p99`/`p999` is a leading indicator of _gradual_ slowdowns approaching
+that limit. It doesn't help with a single commit that hangs indefinitely, though: the metric only
+records once a commit settles, so a genuinely wedged commit contributes no sample at all, while
 `write-transaction-queue-depth`'s `depth` stays elevated on that thread for as long as the commit
 remains outstanding. Harper also logs `Rejecting writes on this thread: a commit has been outstanding
 for ...` once per stuck commit when the 503 check itself fires, which is the authoritative signal for
