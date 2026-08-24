@@ -50,9 +50,9 @@ A typical record:
 			"metric": "bytes-sent",
 			"path": "search_by_conditions",
 			"type": "operation",
-			"mean": 202,
-			"distribution": [202],
-			"count": 1
+			"mean": 201,
+			"distribution": [198, { "value": 202, "count": 3 }],
+			"count": 4
 		},
 		{
 			"metric": "memory",

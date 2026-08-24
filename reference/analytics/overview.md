@@ -55,9 +55,9 @@ Example raw entry:
 			"metric": "bytes-sent",
 			"path": "search_by_conditions",
 			"type": "operation",
-			"mean": 202,
-			"distribution": [202],
-			"count": 1
+			"mean": 201,
+			"distribution": [198, { "value": 202, "count": 3 }],
+			"count": 4
 		},
 		{
 			"metric": "memory",
@@ -80,6 +80,14 @@ Example raw entry:
 	"id": 1688594390708.6853
 }
 ```
+
+Metrics that record sampled values carry `mean`, `distribution`, and `count`. `distribution` is a
+percentile-bucket summary of the period's samples rather than every sample: at most ten entries, one
+per percentile boundary (`p1`, `p10`, `p25`, `median`, `p75`, `p90`, `p95`, `p99`, `p999`, and the
+maximum). An entry is a bare number when its bucket covers a single sample, or
+`{ "value": <sample>, "count": <samples> }` when it covers several, so a consumer reading raw
+entries must handle both shapes. The aggregate table's percentile fields are rolled up from these
+buckets.
 
 ## Aggregate Analytics (`hdb_analytics`)
 
@@ -194,8 +202,8 @@ the aggregate table for percentile-based alerting. With the default
 [`analytics.aggregatePeriod`](#analyticsaggregateperiod) of 60 seconds, those alerts can observe new
 aggregate values no more than once per minute.
 
-The metric shares a timebase with the RocksDB storage engine's overload guard. When the oldest
-tracked outstanding commit on a thread exceeds
+The metric shares a timebase with the RocksDB storage engine's overload guard. When a tracked
+outstanding commit on a thread exceeds
 [`storage.maxTransactionQueueTime`](../database/storage-tuning.md#storagemaxtransactionqueuetime)
 (default 45s), Harper rejects new record updates and publishes from new application requests on that
 thread with `Outstanding write transactions have too long of queue, please try again later` (HTTP
@@ -205,8 +213,9 @@ bypass this check.
 <VersionBadge type="changed" version="v5.2.1" />
 
 Beginning with v5.2.1, the guard tracks every outstanding commit attempt on the thread, including
-conflict retries and chained commits. It rejects once the oldest tracked attempt exceeds the limit,
-so later attempts can no longer be omitted from overload detection.
+conflict retries and chained commits, and rejects once the oldest tracked attempt exceeds the limit.
+In v5.2.0, only one commit per thread was tracked at a time, so an attempt submitted while another
+was already outstanding could be omitted from overload detection.
 
 A rising `p99`/`p999` signals commits are taking longer to drain — from write volume, large
 transactions, or a saturated storage volume — and provides an early warning to shed or throttle
