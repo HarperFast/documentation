@@ -51,7 +51,7 @@ You can also manage nodes dynamically through the [Operations API](./clustering.
 
 Harper automatically replicates node information to other nodes in the cluster using [gossip-style discovery](https://highscalability.com/gossip-protocol-explained/). This means you only need to connect to one existing node in a cluster, and Harper will automatically detect and connect to all other nodes bidirectionally.
 
-As of v5.2, this full-mesh, bidirectional auto-connect behavior applies to nodes with no directional routes. A node configured with [directional routes](#controlling-replication-flow) advertises a constrained registry record instead, so discovered non-neighbor nodes do not receive a replication connection — see [Controlling Replication Flow](#controlling-replication-flow).
+As of v5.2, this full-mesh, bidirectional auto-connect behavior applies to nodes with no directional routes. A node configured with [directional routes](#controlling-replication-flow) advertises a constrained registry record instead, so a node that discovers it — and has no directional route of its own for it — does not open a replication subscription to it. Containment is a property of the _discovered_ node's advertised record, not of the discovering node's configuration: configuring directional routes on one node does not stop that node from subscribing to a discovered peer that still advertises the legacy full-mesh record. See [Controlling Replication Flow](#controlling-replication-flow).
 
 ### Data Selection
 
@@ -202,7 +202,9 @@ In this example, the local node only receives from `node-two` (one-way inbound) 
 
 ### Per-database controlled flow
 
-<VersionBadge version="v5.2.0" />
+<VersionBadge version="v5.1.0" />
+
+Routes have accepted per-database `sendsTo` / `receivesFrom` entries since v5.1.0, but a directional route was stored without being enforced on live connections until v5.1.15: before that, the direction gates read only the peer's advertised `hdb_nodes` record, so traffic flowed both ways regardless of what the route declared. The behavior described below is the v5.1.15-and-later behavior.
 
 You can also scope flow per database, so different databases flow in different directions between the same two nodes. Use `sendsTo` / `receivesFrom` entries with a `database`:
 
