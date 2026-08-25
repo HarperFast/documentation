@@ -972,6 +972,8 @@ Naming the target is what makes the operation safe to retry. If that version is 
 
 The response reports `reverted` (`false` when the target was already live), `to_deployment_id`, and `from_deployment_id` — the version taken out of service, which is also recorded as `rollback_of` on the new `hdb_deployment` row for the audit trail.
 
+A revert needs no source credential. It puts the retained build back without re-fetching from the origin, so it works even when the token or deploy key that installed the current version has since expired or been revoked — which is often the situation you are in when you need to roll back.
+
 **Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails with "no previous version is retained" whenever there is no retained copy — a component deployed only once, or one whose deploys took the one-shot path described above — and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
 
 Reverting also rewrites the component's stored `package:` reference in `harperdb-config.yaml` and its entry in the boot-time application lock, as part of the same operation. So a revert is a config-level rollback too: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs the version the cluster is actually running, not the one you reverted away from. Reverting away from a `package` deploy to a payload-deployed version removes the package reference entirely, for the same reason.
@@ -1093,19 +1095,7 @@ The deployment must be in a terminal status (`success`, `failed`, or `rolled_bac
 
 ### `add_ssh_key`
 
-Adds an SSH key (must be ed25519) for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
-
-`list_ssh_keys` and the logs never return key material.
-
-The stored private key is encrypted at rest and crosses the cluster as ciphertext **when secret custody is configured**. Custody is present by default — the file tier generates a cluster keypair on first boot — so this is the normal case.
-
-:::warning
-On a node with **no** secret custody registered, `add_ssh_key` stores and replicates the private key in **plaintext**. It logs a WARN saying so and the operation still succeeds, because SSH keys predate custody and must keep working on a node that has none.
-
-That means encryption at rest is a property of your configuration, not a guarantee of the operation. If you are relying on it — and `generate: true` in particular reads as though the key can never be exposed — verify `secretCustody` is configured on every node in the cluster, and check the logs for that warning after adding a key. See [Secrets](../security/secrets.md).
-:::
-
-Adding an existing key:
+Adds an SSH key (must be ed25519) for authenticating deployments from private repositories.
 
 ```json
 {
@@ -1116,39 +1106,6 @@ Adding an existing key:
 	"hostname": "github.com"
 }
 ```
-
-#### Server-side key generation (`generate`)
-
-<VersionBadge version="v5.2.4" />
-
-With `generate: true`, Harper mints an ed25519 keypair on the node handling the request and returns only the **public** half. The private key is created inside the cluster and never travels from a client, so it can't be captured in a shell history, CI log, or request body on the way in:
-
-```json
-{
-	"operation": "add_ssh_key",
-	"name": "my-key",
-	"generate": true,
-	"host": "my-key.github.com",
-	"hostname": "github.com"
-}
-```
-
-Response:
-
-```json
-{
-	"message": "Added ssh key: my-key",
-	"public_key": "ssh-ed25519 AAAAC3Nza... harper:my-key"
-}
-```
-
-Register that `public_key` with your git host (e.g. as a GitHub deploy key) to authorize the deploy. The generated key is commented `harper:<name>` so it's identifiable in the host's key list.
-
-`key` and `generate` are mutually exclusive — sending both is rejected. Generation happens in-process, so it requires no `ssh-keygen` binary on the host and the minted private key is never written to a temporary file on its way into storage.
-
-:::note
-`public_key` is returned **only** on the generating call — that response is the one time the public half is handed back. Harper stores the private key (sealed, subject to the custody caveat above) and the host config; it does not retain the public key for later retrieval, and `update_ssh_key` requires a key you supply (it can't mint one). So capture `public_key` from this response — if you lose it, `delete_ssh_key` then `add_ssh_key` with `generate: true` again to mint a fresh pair, and re-register the new public key with your git host.
-:::
 
 ---
 
