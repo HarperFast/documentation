@@ -1067,7 +1067,8 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 - The agent's other tools — scoped filesystem access, outbound `http_fetch`, followup scheduling, and the V8 inspector — run at the Harper process's own privilege, whatever `agent.user` is. (The inspector tools additionally need `threads.debug`, and fail with an explanatory error without it.)
 - `http_fetch` blocks only the known cloud-metadata hostnames and the IPv4 link-local range `169.254.0.0/16`, and it checks the literal hostname you pass — a name that resolves to a blocked address is not caught, and redirects are followed without re-checking. Every other host, including anything private or internal the server can route to, is reachable. Reading is ungated too: `read_file` covers the log and configuration directories as well as the component tree, so an enabled agent puts a read path and an egress path in the same toolset. Treat it as an outbound network client and apply egress policy to the host.
 - With the default `agent.allowDestructive: false`, destructive tools (including filesystem writes) are removed from the toolset entirely. Turning it on admits component writes, and component code is executed by the Harper process — a write is effectively code execution at process privilege.
-- Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes and the inspector's code-evaluation tools. `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
+- Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
+- That curated set is not a list of every damaging operation, so `allowDestructive` and `autoApprove` are not a boundary by themselves. `drop_component` is the one to know about: it is not on the set, so opting it into [`mcp.operations.allow`](../mcp/configuration.md#mcpoperationsallow) puts it in the agent's toolset where `allowDestructive: false` does not remove it and no approval gates it. Vet anything you add to that allow list on its own merits rather than assuming these two settings cover it.
   :::
 
 | Operation              | Description                                                   | Role Required |
@@ -1084,6 +1085,8 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 Each conversation is a session, persisted to `system.hdb_agent_session` so transcripts survive a restart. Runs are asynchronous: `agent_prompt` returns as soon as the run is started, and you poll `get_agent_session` for progress and results.
 
 Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — so treat a prompt as durably recorded and keep credentials out of them.
+
+The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
 
 A session's `status` is one of:
 
@@ -1150,7 +1153,7 @@ Response:
 { "sessions": [{ "session_id": "3f7c...", "status": "completed", "...": "..." }] }
 ```
 
-The result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order. Sort on `updatedAt` or `createdAt` if you need recency.
+Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. Later builds order by `updatedAt` descending and apply `limit` to that ordering ([harper#2268](https://github.com/HarperFast/harper/issues/2268)).
 
 ### `approve_agent_action`
 
@@ -1173,7 +1176,7 @@ When `agent.autoApprove` is off (the default), any tool call the agent makes to 
 
 Both decisions resume the loop: an approval executes the saved tool call, and a denial hands the refusal back to the model as an observation so it can adjust. Neither ends the run — use `cancel_agent_run` for that. If a single turn produced several gated calls, the session stays `awaiting_approval` until every one of them is resolved. Resolving an already-resolved approval is an error.
 
-Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated.
+Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated. Which tools carry that mark is fixed in core — `write_file`, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) — so an operation outside it, `drop_component` among them, is neither removed nor gated.
 
 ### `cancel_agent_run`
 

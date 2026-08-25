@@ -356,16 +356,16 @@ agent:
   user: hdb_agent
 ```
 
-- `enabled` - Enable the agent component; _Default_: `false`
-- `provider` - Recorded on the session but **not yet used to route the model call** — only `model` reaches the provider. Set the provider through the [`models`](../models/overview.md#configuration) configuration instead
-- `model` - Model id override, passed through to the model call; _Default_: the [`models`](../models/overview.md#configuration) generative default
-- `maxTurns` - Maximum tool-call iterations in a single run; _Default_: `50`
-- `maxCostUsd` - Intended per-run cost ceiling. **Not enforced** — it is a stored setting only, and nothing checks spend against it; _Default_: `5.00`
-- `autoApprove` - Run without per-action approval gates; _Default_: `false`
-- `allowDestructive` - Include destructive tools (`drop_component`, `restart`, `set_configuration`, ...) in the agent's toolset. When `false` they are removed entirely rather than gated; _Default_: `false`
-- `user` - Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
-- `componentsScope` - Filesystem write scope for component edits, relative to `rootPath`; _Default_: the full `componentsRoot`
-- `systemPromptAppend` - Operator text appended to the agent's system prompt
+- `enabled` — Enable the agent component; _Default_: `false`
+- `provider` — Recorded on the session but **not yet used to route the model call** — only `model` reaches the provider. Set the provider through the [`models`](../models/overview.md#configuration) configuration instead
+- `model` — Model id override, passed through to the model call; _Default_: the [`models`](../models/overview.md#configuration) generative default
+- `maxTurns` — Maximum tool-call iterations in a single run; _Default_: `50`
+- `maxCostUsd` — Intended per-run cost ceiling. **Not enforced** — it is a stored setting only, and nothing checks spend against it; _Default_: `5.00`
+- `autoApprove` — Run without per-action approval gates; _Default_: `false`
+- `allowDestructive` — Include the tools marked destructive in the agent's toolset: `write_file`, the inspector's code-evaluation tools, and any operations tool carrying MCP's [`destructiveHint`](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). When `false` they are removed entirely rather than gated. That hint comes from a curated set in core which does not cover every damaging operation, so this is not a complete safety boundary on its own — see [Agent operations](../operations-api/operations.md#agent); _Default_: `false`
+- `user` — Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
+- `componentsScope` — Filesystem write scope for component edits, relative to `rootPath`; _Default_: the full `componentsRoot`
+- `systemPromptAppend` — Operator text appended to the agent's system prompt
 
 `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only. `enabled` is the exception worth knowing: it cannot switch the agent on, because with the agent disabled at startup no agent operation is registered at all.
 
