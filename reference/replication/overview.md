@@ -49,7 +49,7 @@ You can also manage nodes dynamically through the [Operations API](./clustering.
 
 ### Gossip Discovery
 
-Harper automatically replicates node information to other nodes in the cluster using [gossip-style discovery](https://highscalability.com/gossip-protocol-explained/). This means you only need to connect to one existing node in a cluster, and Harper will automatically detect and connect to all other nodes bidirectionally.
+Harper automatically replicates node information to other nodes in the cluster using [gossip-style discovery](https://highscalability.com/gossip-protocol-explained/). This means you only need to connect to one existing node in a cluster, and Harper will automatically detect and connect to all other nodes bidirectionally — unless those nodes advertise [directional routes](#controlling-replication-flow), as described below.
 
 As of v5.2, this full-mesh, bidirectional auto-connect behavior applies to nodes with no directional routes. A node configured with [directional routes](#controlling-replication-flow) advertises a constrained registry record instead, so a node that discovers it — and has no directional route of its own for it — does not open a replication subscription to it. Containment is a property of the _discovered_ node's advertised record, not of the discovering node's configuration: configuring directional routes on one node does not stop that node from subscribing to a discovered peer that still advertises the legacy full-mesh record. See [Controlling Replication Flow](#controlling-replication-flow).
 
@@ -243,6 +243,19 @@ replication:
           - database: system
 ```
 
+Each entry can also carry `excludeTables` to keep specific tables out of a database that otherwise flows in that direction:
+
+```yaml
+replication:
+  routes:
+    - hostname: node-two
+      replicates:
+        sendsTo:
+          - database: cardata
+            excludeTables:
+              - raw_telemetry # everything in cardata except this table
+```
+
 `sendsTo` / `receivesFrom` are declared from the perspective of the node whose `harper-config.yaml` they're in, for its route to that one peer. A route that declares `replicates` with `sends`, `receives`, `sendsTo`, or `receivesFrom` is authoritative on each side; a route without those fields — or no route at all — falls back to the peer's advertised `hdb_nodes` self-record.
 
 The **sending** side needs the matching `sendsTo` entry when it has a directional route for that peer. To aggregate a database upstream instead of pushing it downstream — for example, so a role created on a roadside node reaches a middle-tier node — the **roadside** node's directional route to middle needs `sendsTo: [{ database: system }]`; without it, middle's subscription attempt is rejected as unauthorized. If roadside has no directional route to middle, it instead authorizes the send from middle's advertised `receivesFrom` and may serve `system` without a local `sendsTo` entry.
@@ -259,13 +272,13 @@ As of v5.2 you can replicate `system` while keeping a constrained topology among
 
 Notes and current limitations:
 
-- This applies only when a node has **directional** routes (`replicates` with `sends`/`receives` or `sendsTo`/`receivesFrom`). A node with no directional routes keeps the legacy full-mesh advertisement.
+- This applies only when a node has **directional** routes in its `harper-config.yaml` (`replicates` with `sends`/`receives` or `sendsTo`/`receivesFrom`). A node with no directional routes keeps the legacy full-mesh advertisement — including a node scoped only through `add_node` / `set_node`, which does not produce a directional self-record (see [Add Node](./clustering.md#add-node)). A dynamically provisioned tier that replicates `system` without config routes therefore still collapses to a full mesh.
 - The no-direct-connection guarantee requires every discoverable participant to advertise directional routes. A node that advertises the legacy full-mesh record can still be reached through the advertised-record fallback when a receiver has no directional route for it.
 - This constrains replication subscriptions only. On-demand residency/retrieval connections (for example, sharded or invalidated-cache reads) use a separate mechanism governed by data residency, not by this registry record, and can still open a direct socket to a non-neighbor node.
 - Central visibility of every node is not guaranteed: an aggregation node may not list every distant leaf in its `hdb_nodes` registry (the registry relay differs from data relay). This does not open a connection either way.
 - Route changes to a node's own directionality take effect on restart.
-- Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a compromised edge node can create a user or role with cluster-wide privileges or alter its advertised directionality in `hdb_nodes`, and those changes reach every node on the upstream path. If edge nodes are outside your trust boundary, enforce downstream-only `system` replication with directional routes on both nodes: include `system` in the central node's `sendsTo` and the edge node's `receivesFrom`, and omit it from the central node's `receivesFrom` and the edge node's `sendsTo`. A plain or absent route on either side falls back to the peer's advertised registry record and does not enforce that direction.
-- Downstream-only `system` replication is an integrity control, not a confidentiality boundary. The database includes encrypted `system.hdb_secret` rows, and a joined Harper Pro node holds the cluster custody key that can decrypt them. Treat every node receiving `system` as trusted with the system database's contents; for untrusted nodes, avoid replicating `system` to them or exclude sensitive system tables from the controlled-flow entries.
+- **Any node that receives `system` must be trusted with its contents.** The database includes encrypted `system.hdb_secret` rows, and a joined Harper Pro node holds the cluster custody key that can decrypt them, so sending `system` to a node is a disclosure decision regardless of direction. If a node is outside your confidentiality boundary, do not replicate `system` to it. `excludeTables` on the entries that carry `system` (see [Per-database controlled flow](#per-database-controlled-flow)) can keep individual tables off a node, but it is not a general substitute for that decision: a node without its own `hdb_secret` rows cannot resolve the secret references a replicated component deploy carries, so deploys that use registry or git credentials fail there.
+- Within that boundary, direction is still an **integrity** control. Replicating `system` upstream (edge → core) propagates `hdb_user`/`hdb_role` along with everything else in the database: a compromised edge node can create a user or role with cluster-wide privileges or alter its advertised directionality in `hdb_nodes`, and those changes reach every node on the upstream path. To keep an edge node from writing to the cluster's identity state while still receiving it, enforce downstream-only `system` replication with directional routes on both nodes: include `system` in the central node's `sendsTo` and the edge node's `receivesFrom`, and omit it from the central node's `receivesFrom` and the edge node's `sendsTo`. A plain or absent route on either side falls back to the peer's advertised registry record and does not enforce that direction.
 
 ### Explicit Subscriptions
 
