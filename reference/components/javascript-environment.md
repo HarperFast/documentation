@@ -254,7 +254,7 @@ Harper runs a pool of worker threads, and component code runs on each of them. W
 - Exactly one caller wins the lock and spawns a real child process. Every other caller — other threads, and later calls with the same name — receives an `ExistingProcessWrapper` for the already-running process.
 - The name is the whole key. It is not namespaced per component and it is interpolated into the path unsanitized, so two independently installed components that both pick `agent` share one lock and adopt each other's process, and a name containing `../` places the lock file outside `<rootPath>/pids/` entirely. Use a literal, path-safe name prefixed with your component's name — never one derived from configuration or any other input.
 - When the real child exits, the thread that spawned it removes the PID file, so the next spawn call starts a fresh process.
-- If a PID file survives an unclean shutdown, Harper recovers it by checking whether the recorded PID is still alive: if it is not, the stale file is removed and the next caller spawns normally. If the operating system has recycled that PID onto an unrelated process, Harper adopts it instead — and a `version` mismatch would signal it. Another reason to keep the name unique.
+- If a PID file survives an unclean shutdown, Harper recovers it by checking whether the recorded PID is still alive: if it is not, the stale file is removed and the next caller spawns normally. If the operating system has recycled that PID onto an unrelated process, Harper treats that process as the sidecar: it adopts it when you pass no `version`, and sends it `SIGTERM` when the `version` you pass does not match the recorded one. Another reason to keep the name unique.
 
 ### Replacing a running process: the `version` option
 
@@ -280,7 +280,7 @@ The lock winner gets a real [`ChildProcess`](https://nodejs.org/api/child_proces
 | `unref()`       | Stops the liveness poll — see below                         |
 | `'exit'` event  | Emitted with `(null, null)` once the process is gone        |
 
-It does **not** have `stdout`, `stderr`, `stdin`, or `spawnargs` — those properties are simply absent, so reading one yields `undefined` and using it (`child.stdout.on(...)`) throws a `TypeError` on exactly the threads that lost the race, which is most of them. A component that reads the child's output must do so only on the thread that owns the real `ChildProcess`. Because `spawnargs` reads as `undefined` rather than throwing, it is the practical way to tell the two apart:
+It does **not** have `stdout`, `stderr`, `stdin`, or `spawnargs` — those properties are simply absent, so reading one yields `undefined` and using it (`child.stdout.on(...)`) throws a `TypeError` on exactly the threads that lost the race, which is most of them. A component that reads the child's output must do so only on the thread that owns the real `ChildProcess`. Because `spawnargs` reads as `undefined` rather than throwing, it is the practical way to tell the two apart. It tests an internal detail rather than a discriminator Harper promises: it works only because the wrapper does not define `spawnargs` today, and a release that added the property would silently send every losing thread down the real-`ChildProcess` branch. Re-check it when you upgrade.
 
 ```javascript
 const child = spawn('datadog-agent', ['run'], { name: 'datadog-agent', version: 3 });
