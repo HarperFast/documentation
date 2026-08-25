@@ -37,7 +37,7 @@ These are all gated by `verifyPerms`, but defaulting to "expose them to the LLM 
 Each generated tool carries MCP annotations the client can use to decide how to surface it:
 
 - `readOnlyHint: true` — operations matching the read-only set (`describe_*`, `list_*`, `search_*`, `get_*`, `read_*`, `system_information`, `status`). MCP hosts can render these as "safe to call without confirmation".
-- `destructiveHint: true` — operations on Harper's curated destructive list: the schema/user/role `drop_*` operations, the `delete*` data and log operations, `restart`, `restart_service`, `set_configuration`, `remove_node`, `restore_backup`, `delete_backup`, and `purge_backups`. MCP hosts SHOULD prompt before invoking. The list is explicit rather than a prefix match, so damaging operations off it — `drop_component` and `deploy_component` among them — carry no hint; see [Tool Metadata](./tool-metadata.md).
+- `destructiveHint: true` — operations on Harper's curated destructive list, which is enumerated in core rather than matched by prefix. MCP hosts SHOULD prompt before invoking. See [Tool Metadata](./tool-metadata.md) for the exact membership and for the damaging operations that are absent from it.
 
 Neither hint is an authorization check — `verifyPerms` runs at dispatch.
 

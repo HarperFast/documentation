@@ -42,7 +42,11 @@ For operations tools, the descriptor fields are sourced from:
 | `annotations.destructiveHint` | `true` for operations in the curated destructive set — an explicit list, not a prefix match; see below                                          |
 | `annotations.idempotentHint`  | Default empty; opt-in per operation after end-to-end verification that the second call produces the same observable outcome                     |
 
-The curated destructive set is enumerated in core, not matched by prefix. It covers the schema, user, and role `drop_*` operations, the `delete*` data and log operations, `restart`, `restart_service`, `set_configuration`, `remove_node`, `restore_backup`, `delete_backup`, and `purge_backups`. Operations that merely look destructive are not on it and carry no hint — `drop_component`, `deploy_component`, `drop_waf_rule`, `delete_secret`, and `remove_certificate` among them — so do not treat the hint as a complete inventory of what an operation can damage.
+The curated destructive set is enumerated in core rather than matched by prefix, and this is its full membership:
+
+`drop_schema`, `drop_database`, `drop_table`, `drop_attribute`, `drop_user`, `drop_role`, `delete`, `delete_files_before`, `delete_records_before`, `delete_audit_logs_before`, `delete_transaction_logs_before`, `delete_deployment_payload`, `delete_backup`, `purge_backups`, `restore_backup`, `restart`, `restart_service`, `set_configuration`, `remove_node`.
+
+Operations that look destructive but are absent from it carry no hint — `drop_component`, `deploy_component`, `drop_waf_rule`, `delete_secret`, and `remove_certificate` among them — so do not read the hint as an inventory of what an operation can damage.
 
 Operations registered outside core (for example, `cluster_status` from harper-pro) don't have catalog entries; they fall back to the generic description template until the per-operation metadata registry lands.
 

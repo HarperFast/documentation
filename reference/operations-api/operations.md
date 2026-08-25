@@ -1058,7 +1058,7 @@ Operations for driving Harper's built-in agent — an LLM loop that operates the
 
 The agent component is **disabled by default**. Enable it with `agent.enabled: true` in `harper-config.yaml` (see [`agent`](../configuration/options.md#agent)) and configure a generative model under [`models`](../models/overview.md#configuration). With the component disabled at startup none of these operations are registered, so calling one is an unknown-operation error rather than a permission or state error.
 
-All six operations are `super_user` by default. They participate in the role [`operations` allowlist](../users-and-roles/overview.md#operation-permissions), so a non-`super_user` role can be granted a scoped subset (for example `operations: ['agent_prompt', 'get_agent_session']`) without granting full `super_user`. Note that the read operations are not caller-scoped: a role granted `get_agent_session` or `list_agent_sessions` reads every session on the instance, including transcripts of runs it did not start. Because a transcript records the _output_ of every tool call, and those calls ran as `agent.user`, delegating a read operation hands that role the results of work done at the agent's privilege — table contents, log excerpts, configuration — regardless of its own permissions. Delegate the read operations only to roles you would trust with the agent itself.
+All six operations are `super_user` by default. They participate in the role [`operations` allowlist](../users-and-roles/overview.md#operation-permissions), so a non-`super_user` role can be granted a scoped subset (for example `operations: ['agent_prompt', 'get_agent_session']`) without granting full `super_user`. Note that the read operations are not caller-scoped: a role granted `get_agent_session` or `list_agent_sessions` reads every session on the instance, including transcripts of runs it did not start. Because a transcript records the _arguments and output_ of every tool call, and those calls ran as `agent.user`, delegating a read operation hands that role the results of work done at the agent's privilege — table contents, log excerpts, configuration — regardless of its own permissions. Delegate the read operations only to roles you would trust with the agent itself.
 
 :::warning
 Anyone who can call `agent_prompt` can direct whatever the agent does. Understand the boundary before enabling it:
@@ -1084,9 +1084,11 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 
 Each conversation is a session, persisted to `system.hdb_agent_session` so transcripts survive a restart. Runs are asynchronous: `agent_prompt` returns as soon as the run is started, and you poll `get_agent_session` for progress and results.
 
-Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — so treat a prompt as durably recorded and keep credentials out of them.
+Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — and each tool call is recorded with its arguments as well as its output, so a bearer token in an `http_fetch` header or a secret in a `set_configuration` call is stored verbatim. Treat a prompt and everything a run passes to a tool as durably recorded, and keep credentials out of both.
 
 The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it, and a backup of `system` to carry them as well. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
+
+A run does not resume across a restart, and nothing reconciles session status at startup: a session the restart caught in `running` or `awaiting_approval` keeps that status indefinitely, so polling never terminates and `agent_prompt` rejects it with a 409. Clear it with [`cancel_agent_run`](#cancel_agent_run), which reports `"signalledLiveRun": false` because there is no live run left to signal.
 
 A session's `status` is one of:
 
@@ -1095,7 +1097,7 @@ A session's `status` is one of:
 | `idle`              | Created, or resumable — no run in flight                                                      |
 | `running`           | A run is in progress                                                                          |
 | `awaiting_approval` | Paused on one or more destructive tool calls; see `pendingApprovals`                          |
-| `completed`         | The run ended without an error — a final answer, or the `maxTurns` ceiling; check `lastError` |
+| `completed`         | The run ended without throwing — a final answer, or the `maxTurns` ceiling; check `lastError` |
 | `aborted`           | Cancelled by an operator via `cancel_agent_run`                                               |
 | `error`             | The run failed; `lastError` carries the message                                               |
 
@@ -1153,7 +1155,7 @@ Response:
 { "sessions": [{ "session_id": "3f7c...", "status": "completed", "...": "..." }] }
 ```
 
-Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. The fix ([harper#2268](https://github.com/HarperFast/harper/issues/2268)) is merged in core but is not in a tagged release yet; once it ships, the listing orders by `updatedAt` descending and applies `limit` to that ordering.
+Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. The ordering is fixed in core by [harper#2268](https://github.com/HarperFast/harper/issues/2268) — check the release notes for the version it ships in.
 
 ### `approve_agent_action`
 
@@ -1176,7 +1178,7 @@ When `agent.autoApprove` is off (the default), any tool call the agent makes to 
 
 Both decisions resume the loop: an approval executes the saved tool call, and a denial hands the refusal back to the model as an observation so it can adjust. Neither ends the run — use `cancel_agent_run` for that. If a single turn produced several gated calls, the session stays `awaiting_approval` until every one of them is resolved. Resolving an already-resolved approval is an error.
 
-Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated. Which tools carry that mark is fixed in core — `write_file`, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) — so an operation outside it, `drop_component` among them, is neither removed nor gated.
+Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated. Which tools carry that mark is fixed in core — `write_file`, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) — so an operation outside it (`drop_component` and `deploy_component` among them) is neither removed nor gated.
 
 ### `cancel_agent_run`
 
