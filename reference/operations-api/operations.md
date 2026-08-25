@@ -1068,7 +1068,7 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 - `http_fetch` blocks only the known cloud-metadata hostnames and the IPv4 link-local range `169.254.0.0/16`, and it checks the literal hostname you pass — a name that resolves to a blocked address is not caught, and redirects are followed without re-checking. Every other host, including anything private or internal the server can route to, is reachable. Reading is ungated too: `read_file` covers the log and configuration directories as well as the component tree, so an enabled agent puts a read path and an egress path in the same toolset. Treat it as an outbound network client and apply egress policy to the host.
 - With the default `agent.allowDestructive: false`, destructive tools (including filesystem writes) are removed from the toolset entirely. Turning it on admits component writes, and component code is executed by the Harper process — a write is effectively code execution at process privilege.
 - Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
-- That curated set is not a list of every damaging operation, so `allowDestructive` and `autoApprove` are not a boundary by themselves. `drop_component` is the one to know about: it is not on the set, so opting it into [`mcp.operations.allow`](../mcp/configuration.md#mcpoperationsallow) puts it in the agent's toolset where `allowDestructive: false` does not remove it and no approval gates it. Vet anything you add to that allow list on its own merits rather than assuming these two settings cover it.
+- That set is an explicit list in core rather than a prefix match, and it is not a list of every damaging operation, so `allowDestructive` and `autoApprove` are not a boundary by themselves. The component operations are the ones to know about: `drop_component` and `deploy_component` are both off the set, so opting either into [`mcp.operations.allow`](../mcp/configuration.md#mcpoperationsallow) puts it in the agent's toolset where `allowDestructive: false` does not remove it and no approval gates it — and `deploy_component` writes code the Harper process then executes. Vet anything you add to that allow list on its own merits rather than assuming these two settings cover it.
   :::
 
 | Operation              | Description                                                   | Role Required |
@@ -1086,18 +1086,18 @@ Each conversation is a session, persisted to `system.hdb_agent_session` so trans
 
 Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — so treat a prompt as durably recorded and keep credentials out of them.
 
-The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
+The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it, and a backup of `system` to carry them as well. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
 
 A session's `status` is one of:
 
-| Status              | Meaning                                                              |
-| ------------------- | -------------------------------------------------------------------- |
-| `idle`              | Created, or resumable — no run in flight                             |
-| `running`           | A run is in progress                                                 |
-| `awaiting_approval` | Paused on one or more destructive tool calls; see `pendingApprovals` |
-| `completed`         | The model produced a final answer with no further tool calls         |
-| `aborted`           | Cancelled by an operator via `cancel_agent_run`                      |
-| `error`             | The run failed; `lastError` carries the message                      |
+| Status              | Meaning                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `idle`              | Created, or resumable — no run in flight                                                      |
+| `running`           | A run is in progress                                                                          |
+| `awaiting_approval` | Paused on one or more destructive tool calls; see `pendingApprovals`                          |
+| `completed`         | The run ended without an error — a final answer, or the `maxTurns` ceiling; check `lastError` |
+| `aborted`           | Cancelled by an operator via `cancel_agent_run`                                               |
+| `error`             | The run failed; `lastError` carries the message                                               |
 
 `completed` also covers hitting the `agent.maxTurns` ceiling — in that case `lastError` reads `Reached maxTurns=<n> without a final answer.`, so check it before treating a completed session as finished.
 
@@ -1153,7 +1153,7 @@ Response:
 { "sessions": [{ "session_id": "3f7c...", "status": "completed", "...": "..." }] }
 ```
 
-Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. Later builds order by `updatedAt` descending and apply `limit` to that ordering ([harper#2268](https://github.com/HarperFast/harper/issues/2268)).
+Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. The fix ([harper#2268](https://github.com/HarperFast/harper/issues/2268)) is merged in core but is not in a tagged release yet; once it ships, the listing orders by `updatedAt` descending and applies `limit` to that ordering.
 
 ### `approve_agent_action`
 
