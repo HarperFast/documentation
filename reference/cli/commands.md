@@ -263,7 +263,7 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 
 This copies the default `data` database to a new location with compaction applied.
 
-As of v5.3.0 the database's `Blob` files are copied to `<target-database-path>-blobs/<rootIndex>/`, since blob files live outside the database file and are addressed by database name. If the database holds `Blob` values, the copy is not restorable without that companion directory — see [Database Compaction](../database/compaction.md#file-backed-blobs-copied-separately) for the restore steps. LMDB databases only; RocksDB databases compact themselves.
+As of v5.3.0 the database's `Blob` files are copied to `<target-database-path>-blobs/<rootIndex>/`, since blob files live outside the database file and are addressed by database name. If the database holds `Blob` values, the copy is not restorable without that companion directory — see [Database Compaction](../database/compaction.md#file-backed-blobs-copied-separately) for the restore steps. LMDB databases only — `copy-db` fails if the source database is stored in RocksDB, which compacts itself.
 
 **Use Cases**:
 

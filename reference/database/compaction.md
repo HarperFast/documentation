@@ -41,7 +41,7 @@ To replace the original database with the compacted copy, move or rename the out
 harper copy-db data /home/user/hdb/database/copy.mdb
 ```
 
-Copy compaction applies to LMDB databases. RocksDB databases compact themselves and are skipped.
+Copy compaction applies to LMDB databases only. `copy-db` fails if the source database is stored in RocksDB, and [compact on start](#compact-on-start) skips RocksDB databases — RocksDB compacts itself.
 
 ### File-backed blobs copied separately
 
