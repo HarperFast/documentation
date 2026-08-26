@@ -899,7 +899,7 @@ The wait follows the restart's own progress rather than a fixed timeout, so a wi
 
 `"restart": "rolling"` is unchanged: instead of restarting inline it starts a replicated `restart_service` job and returns its `restartJobId` to poll.
 
-`drop_component` accepts `"restart": true` the same way, waits for the restart, and reports `restart_completed` on the same terms <VersionBadge version="v5.2.7" />.
+`drop_component` accepts `"restart": true` the same way, waits for the restart, and reports `restart_completed` on the same terms (v5.2.7).
 
 ### Deployment Operations
 
