@@ -27,7 +27,9 @@ Run using the [CLI](../cli/commands.md):
 harper copy-db <source-database> <target-database-path>
 ```
 
-The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written, and it must not already exist — `copy-db` refuses to write into an existing file rather than merging the copy into whatever it holds.
+The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written.
+
+<VersionBadge type="changed" version="v5.3.0" /> — the target path must not already exist: `copy-db` refuses to write into an existing file rather than merging the copy into whatever it holds. Earlier v5 releases merged the copy into whatever an existing target held.
 
 To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped.
 
@@ -39,19 +41,23 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 
 Copy compaction applies to LMDB databases. RocksDB databases compact themselves and are skipped.
 
-### File-backed blobs travel separately
+### File-backed blobs copied separately
+
+<VersionBadge type="changed" version="v5.3.0" /> — `copy-db` copies the database's file-backed blobs alongside the copy. Earlier v5 releases copied only the database file, leaving the blobs behind.
 
 A database's file-backed blob values (`Blob` and large `Bytes` attributes) are not stored inside the database file. They live in the configured blob roots — `storage.blobPaths[n]`, or `<rootPath>/blobs/<database>` when `blobPaths` is not configured — and are addressed by **database name**, not by the path of the database file.
 
 `copy-db` therefore writes them alongside the copy:
 
 ```
-<target-database-path>-blobs/<rootIndex>/…
+<target-database-path>-blobs/<rootIndex>/...
 ```
 
 `<rootIndex>` is the position of the source root in the database's blob-root list, preserved so a multi-root database restores each root to its original slot. A `README.md` in that directory records the mapping.
 
-**The copy is not restorable without this directory.** To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
+**If the database holds file-backed values, the copy is not restorable without this directory** — moving the database file on its own silently loses every blob it references. (A database with no `Blob` or large `Bytes` values has no companion directory, and restores from the database file alone.)
+
+To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
 
 ```bash
 cp -r /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
