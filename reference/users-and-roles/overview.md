@@ -173,8 +173,8 @@ Each table entry defines CRUD access:
 - `DELETE` is not an attribute-level permission. Deleting rows is controlled at the table level.
 - The `__createdtime__` and `__updatedtime__` attributes managed by Harper can have `read` permissions set; other attribute-level permissions for these fields are ignored.
 
-:::note Attribute `read: false` — filter side-channel
-Setting `read: false` on an attribute prevents the **value** from appearing in any response body (REST, SQL, Operations API, GraphQL all omit or reject it). However, the attribute can still be used as a **filter predicate** by that role — e.g. `GET /Table/?salary=95000` returns the matching rows without the salary field, and the number of results reveals whether any records hold that exact value. Range predicates can similarly enable binary-search enumeration of the restricted column without ever returning a value directly. If preventing any inference from query results is a requirement, the application must reject or ignore filter conditions on `read: false` attributes in a custom resource handler.
+:::note Attribute `read: false` - filter side-channel
+Setting `read: false` on an attribute prevents the **value** from appearing in response bodies. However, an indexed attribute can still be used as a **filter predicate** on an exported table's generated REST route — e.g. `GET /Table/?salary=95000` returns the matching rows without the salary field, and the number of results reveals whether any records hold that exact value. Range predicates can similarly enable binary-search enumeration of the restricted column without ever returning a value directly. If preventing this inference is a requirement, do not expose the generated route. Force callers through a custom resource that rejects or ignores filter conditions on `read: false` attributes.
 :::
 
 ## Role-Based Operation Restrictions

@@ -201,7 +201,7 @@ type InternalConfig @table @hidden {
 ```
 
 :::warning `@hidden` does not restrict data access
-`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data is returned on **all** read surfaces — REST, SQL, and the Operations API — for any user with table-level `read` permission. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, use role `attribute_permissions` with `read: false`.
+`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data remains available on every surface through which the table is reachable — REST when the table is exported, plus SQL and the Operations API — subject to the user's role permissions. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, use role `attribute_permissions` with `read: false`.
 :::
 
 `@hidden` is also available as a [field directive](#hidden-field-directive) to suppress individual attributes.
@@ -334,7 +334,7 @@ type Event @table {
 
 ### `@hidden` (Field Directive)
 
-Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table; data is still returned on all read surfaces (REST GET, SQL, Operations API) for any user with read permission on the table. Use this for fields that should not appear in generated specs or tool schemas, not to restrict data access.
+Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table and can be returned through every surface on which the table is reachable (REST GET when exported, SQL, and the Operations API), subject to the user's field permissions. Use this for fields that should not appear in generated specs or tool schemas, not to restrict data access.
 
 ```graphql
 type Customer @table {
@@ -348,7 +348,7 @@ type Customer @table {
 }
 ```
 
-`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the data-access enforcement mechanism. A field marked `@hidden` is still readable by any role with table `read` access — to prevent a role from reading a field value, set `read: false` in `attribute_permissions` for that role.
+`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the field-level data-access enforcement mechanism. To prevent a role from reading a field value, set `read: false` in `attribute_permissions` for that role.
 
 ## Relationships
 
