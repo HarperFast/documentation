@@ -889,9 +889,11 @@ Response:
 
 #### Restarting (`restart`)
 
-`"restart": true` restarts this node's HTTP worker threads and <VersionBadge type="changed" version="v5.2.7" /> waits for that restart to finish before responding, so a successful response means every worker thread is serving the newly deployed code. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — a client that treated the earlier immediate response as "the component is live" could be served by a worker that had never loaded it.
+<VersionBadge type="changed" version="v5.2.7" />
 
-The response carries `restart_completed` <VersionBadge version="v5.2.7" />: `true` when no worker thread was left running the previous code, and `false` when the wait ran out (the restart continues in the background), when a worker could not be replaced, or when the restart was handed off to another thread and could not be awaited. The Harper log records which of those happened. A restart that fails does not fail the deploy — the component is already installed and replicated.
+`"restart": true` restarts this node's HTTP worker threads and now waits for that restart to finish before responding, so a successful response means every worker thread is serving the newly deployed code. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — a client that treated the earlier immediate response as "the component is live" could be served by a worker that had never loaded it.
+
+The response carries `restart_completed` (v5.2.7): `true` when no worker thread was left running the previous code, and `false` when the wait ran out (the restart continues in the background), when a worker could not be replaced, or when the restart was handed off to another thread and could not be awaited. The Harper log records which of those happened. A restart that fails does not fail the deploy — the component is already installed and replicated.
 
 `"restart": "rolling"` is unchanged: instead of restarting inline it starts a replicated `restart_service` job and returns its `restartJobId` to poll.
 
