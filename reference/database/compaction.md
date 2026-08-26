@@ -80,7 +80,7 @@ Automatically compacts all non-system databases when Harper starts. Harper will 
 
 Compact on start replaces each database in place under its own name, so the blob roots keep resolving and no blob companion directory is involved. As of v5.3.0 it skips RocksDB databases, and skips a database whose tables span more than one storage environment (table-specific paths), which compaction cannot replace as a single file.
 
-> **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup. For that, LMDB databases need a volume snapshot, [`get_backup`](../backups/operations.md#get_backup), or a `copy-db` copy kept with its blob companion directory.
+> **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup. For that, an LMDB database needs a volume snapshot covering the database file and its blob roots together, or a `copy-db` copy kept with its blob companion directory — [`get_backup`](../backups/operations.md#get_backup) on an LMDB database streams the `.mdb` file only.
 
 Configure in `harper-config.yaml`:
 
