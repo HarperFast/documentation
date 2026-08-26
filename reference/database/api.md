@@ -63,6 +63,8 @@ Programmatic `update`, `patch`, and `delete` calls operate directly on stored da
 
 Use `databases` when you need to access tables from a non-default database.
 
+The same [trusted server-side authorization boundary](../components/javascript-environment.md#tables) applies to direct calls through `databases`.
+
 ### Example
 
 ```javascript
