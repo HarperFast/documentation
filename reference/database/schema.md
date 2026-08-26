@@ -175,7 +175,7 @@ type MyTable @table @export(name: "my-table") {
 The optional `name` parameter specifies the URL path segment (e.g., `/my-table/`). Without `name`, the type name is used.
 
 :::warning `@export` is a routing directive, not an access control
-Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and remains accessible through the Operations API and SQL, subject to RBAC, to administrators and roles with the required operation and table permissions. For table-level confidentiality, omit the table from a role's grants or set its table-level `read` permission to `false` rather than relying on the absence of an export route. Use `attribute_permissions` with `read: false` to protect individual fields, and account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and remains accessible through the Operations API and SQL, subject to RBAC, to administrators and roles with the required operation and table permissions. For table-level confidentiality, omit the table from a role's grants or set its table-level `read` permission to `false` rather than relying on the absence of an export route. To protect individual fields, configure `attribute_permissions` as a whitelist: list every field the role may read and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
 :::
 
 ### `@sealed`
@@ -201,7 +201,7 @@ type InternalConfig @table @hidden {
 ```
 
 :::warning `@hidden` does not restrict data access
-`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data remains available on every surface through which the table is reachable — REST, MQTT, and GraphQL when the table is exported, plus SQL and the Operations API — subject to the user's role permissions. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, use role `attribute_permissions` with `read: false`, and account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data remains available on every surface through which the table is reachable — REST, MQTT, and GraphQL when the table is exported, plus SQL and the Operations API — subject to the user's role permissions. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, configure role `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
 :::
 
 `@hidden` is also available as a [field directive](#hidden-field-directive) to suppress individual attributes.
@@ -348,7 +348,7 @@ type Customer @table {
 }
 ```
 
-`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the field-level data-access enforcement mechanism. To prevent a role from reading a field value, set `read: false` in `attribute_permissions` for that role, and account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the field-level data-access enforcement mechanism. To prevent a role from reading a field value, configure `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
 
 ## Relationships
 
