@@ -33,7 +33,7 @@ The `source-database` is the database name (not a file path). The target is the 
 
 As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. Retrying an interrupted copy means removing both.
 
-To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped. That is the one case where the database file travels alone — any other destination also needs the blob companion directory described in [File-backed blobs copied separately](#file-backed-blobs-copied-separately).
+To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped. That is the one case where the database file travels alone; if the database has `Blob` values, any other destination also needs the blob companion directory described in [File-backed blobs copied separately](#file-backed-blobs-copied-separately).
 
 **Example — compact the default `data` database:**
 
@@ -66,7 +66,7 @@ The directory is written only for blob roots that exist on disk, and is not writ
 To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
 
 ```bash
-cp -r /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
+cp /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
 cp -r /home/user/hdb/database/copy.mdb-blobs/0/. /home/user/hdb/blobs/archive/
 ```
 
@@ -77,6 +77,10 @@ One narrow exception: if the copy immediately replaces its own source in place �
 ## Compact on Start
 
 Automatically compacts all non-system databases when Harper starts. Harper will not start until compaction is complete. Under the hood, it loops through all user databases, creates a backup of each, compacts it, replaces the original with the compacted copy, and removes the backup.
+
+Compact on start replaces each database in place under its own name, so the blob roots keep resolving and no blob companion directory is involved. As of v5.3.0 it skips RocksDB databases, and skips a database whose tables span more than one storage environment (table-specific paths), which compaction cannot replace as a single file.
+
+> **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup — use [`create_backup`](../backups/overview.md) or `copy-db` with its companion directory for that.
 
 Configure in `harper-config.yaml`:
 
