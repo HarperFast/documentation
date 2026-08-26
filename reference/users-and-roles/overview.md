@@ -174,7 +174,7 @@ Each table entry defines CRUD access:
 - The `__createdtime__` and `__updatedtime__` attributes managed by Harper can have `read` permissions set; other attribute-level permissions for these fields are ignored.
 
 :::note Attribute `read: false` — filter side-channel
-Setting `read: false` on an attribute prevents the **value** from appearing in any response body (REST, SQL, Operations API, GraphQL all omit or reject it). However, the attribute can still be used as a **filter predicate** by that role — e.g. `GET /Table/?salary=95000` returns 0 or 1 rows, revealing whether any record holds that exact value. Binary-search enumeration of the restricted column is possible without ever reading a value directly. If preventing any inference from query results is a requirement, the application must reject or ignore filter conditions on `read: false` attributes in a custom resource handler.
+Setting `read: false` on an attribute prevents the **value** from appearing in any response body (REST, SQL, Operations API, GraphQL all omit or reject it). However, the attribute can still be used as a **filter predicate** by that role — e.g. `GET /Table/?salary=95000` returns the matching rows without the salary field, and the number of results reveals whether any records hold that exact value. Range predicates can similarly enable binary-search enumeration of the restricted column without ever returning a value directly. If preventing any inference from query results is a requirement, the application must reject or ignore filter conditions on `read: false` attributes in a custom resource handler.
 :::
 
 ## Role-Based Operation Restrictions

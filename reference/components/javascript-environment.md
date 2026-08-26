@@ -86,7 +86,7 @@ An object whose properties are the tables in the default database (`data`). Each
 See [Database API](../database/api.md) for full reference.
 
 :::note Server-side `tables.*` reads run in a trusted context
-Calls to `tables.X.get()`, `tables.X.search()`, and similar methods from within resource code (or Operations API SQL) execute in a **trusted system context** and do **not** re-apply the target table's `allowRead` guard or role-level `attribute_permissions`. This is by design — server-side code is responsible for its own authorization checks. A computed attribute or custom resource that cross-reads a protected table will pull the raw data into the response regardless of the caller's role. If you expose data from a protected table through a custom resource, apply authorization explicitly (e.g. check `getCurrentUser()` and enforce the relevant restrictions before returning the data).
+Calls to `tables.X.get()`, `tables.X.search()`, and similar methods from within resource code execute in a **trusted system context** and do **not** re-apply the target table's `allowRead` guard or role-level `attribute_permissions`. This is by design — server-side code is responsible for its own authorization checks. A computed attribute or custom resource that cross-reads a protected table will pull the raw data into the response regardless of the caller's role. If you expose data from a protected table through a custom resource, apply authorization explicitly (e.g. call `this.getCurrentUser()` in a `Resource` method, or use `getUser()`, and enforce the relevant restrictions before returning the data).
 :::
 
 ### `databases`

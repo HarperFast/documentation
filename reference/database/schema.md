@@ -175,7 +175,7 @@ type MyTable @table @export(name: "my-table") {
 The optional `name` parameter specifies the URL path segment (e.g., `/my-table/`). Without `name`, the type name is used.
 
 :::warning `@export` is a routing directive, not an access control
-Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and its records remain fully accessible to administrators via the Operations API and SQL. For data confidentiality, use role permissions (`attribute_permissions`, `read: false`) rather than relying on the absence of an export route.
+Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and remains accessible through the Operations API and SQL, subject to RBAC, to administrators and roles with the required operation and table permissions. For table-level confidentiality, omit the table from a role's grants or set its table-level `read` permission to `false` rather than relying on the absence of an export route. Use `attribute_permissions` with `read: false` to protect individual fields.
 :::
 
 ### `@sealed`
@@ -191,7 +191,7 @@ type StrictRecord @table @sealed {
 
 ### `@hidden` (Type Directive)
 
-Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use `attribute_permissions` on roles to control data access.
+Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use table-level role permissions to control access to the table and `attribute_permissions` to control access to individual fields.
 
 ```graphql
 type InternalConfig @table @hidden {
@@ -201,7 +201,7 @@ type InternalConfig @table @hidden {
 ```
 
 :::warning `@hidden` does not restrict data access
-`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data is returned on **all** read surfaces — REST, SQL, and the Operations API — for any user with table-level `read` permission. Do not use `@hidden` as a confidentiality control. To restrict which users can read a field or table, use role `attribute_permissions` with `read: false`.
+`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data is returned on **all** read surfaces — REST, SQL, and the Operations API — for any user with table-level `read` permission. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, use role `attribute_permissions` with `read: false`.
 :::
 
 `@hidden` is also available as a [field directive](#hidden-field-directive) to suppress individual attributes.
