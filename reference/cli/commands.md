@@ -242,6 +242,8 @@ This command regenerates the self-signed SSL/TLS certificates used by Harper.
 
 Available since: v4.1.0
 
+<VersionBadge type="changed" version="v5.3.0" />
+
 Copy a Harper database with compaction to eliminate free-space and fragmentation.
 
 ```bash
@@ -251,7 +253,7 @@ harper copy-db <source-database> <target-database-path>
 **Parameters**:
 
 - `<source-database>` - Name of the source database (a name, not a file path)
-- `<target-database-path>` - Full path to the target database file, which must not already exist
+- `<target-database-path>` - Full path to the target database file; neither it nor its `<target-database-path>-blobs` companion directory may already exist
 
 **Example**:
 
@@ -261,7 +263,7 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 
 This copies the default `data` database to a new location with compaction applied.
 
-<VersionBadge type="changed" version="v5.3.0" /> — the database's file-backed blobs are copied to `<target-database-path>-blobs/<rootIndex>/`, since blob files live outside the database file and are addressed by database name, and the target path must not already exist. If the database holds file-backed values, the copy is not restorable without that companion directory — see [Database Compaction](../database/compaction.md#file-backed-blobs-copied-separately) for the restore steps. LMDB databases only; RocksDB databases compact themselves.
+As of v5.3.0 the database's `Blob` files are copied to `<target-database-path>-blobs/<rootIndex>/`, since blob files live outside the database file and are addressed by database name. If the database holds `Blob` values, the copy is not restorable without that companion directory — see [Database Compaction](../database/compaction.md#file-backed-blobs-copied-separately) for the restore steps. LMDB databases only; RocksDB databases compact themselves.
 
 **Use Cases**:
 
