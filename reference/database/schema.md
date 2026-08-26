@@ -82,7 +82,7 @@ Optional arguments:
 | `scanInterval`       | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                              |
 | `replicate`          | `Boolean` | true                          | Enable replication of this table                                                            |
 | `cacheControl`       | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table |
-| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                     |
+| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                     |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
