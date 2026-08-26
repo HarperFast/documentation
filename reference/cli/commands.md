@@ -149,6 +149,7 @@ All parameters are passed as `key=value` arguments. Every parameter is optional.
 - `force=true` - Allow deploying over a protected core component name.
 - `urlPath=<path>` - HTTP path the component is mounted at (e.g. `/api/v2`). Requires `package`.
 - `host=<hostname>` - Virtual hostname the component is served on (e.g. `api.example.com`). Requires `package`. (Added in: v5.2.0)
+- `credentials='<json>'` - JSON array of credential objects for installing from a private npm registry or git repository. See [Private deploy sources](#private-deploy-sources). (Added in: v5.2.0)
 - `json=true` - Print output as JSON instead of the default YAML.
 
 **Packaging options** (directory deploy only):
@@ -183,19 +184,28 @@ The commit must be pushed to the remote before deploying, so the cluster can clo
 
 <VersionBadge version="v5.2.3" />
 
-Installing a component from a private npm registry or a private git repository requires the `deploy_component` operation's [`credentials`](../operations-api/operations.md#deploy-credentials-credentials) field, an array of credential objects. The CLI's `key=value` arguments [do not support array-of-object parameters](./operations-api-commands.md#object-parameters), so there are two supported paths:
+Installing a component from a private npm registry or a private git repository requires the `deploy_component` operation's [`credentials`](../operations-api/operations.md#deploy-credentials-credentials) field, an array of credential objects. Rather than passing a raw token on the command line (where it is exposed in shell history, process listings, and CI logs), provision a sealed credential once with `harper deploy setup=true`:
 
-- **Private git repository** - Provision the credential once with `harper deploy setup=true`, which seals an encrypted token (from `gh auth token` or a pasted PAT) on your machine using the cluster's public key and stores only the ciphertext. Then deploy with `credential=true`, which attaches the sealed credential reference for the clone:
+```bash
+harper deploy setup=true
+```
+
+This interactive flow prompts for the provider (a private GitHub repository or a private npm registry), encrypts a token you supply (from `gh auth token`, `npm token create`, or a pasted PAT) on your machine using the cluster's public key, and stores only the ciphertext. It then prints a `credentials='[...]'` reference — containing the sealed secret's name, not the token — to use in your deploy.
+
+- **Private git repository** - After `setup=true`, deploy by reference with `credential=true`, which attaches the sealed credential reference for the clone automatically:
 
   ```bash
-  # One-time: seal a durable credential for the private repo
-  harper deploy setup=true
-
-  # Deploy the private repo by reference, using the sealed credential
   harper deploy by_ref=true credential=true
   ```
 
-- **Private npm registry** - Supply the `credentials` array through the [Operations API](../operations-api/operations.md#deploy-credentials-credentials) over HTTP, which can represent the nested object shape the CLI arguments cannot.
+- **Private npm registry** - After `setup=true`, pass the printed `credentials` reference on your deploy. CLI argument values are parsed as JSON, so a shell-quoted array works:
+
+  ```bash
+  harper deploy package=npm:@my-org/my-app@1.2.3 \
+    credentials='[{"registry":"registry.my-org.com","secret":"deploy.my-app.registry.my-org.com"}]'
+  ```
+
+See [`deploy_component` credentials](../operations-api/operations.md#deploy-credentials-credentials) for the full credential-entry shape, including passing a literal `token` instead of a sealed `secret` reference.
 
 ### `harper restart`
 
