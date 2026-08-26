@@ -19,7 +19,8 @@
 		"format:check": "npm run format -- --check",
 		"format:write": "npm run format -- --write",
 		"lint": "echo 0;",
-		"preview:pr": "node scripts/preview-pr.mjs"
+		"preview:pr": "node scripts/preview-pr.mjs",
+		"test:workflows": "node scripts/companion-check.test.mjs"
 	},
 	"devDependencies": {
 		"@docusaurus/core": "3.9.2",
