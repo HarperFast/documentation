@@ -31,7 +31,7 @@ harper copy-db <source-database> <target-database-path>
 
 The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written.
 
-As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. Retrying an interrupted copy means removing both.
+As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. Retrying an interrupted copy means removing both. This is stricter than earlier v5 releases, which wrote into an existing target: a script that re-copies to a fixed path on a schedule has to remove the previous copy and its companion directory first, or it now fails.
 
 To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped. That is the one case where the database file travels alone; if the database has `Blob` values, any other destination also needs the blob companion directory described in [File-backed blobs copied separately](#file-backed-blobs-copied-separately).
 
@@ -80,7 +80,7 @@ Automatically compacts all non-system databases when Harper starts. Harper will 
 
 Compact on start replaces each database in place under its own name, so the blob roots keep resolving and no blob companion directory is involved. As of v5.3.0 it skips RocksDB databases, and skips a database whose tables span more than one storage environment (table-specific paths), which compaction cannot replace as a single file.
 
-> **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup — use [`create_backup`](../backups/overview.md) or `copy-db` with its companion directory for that.
+> **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup. For that, LMDB databases need a volume snapshot, [`get_backup`](../backups/operations.md#get_backup), or a `copy-db` copy kept with its blob companion directory.
 
 Configure in `harper-config.yaml`:
 
