@@ -33,7 +33,7 @@ The `source-database` is the database name (not a file path). The target is the 
 
 As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. Retrying an interrupted copy means removing both.
 
-To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped.
+To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped. That is the one case where the database file travels alone — any other destination also needs the blob companion directory described in [File-backed blobs copied separately](#file-backed-blobs-copied-separately).
 
 **Example — compact the default `data` database:**
 
@@ -49,7 +49,7 @@ Copy compaction applies to LMDB databases only. `copy-db` fails if the source da
 
 `copy-db` copies the database's blob files alongside the copy. Earlier v5 releases copied only the database file, leaving the blobs behind.
 
-`Blob` values are stored outside the database file (unlike `Bytes` values, which are stored inside the record). These blob files live in the configured blob roots — `storage.blobPaths[n]`, or `<rootPath>/blobs/<database>` when `blobPaths` is not configured — and are addressed by **database name**, not by the path of the database file.
+`Blob` values are stored outside the database file (unlike `Bytes` values, which are stored inside the record). These blob files live in the configured blob roots — `<storage.blobPaths[n]>/<database>`, or `<rootPath>/blobs/<database>` when `blobPaths` is not configured — and are addressed by **database name**, not by the path of the database file.
 
 `copy-db` therefore writes them alongside the copy:
 
@@ -59,7 +59,9 @@ Copy compaction applies to LMDB databases only. `copy-db` fails if the source da
 
 `<rootIndex>` is the position of the source root in the database's blob-root list, preserved so a multi-root database restores each root to its original slot. A `README.md` in that directory records the mapping.
 
-**If the database holds `Blob` values, the copy is not restorable without this directory** — moving the database file on its own silently loses every blob it references. A database with no live blob references does not need the companion directory; one may still be written (possibly empty) if a blob root directory exists for the database.
+**If the database holds `Blob` values, the copy is not restorable without this directory** — moving the database file on its own silently loses every blob it references. A database with no live blob references does not need the companion directory, though one may still be written (possibly empty) whenever a blob root directory exists.
+
+The directory is written only for blob roots that exist on disk, and is not written at all when every root is missing — an unmounted `blobPaths` volume, for instance, yields a database-file-only copy without failing the command. Confirm the roots are mounted before copying, and confirm `<target-database-path>-blobs` is there afterwards, before treating the copy as a restorable backup.
 
 To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
 
@@ -67,6 +69,8 @@ To restore the copy under a database name, put each `<rootIndex>` tree into that
 cp -r /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
 cp -r /home/user/hdb/database/copy.mdb-blobs/0/. /home/user/hdb/blobs/archive/
 ```
+
+A database with several `storage.blobPaths` entries has one `<rootIndex>` tree per root: restore every one of them into the slot of the same index. Leaving a tree behind loses exactly the blobs that lived on that root, and neither the copy nor Harper reports it.
 
 One narrow exception: if the copy immediately replaces its own source in place — same installation, same database name, before anything writes to the source — the database file alone is enough, since the blob roots it references are still exactly as the copy left them. A copy kept as a backup does not qualify: once the source is written to, Harper can reclaim the blob files an older copy still references, so restore the companion directory along with the database file.
 
