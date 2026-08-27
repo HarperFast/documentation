@@ -13,7 +13,7 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 ## Code Style
 
 - TypeScript (config files and scripts), MDX/Markdown (content).
-- Prettier is configured via `@harperdb/code-guidelines/prettier` (see `package.json`).
+- Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 - **Required before every commit/PR:** run `npm run format:write`, then confirm `npm run format:check` is clean. This is a hard gate, not advisory — CI fails any unformatted PR (see [CI](#ci)).
 - Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `plans/`, `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
 - The lint script is a no-op (`echo 0`); do not expect `npm run lint` to catch issues.
@@ -47,12 +47,15 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 - Reference is versioned; current version is v5 (`reference/`). Archived v4 content is in `reference_versioned_docs/version-v4/`.
 - Do not modify `reference_versioned_docs/` for current (v5) work; edit `reference/` instead.
 - The `<VersionBadge>` component is globally registered — no import needed in `.md`/`.mdx` files.
+- The `<EngineBadge>` component (also global) tags storage-engine support inline: `<EngineBadge engines="RocksDB" />` or `<EngineBadge engines="RocksDB, LMDB" />`.
 - See the complete repository organization in `CONTRIBUTING.md`
 
 ## Versioning Content
 
 - Tag minor-version availability inline: `<VersionBadge version="vX.Y.0" />` for new surface, `<VersionBadge type="changed" version="vX.Y.0" />` for behavior changes to existing surface.
 - Derive the version from the core release the change ships in, stripping prerelease suffixes (`5.1.0-beta.1` → `v5.1.0`).
+- **Determine that release from the core repo's git tags, not from the feature branch's `package.json`.** A branch reading `5.2.0-beta.3` says which release was open when the branch started, not which one the change lands in — if a release is cut before the feature merges, the badge is silently wrong. Check `git tag --sort=-creatordate` for the newest release, and `git tag --contains <merge-commit>` for whether the change is in one; a merged-but-untagged feature ships in the _next_ version, which may be a minor bump. Re-check on every refresh pass of a long-lived docs PR, because a release cut between passes invalidates a badge that was correct when written.
+- **Fetch tags and confirm the tag object before trusting the answer.** `git tag --contains` is only as good as the local tag it compares against: a stale or divergent tag of the same name gives a confidently wrong answer in either direction. Run `git fetch --tags`, then check `git rev-parse <tag>` against `git ls-remote --tags origin <tag>`. When a badge is disputed, the decisive check is not `--contains` at all but whether the feature's files exist at the tag — `git ls-tree -r --name-only <tag> | grep <path>`, or `git show <tag>:<file>` — since that cannot be confounded by ancestry or by which tag your clone happens to hold.
 - Each minor release gets a file under `release-notes/<major-codename>/` (e.g. `release-notes/v5-lincoln/5.1.md`); the sidebar picks it up automatically.
 - Absolute links from `release-notes/` (or `learn/`) into current reference docs use the versioned path `/reference/v5/...` — the reference plugin maps the current version to the `v5` URL path.
 - When documenting a change from a core/pro PR, cross-link the feature PR and the docs PR in both descriptions.

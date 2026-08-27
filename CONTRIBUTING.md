@@ -59,7 +59,7 @@ npm run format:write
 npm run format:check
 ```
 
-CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperdb/code-guidelines/prettier` (see `package.json`).
+CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 
 ## Site Organization
 
@@ -185,7 +185,7 @@ The `type` prop defaults to `"added"`, so the most common case is just `version`
 
 <VersionBadge version="v4.3.0" />
 
-The `@relation` directive allows you to define relationships between tables...
+The `@relationship` directive allows you to define relationships between tables...
 ```
 
 **Changed behavior:**

@@ -20,13 +20,14 @@ For concept introductions, tutorials, and guides, see the [Learn](/learn) sectio
 
 ### Access & Security
 
-| Section                                        | Description                                                                |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| [REST](./rest/overview.md)                     | Auto-REST interface, querying, content types, headers, WebSockets, and SSE |
-| [HTTP](./http/overview.md)                     | HTTP server configuration, TLS, and the `server` API                       |
-| [MCP](./mcp/overview.md)                       | Built-in Model Context Protocol server, profiles, CLI, and migration       |
-| [Security](./security/overview.md)             | Authentication mechanisms, certificates, and CORS/SSL configuration        |
-| [Users & Roles](./users-and-roles/overview.md) | RBAC, roles configuration, and user management operations                  |
+| Section                                                            | Description                                                                |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| [REST](./rest/overview.md)                                         | Auto-REST interface, querying, content types, headers, WebSockets, and SSE |
+| [HTTP](./http/overview.md)                                         | HTTP server configuration, TLS, and the `server` API                       |
+| [MCP](./mcp/overview.md)                                           | Built-in Model Context Protocol server, profiles, CLI, and migration       |
+| [Security](./security/overview.md)                                 | Authentication mechanisms, certificates, and CORS/SSL configuration        |
+| [Web Application Firewall](./web-application-firewall/overview.md) | Rule-based filtering for HTTP requests                                     |
+| [Users & Roles](./users-and-roles/overview.md)                     | RBAC, roles configuration, and user management operations                  |
 
 ### Setup & Operation
 
@@ -40,6 +41,7 @@ For concept introductions, tutorials, and guides, see the [Learn](/learn) sectio
 
 | Section                                                      | Description                                                        |
 | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| [Backups](./backups/overview.md)                             | Managed incremental backups, snapshot downloads, and restore       |
 | [Logging](./logging/overview.md)                             | Log configuration, the `logger` API, and log management operations |
 | [Analytics](./analytics/overview.md)                         | Resource and storage analytics, system tables                      |
 | [MQTT](./mqtt/overview.md)                                   | MQTT broker configuration and usage                                |

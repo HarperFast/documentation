@@ -23,7 +23,7 @@ Resource classes have static methods that directly map to RESTful methods or HTT
 
 ## Resource Static Methods
 
-Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. They handle transaction setup, access checks, and request parsing automatically. These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
+Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. When invoked through an external request path, they handle transaction setup, access checks, and request parsing automatically. Direct calls from server-side code run in a trusted context and do not automatically apply the caller's role permissions; see [Server-side table reads](../components/javascript-environment.md#tables). These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
 
 ### `get(target: RequestTarget | Id | Query, context?: Resource | Context): Promise<object> | ExtendedIterable`
 
@@ -98,7 +98,8 @@ This is called for HTTP PUT requests, and can be overridden to implement a custo
 ```javascript
 class MyResource extends Resource {
 	static async put(target, data) {
-		return super.put(target, { ...(await data), status: data.status ?? 'active' });
+		const record = await data;
+		return super.put(target, { ...record, status: record.status ?? 'active' });
 	}
 }
 ```
@@ -118,7 +119,8 @@ This is called for HTTP PATCH requests, and can be overridden to implement a cus
 ```javascript
 class MyResource extends Resource {
 	static async patch(target, data) {
-		return super.patch(target, { ...(await data), status: data.status ?? 'active' });
+		const record = await data;
+		return super.patch(target, { ...record, status: record.status ?? 'active' });
 	}
 }
 ```
@@ -131,10 +133,12 @@ class MyResource extends Resource {
 
 Called for HTTP POST requests. The default behavior creates a new record, but it can be overridden to implement custom actions. Prefer more explicit methods like `create()` or `update()` over calling `post` directly.
 
+`data` is a promise that resolves to the deserialized request body — the body is read and decoded lazily, so you must `await` `data` before reading its fields. Once awaited, an `application/json` body resolves to the parsed JSON value (typically an object):
+
 ```javascript
 class MyResource extends Resource {
-	static async post(target, promisedData) {
-		let data = await promisedData;
+	static async post(target, data) {
+		data = await data;
 		if (data.action === 'create') {
 			return this.create(target, data.content);
 		} else if (data.action === 'update') {
@@ -145,6 +149,17 @@ class MyResource extends Resource {
 	}
 }
 ```
+
+The shape of the resolved value depends on the request's `Content-Type`. The built-in deserializers produce:
+
+| `Content-Type`                               | resolved `data`       |
+| -------------------------------------------- | --------------------- |
+| `application/json`                           | parsed JSON value     |
+| `application/cbor`, `application/x-msgpack`  | decoded value         |
+| `application/x-ndjson`, `application/ndjson` | array of parsed lines |
+| `text/plain`                                 | string                |
+
+Custom content types registered through `contentTypes.set(...)` receive whatever value the deserializer returns.
 
 ---
 
@@ -215,6 +230,8 @@ All properties are optional:
 | `startTime`          | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
 | `previousCount`      | Return the last N updates/messages. Cannot be used with `startTime`.                           |
 | `omitCurrent`        | Do not send the current/retained record as the first update.                                   |
+| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                          |
+| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.           |
 
 ---
 
@@ -250,21 +267,23 @@ Harper automatically serializes concurrent requests for the same missing or stal
 
 #### Observing cache disposition
 
-Each `get` on a caching table records whether the record came from the cache or from the source, in the `loadedFromSource` property of both the request context and the `RequestTarget`:
+Each `get` on a caching table records whether the record came from the cache or from the source in the `loadedFromSource` property of the **`RequestTarget`** for that get. Cache disposition is a per-get result, so it lives on the per-get target — pass an explicit `RequestTarget` to observe it:
 
 ```javascript
-const context = {};
-const record = await MyCache.get(recordId, context);
-console.log(context.loadedFromSource); // true = went to the source, false = served from cache
+import { RequestTarget } from 'harper';
+
+const target = new RequestTarget();
+target.id = recordId;
+const record = await MyCache.get(target);
+console.log(target.loadedFromSource); // true = went to the source, false = served from cache
 ```
 
-Within a resource method, the same value is available on the active context via `getContext().loadedFromSource` after the `get` resolves. The flag settles as follows:
+The flag settles as follows:
 
 - `true` — the get went to the source: either it fetched the record, or the source errored and a stale cached record was served as a fallback (`staleIfError`). `true` means a source request was made, not necessarily that the returned data is fresh.
 - `false` — the record was served from the cache: fresh hits, `onlyIfCached` requests, stale-while-revalidate responses (the source fetch continues in the background), and requests that waited on another request's in-flight fetch of the same record. This last case means a cache hit can still take as long as an upstream fetch.
-- Each get on a caching table in the same context overwrites the value, so read it after the `get` you are measuring.
 
-Note that `get()` returns a plain `RecordObject`, not a resource instance — the record itself does not carry cache disposition; read it from the context (or an explicitly passed `RequestTarget`). Prior to Harper 5.1.16, `context.loadedFromSource` was never assigned and the flag was only observable via an explicitly passed `RequestTarget`.
+Note that `get()` returns a plain `RecordObject`, not a resource instance — the record itself does not carry cache disposition; the explicitly passed `RequestTarget` is the supported way to observe it. There is deliberately no request-`Context` mirror of this flag: a context is shared across every `get` in the request (including a caching table's internal gets), so a context-level value would be silently overwritten before the caller could read it.
 
 #### Source `get` — controlling timestamp and expiration
 
@@ -428,6 +447,14 @@ class BlogSource extends Resource {
 }
 Post.sourcedFrom(BlogSource);
 ```
+
+#### Read consistency across databases
+
+A resolver's reads are snapshot-consistent as long as every table it reads lives in the same [database](../database/overview.md#databases) — Harper pins a single transaction snapshot per database, so multiple `get()` calls into tables in that database always see the same point-in-time view, no matter how the resolver interleaves them.
+
+That snapshot is scoped per database. If a resolver reads from one database, `await`s something (an upstream fetch, another async call), and then reads from a second database, the second read is not guaranteed to reflect the same point in time as the first — it can observe writes that landed on the second database during the `await`.
+
+> **Note:** If a `sourcedFrom` resolver must assemble a self-consistent view from multiple tables, keep all of those tables in a single database. If it must span multiple databases, do not assume the combined result is atomic — design for skew between the sources instead.
 
 ---
 
@@ -653,7 +680,6 @@ Returns the current context, which includes:
 
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
-- `loadedFromSource` — For caching tables (5.1.16+), cache disposition of the most recent `get` in this context: `true` if it went to the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
 
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 
@@ -1014,6 +1040,28 @@ Sort order object:
 | `descending` | Sort descending if `true` (default: `false`)               |
 | `next`       | Secondary sort to resolve ties (same structure)            |
 
+Harper uses an index to provide sort order, so a `sort` needs one of:
+
+- An `@indexed` sort `attribute`. Harper aligns the scan with the index automatically — **no condition is required**, and the condition (if any) does not have to be on the sort attribute.
+- At least one `conditions` entry (on **any** attribute) when the sort `attribute` is not indexed. Harper filters by the condition and then orders the result set in memory.
+
+Only the combination of a non-indexed sort `attribute` **and** zero conditions is rejected:
+
+> `HdbError: <attribute> is not indexed and not combined with any other conditions`
+
+Note the bare `@primaryKey` is treated as not indexed for this purpose (it has its own primary store rather than a secondary index), so sorting by the primary key alone — with no conditions — hits this error.
+
+To iterate a whole table in primary-key order, add an open-ended range condition (which can be on the primary key or any other attribute):
+
+```javascript
+Product.search({
+	conditions: [{ attribute: 'id', comparator: 'greater_than', value: '' }],
+	sort: { attribute: 'id' },
+});
+```
+
+Alternatively, pass `allowFullScan: true` to permit an unconditional ordered scan, or — if order doesn't matter — omit `sort` entirely and `search({})` will iterate without an index requirement.
+
 ### `explain`
 
 If `true`, returns conditions reordered as Harper will execute them (for debugging and optimization).
@@ -1034,7 +1082,8 @@ Properties:
 - `search` — The query/search string portion of the URL
 - `id` — Primary key derived from the path
 - `isCollection` — `true` when the request targets a collection
-- `checkPermission` — Set to indicate authorization should be performed; has `action`, `resource`, and `user` sub-properties
+- `rowFilter` — Synchronous JavaScript predicate applied to candidate records during search. It cannot be set by REST or QUERY request data.
+- `checkPermission` — Framework-owned, one-shot request to run legacy operation authorization. Harper arms it for permission-checked dispatches. Trusted server-side code making a subsequent direct Resource call may set it to `true`, causing built-in table gates to derive permissions from `context.user`. Never accept or copy this field or a permission object from client data.
 
 Standard `URLSearchParams` methods are available:
 
@@ -1159,7 +1208,6 @@ getContext is availabe as export from the `harper` module, or as a global variab
 
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
-- `loadedFromSource` — For caching tables (5.1.16+), cache disposition of the most recent `get` in this context: `true` if it went to the source, `false` if served from cache (see [Observing cache disposition](#observing-cache-disposition))
 
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 

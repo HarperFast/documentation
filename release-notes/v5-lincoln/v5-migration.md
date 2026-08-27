@@ -73,7 +73,7 @@ class MyResource {
 		// this function is within a transaction, with a consistent snapshot of data that won't change, but previous code could
 		// call Table.get without a context, it would not use the current transaction and would instead get the latest data
 		while ((await Table.get(target)).status !== 'ready') {
-			delay(100);
+			await delay(100);
 		}
 		return Table.get(target);
 	}
@@ -84,7 +84,7 @@ Now the internal `Table.get` will automatically use the current transaction, whi
 
 ```javascript
 import { setTimeout as delay } from 'node:timers/promises';
-import { getContext } from 'harper';
+import { getContext, transaction } from 'harper';
 class MyResource {
 	static async get(target) {
 		// this function is still within a transaction, with a consistent snapshot of data that won't change, but we should
@@ -93,7 +93,7 @@ class MyResource {
 		// now we can call Table.get and it will read the latest data.
 		// we could also explicitly start a new transaction here for each get:
 		while ((await transaction(() => Table.get(target))).status !== 'ready') {
-			delay(100);
+			await delay(100);
 		}
 		return Table.get(target);
 	}
@@ -105,8 +105,8 @@ Automatic context tracking can greatly simplify code and automatically handling 
 ## Spawning new processes (via `node:child_process`)
 
 The ability to spawn new processes is a dangerous pathway for exploitation and security vulnerabilities. Additionally, spawning processes from multiple threads presents unique challenges and hazards. In Harper version 5, spawning new processes (through node's `child_process` module) is more tightly controlled and managed.
-First, any `spawn`, `exec`, or `execFile` may only spawn executables or commands that have been registered in the `applications.allowedSpawnCommands` configuration. This provides a much more secure evironment, preventing malicious intrusions.
-Second, it is common to attempt to use spawn child processes with the expectations of code that is written to run in a single thread for an indefinite period of time. However, Harper runs multiple threads that may frequently be restarted. When attempting to start/run a supporting process, spawning every time a module loads leads multiplication of processes and orphaned processes. Harper now manages the spawning process to ensure a single process is spawned. To ensure that only a single process is started, the `spawn`, `exec`, etc. functions require a `name` property in the `options` argument, to create a named process that other threads can check and omit starting a new process if one is already started. If you really want to start a separate process from a previously started process, a new `name` must be provided.
+First, any `spawn` or `execFile` may only spawn executables or commands that have been registered in the `applications.allowedSpawnCommands` configuration. This narrows what component code can launch. It is not a complete barrier — only the first token of the command is matched, and the substitution reaches only code the VM module loaders handle. (`exec` is not usable through the substituted module, and `execSync` always throws.) See [Child Processes](/reference/v5/components/javascript-environment#child-processes) for the full contract and its limits.
+Second, it is common to attempt to spawn child processes with the expectations of code that is written to run in a single thread for an indefinite period of time. However, Harper runs multiple threads that may frequently be restarted. When attempting to start/run a supporting process, spawning every time a module loads leads to the multiplication of processes and orphaned processes. Harper now manages the spawning process to ensure a single process is spawned. To ensure that only a single process is started, the `spawn`, `execFile`, and `fork` functions require a `name` property in the `options` argument, to create a named process that other threads can check and omit starting a new process if one is already started. If you really want to start a separate process from a previously started process, a new `name` must be provided. The complete contract — allowlist matching, the PID-file lock, the `version` replacement option, and what a losing caller receives instead of a `ChildProcess` — is documented under [Child Processes](/reference/v5/components/javascript-environment#child-processes).
 
 ## Response Objects
 
