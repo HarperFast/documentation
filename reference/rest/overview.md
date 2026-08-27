@@ -35,6 +35,53 @@ rest:
   webSocket: false # disables automatic WebSocket support (enabled by default)
 ```
 
+## Tables and Their Automatic Endpoints
+
+A table is served over REST only when **both** of the following are true:
+
+1. The table is exported in a schema definition with [`@export`](../database/schema.md#export).
+2. The `rest` plugin is enabled in the application's `config.yaml` (see [Configuration](#configuration)).
+
+```graphql
+# schema.graphql
+type Product @table @export {
+	id: Long @primaryKey
+	name: String
+	price: Float
+}
+```
+
+```yaml
+# config.yaml
+graphqlSchema:
+  files: schema.graphql
+rest: true
+```
+
+Neither half is sufficient on its own. Without `@export` the table has no REST route and callers get `404`. Without `rest: true` the REST handler is never registered for the application, so exported tables do not respond to HTTP requests at all — `rest` is not enabled by default.
+
+With both in place, the exported name becomes the base path (`Product` above, or the `name` argument of `@export`) and Harper serves the following endpoints on the application HTTP server port (default `9926`). No route definitions, controllers, or handler code are required.
+
+| Endpoint                     | Description                                                                                                                                                            | Details                                |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `GET /Product`               | Describes the resource — table name, database, and declared attributes — plus an href to the record collection. No trailing slash.                                     | [GET](#get)                            |
+| `GET /Product/`              | The record collection. Append query parameters to search, filter, sort, and page.                                                                                      | [GET](#get), [Querying](./querying.md) |
+| `GET /Product/{id}`          | A single record by primary key; `404` when no such record exists.                                                                                                      | [GET](#get)                            |
+| `GET /Product/{id}.property` | A single property of one record. Only properties declared in the schema.                                                                                               | [GET](#get)                            |
+| `POST /Product/`             | Creates a record with a Harper-assigned primary key, returned in the `Location` response header. Requires the trailing slash.                                          | [POST](#post)                          |
+| `PUT /Product/{id}`          | Creates or replaces the record at `{id}` (upsert). The stored record matches the body exactly — properties omitted from the body are **removed**.                      | [PUT](#put)                            |
+| `PATCH /Product/{id}`        | Merges the body into the existing record, preserving unspecified properties. The merge is **shallow** — a nested object in the body replaces the stored one wholesale. | [PATCH](#patch)                        |
+| `DELETE /Product/{id}`       | Deletes the record at `{id}`.                                                                                                                                          | [DELETE](#delete)                      |
+| `DELETE /Product/?query`     | Deletes every record matching the query. With no query parameters, this matches — and deletes — every record in the table.                                             | [DELETE](#delete)                      |
+
+Notes on this surface:
+
+- The trailing slash is significant throughout: `/Product` addresses the resource itself, `/Product/` addresses its collection of records. See [URL Structure](#url-structure).
+- `HEAD` behaves as `GET` with the body omitted, and `OPTIONS` reports the resource's supported methods in an `Allow` header. A method a resource does not implement returns `405` with an `Allow` header listing the ones it does.
+- Enabling `rest` also enables [WebSocket](./websockets.md) and [Server-Sent Events](./server-sent-events.md) subscriptions on these same resource paths.
+- Every exported resource is included in the generated [OpenAPI](#openapi) document.
+- Custom resource classes exported from an application get the same URL structure and method mapping; they implement the methods themselves rather than inheriting the table behavior above. See [Resource API](../resources/resource-api.md).
+
 ## URL Structure
 
 The REST interface follows a consistent URL structure:
