@@ -207,15 +207,20 @@ class InternalReports extends Resource {
 
 An anonymous session arrives as `{ username: '' }`, not `undefined`, so `if (!context.user)` does **not** reject it. Test the field you actually require — a non-empty `context.user.username`, or the specific `context.user.role.permission` entry.
 
-When the content wraps row-level-guarded table data, fetch it through the **exported (routing) Resource** — the subclass that carries the row-level `allow*` predicates — with a `checkPermission`-bearing `RequestTarget` <VersionBadge version="v5.2.0" />:
+When the content wraps guarded table data, fetch it through the **exported (routing) Resource** — the subclass whose operation override is the gate REST enforces <VersionBadge version="v5.2.0" />:
 
 ```ts
-import { RequestTarget } from 'harper';
+import { getUser } from 'harper';
 
-// The exported subclass carries the per-record guard that REST enforces.
+// The exported subclass is the routing Resource. Its `get` override is the
+// authorization gate, and routing through this class is the only thing that
+// runs it.
 export class Order extends tables.Order {
-	allowRead(user) {
-		return user?.username != null && this.customerId === user.username;
+	static async get(target, context) {
+		const order = await super.get(target, context);
+		const user = getUser();
+		if (order && order.customerId !== user?.username) throw new Error('not authorized');
+		return order;
 	}
 }
 
@@ -230,25 +235,25 @@ export class OrderDocs extends Resource {
 		},
 	];
 
-	async readOrder(params, context) {
-		const target = new RequestTarget();
-		target.id = params.orderId;
-		// Ask the Resource to enforce its row-level allow* against this user.
-		target.checkPermission = context.user?.role?.permission ?? true;
-		const order = await Order.get(target); // runs Order's allowRead
+	async readOrder(params) {
+		const order = await Order.get(params.orderId); // runs Order's get override
 		if (!order) throw new Error(`no such order: ${params.orderId}`);
 		return { text: JSON.stringify(order), mimeType: 'application/json' };
 	}
 }
 ```
 
-From 5.2.0 the read runs inside a transaction that carries the calling MCP session user, which is what makes the single-argument `Order.get(target)` above authorize against that user; an `AccessViolation` raised by `allowRead` then surfaces to the client as `permission denied` rather than a generic read failure. Call the guarded fetch single-argument — forwarding the resource's own context (`Order.get(target, this.getContext())`) starts an independent transaction and drops that shared snapshot.
+Put the check in an operation override (`get`, `put`, `delete`) rather than in an `allow*` hook: the `allow*` hooks are deprecated one-time operation gates, and an override receives the complete target and context. See [Authorization](/release-notes/v5-lincoln/5.2#authorization).
+
+`getUser()` reads the authenticated user from the current async request context. From 5.2.0 the MCP layer runs a custom resource's read inside a transaction that carries the calling MCP session user, which is what makes `getUser()` return that user inside the override; an `AccessViolation` raised on the way surfaces to the client as `permission denied` rather than a generic read failure. That ambient transaction is also why the fetch above passes no context of its own — forwarding the resource's own context (`Order.get(target, this.getContext())`) would start an independent transaction and drop the shared snapshot.
 
 :::warning
-Do not fetch guarded rows through the base table class (`tables.Order.get(id)`). The base class's `allowRead` is a table-level grant only; it does not run the exported subclass's per-record override, so a user holding table-level `read` receives rows the same request is denied over REST ([harper#1735](https://github.com/HarperFast/harper/issues/1735)).
+Do not fetch guarded rows through the base table class (`tables.Order.get(id)`). The base class does not carry the exported subclass's override, so the gate never runs and a user holding table-level `read` receives rows the same request is denied over REST ([harper#1735](https://github.com/HarperFast/harper/issues/1735)).
 
-On 5.1.x the read does not run inside a user-carrying transaction at all: the `context.user` gate above works, but a guarded row-backed fetch cannot authorize. Serve row-level-guarded content from 5.2.0 or later.
+On 5.1.x the read does not run inside a user-carrying transaction at all: the `context.user` gate above works, but a delegated guarded fetch has no user to authorize against. Serve guarded content from 5.2.0 or later.
 :::
+
+If a Resource still relies on the deprecated `allow*` hooks, a delegated call arms them with `target.checkPermission = true` on a fresh [`RequestTarget`](/reference/v5/resources/resource-api#requesttarget). Set it to `true` only — never copy a permission object into it, and never take it from client input such as a template parameter.
 
 ### `exportTypes` gating
 
