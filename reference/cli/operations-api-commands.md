@@ -204,7 +204,7 @@ For comprehensive configuration options, see the [Configuration Reference](../co
 **Deploy a component**:
 
 ```bash
-harper deploy_component project=my-cool-app package=https://github.com/HarperDB/application-template
+harper deploy_component project=my-cool-app package=https://github.com/HarperFast/application-template
 ```
 
 **Get all components**:
