@@ -40,11 +40,31 @@ To continue the middleware chain, call `next(request)`. To short-circuit, return
 
 ### `HttpOptions`
 
-| Property     | Type    | Default           | Description                                   |
-| ------------ | ------- | ----------------- | --------------------------------------------- |
-| `runFirst`   | boolean | `false`           | Insert this handler at the front of the chain |
-| `port`       | number  | `http.port`       | Target the HTTP server on this port           |
-| `securePort` | number  | `http.securePort` | Target the HTTPS server on this port          |
+<VersionBadge version="v5.2.0" /> (`name`, `before`, `after`, `urlPath`, and `host`)
+
+| Property     | Type    | Default                      | Description                                                                                                                                                                                              |
+| ------------ | ------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | string  | Registering component's name | Name this middleware entry so other entries can position themselves relative to it                                                                                                                       |
+| `before`     | string  | -                            | Run this entry before the named middleware entry                                                                                                                                                         |
+| `after`      | string  | -                            | Run this entry after the named middleware entry                                                                                                                                                          |
+| `urlPath`    | string  | -                            | Only handle requests whose pathname matches this prefix on a segment boundary (`/api` matches `/api` and `/api/x`, not `/apinews`). Harper removes the prefix before passing the request to the handler. |
+| `host`       | string  | -                            | Only handle requests whose `Host` header matches this virtual hostname (case-insensitive, port ignored). IPv6 hosts are given as a bare literal (`::1`), not bracketed.                                  |
+| `runFirst`   | boolean | `false`                      | Deprecated. Insert this handler at the front of the chain. Use `before` or `after` for explicit ordering.                                                                                                |
+| `port`       | number  | `http.port`                  | Target the HTTP server on this port                                                                                                                                                                      |
+| `securePort` | number  | `http.securePort`            | Target the HTTPS server on this port                                                                                                                                                                     |
+
+`host` and `urlPath` create a routed middleware chain. When both are present, both must match. Harper selects the most specific matching chain in this order: host and path, host only, then path only. Longer path prefixes take precedence. A request that matches no routed chain uses the default chain.
+
+```js
+server.http(handleAdminRequest, {
+	name: 'admin',
+	host: 'admin.example.com',
+	urlPath: '/api',
+	after: 'authentication',
+});
+```
+
+For this example, a request to `https://admin.example.com/api/users` reaches `handleAdminRequest` with a pathname of `/users`.
 
 ### `HttpServer`
 
@@ -58,17 +78,53 @@ A `Request` object is passed to HTTP middleware handlers and direct static REST 
 
 ### Properties
 
-| Property   | Type                                                                  | Description                                                                                                                                                                                          |
-| ---------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`      | string                                                                | The request target (path + query string), e.g. `/path?query=string`                                                                                                                                  |
-| `method`   | string                                                                | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, etc.                                                                                                                                                    |
-| `headers`  | [`Headers`](https://developer.mozilla.org/en-US/docs/Web/API/Headers) | Request headers                                                                                                                                                                                      |
-| `pathname` | string                                                                | Path portion of the URL, without query string                                                                                                                                                        |
-| `protocol` | string                                                                | `http` or `https`                                                                                                                                                                                    |
-| `data`     | any                                                                   | Deserialized body, based on `Content-Type` header                                                                                                                                                    |
-| `ip`       | string                                                                | Remote IP address of the client (or last proxy)                                                                                                                                                      |
-| `host`     | string                                                                | Host from the request headers                                                                                                                                                                        |
-| `session`  | object                                                                | Current cookie-based session (a `Table` record instance). Update with `request.session.update({ key: value })`. A cookie is set automatically the first time a session is updated or a login occurs. |
+| Property         | Type                                                                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`            | string                                                                | The request target (path + query string), e.g. `/path?query=string`                                                                                                                                                                                                                                                                                                                                                                                        |
+| `method`         | string                                                                | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, etc.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `headers`        | [`Headers`](https://developer.mozilla.org/en-US/docs/Web/API/Headers) | Request headers                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `pathname`       | string                                                                | Path portion of the URL, without query string                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `protocol`       | string                                                                | `http` or `https`. On the Node runtime, behind a TLS-terminating proxy that forwards the PROXY v2 SSL TLV, this reflects the client's original scheme even though the proxy-to-Harper hop is plaintext; a proxy forwarding only address info (no SSL TLV) still reads as `http`. Bun and uWebSockets derive this from `X-Forwarded-Proto`/the listener's secure flag instead, independent of the SSL TLV. <VersionBadge type="changed" version="v5.2.0" /> |
+| `data`           | any                                                                   | Deserialized body, based on `Content-Type` header                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `ip`             | string                                                                | Remote IP address of the client (or last proxy)                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `host`           | string                                                                | Host from the request headers                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `session`        | object                                                                | Current cookie-based session (a `Table` record instance). Update with `request.session.update({ key: value })`. A cookie is set automatically the first time a session is updated or a login occurs.                                                                                                                                                                                                                                                       |
+| `connectionInfo` | object \| undefined                                                   | TLS facts a fronting proxy forwarded over PROXY protocol v2 — negotiated ALPN, SNI, TLS version/cipher, the client's JA3/JA4 fingerprint, and the client's mTLS certificate chain (presented, not necessarily verified — see below). `undefined` for a direct connection or one without a v2 header. See [Connection info](#connection-info). <VersionBadge version="v5.2.0" />                                                                            |
+
+### Connection info
+
+<VersionBadge version="v5.2.0" />
+
+When Harper runs behind a TLS-terminating proxy (for example, Harper Fabric's Symphony edge), the TLS handshake happens at the proxy, so facts about the client's TLS connection — its fingerprint, negotiated protocol, and any client certificate — are otherwise invisible to your application. Harper Fabric's proxy-protocol Unix domain socket mirrors decode this from a forwarded PROXY protocol v2 header and expose it on `request.connectionInfo`; a PROXY v2 header sent to an ordinary `http.port`/`securePort` listener isn't decoded (and isn't valid HTTP, so the connection fails).
+
+```ts
+interface ConnectionInfo {
+	alpn?: string; // negotiated ALPN protocol, e.g. "h2" — raw, unvalidated
+	authority?: string; // SNI hostname from the ClientHello — raw, unvalidated
+	tls?: {
+		version?: string; // e.g. "TLSv1.3"
+		cipher?: string; // negotiated cipher suite
+		verified?: boolean; // a client certificate was presented and the proxy verified it
+	};
+	ja3?: string; // JA3 fingerprint (32-char MD5 hex) — raw, unvalidated
+	ja4?: string; // JA4 fingerprint — raw, unvalidated
+	clientCertChain?: Buffer[]; // client certificate chain (DER, leaf first) — presented, not necessarily verified; check tls.verified
+}
+```
+
+`request.connectionInfo` is `undefined` unless a PROXY v2 header carrying TLS facts was decoded; each field is present only when the proxy actually forwarded it. On the Bun and uWebSockets runtimes it is always `undefined`. `alpn`, `authority`, `ja3`, and `ja4` are string-decoded from the TLV payload with no grammar or length validation beyond the header's own bounds, so validate them before placing them in response headers, logs, cache keys, or other security-sensitive contexts. Reading the client's JA4 fingerprint — e.g. to make a bot or abuse decision — is simply:
+
+```javascript
+class Origin {
+	get(request) {
+		const ja4 = request.connectionInfo?.ja4;
+		if (ja4 && abuseList.has(ja4)) return new Response('blocked', { status: 403 });
+		return fetch(request);
+	}
+}
+```
+
+**Trust and mTLS.** `connectionInfo` is populated only from the trusted proxy-protocol channel (Harper Fabric's per-worker Unix domain socket, writable only by the local proxy) — never from a request header, so the channel itself cannot be forged by a client (its _contents_ are client-controlled, per above). `clientCertChain` and `tls.verified` are independent signals, not one another's proof: a chain is attached whenever the client presented a certificate, whether or not the proxy verified it, and `tls.verified` can be `true` while `clientCertChain` is absent (a proxy may verify a certificate but omit an oversized chain). Treating chain presence alone as proof of a verified client accepts unverified certificates. For gating on a verified mTLS client, use `request.authorized` — a chain-gated boolean the proxy layer populates with the same semantics as a directly-terminated TLS connection — rather than `connectionInfo.tls.verified` or `clientCertChain` presence alone. Like `connectionInfo`, this is Node-runtime only: `request.authorized` is always `undefined` on Bun and uWebSockets.
 
 ### Methods
 
@@ -162,12 +218,11 @@ type WsListener = (ws: WebSocket, request: Request, chainCompletion: Promise<voi
 
 ### `WsOptions`
 
-| Property     | Type    | Default           | Description                                     |
-| ------------ | ------- | ----------------- | ----------------------------------------------- |
-| `maxPayload` | number  | 100 MB            | Maximum WebSocket payload size                  |
-| `runFirst`   | boolean | `false`           | Insert this handler at the front of the chain   |
-| `port`       | number  | `http.port`       | Target the WebSocket server on this port        |
-| `securePort` | number  | `http.securePort` | Target the secure WebSocket server on this port |
+WsOptions supports the same options as [HttpOptions](#httpoptions), plus:
+
+| Property     | Type   | Default | Description                                     |
+| ------------ | ------ | ------- | ----------------------------------------------- |
+| `maxPayload` | number | 100 MB  | Maximum WebSocket message size accepted by `ws` |
 
 ---
 
@@ -206,11 +261,7 @@ type UpgradeListener = (request: IncomingMessage, socket: Socket, head: Buffer, 
 
 ### `UpgradeOptions`
 
-| Property     | Type    | Default           | Description                          |
-| ------------ | ------- | ----------------- | ------------------------------------ |
-| `runFirst`   | boolean | `false`           | Insert at the front of the chain     |
-| `port`       | number  | `http.port`       | Target the HTTP server on this port  |
-| `securePort` | number  | `http.securePort` | Target the HTTPS server on this port |
+UpgradeOptions supports the same options as [HttpOptions](#httpoptions).
 
 ---
 

@@ -59,7 +59,7 @@ npm run format:write
 npm run format:check
 ```
 
-CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperdb/code-guidelines/prettier` (see `package.json`).
+CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 
 ## Site Organization
 

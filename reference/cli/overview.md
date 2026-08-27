@@ -153,13 +153,20 @@ See [Operations API Commands](./operations-api-commands.md) for the complete lis
 
 The CLI can execute operations on remote Harper instances by passing the `target` parameter with the HTTP address of the remote instance.
 
-**Authentication**: Provide credentials via:
+### Authentication
 
+<VersionBadge type="changed" version="v5.2.0" />
+
+Provide credentials via:
+
+- **Dedicated authentication parameters**: Use `auth_username=<user> auth_password=<pass>` for one-off commands
+- **Target URL credentials**: Embed a complete username and password in the URL (supported, but not recommended because URLs are easily exposed)
+- **Environment variables and `.env` files**: Use `HARPER_CLI_TARGET` with `HARPER_CLI_USERNAME` and `HARPER_CLI_PASSWORD` (project-specific configuration)
+- **Token credentials**: `HARPER_CLI_REFRESH_TOKEN`, provisioned with [`harper login --for-ci`](./authentication.md#token-credentials-for-cicd) (recommended for CI/CD)
 - **Persistent Login**: `harper login` to store tokens (recommended for local development)
-- **Environment variables and `.env` files**: Use `HARPER_CLI_TARGET`, `HARPER_CLI_USERNAME`, and `HARPER_CLI_PASSWORD` (recommended for CI/CD and project-specific configuration)
-- **Parameters**: `username=<user> password=<pass>`
+- **Legacy parameters**: `username=<user> password=<pass>` remain a fallback when no higher-priority authentication source is available
 
-See [CLI Authentication](./authentication.md) for detailed information on authentication methods and best practices.
+This list is abbreviated and is **not** in precedence order. See [Authentication Precedence](./authentication.md#authentication-precedence) for the resolution order, which changed in v5.2.0, and for the preferred and legacy environment-variable namespaces. Configure one style per context rather than combining them.
 
 **Example: Persistent Login and `.env`**:
 
@@ -183,7 +190,7 @@ harper describe_database database=dev target=https://server.com:9925
 **Example: CLI Options**:
 
 ```bash
-harper describe_database database=dev target=https://server.com:9925 username=HDB_ADMIN password=password
+harper describe_database database=dev target=https://server.com:9925 auth_username=HDB_ADMIN auth_password="$ADMIN_PASSWORD"
 ```
 
 ## Development Mode

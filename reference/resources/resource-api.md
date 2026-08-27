@@ -23,7 +23,7 @@ Resource classes have static methods that directly map to RESTful methods or HTT
 
 ## Resource Static Methods
 
-Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. They handle transaction setup, access checks, and request parsing automatically. These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
+Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. When invoked through an external request path, they handle transaction setup, access checks, and request parsing automatically. Direct calls from server-side code run in a trusted context and do not automatically apply the caller's role permissions; see [Server-side table reads](../components/javascript-environment.md#tables). These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
 
 ### `get(target: RequestTarget | Id | Query, context?: Resource | Context): Promise<object> | ExtendedIterable`
 
@@ -230,6 +230,8 @@ All properties are optional:
 | `startTime`          | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
 | `previousCount`      | Return the last N updates/messages. Cannot be used with `startTime`.                           |
 | `omitCurrent`        | Do not send the current/retained record as the first update.                                   |
+| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                          |
+| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.           |
 
 ---
 
@@ -445,6 +447,14 @@ class BlogSource extends Resource {
 }
 Post.sourcedFrom(BlogSource);
 ```
+
+#### Read consistency across databases
+
+A resolver's reads are snapshot-consistent as long as every table it reads lives in the same [database](../database/overview.md#databases) — Harper pins a single transaction snapshot per database, so multiple `get()` calls into tables in that database always see the same point-in-time view, no matter how the resolver interleaves them.
+
+That snapshot is scoped per database. If a resolver reads from one database, `await`s something (an upstream fetch, another async call), and then reads from a second database, the second read is not guaranteed to reflect the same point in time as the first — it can observe writes that landed on the second database during the `await`.
+
+> **Note:** If a `sourcedFrom` resolver must assemble a self-consistent view from multiple tables, keep all of those tables in a single database. If it must span multiple databases, do not assume the combined result is atomic — design for skew between the sources instead.
 
 ---
 
@@ -1148,7 +1158,8 @@ Properties:
 - `search` — The query/search string portion of the URL
 - `id` — Primary key derived from the path
 - `isCollection` — `true` when the request targets a collection
-- `checkPermission` — Set to indicate authorization should be performed; has `action`, `resource`, and `user` sub-properties
+- `rowFilter` — Synchronous JavaScript predicate applied to candidate records during search. It cannot be set by REST or QUERY request data.
+- `checkPermission` — Framework-owned, one-shot request to run legacy operation authorization. Harper arms it for permission-checked dispatches. Trusted server-side code making a subsequent direct Resource call may set it to `true`, causing built-in table gates to derive permissions from `context.user`. Never accept or copy this field or a permission object from client data.
 
 Standard `URLSearchParams` methods are available:
 

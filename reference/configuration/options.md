@@ -107,7 +107,7 @@ authentication:
 - `cacheTTL` — Session cache duration (ms); _Default_: `30000`
 - `enableSessions` — Cookie-based sessions; _Default_: `true`
 - `operationTokenTimeout` — Access token lifetime; _Default_: `1d`
-- `refreshTokenTimeout` — Refresh token lifetime; _Default_: `1d`
+- `refreshTokenTimeout` — Refresh token lifetime; _Default_: `30d`
 - `logging` — Authentication event logging (Added in: v4.6.0); sub-options: `path`, `level`, `tag`, `stdStreams`. See [Logging Configuration](../logging/configuration.md)
 
 ---
@@ -205,6 +205,19 @@ logging:
 
 ---
 
+## `node`
+
+This node's identity within the cluster. See [Replication](../replication/overview.md).
+
+```yaml
+node:
+  hostname: server-one
+```
+
+- `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This node's identity: it becomes the node's TLS certificate common name and the host that replication advertises to peers and dials to reach this node. Must be a **bare hostname or IP literal** (e.g. `server-one`, `10.0.0.5`, or the unbracketed IPv6 form `::1`) — **not** a URL and **not** `host:port`. Harper **fails to start** if the value carries a scheme, port, path, credentials, query string, or fragment, is a bracketed IPv6 literal (`[::1]`), or is not a string; the startup error names the offending value and the reason. Earlier versions accepted such values and silently corrupted certificate matching and replication — a node configured as `http://host:9926` advertised and dialed a host literally named `http`. The same requirement applies to [`replication.hostname`](#replication). If unset, Harper uses the first valid bare host among `replication.hostname`, the host in `replication.url`, the TLS certificate common name, and the Operations API host, falling back to `127.0.0.1`.
+
+---
+
 ## `replication`
 
 Native WebSocket-based replication (Plexus). Added in: v4.4.0. See [Replication](../replication/overview.md) and [Clustering](../replication/clustering.md).
@@ -218,7 +231,7 @@ replication:
     - wss://server-two:9933
 ```
 
-- `hostname` — This instance's hostname within the cluster
+- `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This instance's hostname within the cluster. Subject to the same bare hostname or IP literal requirement as [`node.hostname`](#node) — a URL, `host:port`, or non-string value fails startup. When both are set, `node.hostname` wins.
 - `url` — WebSocket URL peers use to connect to this instance
 - `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name` and `sharded`
 - `routes` — Peer nodes; URL strings or `{hostname, port, startTime, revokedCertificates}` objects
@@ -226,6 +239,9 @@ replication:
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
 - `enableRootCAs` — Verify against Node.js Mozilla CA store; _Default_: `true`
 - `blobTimeout` — Blob transfer timeout (ms); _Default_: `120000`
+- `blobGapReconnectMs` — Interval (ms) for the blob-gap watchdog: when a transient blob save failure pins a replication resume cursor, the connection is forced to reconnect on this cadence so the gapped blob is re-streamed and, during a bulk copy, the copy resumes from the last banked cursor. Lower values heal gaps faster at the cost of more reconnects on a link whose faults never heal; _Default_: the `blobTimeout` value
+- `copyCursorFlushBytes` — Bytes of applied bulk-copy data between durable flushes of the copy resume cursor (RocksDB); _Default_: `67108864`
+- `copyCursorFlushIntervalMs` — Maximum time (ms) between durable flushes of the bulk-copy resume cursor (RocksDB); _Default_: `5000`
 - `blobSendDrainTimeout` — Maximum time (ms) a worker waits for in-flight replication blob **sends** to finish before shutting down during a restart, so a rolling restart (e.g., a component deploy reload) doesn't interrupt a transfer in progress. Only sends that are still making progress are waited on; `0` disables draining; _Default_: `600000`
 - `failOver` — Failover to alternate node if peer unreachable; _Default_: `true`
 - `shard` — Shard ID for traffic routing; see [Sharding](../replication/sharding.md)
@@ -253,10 +269,11 @@ storage:
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)
 - `compactOnStartKeepBackup` — Retain compaction backups; _Default_: `false`
-- `maxTransactionQueueTime` — Max write queue time before 503; _Default_: `45s`
+- `maxTransactionQueueTime` — Max time a single write commit may stay unsettled before Harper starts rejecting writes with 503; see [Storage Tuning](../database/storage-tuning.md#storagemaxtransactionqueuetime); _Default_: `45s`
 - `noReadAhead` — Advise OS against read-ahead; _Default_: `false`
 - `prefetchWrites` — Prefetch before write transactions; _Default_: `true`
 - `path` — Database files directory; _Default_: `<rootPath>/database`
+- `backupPath` — Directory for managed database backups (created by [`create_backup`](../backups/operations.md#create_backup)), one subdirectory per database; _Default_: `<rootPath>/backup` (Added in: v5.2.0)
 - `blobPaths` — Blob storage directory or directories; _Default_: `<rootPath>/blobs` (Added in: v4.5.0)
 - `pageSize` — Database page size (bytes); _Default_: OS default
 - `reclamation.threshold` — Free-space ratio below which reclamation begins evicting from caching tables; _Default_: `0.4` (Added in: v4.5.0)
@@ -345,18 +362,18 @@ Added in: v5.0.0
 
 ```yaml
 applications:
-  lockdown: freeze
-  moduleLoader: vm
+  lockdown: freeze-after-load
+  moduleLoader: vm-current-context
   dependencyLoader: auto
   allowedSpawnCommands:
     - npm
     - node
 ```
 
-- `lockdown` — Indicates if intrinsic/built-in objects should be locked down/frozen. This provides additional security and protection against prototype pollution attacks. The options can be `freeze` (default, which freezes the important built-in objects, without interfering with most packages), 'none', or 'ses' (lockdown provided by `ses` package, which is more strict).
-- `moduleLoader` — The method used to load modules (and isolate the application). The default is `vm`, which uses Node's VM to load modules. This can also be set to `native` (use standard Node module loader), or `compartment`, which uses the `ses` implementation of the proposed `Compartment` functionality.
+- `lockdown` — Indicates if intrinsic/built-in objects should be locked down/frozen. This provides additional security and protection against prototype pollution attacks. The default is `freeze-after-load`, which freezes the important built-in objects once all components have loaded, so component initialization can still modify them. This can also be set to `freeze` (freeze before any application code loads), `none`, or `ses` (lockdown provided by the `ses` package, which is more strict). See [Intrinsic Lockdown](/release-notes/v5-lincoln/v5-migration#intrinsic-lockdown).
+- `moduleLoader` — The method used to load modules (and isolate the application). The default is `vm-current-context`, which uses Node's VM module loader in Harper's own context so applications share JavaScript intrinsics. This can also be set to `vm` (VM loader with a separate context and its own intrinsics per application), `native` (standard Node module loader), or `compartment`, which uses the `ses` implementation of the proposed `Compartment` functionality. See [Module Loader Modes](/release-notes/v5-lincoln/v5-migration#module-loader-modes).
 - `dependencyLoader` — The application module loader can be used to load packages/dependencies (installed as `dependencies` from the package.json). The default is 'auto', which only use the VM module loader if the package specifies `harper` as a dependency. This can also be set to `app` to always use the application module loader or `native` to always native module loader for packages.
-- `allowedSpawnCommands` - This lists the specific commands that can be spawned by the application (using `child_process`'s `spawn()`, `exec()`, and `execFile()` functions). You can add commands that you are application will need to launch (this is to protect against malicious code spawning processes).
+- `allowedSpawnCommands` - This lists the specific commands that can be spawned by the application (using `child_process`'s `spawn()` and `execFile()` functions). You can add commands that your application will need to launch (this is to protect against malicious code spawning processes). Only the first token of the command is matched, spawning also requires a mandatory `name` option, and the call is subject to a node-wide single-process lock — see [Child Processes](../components/javascript-environment.md#child-processes) for the full contract.
 
 ## Component Configuration
 

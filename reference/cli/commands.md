@@ -155,6 +155,7 @@ harper login <URL>
 **Optional Parameters**:
 
 - `<URL>` - The URL of the Harper instance to log in to.
+- `--for-ci` - After logging in, print CI/CD credentials to stdout. Available since v5.2.0.
 
 **Prompts**:
 
@@ -163,6 +164,19 @@ You'll be asked to type in the following information:
 - `<URL>` - If a URL parameter is not provided, you'll be prompted to enter the URL of the Harper instance to log in to.
 - `<username>` - Harper admin username.
 - `<password>` - Harper admin password.
+
+#### `--for-ci`
+
+<VersionBadge version="v5.2.0" />
+
+Prints `HARPER_CLI_TARGET` and `HARPER_CLI_REFRESH_TOKEN` to **stdout** in `.env` format — and nothing else, so the output pipes directly into a secret store without the token being displayed. Everything else (banner, prompts, status, warnings) goes to stderr:
+
+```bash
+# Set both GitHub Actions secrets in one command
+harper login --for-ci | gh secret set --env-file -
+```
+
+Run this as a **dedicated CI user**, not your own account: a user holds only one valid refresh token at a time, so issuing one for CI revokes any other token that user already had. See [Token credentials for CI/CD](authentication.md#token-credentials-for-cicd) for how the CLI consumes these variables and where they sit in authentication precedence.
 
 ### `harper logout`
 
@@ -272,6 +286,8 @@ See also: [Database Compaction](../database/compaction.md) for more information.
 
 #### How Backups Work
 
+Which backup approach to use depends on the storage engine: use **volume snapshots** for **LMDB** databases, and the [**RocksDB backup engine**](../backups/overview.md) (`harper create_backup`) for **RocksDB** databases. The RocksDB backup engine produces incremental, checksum-verified backups directly, with no need for atomic volume snapshots. The rest of this section covers the volume-snapshot approach.
+
 Harper uses a transactional commit process that ensures data on disk is always transactionally consistent with storage. This means Harper maintains database integrity in the event of a crash and allows you to use standard volume snapshot tools to make backups.
 
 **Backup Process**:
@@ -280,7 +296,7 @@ Database files are stored in the `hdb/database` directory. As long as the snapsh
 
 **Important Notes**:
 
-- **Atomic Snapshots**: Use volume snapshot tools that create atomic snapshots
+- **Atomic Snapshots**: Use volume snapshot tools for LMDB databases and the [RocksDB backup engine](../backups/overview.md) for RocksDB databases.
 - **Not Safe**: Simply copying an in-use database file using `cp` is **not reliable**
   - Progressive reads occur at different points in time
   - Results in an unreliable copy that likely won't be usable

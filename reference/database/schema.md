@@ -73,14 +73,15 @@ type MyTable @table {
 
 Optional arguments:
 
-| Argument       | Type      | Default                       | Description                                                                 |
-| -------------- | --------- | ----------------------------- | --------------------------------------------------------------------------- |
-| `table`        | `String`  | type name                     | Override the table name                                                     |
-| `database`     | `String`  | `"data"`                      | Database to place the table in                                              |
-| `expiration`   | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)               |
-| `eviction`     | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed |
-| `scanInterval` | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                              |
-| `replicate`    | `Boolean` | true                          | Enable replication of this table                                            |
+| Argument       | Type      | Default                       | Description                                                                                 |
+| -------------- | --------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `table`        | `String`  | type name                     | Override the table name                                                                     |
+| `database`     | `String`  | `"data"`                      | Database to place the table in                                                              |
+| `expiration`   | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                               |
+| `eviction`     | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                 |
+| `scanInterval` | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                              |
+| `replicate`    | `Boolean` | true                          | Enable replication of this table                                                            |
+| `cacheControl` | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
@@ -162,6 +163,37 @@ type Event @table(database: "analytics", expiration: 86400) {
 
 **Replication:** Replication is enabled by default for all tables. Note that if you disable replication on a table and re-enable it later, it will not catch-up on previous writes during when the replication was disabled.
 
+#### `cacheControl`
+
+<VersionBadge version="v5.2.0" />
+
+The `cacheControl` argument sets a `Cache-Control` header value emitted on anonymous (unauthenticated) GET/HEAD `200`/`304` responses for this table. It is designed for tables whose content is public and safe for shared caches (CDNs, reverse proxies) to store.
+
+```graphql
+type Product @table(cacheControl: "public, max-age=60") @export {
+	id: Long @primaryKey
+	name: String
+	price: Float
+}
+```
+
+Key semantics:
+
+- **Anonymous reads only.** The header is emitted only when the request carries no authenticated principal. Authenticated responses instead receive an identity floor of `Cache-Control: private, no-cache` (plus `Vary: Authorization`/`Cookie`) — the table declaration is not inherited by authenticated reads.
+- **Explicit opt-in required.** Anonymous readability alone does not cause Harper to emit shared-cache headers, because a table gated on request attributes (IP, headers, etc.) could leak across a URL-keyed cache. The `cacheControl` declaration is the explicit statement that the content is safe to cache publicly.
+- **Never on 401 responses.** A rejected request always gets `Cache-Control: private, no-cache` regardless of any declaration.
+- **Visible in `describe_table`.** The value is stored with the table schema and surfaces in the Operations API's `describe_table` output.
+
+The declaration can equivalently be made as a `static cacheControl` property on an exported JavaScript resource class:
+
+```javascript
+export class Product extends tables.Product {
+	static cacheControl = 'public, max-age=60';
+}
+```
+
+See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the full caching behavior and how `Cache-Control` interacts with authentication headers.
+
 ### `@export`
 
 Exposes the table as an externally accessible resource endpoint, available via REST, MQTT, and other interfaces.
@@ -173,6 +205,10 @@ type MyTable @table @export(name: "my-table") {
 ```
 
 The optional `name` parameter specifies the URL path segment (e.g., `/my-table/`). Without `name`, the type name is used.
+
+:::warning `@export` is a routing directive, not an access control
+Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and remains accessible through the Operations API and SQL, subject to RBAC, to administrators and roles with the required operation and table permissions. For table-level confidentiality, omit the table from a role's grants or set its table-level `read` permission to `false` rather than relying on the absence of an export route. To protect individual fields, configure `attribute_permissions` as a whitelist: list every field the role may read and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+:::
 
 ### `@sealed`
 
@@ -187,7 +223,7 @@ type StrictRecord @table @sealed {
 
 ### `@hidden` (Type Directive)
 
-Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use `attribute_permissions` on roles to control data access.
+Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use table-level role permissions to control access to the table and `attribute_permissions` to control access to individual fields.
 
 ```graphql
 type InternalConfig @table @hidden {
@@ -195,6 +231,10 @@ type InternalConfig @table @hidden {
 	value: String
 }
 ```
+
+:::warning `@hidden` does not restrict data access
+`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data remains available on every surface through which the table is reachable — REST, MQTT, and GraphQL when the table is exported, plus SQL and the Operations API — subject to the user's role permissions. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, configure role `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+:::
 
 `@hidden` is also available as a [field directive](#hidden-field-directive) to suppress individual attributes.
 
@@ -324,9 +364,27 @@ type Event @table {
 }
 ```
 
+### `@expiresAt`
+
+Marks a field as the record's absolute expiration time (Unix epoch milliseconds). Once the timestamp is in the past, the record is treated as expired: it is hidden from reads and physically removed by the eviction sweep. Useful for session, token, or per-record cache-entry tables where each record carries its own expiry.
+
+```graphql
+type Session @table {
+	id: ID @primaryKey
+	token: String
+	expiresAt: Long @expiresAt
+}
+```
+
+The `@expiresAt` field is authoritative over the table-level [`expiration`](#table) default, in both directions — a per-record value may extend a record's expiration past (since 5.2), or expire it before, the table default. When a record omits the field, the table default (if any) applies.
+
+- The field must be an absolute timestamp (Unix epoch milliseconds), not a duration. Negative values are ignored and fall back to the table default.
+- A full-record `put` that omits the field **clears** it (the record then follows the table default, or never expires if there is none). A `patch` of other fields preserves it — so a session-renewal write must re-include `expiresAt`.
+- On caching tables (with a [source](../resources/resource-api.md#sourcedfromresource-options)), set the per-record TTL via `context.expiresAt` in the source `get()` rather than an `@expiresAt` field.
+
 ### `@hidden` (Field Directive)
 
-Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table; data is still queryable through other interfaces subject to RBAC. Use this for fields that should not appear in introspectable surfaces.
+Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table and can be returned through every surface on which the table is reachable (REST GET, MQTT, and GraphQL when exported, plus SQL and the Operations API), subject to the user's field permissions. Use this for fields that should not appear in generated specs or tool schemas, not to restrict data access.
 
 ```graphql
 type Customer @table {
@@ -340,7 +398,7 @@ type Customer @table {
 }
 ```
 
-`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the data-access enforcement mechanism.
+`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the field-level data-access enforcement mechanism. To prevent a role from reading a field value, configure `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
 
 ## Relationships
 
@@ -397,14 +455,14 @@ type Network @table @export {
 
 ### `@relationship(from: attribute, to: attribute)` — foreign key to foreign key
 
-Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. This is useful for many-to-many relationships that join on non-primary-key attributes.
+Both `from` and `to` can be specified together to define a relationship where neither side uses the primary key — a foreign key to foreign key join. As with the `to`-only form above, the result type must be an array: Harper resolves it by searching the target table's `to` attribute for matches, using this record's `from` attribute (instead of its primary key) as the search value.
 
 ```graphql
 type OrderItem @table @export {
 	id: Long @primaryKey
 	orderId: Long @indexed
 	productSku: Long @indexed
-	product: Product @relationship(from: productSku, to: sku) # join on sku, not primary key
+	products: [Product] @relationship(from: productSku, to: sku) # matches products by sku, not primary key
 }
 
 type Product @table @export {
@@ -449,6 +507,8 @@ tables.Product.setComputedAttribute('totalPrice', (record) => {
 ```
 
 Computed properties are not included in query results by default — use `select` to include them explicitly.
+
+Computed properties that read other tables use the same [trusted server-side authorization context](../components/javascript-environment.md#tables) as other direct `tables` or `databases` calls. Do not expose protected cross-read data through a computed property when access depends on the caller.
 
 ### Computed Indexes
 
@@ -528,35 +588,79 @@ let results = Document.search(
 
 `vectorFilter` is available from the JavaScript API only (it cannot be expressed in a REST query string). The function receives the candidate record and must return a boolean — `true` to include the record in results, `false` to exclude it (it still routes traversal either way). It must be synchronous, side-effect free, and fast — it can run once per candidate record visited during traversal (verdicts are memoized per query). Records passed to it are frozen.
 
-### Record-Level Access Control (Record-Scoped `allowRead`)
+### Row-Level Access Control with Explicit Filters
 
 <VersionBadge version="v5.2.0" />
 
-Overriding `allowRead(user, target, context)` on a table resource makes it a **record-scoped** check: during query execution it is evaluated once per record with `this` bound to the record, so row-level logic reads naturally from `this`. For vector queries the check participates in the graph traversal, so a restricted user receives the k nearest records _they are allowed to see_ rather than "nearest k, minus redacted" (which under-fills results and reveals that nearby restricted records exist):
+Use a `rowFilter` function on a search target or subscription request when access depends on each record. Attach the filter in an operation override after deciding that the request itself is allowed to proceed. This keeps authorization ahead of query planning and table scans while still filtering the returned or delivered rows:
 
 ```javascript
+function canReadReport(record, context) {
+	const user = context.user;
+	if (user?.role?.permission?.super_user) return true;
+	return user?.username != null && record.ownerId != null && record.ownerId === user.username;
+}
+
 export class Reports extends tables.Reports {
-	allowRead(user, target, context) {
-		// Compose the table/RBAC grant first, so losing the role's read denies (at request entry and
-		// when a live subscription is re-authorized). super.allowRead is safe to call at any scope.
-		if (!super.allowRead(user, target, context)) return false;
-		if (user.role.permission.super_user) return true;
-		// Collection scope — a whole-table subscribe or the subscription re-auth check — has no record
-		// loaded (`this.ownerId` is undefined). Return true to open the connection; rows are filtered
-		// per record during delivery / query execution.
-		if (this.ownerId == null) return true;
-		return this.ownerId === user.id; // per record
+	get(target) {
+		const context = this.getContext();
+		if (target.isCollection) {
+			target.rowFilter = canReadReport;
+		} else if (!canReadReport(this, context)) {
+			return new Response(null, { status: 404 });
+		}
+		return super.get(target);
+	}
+
+	search(target) {
+		target.rowFilter = canReadReport;
+		return super.search(target);
+	}
+
+	subscribe(request) {
+		request.rowFilter = canReadReport;
+		return super.subscribe(request);
 	}
 }
 ```
 
-How the one definition applies at each scope (when permission checking is active, e.g. any external request):
+`rowFilter` is available only from the JavaScript API; clients cannot set it through REST or QUERY request data. It receives the candidate record and the live request or subscription context. It must be synchronous, side-effect free, and fast. Ordinary object and array records are passed as shallow read-only views. Throwing an error or returning a promise aborts a query; on a subscription it terminates the stream. The filter is enforced across normal index and range searches, OR queries, HNSW traversal, source-revalidated records, subscription snapshots, and live row events.
 
-- **Collection queries** (REST collection `GET`, `search()`, including vector sorts) — evaluated per record; rows failing the check are filtered out of results. The default (non-overridden) `allowRead` is a table-level RBAC check and continues to run once at request entry with no per-record cost.
-- **Single-record `get(id)`** — evaluated at request entry with the record loaded (attribute reads like `this.ownerId` resolve against the record); a denied record returns a 403.
-- **Subscriptions** (SSE, WebSocket, MQTT) — the entry check grants the connection at subscribe time (evaluated at collection scope — return the base grant to open), then delivery is filtered per event so a subscriber receives only the row-change events for records the check permits. A live subscription is periodically re-authorized by re-running this same `allowRead` against the current user, so revoking the role's read (or, for a connection-level override, its grant) tears the subscription down. Delete tombstones and published message payloads do not carry the full record, so an override keyed on row fields will deny those event types.
+`rowFilter` does not apply to a direct primary-key `get`. The example performs that check in `get()` after the default instance-loading flow has loaded the record. It therefore assumes the default `loadAsInstance` behavior. A false-mode handler must explicitly load any record data it needs before making the same decision.
 
-Constraints: the check must be synchronous, side-effect free, and fast — it can run once per candidate record visited during traversal (verdicts are memoized per query). `this` is the frozen record during per-record evaluation. A thrown exception denies that record (fail closed). On caching tables the check is enforced against the record actually returned, after any source revalidation.
+For vector queries, `rowFilter` participates in HNSW traversal. A caller therefore receives the k nearest _matching_ records rather than "nearest k, minus filtered records." `rowFilter` can apply to every candidate visited; prefer indexed query conditions for predicates that can be expressed declaratively.
+
+`rowFilter` applies only when a non-raw `put` or `invalidate` event carries an authoritative row value. Delete tombstones, value-less invalidations, raw events, and published messages may not contain the complete current record. A subscription that needs such events can also provide an `eventFilter`:
+
+```javascript
+subscribe(request) {
+	request.rowFilter = canReadReport;
+	request.eventFilter = (event, context) => {
+		const rowEvent = event.type === 'put' || event.type === 'invalidate';
+		if (!request.rawEvents && rowEvent && event.value != null) return true;
+		const username = context.user?.username;
+		const ownerPrefix = username == null ? null : `${encodeURIComponent(username)}:`;
+		return (
+			ownerPrefix != null &&
+			(rowEvent || event.type === 'delete') &&
+			String(event.id).startsWith(ownerPrefix)
+		);
+	};
+	return super.subscribe(request);
+}
+```
+
+This example assumes report IDs are created with the same `encodeURIComponent(username) + ':'` owner prefix, allowing value-less events to be authorized without loading the deleted or invalidated record. Encoding the owner segment prevents one username from being a raw string prefix of another owner's IDs.
+
+`eventFilter` receives a shallow read-only view of every non-control event and the live context. It has the same synchronous and fail-closed requirements as `rowFilter` and is composed with it for authoritative row events. When a subscription has a `rowFilter`, non-row events are withheld unless an `eventFilter` explicitly accepts them. Transaction and reload control events continue to pass so the subscription remains coherent.
+
+Live subscriptions are periodically re-authorized with a freshly loaded user. This recheck reruns the operation-level `allowRead` grant; it does not call a custom `subscribe()` override again. The `rowFilter` and `eventFilter` callbacks receive the refreshed context for subsequent events. If an application-specific connection grant must terminate an existing stream when revoked, keep that revocable grant in an `allowRead` override composed with `super.allowRead`; admission logic that runs only in `subscribe()` cannot provide that teardown behavior.
+
+The legacy `allowRead`, `allowUpdate`, `allowCreate`, and `allowDelete` hooks are deprecated operation-level gates. When permission checking is active, Harper's standard instance flow evaluates the relevant hook once for the operation rather than once per row. Built-in table handlers with `loadAsInstance = false` likewise use one request/collection-scoped verdict; custom false-mode handlers remain responsible for authorization unless they delegate to those built-in handlers.
+
+Put application authorization and access-control decisions that need the complete target and context in operation overrides such as `get`, `put`, and `delete`. Collection operation overrides run before query planning or table scans and can attach a `rowFilter` or indexed conditions when an admitted request needs row-level narrowing. In the default single-record `get` flow, the record instance is loaded before the operation override runs, so its fields are available through `this`.
+
+See the [`RequestTarget`](../resources/resource-api.md#requesttarget) and [`SubscriptionRequest`](../resources/resource-api.md#subscriptionrequest-options) references for the filter properties.
 
 ### Tuning Filtered Traversal
 
