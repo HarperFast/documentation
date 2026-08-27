@@ -17,7 +17,7 @@ Compaction is also the mechanism to apply storage configuration changes (such as
 
 ## Copy Compaction
 
-<VersionBadge type="changed" version="v5.3.0" />
+<VersionBadge type="changed" version="v5.3.0" /> <EngineBadge engines="LMDB" />
 
 Creates a compacted copy of a database file. The original database is left unchanged.
 
@@ -41,7 +41,9 @@ To replace the original database with the compacted copy, move or rename the out
 harper copy-db data /home/user/hdb/database/copy.mdb
 ```
 
-Copy compaction applies to LMDB databases only. `copy-db` fails if the source database is stored in RocksDB, and [compact on start](#compact-on-start) skips RocksDB databases — RocksDB compacts itself.
+`copy-db` fails if the source database is stored in RocksDB, and [compact on start](#compact-on-start) skips RocksDB databases — RocksDB compacts itself.
+
+`copy-db` also fails if the source database's tables span more than one storage environment. Per-table `path` settings put a database's tables in separate root stores — the same configuration that puts a database out of scope for [managed backups](../backups/overview.md#limitations) — and the target is a single environment file, so `copy-db` errors out rather than copying one environment and exiting successfully. [Compact on start](#compact-on-start) skips such a database for the same reason.
 
 ### File-backed blobs copied separately
 
@@ -61,7 +63,7 @@ Copy compaction applies to LMDB databases only. `copy-db` fails if the source da
 
 **If the database holds `Blob` values, the copy is not restorable without this directory** — moving the database file on its own silently loses every blob it references. A database with no live blob references does not need the companion directory, though one may still be written (possibly empty) whenever a blob root directory exists.
 
-The directory is written only for blob roots that exist on disk, and is not written at all when every root is missing — an unmounted `blobPaths` volume, for instance, yields a database-file-only copy without failing the command. Confirm the roots are mounted before copying, and confirm `<target-database-path>-blobs` is there afterwards, before treating the copy as a restorable backup.
+> **Important:** the companion directory holds only the blob roots that existed on disk when the copy ran, and is not written at all when every root is missing — an unmounted `blobPaths` volume, for instance, yields a database-file-only copy and still exits successfully. `copy-db` says so as it runs: it warns naming each missing root and stating that the copy is missing those blobs if the database ever wrote to them, and on a successful blob copy logs how many roots it copied and where. Read that output before treating the copy as a restorable backup — a root that was unmounted at copy time leaves no `<rootIndex>` tree behind, while the mapping in the companion directory's `README.md` still lists it.
 
 To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
 
@@ -76,9 +78,11 @@ One narrow exception: if the copy immediately replaces its own source in place �
 
 ## Compact on Start
 
+<VersionBadge type="changed" version="v5.3.0" /> <EngineBadge engines="LMDB" />
+
 Automatically compacts all non-system databases when Harper starts. Harper will not start until compaction is complete. Under the hood, it loops through all user databases, creates a backup of each, compacts it, replaces the original with the compacted copy, and removes the backup.
 
-Compact on start replaces each database in place under its own name, so the blob roots keep resolving and no blob companion directory is involved. As of v5.3.0 it skips RocksDB databases, and skips a database whose tables span more than one storage environment (table-specific paths), which compaction cannot replace as a single file.
+Compact on start replaces each database in place under its own name, so the blob roots keep resolving and no blob companion directory is involved. It skips RocksDB databases, and skips a database whose tables span more than one storage environment (table-specific paths), which compaction cannot replace as a single file. Both skips are logged and the remaining databases still compact.
 
 > **Note:** the backup `compactOnStartKeepBackup` retains is the pre-compaction database file only. It carries no blobs, and blob files are shared by database name, so blobs deleted or superseded after the compaction are gone from that backup's point of view. Treat it as a rollback for the compaction itself, not as a point-in-time backup. For that, an LMDB database needs a volume snapshot covering the database file and its blob roots together, or a `copy-db` copy kept with its blob companion directory — [`get_backup`](../backups/operations.md#get_backup) on an LMDB database streams the `.mdb` file only.
 
