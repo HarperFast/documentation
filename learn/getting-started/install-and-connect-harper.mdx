@@ -110,6 +110,10 @@ The image is configured to automatically run the `harper` command upon startup. 
 
 The Harper installation process is normally an interactive prompt; however, it also supports overrides using environment variables or CLI arguments. Since the image contains preset environment variables and additional environment variables `DEFAULTS_MODE` and `REPLICATION_HOSTNAME` are included in the `docker run` command, Harper will complete its installation step completely non-interactively.
 
+:::tip
+This is not limited to installation: _any_ Harper configuration option can be set with an environment variable by mapping its YAML key to `SCREAMING_SNAKE_CASE` (`http.port` becomes `HTTP_PORT`, `replication.hostname` becomes `REPLICATION_HOSTNAME`), which makes `-e` flags the natural way to configure a containerized instance. See [Environment Variables](/reference/v5/configuration/overview#2-environment-variables) in the configuration reference for the full naming convention.
+:::
+
   </TabItem>
 </Tabs>
 
