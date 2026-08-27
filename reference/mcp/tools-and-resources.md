@@ -110,9 +110,18 @@ The corresponding instance method runs through Harper's normal `transactional()`
 
 ### Custom `mcpResources` opt-in
 
-A component author can expose arbitrary content — documentation pages, rendered reports, any `text` or `blob` payload — as MCP resources under author-chosen URIs by declaring a static `mcpResources` array (5.1.18+):
+<VersionBadge version="v5.1.18" />
+
+A component author can expose arbitrary content — documentation pages, rendered reports, any `text` or `blob` payload — as MCP resources under author-chosen URIs by declaring a static `mcpResources` array:
 
 ```ts
+// Template parameters are client-controlled, so an allowlist decides what
+// content is reachable — see Access control below.
+const PAGES = {
+	'guides/install.md': '# Install\n\nnpm install -g harper',
+	'guides/deploy.md': '# Deploy\n\nharper deploy',
+};
+
 class DocsPages extends Resource {
 	static mcpResources = [
 		{
@@ -133,23 +142,109 @@ class DocsPages extends Resource {
 	];
 
 	async readIndex() {
-		return { text: '- docs:///guides/install.md\n…', mimeType: 'text/markdown' };
+		return {
+			text: Object.keys(PAGES)
+				.map((page) => `- docs:///${page}`)
+				.join('\n'),
+			mimeType: 'text/markdown',
+		};
 	}
 
 	async readPage(params) {
-		return { text: loadPage(params.path), mimeType: 'text/markdown' };
+		const body = PAGES[params.path];
+		if (!body) throw new Error(`no such page: ${params.path}`);
+		return { text: body, mimeType: 'text/markdown' };
 	}
 }
 ```
 
-Each entry declares exactly one of `uri` (fixed — listed by `resources/list`) or `uriTemplate` (listed by `resources/templates/list`). Templates use `{name}` to match a single path segment and `{+name}` to match across segments; `resources/read` extracts the parameters and passes them to the named instance method as its first argument. The method returns a string (text content), `{ text, mimeType? }`, `{ blob, mimeType? }` (base64 binary), or any other object (serialized as JSON).
+Each entry declares exactly one of `uri` (fixed — listed by `resources/list`) or `uriTemplate` (listed by `resources/templates/list`). Templates use `{name}` to match a single path segment and `{+name}` to match across segments; `resources/read` extracts the parameters and invokes the named instance method on the live class as `(params, context)`:
+
+- `params` — the extracted template parameters as a `{ [name]: string }` map, percent-decoded. A fixed-`uri` entry gets `{}`.
+- `context` — `{ user, profile }`: the MCP session's user (`{ username, role }`, where `role.permission` is the RBAC block) and the profile name, always `'application'` for custom resources.
+
+The method returns a string (text content), `{ text, mimeType? }`, `{ blob, mimeType? }` (base64 binary), or any other object (serialized as JSON).
 
 Notes:
 
-- Reads dispatch on the **live** registry class, so an exported `resources.js` subclass's method (and its access control) always wins — the same rule as custom `mcpTools`. Custom resources are served to **any** MCP session, including anonymous, unauthenticated ones (the public-docs case this feature targets) — the MCP layer performs no auth check for them; to restrict one, check `context.user` in the `read` method and throw.
+- Reads dispatch on the **live** registry class, so an exported `resources.js` subclass's method (and its access control) always wins — the same rule as custom `mcpTools`.
 - `completions` optionally declares candidate values per template parameter, served by `completion/complete`.
-- Custom URIs must use an author-chosen scheme (`docs:///…` above). The reserved schemes — `harper:`, `harper+rest:`, `http:`, `https:` — are rejected at registration so custom entries cannot shadow the built-in surfaces.
+- Custom URIs must use an author-chosen scheme (`docs:///...` above), and that scheme must be a literal — a template whose scheme position holds a parameter (`{scheme}://...`) is rejected. The reserved schemes — `harper:`, `harper+rest:`, `http:`, `https:` — are rejected at registration so custom entries cannot shadow the built-in surfaces.
+- Invalid entries are skipped with a warning in the server log rather than failing the profile rebuild: a missing `name` or `method`, both or neither of `uri`/`uriTemplate`, a malformed or parameter-less template, a reserved scheme, or a `method` that is not a function on the prototype.
 - A read error from the method surfaces to the client as a sanitized JSON-RPC error; the raw error is written to the server log.
+
+#### Template parameters are client-controlled
+
+A template parameter is whatever the client put in the URI it asked to read, so treat it as untrusted input. `{+name}` matches across `/`, and the captured value is percent-decoded before your method sees it — a read of `docs:///../../secret` calls `readPage({ path: '../../secret' })`. Resolve the parameter through an allowlist (the `PAGES` map above) or validate containment before any filesystem- or URL-backed load; never interpolate it straight into a path.
+
+#### Access control for custom resources
+
+The MCP layer runs **no** authorization check on a custom resource. Entries are listed to every session on the profile — including anonymous, unauthenticated ones where the deployment allows them (the public-docs case this feature targets) — and RBAC is delegated to the Resource, the same as custom `mcpTools`. Enforcement is the read method's responsibility.
+
+For content the method renders itself, gate on `context.user` and throw:
+
+```ts
+class InternalReports extends Resource {
+	static mcpResources = [
+		{
+			uriTemplate: 'reports:///{id}',
+			name: 'internal report',
+			description: 'Rendered internal report',
+			method: 'readReport',
+		},
+	];
+
+	async readReport(params, context) {
+		if (!context.user?.role?.permission?.super_user) throw new Error('not authorized');
+		return { text: renderReport(params.id), mimeType: 'text/markdown' };
+	}
+}
+```
+
+An anonymous session arrives as `{ username: '' }`, not `undefined`, so `if (!context.user)` does **not** reject it. Test the field you actually require — a non-empty `context.user.username`, or the specific `context.user.role.permission` entry.
+
+When the content wraps row-level-guarded table data, fetch it through the **exported (routing) Resource** — the subclass that carries the row-level `allow*` predicates — with a `checkPermission`-bearing `RequestTarget` <VersionBadge version="v5.2.0" />:
+
+```ts
+import { RequestTarget } from 'harper';
+
+// The exported subclass carries the per-record guard that REST enforces.
+export class Order extends tables.Order {
+	allowRead(user) {
+		return user?.username != null && this.customerId === user.username;
+	}
+}
+
+export class OrderDocs extends Resource {
+	static mcpResources = [
+		{
+			uriTemplate: 'orders:///{+orderId}',
+			name: 'order by id',
+			description: 'Fetch an order by id',
+			mimeType: 'application/json',
+			method: 'readOrder',
+		},
+	];
+
+	async readOrder(params, context) {
+		const target = new RequestTarget();
+		target.id = params.orderId;
+		// Ask the Resource to enforce its row-level allow* against this user.
+		target.checkPermission = context.user?.role?.permission ?? true;
+		const order = await Order.get(target); // runs Order's allowRead
+		if (!order) throw new Error(`no such order: ${params.orderId}`);
+		return { text: JSON.stringify(order), mimeType: 'application/json' };
+	}
+}
+```
+
+From 5.2.0 the read runs inside a transaction that carries the calling MCP session user, which is what makes the single-argument `Order.get(target)` above authorize against that user; an `AccessViolation` raised by `allowRead` then surfaces to the client as `permission denied` rather than a generic read failure. Call the guarded fetch single-argument — forwarding the resource's own context (`Order.get(target, this.getContext())`) starts an independent transaction and drops that shared snapshot.
+
+:::warning
+Do not fetch guarded rows through the base table class (`tables.Order.get(id)`). The base class's `allowRead` is a table-level grant only; it does not run the exported subclass's per-record override, so a user holding table-level `read` receives rows the same request is denied over REST ([harper#1735](https://github.com/HarperFast/harper/issues/1735)).
+
+On 5.1.x the read does not run inside a user-carrying transaction at all: the `context.user` gate above works, but a guarded row-backed fetch cannot authorize. Serve row-level-guarded content from 5.2.0 or later.
+:::
 
 ### `exportTypes` gating
 
@@ -178,7 +273,9 @@ The schema URIs honor each user's `permission[db].tables[table]` walk — a user
 
 ### `harper+rest://` URIs
 
-The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as a `harper+rest://<host>:<port>/<path>` URI (5.1.18+ — earlier releases listed these under `http(s)://`, which the MCP spec reserves for resources a client can fetch directly from the web; legacy `http(s)://` URIs continue to work for `resources/read` and `resources/subscribe`). These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
+<VersionBadge type="changed" version="v5.1.18" />
+
+The application profile additionally exposes every exported `Resource` (that passes the `exportTypes.mcp` gate **and** the `hasRestVerbs` check) as a `harper+rest://<host>:<port>/<path>` URI. Earlier releases listed these under `http(s)://`, which the MCP spec reserves for resources a client can fetch directly from the web; legacy `http(s)://` URIs continue to work for `resources/read` and `resources/subscribe`. These resolve in-process via `Resources.getMatch(path, 'mcp')` — there is no outbound HTTP request. The body returned by `resources/read` is a small descriptor:
 
 ```json
 {
