@@ -58,7 +58,13 @@ graphqlSchema:
 rest: true
 ```
 
-Neither half is sufficient on its own. Without `@export` the table has no REST route and callers get `404`. Without `rest: true` the REST handler is never registered for the application, so exported tables do not respond to HTTP requests at all — `rest` is not enabled by default.
+Neither half is sufficient on its own. Without `@export` the table has no REST route and callers get `404`. Without `rest: true` the REST handler is never registered for the application, so even an exported table does not respond to HTTP requests.
+
+:::note Components with no configuration file
+The one exception is a component directory that has **no configuration file at all**. Harper falls back to a built-in default for those, and that default enables `rest` and loads `*.graphql` from the component root — so a bare directory containing only a schema file does serve its exported tables.
+
+The fallback is all or nothing. As soon as a configuration file exists it is used verbatim, with no merge against the built-in default, so a `config.yaml` that omits `rest` turns REST off even though the same directory would have had it with no file present. If you add a configuration file, add `rest: true` with it.
+:::
 
 With both in place, the exported name becomes the base path (`Product` above, or the `name` argument of `@export`) and Harper serves the following endpoints on the application HTTP server port (default `9926`). No route definitions, controllers, or handler code are required.
 
@@ -68,7 +74,7 @@ With both in place, the exported name becomes the base path (`Product` above, or
 | `GET /Product/`              | The record collection. Append query parameters to search, filter, sort, and page.                                                                                      | [GET](#get), [Querying](./querying.md) |
 | `GET /Product/{id}`          | A single record by primary key; `404` when no such record exists.                                                                                                      | [GET](#get)                            |
 | `GET /Product/{id}.property` | A single property of one record. Only properties declared in the schema.                                                                                               | [GET](#get)                            |
-| `POST /Product/`             | Creates a record with a Harper-assigned primary key, returned in the `Location` response header. Requires the trailing slash.                                          | [POST](#post)                          |
+| `POST /Product/`             | Creates a record with a Harper-assigned primary key and responds `201`. Requires the trailing slash — `POST /Product` returns `404`.                                   | [POST](#post)                          |
 | `PUT /Product/{id}`          | Creates or replaces the record at `{id}` (upsert). The stored record matches the body exactly — properties omitted from the body are **removed**.                      | [PUT](#put)                            |
 | `PATCH /Product/{id}`        | Merges the body into the existing record, preserving unspecified properties. The merge is **shallow** — a nested object in the body replaces the stored one wholesale. | [PATCH](#patch)                        |
 | `DELETE /Product/{id}`       | Deletes the record at `{id}`.                                                                                                                                          | [DELETE](#delete)                      |
@@ -77,7 +83,9 @@ With both in place, the exported name becomes the base path (`Product` above, or
 Notes on this surface:
 
 - The trailing slash is significant throughout: `/Product` addresses the resource itself, `/Product/` addresses its collection of records. See [URL Structure](#url-structure).
-- `HEAD` behaves as `GET` with the body omitted, and `OPTIONS` reports the resource's supported methods in an `Allow` header. A method a resource does not implement returns `405` with an `Allow` header listing the ones it does.
+- `HEAD` is served exactly as `GET` with the response body omitted. `QUERY` is accepted on the collection path (`QUERY /Product/`) and runs a search taken from the request body rather than the URL.
+- On a successful `POST`, the new record's primary key is returned in the `Location` response header. The header carries the bare key value, not a URL — it is not a link to follow.
+- `PUT` replaces the stored record, with three exceptions that Harper always applies: a [`@createdTime`](../database/schema.md#createdtime) attribute keeps the original record's value, an [`@updatedTime`](../database/schema.md#updatedtime) attribute is re-stamped with the time of the write, and the primary key is forced to match the `{id}` in the URL even if the body carries a different one.
 - Enabling `rest` also enables [WebSocket](./websockets.md) and [Server-Sent Events](./server-sent-events.md) subscriptions on these same resource paths.
 - Every exported resource is included in the generated [OpenAPI](#openapi) document.
 - Custom resource classes exported from an application get the same URL structure and method mapping; they implement the methods themselves rather than inheriting the table behavior above. See [Resource API](../resources/resource-api.md).
