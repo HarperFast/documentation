@@ -31,7 +31,7 @@ harper copy-db <source-database> <target-database-path>
 
 The `source-database` is the database name (not a file path). The target is the full file path where the compacted copy will be written.
 
-As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. Retrying an interrupted copy means removing both. This is stricter than earlier v5 releases, which wrote into an existing target: a script that re-copies to a fixed path on a schedule has to remove the previous copy and its companion directory first, or it now fails.
+As of v5.3.0 neither the target path nor its `<target-database-path>-blobs` companion directory may already exist — `copy-db` refuses both rather than merging the copy into whatever they hold. A copy that fails removes the target, its lock file, and the companion directory it created before reporting the error, so a retry is not blocked by the failed attempt; clearing them by hand is for a previous successful copy to the same path, or a run killed outright before it could clean up. This is stricter than earlier v5 releases, which wrote into an existing target: a script that re-copies to a fixed path on a schedule has to remove the previous copy and its companion directory first, or it now fails.
 
 To replace the original database with the compacted copy, move or rename the output file to the original database path after Harper is stopped. That is the one case where the database file travels alone; if the database has `Blob` values, any other destination also needs the blob companion directory described in [File-backed blobs copied separately](#file-backed-blobs-copied-separately).
 
@@ -63,12 +63,13 @@ harper copy-db data /home/user/hdb/database/copy.mdb
 
 **If the database holds `Blob` values, the copy is not restorable without this directory** — moving the database file on its own silently loses every blob it references. A database with no live blob references does not need the companion directory, though one may still be written (possibly empty) whenever a blob root directory exists.
 
-> **Important:** the companion directory holds only the blob roots that existed on disk when the copy ran, and is not written at all when every root is missing — an unmounted `blobPaths` volume, for instance, yields a database-file-only copy and still exits successfully. `copy-db` says so as it runs: it warns naming each missing root and stating that the copy is missing those blobs if the database ever wrote to them, and on a successful blob copy logs how many roots it copied and where. Read that output before treating the copy as a restorable backup — a root that was unmounted at copy time leaves no `<rootIndex>` tree behind, while the mapping in the companion directory's `README.md` still lists it.
+> **Important:** the companion directory holds only the blob roots that existed on disk when the copy ran, and is not written at all when every root is missing — an unmounted `blobPaths` volume, for instance, yields a database-file-only copy and still exits successfully. `copy-db` says so as it runs: it warns naming each missing root and stating that the copy is missing those blobs if the database ever wrote to them, and on a successful blob copy logs how many roots it copied and where. The exit status carries none of it, so a scheduled copy that checks only the exit code will keep rotating incomplete copies — check the warning, or that every expected `<rootIndex>` tree is present, before treating a copy as a restorable backup. A root that was unmounted at copy time leaves no `<rootIndex>` tree behind, while the mapping in the companion directory's `README.md` still lists it.
 
 To restore the copy under a database name, put each `<rootIndex>` tree into that name's matching blob root — for example, restoring the copy above as a database named `archive` with no `storage.blobPaths` configured:
 
 ```bash
 cp /home/user/hdb/database/copy.mdb /home/user/hdb/database/archive.mdb
+mkdir -p /home/user/hdb/blobs/archive
 cp -r /home/user/hdb/database/copy.mdb-blobs/0/. /home/user/hdb/blobs/archive/
 ```
 

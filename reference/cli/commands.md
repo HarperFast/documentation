@@ -253,7 +253,7 @@ harper copy-db <source-database> <target-database-path>
 **Parameters**:
 
 - `<source-database>` - Name of the source database (a name, not a file path)
-- `<target-database-path>` - Full path to the target database file; neither it nor its `<target-database-path>-blobs` companion directory may already exist. Retrying an interrupted copy means removing both.
+- `<target-database-path>` - Full path to the target database file; neither it nor its `<target-database-path>-blobs` companion directory may already exist. A failed copy removes what it created, so a retry is not blocked by it; a previous successful copy to the same path has to be removed first.
 
 **Example**:
 
