@@ -1,8 +1,71 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended"],
-	"prConcurrentLimit": 2,
+	"timezone": "America/New_York",
+	"schedule": ["before 9am on Monday"],
+	"automergeSchedule": ["at any time"],
+	"semanticCommits": "enabled",
+	"prConcurrentLimit": 10,
+	"prHourlyLimit": 4,
 	"minimumReleaseAge": "7 days",
 	"internalChecksFilter": "strict",
-	"reviewersFromCodeOwners": true
+	"reviewersFromCodeOwners": true,
+	"automergeType": "pr",
+	"platformAutomerge": false,
+	"lockFileMaintenance": {
+		"enabled": true,
+		"schedule": ["before 9am on the first day of the month"],
+		"automerge": true
+	},
+	"packageRules": [
+		{
+			"description": "Pin GitHub Actions to commit digests, matching the existing convention in .github/workflows.",
+			"groupName": "pin digests",
+			"groupSlug": "all-digests",
+			"matchDepTypes": ["action"],
+			"pinDigests": true
+		},
+		{
+			"description": "Automerge patch and minor devDependency updates. Every dependency in this repo is a devDependency, and Renovate PRs run the full Docusaurus build (Deploy PR Preview) plus tsc and prettier --check, so a green branch is strong evidence.",
+			"matchDepTypes": ["devDependencies"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"automerge": true
+		},
+		{
+			"description": "For 0.x releases a minor bump is a breaking change under semver, so require review. Currently affects @easyops-cn/docusaurus-search-local and @harperfast/code-guidelines.",
+			"matchCurrentVersion": "/^0\\./",
+			"matchUpdateTypes": ["minor"],
+			"automerge": false
+		},
+		{
+			"description": "Never automerge a major update.",
+			"matchUpdateTypes": ["major"],
+			"automerge": false
+		},
+		{
+			"description": "All ten @docusaurus/* packages publish in lockstep from facebook/docusaurus, including tsconfig, types and module-type-aliases. Any solo bump breaks the build, so they must move as one PR.",
+			"groupName": "docusaurus monorepo",
+			"groupSlug": "docusaurus",
+			"matchPackageNames": ["@docusaurus/**"]
+		},
+		{
+			"description": "A Docusaurus minor can change rendering without failing the build, so a human should review the PR preview deployment. Docusaurus patch updates still automerge.",
+			"matchPackageNames": ["@docusaurus/**"],
+			"matchUpdateTypes": ["minor"],
+			"automerge": false
+		},
+		{
+			"description": "react and react-dom must always move together.",
+			"groupName": "react",
+			"groupSlug": "react",
+			"matchPackageNames": ["react", "react-dom"]
+		},
+		{
+			"description": "TypeScript 7 is a full compiler rewrite and @docusaurus/tsconfig 3.x is not validated against it. Require an explicit tick on the Dependency Dashboard before a PR is even opened, so the upgrade happens when someone is ready to drive it.",
+			"matchPackageNames": ["typescript"],
+			"matchUpdateTypes": ["major"],
+			"automerge": false,
+			"dependencyDashboardApproval": true
+		}
+	]
 }
