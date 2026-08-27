@@ -524,8 +524,6 @@ export class ProductInventory extends Resource {
 
 ### `static properties?: Record<string, JsonSchemaFragment>`
 
-<VersionBadge type="changed" version="v5.2.0" />
-
 JSON-Schema-shaped attribute map keyed by name. This is the canonical public API for class-level metadata. For `@table @export` Resources it's auto-derived from the GraphQL schema. For programmatic Resources, declare it directly:
 
 ```typescript
@@ -548,81 +546,7 @@ export class ProductInventory extends Resource {
 }
 ```
 
-As of v5.2.0, a Resource that declares `static properties` with no table backing drives the same schema derivation a table-backed Resource gets:
-
-- **MCP verb tools** — the `inputSchema` on every registered verb tool, and the `outputSchema` on `get_*` (the full record shape). `search_*` has no `outputSchema`; `create_*` / `update_*` / `patch_*` / `delete_*` advertise fixed result envelopes (`{ id }`, `{ ok }`, `{ deleted }`) that don't vary with your properties. A Resource implementing both `put` and `patch` registers `update_*` only — `patch_*` appears when it implements `patch` without `put`.
-- **OpenAPI** — the resource's `components.schemas` entry and its per-path query parameters.
-
-Before v5.2.0 these surfaces read only the internal `attributes` Array, so a bare `static properties` declaration yielded an empty property set.
-
-The `harper://schema/{db}/{table}` MCP resource is **not** included: it is keyed by database and table name, so only Resources that identify a table are enumerated there. A purely programmatic Resource never gets such a URI.
-
-> **Listing visibility.** MCP `tools/list` has no static permission gate to apply to a Resource with no backing table, so Harper conservatively lists its verb tools for super-users only. Other users can still call the tools by name — the Resource's own `allowRead` / `allowUpdate` / etc. predicates enforce access at call time.
-
-#### JSON Schema vocabulary
-
-`static properties` speaks JSON Schema, not GraphQL. Types are **lowercase** (`string`, `integer`, `number`, `boolean`, `object`, `array`, `null`) — distinct from the capitalized Harper/GraphQL type names (`String`, `Int`, `Long`, `Float`, `Boolean`, `Date`, `Bytes`, `BigInt`) that appear on the internal `Class.attributes` Array. Harper recognizes both vocabularies: it maps the GraphQL names to their JSON Schema equivalents and passes lowercase names through unchanged.
-
-A name in neither vocabulary (`'Text'`, `'Object'`, `'Array'`) is where the surfaces diverge — MCP coerces it to `{ type: 'string' }` while OpenAPI emits an untyped `{}`. Use the lowercase JSON Schema names so the two agree.
-
-Fragment keys Harper reads:
-
-| Key                                              | Purpose                                                                                                                                                                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`                                           | JSON Schema type, or an array of types for a union                                                                                                                                                            |
-| `description`                                    | Per-property prose; flows to MCP `properties[*].description` and OpenAPI                                                                                                                                      |
-| `primaryKey`                                     | Marks the identifying property. Types and describes the `id` argument on `get_*` / `update_*` / `delete_*` — see the caveat below                                                                             |
-| `enum`, `format`, `const`                        | Value constraints. Emitted on both surfaces for a top-level property (`const` in an OpenAPI-compatible form — see below); inside a nested object or an array's `items`, MCP keeps them and OpenAPI drops them |
-| `items`                                          | Element schema for `type: 'array'` — including arrays of objects                                                                                                                                              |
-| `properties`, `required`, `additionalProperties` | Nested object shape and its object-level constraints                                                                                                                                                          |
-| `nullable`                                       | Marks the property nullable; also inferred when `type` is a union containing `'null'`. See the note below on how each surface emits it                                                                        |
-| `hidden`                                         | Suppresses a **top-level** property from MCP and OpenAPI (see [`static hidden`](#static-hidden-boolean) for the whole-class equivalent)                                                                       |
-| `assignCreatedTime`, `assignUpdatedTime`         | Marks a Harper-assigned timestamp: dropped from the MCP write-verb input schemas and marked `required` on the `get_*` output schema                                                                           |
-
-Notes on how a few of these resolve:
-
-- **Nullability is emitted differently per surface.** A `'null'` member in a union folds into the same internal flag `nullable: true` sets. MCP then re-expands it — `type: ['string', 'null']` emits `{ "type": ["string", "null"] }`, never a `nullable` keyword. OpenAPI 3.0.3 emits `{ "type": "string" }` for a top-level property (the flag isn't represented there) and `{ "type": "string", "nullable": true }` for a property inside a nested object. A union of two non-null types isn't expressible on the attribute form, so the first member wins — prefer a single type where you can.
-- **`const` is spelled differently per surface.** Harper's OpenAPI document declares 3.0.3, whose Schema Object is the JSON Schema draft-04 subset — `const` only arrived in draft-06, so it is not a keyword there. MCP receives `const` as written; OpenAPI receives the equivalent single-value `enum`. `{ kind: { type: 'string', const: 'order' } }` reaches Swagger UI as `{ "type": "string", "enum": ["order"] }`. The constraint is identical either way; only the spelling changes. For the same reason a bare `type: 'null'` becomes an untyped `nullable` schema in the OpenAPI document, since 3.0 has no `null` type.
-- `{ type: 'array' }` with no `items` is valid and means "array of anything"; it emits a bare array schema rather than guessing an element type.
-- `hidden` and `assignCreatedTime` / `assignUpdatedTime` are honored only at the top level, and the timestamp keys only by MCP — OpenAPI request bodies reference one shared component schema per resource, so a Harper-assigned property still appears there.
-- **Optional properties need `nullable: true`.** On the `create_*` input schema every visible property is `required` unless it is the primary key or is marked nullable — the same rule GraphQL's `String` vs `String!` expresses. Mark genuinely optional properties `nullable: true` (or give `type` a `'null'` member) or an MCP client will believe it must supply them.
-- **Declare `static primaryKey` as well.** `primaryKey: true` on a fragment is what MCP's `id` argument is typed and described from, but the OpenAPI path parameter and the verb-tool description sentence read the class-level `static primaryKey`, which defaults to `'id'`. Without it you get `/OrderSummary/{id}` and "…record by id" even though the record is keyed by `orderId`.
-
-```typescript
-export class OrderSummary extends Resource {
-	static description = 'Rolled-up order totals with line items, computed per customer order.';
-	static primaryKey = 'orderId';
-
-	static properties = {
-		orderId: { type: 'string', primaryKey: true, description: 'Order identifier (ULID).' },
-		placedAt: { type: 'string', format: 'date-time', description: 'ISO 8601 timestamp the order was placed.' },
-		status: {
-			type: 'string',
-			enum: ['pending', 'shipped', 'delivered', 'cancelled'],
-			description: 'Fulfillment state.',
-		},
-		note: { type: ['string', 'null'], description: 'Free-text note; null when the customer left none.' },
-		lineItems: {
-			type: 'array',
-			description: 'One entry per SKU on the order.',
-			items: {
-				type: 'object',
-				properties: {
-					sku: { type: 'string', description: 'Stock keeping unit.' },
-					quantity: { type: 'integer', description: 'Units ordered.' },
-					unitPriceCents: { type: 'integer', description: 'Price per unit in cents (USD).' },
-				},
-				required: ['sku', 'quantity'],
-				additionalProperties: false,
-			},
-		},
-	};
-
-	static async get(target) {
-		/* ... */
-	}
-}
-```
+For complex types and nested structures, JSON Schema vocabulary applies (`type`, `enum`, `required`, `additionalProperties`, etc.). Per-property `description` flows into both MCP `inputSchema.properties[*].description` and OpenAPI `components.schemas[*].properties[*].description`.
 
 **Inheritance composes naturally.** Extend a `@table @export` Resource and override individual entries with spread:
 
@@ -644,7 +568,19 @@ The author writes against `properties` (the public API). Internal code that need
 
 ### `static outputSchemas?: { [verb: string]: JsonSchemaFragment }`
 
-Per-verb output schema overrides for programmatic Resources whose verb methods return a projection rather than the full record. When omitted, the MCP deriver falls back to `static properties` for the cheap verbs (`get`/`create`/`update`/`patch`) and a synthesized `{deleted: true, <pk>}` envelope for `delete`. `search_*` deliberately has no output schema.
+Per-verb output schema overrides for programmatic Resources whose verb methods return a projection rather than the full record. Only `get_*` derives a record-shaped output schema; the write verbs advertise fixed envelopes that do not vary with the record shape:
+
+| Verb                  | Output schema when no override is supplied                                        |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `get_*`               | The record shape, derived from the Resource's attributes                          |
+| `create_*`            | `{ id }` — the new record's primary key, typed by the primary-key attribute       |
+| `update_*`, `patch_*` | `{ ok }` — a boolean acknowledgement (`Table.put` / `Table.patch` return nothing) |
+| `delete_*`            | `{ deleted }` — a boolean; it does not carry the primary key                      |
+| `search_*`            | None. `search_*` deliberately registers no `outputSchema`                         |
+
+So `static outputSchemas` is the only way to describe what a write verb actually returns. `outputSchemas.search` is not read at all — a `search` entry has no effect on `tools/list`.
+
+A programmatic Resource that declares no attributes gets an empty record schema on `get_*`, because the derivation reads the internal `attributes` Array rather than `static properties` ([harper#1923](https://github.com/HarperFast/harper/issues/1923)). Until that is resolved, describe such a Resource's `get_*` result with `static outputSchemas.get`.
 
 ```typescript
 export class ProductInventory extends Resource {

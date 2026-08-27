@@ -48,17 +48,15 @@ Operations registered outside core (for example, `cluster_status` from harper-pr
 
 For verb tools generated from exported Resources:
 
-| Field                         | Source                                                                                                                                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                        | `${verb}_${sanitized-path}` (e.g. `get_Product`, `search_Customer`)                                                                                                                             |
-| `description`                 | Composed: `[ResourceClass.description \n\n] ${verb sentence} ${runtime RBAC note}`                                                                                                              |
-| `inputSchema`                 | Derived per verb from the Resource's schema (below), once at registration time and identical for every caller. Per-property `description` propagates to `inputSchema.properties[*].description` |
-| `outputSchema`                | The full record shape on `get_*`; fixed envelopes on `create_*` (`{ id }`), `update_*` / `patch_*` (`{ ok }`), and `delete_*` (`{ deleted }`). `search_*` deliberately omits `outputSchema`     |
-| `annotations.readOnlyHint`    | `true` on `get_*` and `search_*`                                                                                                                                                                |
-| `annotations.destructiveHint` | `true` on `delete_*`                                                                                                                                                                            |
-| `annotations.idempotentHint`  | `true` on `update_*` (PUT semantics); other verbs default off                                                                                                                                   |
-
-The schema source is the Resource's table-derived attributes when it has them, and its `static properties` declaration when it doesn't — a programmatic Resource declaring only `static properties` yields the same rich `inputSchema` / `outputSchema` as a table-backed one <VersionBadge type="changed" version="v5.2.0" />. `static properties` uses JSON Schema types (lowercase), including `enum`, `format`, `const`, arrays, and nested objects; see the [Resource API reference](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment).
+| Field                         | Source                                                                                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                        | `${verb}_${sanitized-path}` (e.g. `get_Product`, `search_Customer`)                                                                                                                           |
+| `description`                 | Composed: `[ResourceClass.description \n\n] ${verb sentence} ${runtime RBAC note}`                                                                                                            |
+| `inputSchema`                 | Derived per verb from `ResourceClass.attributes`, once at registration time and identical for every caller. Per-attribute `description` propagates to `inputSchema.properties[*].description` |
+| `outputSchema`                | The full record shape on `get_*`; fixed envelopes on `create_*` (`{ id }`), `update_*` / `patch_*` (`{ ok }`), and `delete_*` (`{ deleted }`). `search_*` deliberately omits `outputSchema`   |
+| `annotations.readOnlyHint`    | `true` on `get_*` and `search_*`                                                                                                                                                              |
+| `annotations.destructiveHint` | `true` on `delete_*`                                                                                                                                                                          |
+| `annotations.idempotentHint`  | `true` on `update_*` (PUT semantics); other verbs default off                                                                                                                                 |
 
 `static description` and `static properties` on the Resource class override the auto-derived values. `static outputSchemas[verb]` overrides per-verb output schemas. `static mcp.annotations[verb]` overrides annotations per verb. `static hidden === true` suppresses the entire Resource from MCP listing.
 
@@ -141,7 +139,7 @@ Harper also publishes a small set of synthetic resources via the MCP `resources/
 | `harper://schema/{db}/{table}` | application | Per-table schema, filtered by `attribute_permissions` |
 | `https://{host}/{path}`        | application | Application HTTP Resources, in-process                |
 
-For `harper://schema/{db}/{table}` and `https://{host}/{path}` entries, the descriptor description prepends `Table.description` / `ResourceClass.description` when present. `harper://schema/{db}/{table}` is enumerated by database and table name, so a Resource that identifies no table is not listed there; for one that does, the schema body falls back to its `static properties` declaration when its `attributes` Array is empty <VersionBadge type="changed" version="v5.2.0" />.
+For `harper://schema/{db}/{table}` and `https://{host}/{path}` entries, the descriptor description prepends `Table.description` / `ResourceClass.description` when present.
 
 ## See also
 

@@ -72,15 +72,15 @@ The Resource's path is sanitized into a valid tool name: `/` and `.` become `_`.
 
 ### Input schema derivation
 
-Input schemas come from `Table.attributes` — or, for a programmatic Resource that declares no attributes, from its [`static properties`](/reference/v5/resources/resource-api#static-properties-recordstring-jsonschemafragment) <VersionBadge type="changed" version="v5.2.0" />, whose JSON Schema types pass through unchanged:
+Input schemas come from `Table.attributes`:
 
 - Harper types map to JSON Schema primitive types (`Int`/`Long`/`BigInt` → `integer`, `Float` → `number`, `String`/`ID` → `string`, `Boolean` → `boolean`, `Date` → `[string, number]`, `Bytes`/`Blob` → `string` with `contentEncoding: base64`).
 - Nested `Object` and `Array` attributes recurse into their `properties` / `elements`.
 - `nullable: true` adds `"null"` to the type union.
 - Auto-managed columns (`assignCreatedTime`, `assignUpdatedTime`, `expiresAt`) and computed columns are stripped from write schemas (`create_*`, `update_*`) — the server fills them in.
-- Per-attribute `attribute_permissions` narrow the schema **per requesting user**: attributes the user cannot read are stripped from `get_*` / `search_*` schemas; attributes the user cannot insert/update are stripped from `create_*` / `update_*` schemas.
+- Every remaining attribute is included. Schemas are derived **once at registration time**, with no caller permissions in scope, so `attribute_permissions` does not narrow them — the descriptor a restricted user receives is identical to a super-user's.
 
-The schema narrowing is a UX optimization, not a security boundary — runtime `Table.allowUpdate` / `Table.allowCreate` still enforces. The narrowing just avoids burning LLM tokens on fields the user couldn't write anyway.
+`attribute_permissions` is enforced when the tool runs, not when it is described: runtime `Table.allowUpdate` / `Table.allowCreate` and the per-attribute checks reject a restricted read or write regardless of what the advertised schema listed. What RBAC does filter is the tool _list_ — `tools/list` omits a Resource's verb tools unless the caller holds the matching table-level permission (`read` or `describe` for `get_*` / `search_*`, and `insert` / `update` / `delete` for the write verbs). Because the schema is caller-agnostic, treat every attribute name and `description` in it as visible to any authenticated caller who can see the tool, and use `@hidden` for anything that shouldn't be.
 
 ### Custom `mcpTools` opt-in
 
