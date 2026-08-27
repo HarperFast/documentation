@@ -189,6 +189,8 @@ Returns: `string` — Root directory of the application component (where `config
 
 #### `scope.close()`
 
+<VersionBadge type="changed" version="v5.1.3" />
+
 Closes all associated entry handlers and the `scope.options` instance, emits `'close'`, and removes all listeners. Promises returned by `'close'` listeners are awaited before it resolves.
 
 Plugins rarely call this directly. Harper calls it on each worker thread during shutdown and graceful restart — see [Cleanup on Shutdown](#cleanup-on-shutdown).
