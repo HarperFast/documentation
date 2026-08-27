@@ -7,6 +7,22 @@
 }
 
 /*
+ * Width of the right-hand gutter reserved on a badge-annotated heading, so a
+ * heading long enough to wrap can never run underneath the right-aligned
+ * badge. It has to clear the widest badge plus a visible gap.
+ *
+ * Measured in the browser, in the site's own font at the badge's 0.8rem: the
+ * widest badge currently in use, "Deprecated in: v4.2.0", is 8.02rem, and the
+ * widest string the component can produce from a plausible future version,
+ * "Deprecated in: v5.10.15", is 8.69rem. 10rem therefore keeps at least
+ * 1.3rem of clearance in every case — slightly more than the 1rem the badge
+ * already sets as its own margin-left, which is the gap the design asks for.
+ */
+:global(:root) {
+	--version-badge-gutter: 10rem;
+}
+
+/*
  * Standalone badges — the documented pattern of a badge on its own line
  * directly below the heading it annotates (CONTRIBUTING.md, "Version
  * Annotations"). From tablet width up, such a badge is lifted onto the
@@ -65,10 +81,11 @@
 
 	/*
 	 * Reserve the right-hand gutter on the annotated heading so a heading long
-	 * enough to wrap can never run underneath the badge.
+	 * enough to wrap can never run underneath the badge. See
+	 * `--version-badge-gutter` above for how the width was derived.
 	 */
 	:global(.theme-doc-markdown) > :is(h1, h2, h3, h4, h5, h6):has(+ .badge):not(:has(+ .badge + .badge)),
 	:global(.theme-doc-markdown) > header:has(+ .badge):not(:has(+ .badge + .badge)) h1 {
-		padding-right: 10rem;
+		padding-right: var(--version-badge-gutter);
 	}
 }
