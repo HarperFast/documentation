@@ -5,3 +5,87 @@
 	font-style: italic;
 	margin-bottom: 0.75rem;
 }
+
+/*
+ * Width of the right-hand gutter reserved on a badge-annotated heading, so a
+ * heading long enough to wrap can never run underneath the right-aligned
+ * badge. It has to clear the widest badge plus a visible gap.
+ *
+ * Measured in the browser, in the site's own font at the badge's 0.8rem: the
+ * widest badge currently in use, "Deprecated in: v4.2.0", is 8.02rem, and the
+ * widest string the component can produce from a plausible future version,
+ * "Deprecated in: v5.10.15", is 8.69rem. 10rem therefore keeps at least
+ * 1.3rem of clearance in every case — slightly more than the 1rem the badge
+ * already sets as its own margin-left, which is the gap the design asks for.
+ */
+:global(:root) {
+	--version-badge-gutter: 10rem;
+}
+
+/*
+ * Standalone badges — the documented pattern of a badge on its own line
+ * directly below the heading it annotates (CONTRIBUTING.md, "Version
+ * Annotations"). From tablet width up, such a badge is lifted onto the
+ * heading's own line and right-aligned, so an annotated heading costs no more
+ * vertical space than an unannotated one.
+ *
+ * The selector deliberately matches only a badge whose previous sibling is the
+ * heading itself: MDX renders a standalone <VersionBadge /> as a block-level
+ * sibling of the heading rather than wrapping it in a <p>. Inline badges inside
+ * a <p>, <li>, or table cell, and standalone badges that follow a paragraph,
+ * list, or code block, keep the original in-flow layout.
+ *
+ * `:not(:has(+ .badge))` excludes the "stabilized feature" pattern of two
+ * badges in a row: two right floats given the same negative margin overlap
+ * instead of stacking, and right-aligning the pair as a unit would need a
+ * wrapper element around them. Those keep the original in-flow layout too.
+ *
+ * A float is used rather than a negative-margin block so that the badge is out
+ * of flow — the heading's own bottom margin and the position of the following
+ * content are untouched, and nothing has to be re-derived to reclaim the line.
+ */
+@media (min-width: 768px) {
+	:global(.theme-doc-markdown) > :is(header, h1, h2, h3, h4, h5, h6) + .badge:not(:has(+ .badge)) {
+		float: right;
+		margin-top: calc(-1 * var(--version-badge-lift));
+		margin-bottom: 0;
+		margin-left: 1rem;
+	}
+
+	/*
+	 * Lift = the heading's bottom margin (1.25rem in the markdown scope) plus
+	 * its line box, less the offset that puts the badge's baseline on the
+	 * heading's baseline — so it depends on the heading's font size. A heading
+	 * long enough to wrap keeps the badge on its last line, which is where the
+	 * float lands anyway (CSS 2.1 float rule 6).
+	 */
+	:global(.theme-doc-markdown) > :is(header, h1) + .badge {
+		--version-badge-lift: 3.3rem;
+	}
+
+	:global(.theme-doc-markdown) > h2 + .badge {
+		--version-badge-lift: 2.7rem;
+	}
+
+	:global(.theme-doc-markdown) > h3 + .badge {
+		--version-badge-lift: 2.65rem;
+	}
+
+	:global(.theme-doc-markdown) > h4 + .badge {
+		--version-badge-lift: 2.55rem;
+	}
+
+	:global(.theme-doc-markdown) > :is(h5, h6) + .badge {
+		--version-badge-lift: 2.45rem;
+	}
+
+	/*
+	 * Reserve the right-hand gutter on the annotated heading so a heading long
+	 * enough to wrap can never run underneath the badge. See
+	 * `--version-badge-gutter` above for how the width was derived.
+	 */
+	:global(.theme-doc-markdown) > :is(h1, h2, h3, h4, h5, h6):has(+ .badge):not(:has(+ .badge + .badge)),
+	:global(.theme-doc-markdown) > header:has(+ .badge):not(:has(+ .badge + .badge)) h1 {
+		padding-right: var(--version-badge-gutter);
+	}
+}
