@@ -8,7 +8,7 @@ This guide shows how to author that metadata once and have it flow to both surfa
 
 ## Why descriptions matter
 
-Harper auto-generates MCP tools for every exported Resource. Without descriptions, every tool gets a generic template: `"get on resource '/Product' (table Product). Runtime RBAC enforces per-record access at call time."` An LLM picking between `get_Product`, `get_Order`, `get_Customer` sees three near-identical descriptions. Tool selection becomes guesswork.
+Harper auto-generates MCP tools for every exported Resource. Without descriptions, every tool gets a mechanical sentence and nothing else: `"Fetches a single Product record by sku. Runtime RBAC (allowRead) enforces operation access at call time."` An LLM picking between `get_Product`, `get_Order`, `get_Customer` sees three descriptions that differ only by table name. Tool selection becomes guesswork.
 
 Add a one-line docstring to your `@table @export` type and the picture changes: each tool's description includes a sentence about what the resource actually represents, and every searchable attribute has a per-attribute description the LLM can use to form queries.
 
@@ -32,7 +32,7 @@ MCP `tools/list` returns:
 ```json
 {
 	"name": "get_Product",
-	"description": "get on resource '/Product' (table Product). Runtime RBAC (allowGet) enforces per-record access at call time.",
+	"description": "Fetches a single Product record by sku. Runtime RBAC (allowRead) enforces operation access at call time.",
 	"inputSchema": {
 		"type": "object",
 		"properties": { "id": { "type": "string", "description": "Primary key (sku)." } },
@@ -76,7 +76,7 @@ MCP `tools/list` now returns:
 ```json
 {
 	"name": "get_Product",
-	"description": "Product catalog row — what shows up in the storefront listing, search, and inventory feeds. One row per SKU.\n\nFetches a single Product record by sku. Runtime RBAC (allowGet) enforces per-record access at call time.",
+	"description": "Product catalog row — what shows up in the storefront listing, search, and inventory feeds. One row per SKU.\n\nFetches a single Product record by sku. Runtime RBAC (allowRead) enforces operation access at call time.",
 	"inputSchema": {
 		"type": "object",
 		"properties": {
@@ -101,7 +101,7 @@ MCP `tools/list` now returns:
 }
 ```
 
-And `/openapi` picks up the same data: schema-level `description`, per-property `description`, and prepended path-level descriptions for every verb on `/Product`.
+And `/openapi` picks up the same data: schema-level `description`, per-property `description`, and prepended path-level descriptions for every verb on the generated paths — `/Product/` for the collection and `/Product/{sku}` for a single record. The trailing slash is load-bearing: a bare `/Product` returns the resource description rather than a record list, and is not itself a path in the document.
 
 ### `search_*` gets typed and described too
 
