@@ -387,7 +387,7 @@ Function signature for the `'all'` event handler passed to `scope.handleEntry()`
 
 Harper calls `scope.close()` on every application scope when a worker thread shuts down, which emits the [`'close'`](#events) event. This happens both when Harper is stopping and on a graceful restart — including the automatic worker restarts triggered by `harper dev` file watching and by the `restart` operation.
 
-Listen for `'close'` to release anything the plugin or application acquired at load time: background services, timers, open connections, or buffered work that needs flushing.
+Listen for `'close'` to finish work that must complete, or be acknowledged outside the process, before the thread goes away: flushing buffered writes, deregistering from an external service or registry, releasing a distributed lock or lease, or closing a connection whose remote side expects a graceful goodbye. Node tears down timers and sockets on its own when a thread exits, so purely in-process resources need no `'close'` listener.
 
 ```js
 export function handleApplication(scope) {
@@ -398,7 +398,7 @@ export function handleApplication(scope) {
 }
 ```
 
-Use `scope.once()` rather than `scope.on()` — the scope is closed once per worker lifetime, and `once` avoids leaving a listener behind if the plugin registers during a reload.
+Use `scope.once()` rather than `scope.on()` — closing is a one-time lifecycle event, so `once()` expresses that intent.
 
 Notes on the shutdown sequence:
 
