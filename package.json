@@ -19,7 +19,8 @@
 		"format:check": "npm run format -- --check",
 		"format:write": "npm run format -- --write",
 		"lint": "echo 0;",
-		"preview:pr": "node scripts/preview-pr.mjs"
+		"preview:pr": "node scripts/preview-pr.mjs",
+		"test:workflows": "node scripts/companion-check.test.mjs"
 	},
 	"devDependencies": {
 		"@docusaurus/core": "3.9.2",
@@ -33,7 +34,7 @@
 		"@docusaurus/tsconfig": "3.9.2",
 		"@docusaurus/types": "3.9.2",
 		"@easyops-cn/docusaurus-search-local": "0.52.3",
-		"@harperdb/code-guidelines": "0.0.6",
+		"@harperfast/code-guidelines": "0.1.2",
 		"@mdx-js/react": "3.1.1",
 		"@signalwire/docusaurus-plugin-llms-txt": "1.2.2",
 		"clsx": "2.1.1",
@@ -58,6 +59,6 @@
 	"engines": {
 		"node": ">=22"
 	},
-	"prettier": "@harperdb/code-guidelines/prettier",
+	"prettier": "@harperfast/code-guidelines/prettier",
 	"license": "Apache-2.0"
 }

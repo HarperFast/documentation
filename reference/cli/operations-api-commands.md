@@ -26,7 +26,7 @@ harper <operation> <parameter>=<value>
 
 <!-- Source: Harper CLI source code (SUPPORTED_OPS and OP_ALIASES arrays) -->
 
-The following operations are available through the CLI. Operations that require complex nested parameters or object structures are not supported via CLI and must be executed through the HTTP API.
+The following operations are available through the CLI. Argument values are JSON-parsed, so operations that take nested objects or arrays of objects work from the CLI as well. See [Parameter Formatting](#parameter-formatting) for how to quote them.
 
 ### Complete Operations List
 
@@ -54,24 +54,24 @@ This is just a brief overview of all operations available as CLI commands. Revie
 | `sql`                            | Execute SQL queries                   | [Data](../operations-api/operations.md#nosql-operations)               | v4.3.0          |
 | `csv_file_load`                  | Load data from CSV file               | [Data](../operations-api/operations.md#nosql-operations)               | v4.3.0          |
 | `csv_url_load`                   | Load data from CSV URL                | [Data](../operations-api/operations.md#nosql-operations)               | v4.3.0          |
-| `list_users`                     | List all users                        | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
-| `add_user`                       | Create a new user                     | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
-| `alter_user`                     | Modify user properties                | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
-| `drop_user`                      | Delete a user                         | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
-| `list_roles`                     | List all roles                        | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
-| `drop_role`                      | Delete a role                         | [Security](../operations-api/operations.md#certificate-management)     | v4.3.0          |
+| `list_users`                     | List all users                        | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
+| `add_user`                       | Create a new user                     | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
+| `alter_user`                     | Modify user properties                | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
+| `drop_user`                      | Delete a user                         | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
+| `list_roles`                     | List all roles                        | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
+| `drop_role`                      | Delete a role                         | [Users & Roles](../operations-api/operations.md#users--roles)          | v4.3.0          |
 | `create_csr`                     | Create certificate signing request    | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
 | `sign_certificate`               | Sign a certificate                    | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
 | `list_certificates`              | List SSL/TLS certificates             | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
 | `add_certificate`                | Add SSL/TLS certificate               | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
 | `remove_certificate`             | Remove SSL/TLS certificate            | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `add_ssh_key`                    | Add SSH key                           | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `get_ssh_key`                    | Get SSH key                           | [Security](../operations-api/operations.md#certificate-management)     | v4.7.2          |
-| `update_ssh_key`                 | Update SSH key                        | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `delete_ssh_key`                 | Delete SSH key                        | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `list_ssh_keys`                  | List all SSH keys                     | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `set_ssh_known_hosts`            | Set SSH known hosts                   | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
-| `get_ssh_known_hosts`            | Get SSH known hosts                   | [Security](../operations-api/operations.md#certificate-management)     | v4.4.0          |
+| `add_ssh_key`                    | Add SSH key                           | [Components](../operations-api/operations.md#components)               | v4.4.0          |
+| `get_ssh_key`                    | Get SSH key                           | [Components](../operations-api/operations.md#components)               | v4.7.2          |
+| `update_ssh_key`                 | Update SSH key                        | [Components](../operations-api/operations.md#components)               | v4.4.0          |
+| `delete_ssh_key`                 | Delete SSH key                        | [Components](../operations-api/operations.md#components)               | v4.4.0          |
+| `list_ssh_keys`                  | List all SSH keys                     | [Components](../operations-api/operations.md#components)               | v4.4.0          |
+| `set_ssh_known_hosts`            | Set SSH known hosts                   | [Components](../operations-api/operations.md#components)               | v4.4.0          |
+| `get_ssh_known_hosts`            | Get SSH known hosts                   | [Components](../operations-api/operations.md#components)               | v4.4.0          |
 | `cluster_get_routes`             | Get cluster routing information       | [Clustering](../operations-api/operations.md#replication--clustering)  | v4.3.0          |
 | `cluster_network`                | Get cluster network status            | [Clustering](../operations-api/operations.md#replication--clustering)  | v4.3.0          |
 | `cluster_status`                 | Get cluster status                    | [Clustering](../operations-api/operations.md#replication--clustering)  | v4.3.0          |
@@ -97,6 +97,13 @@ This is just a brief overview of all operations available as CLI commands. Revie
 | `get_fingerprint`                | Get instance fingerprint              | [Licensing](../operations-api/operations.md#registration--licensing)   | v4.3.0          |
 | `set_license`                    | Set license key                       | [Licensing](../operations-api/operations.md#registration--licensing)   | v4.3.0          |
 | `get_usage_licenses`             | Get usage and license info            | [Licensing](../operations-api/operations.md#registration--licensing)   | v4.7.3          |
+| `create_backup`                  | Create a managed database backup      | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `list_backups`                   | List managed backups                  | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `verify_backup`                  | Verify a managed backup's integrity   | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `delete_backup`                  | Delete a managed backup               | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `purge_backups`                  | Delete all but the newest backups     | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `restore_backup`                 | Restore a database from a backup      | [Backups](../backups/operations.md)                                    | v5.2.0          |
+| `get_backup`                     | Download a full database snapshot     | [Backups](../backups/operations.md)                                    | v5.2.0          |
 | `get_job`                        | Get job status                        | [Jobs](../operations-api/operations.md#jobs)                           | v4.3.0          |
 | `search_jobs_by_start_date`      | Search jobs by start date             | [Jobs](../operations-api/operations.md#jobs)                           | v4.3.0          |
 | `read_log`                       | Read application logs                 | [Logging](../operations-api/operations.md#logs)                        | v4.3.0          |
@@ -197,7 +204,7 @@ For comprehensive configuration options, see the [Configuration Reference](../co
 **Deploy a component**:
 
 ```bash
-harper deploy_component project=my-cool-app package=https://github.com/HarperDB/application-template
+harper deploy_component project=my-cool-app package=https://github.com/HarperFast/application-template
 ```
 
 **Get all components**:
@@ -275,6 +282,10 @@ For more information on Harper applications and components, see:
 
 ## Parameter Formatting
 
+Every argument is split on the first `=` and the value is parsed as JSON. If the value is not valid JSON, it is passed through unchanged as a string. That single rule covers all of the parameter types below: `database=dev` fails to parse and stays the string `"dev"`, `json=true` parses to the boolean `true`, and `ids='["1","2"]'` parses to an array.
+
+The one exception is `ref` (used by deploy-by-reference), which is always taken as a raw string so that a numeric-looking git tag such as `ref=1.0` is not rewritten into the number `1`.
+
 ### String Parameters
 
 Simple string values can be passed directly:
@@ -293,10 +304,24 @@ harper search_by_id database=dev table=dog ids='["1","2","3"]'
 
 ### Object Parameters
 
-Object parameters are not supported via CLI. For operations requiring complex nested objects, use:
+Objects and arrays of objects are supported. Pass them as single-quoted JSON:
 
-- The [Operations API](../operations-api/overview.md) via HTTP
-- A custom script or tool
+```bash
+harper deploy_component project=my-app package=npm:@my-org/my-app@1.2.3 \
+  credentials='[{"registry":"registry.my-org.com","secret":"deploy.my-app.registry.my-org.com"}]'
+```
+
+`harper deploy setup=true` prints exactly this `credentials='[...]'` form as the command to run after it seals a registry or git token, so an array-of-objects argument is the normal path for private-package deploys rather than an edge case.
+
+Quoting rules:
+
+- Wrap the JSON in **single** quotes. Double quotes let the shell expand `$`, backticks, and history references inside the value; single quotes pass the JSON through intact.
+- The whole `key=value` pair is one shell argument, so no unescaped spaces outside the quotes. Compact JSON with no spaces after `:` and `,` avoids the problem entirely.
+- To embed a literal single quote inside the JSON, end the quoted run, escape it, and reopen: `'{"name":"O'\''Brien"}'`.
+
+:::warning
+Command-line arguments are not private. Anything you type appears in shell history, in process listings (`ps`), and in CI job logs. Prefer a stored secret reference (the `secret` field above) or an environment variable over inlining a plaintext token in an argument.
+:::
 
 ### Boolean Parameters
 
@@ -362,14 +387,13 @@ harper get_components \
 
 ## Limitations
 
-The following operation types are **not supported** via CLI:
+Nested objects and arrays of objects are **not** a limitation; see [Object Parameters](#object-parameters). The real constraints are about what an argument value can carry:
 
-- Operations requiring complex nested JSON structures
-- Operations with array-of-objects parameters
-- File upload operations
-- Streaming operations
+- **Raw binary bodies.** An argument value is text, so an operation whose request body is raw binary has no general CLI form. The two that need one have dedicated handling: `deploy_component` packages and uploads the current directory when `package` is omitted, and `get_backup` streams the snapshot to a file. Any other binary payload has to go over HTTP.
+- **Large payloads.** There is no way to feed an argument value from stdin or a file, and the operating system caps total argument length. Bulk data such as an inline `csv_data_load` is better sent over HTTP.
+- **Secrets on the command line.** Arguments are visible in shell history, `ps` output, and CI logs. Use a stored secret reference or an environment variable instead of an inline token.
 
-For these operations, use the [Operations API](../operations-api/overview.md) directly via HTTP.
+For these cases, use the [Operations API](../operations-api/overview.md) directly via HTTP.
 
 ## See Also
 

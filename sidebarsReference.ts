@@ -125,6 +125,11 @@ const sidebars: SidebarsConfig = {
 					id: 'models/analytics',
 					label: 'Analytics',
 				},
+				{
+					type: 'doc',
+					id: 'models/local-development',
+					label: 'Local Development',
+				},
 			],
 		},
 		{
@@ -157,6 +162,11 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'components/javascript-environment',
 					label: 'JavaScript Environment',
+				},
+				{
+					type: 'doc',
+					id: 'components/scheduler',
+					label: 'Scheduler',
 				},
 				{
 					type: 'doc',
@@ -292,6 +302,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'security/response-headers',
+					label: 'Response Header Hardening',
+				},
+				{
+					type: 'doc',
 					id: 'security/basic-authentication',
 					label: 'Basic Authentication',
 				},
@@ -324,6 +339,34 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'security/impersonation',
 					label: 'Impersonation',
+				},
+				{
+					type: 'doc',
+					id: 'security/secrets',
+					label: 'Secrets',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Web Application Firewall',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'web-application-firewall/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'web-application-firewall/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'web-application-firewall/operations',
+					label: 'Operations & Rule Schema',
 				},
 			],
 		},
@@ -426,6 +469,24 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'operations-api/sql',
 					label: 'SQL',
+				},
+			],
+		},
+		{
+			type: 'category',
+			label: 'Backups',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'backups/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'backups/operations',
+					label: 'Operations',
 				},
 			],
 		},

@@ -15,7 +15,7 @@ All clustering operations require `super_user` role.
 
 ### Add Node
 
-Adds a new Harper instance to the cluster. If `subscriptions` are provided, it creates the specified replication relationships between the nodes. Without `subscriptions`, a fully replicating system is created (all data in all databases).
+Adds a new Harper instance to the cluster. If `subscriptions` are provided, it creates the specified replication relationships between the nodes. Without `subscriptions` or `sendsTo` / `receivesFrom`, a fully replicating system is created (all data in all databases). `sendsTo` / `receivesFrom` instead scope controlled-flow replication to the databases they name.
 
 **Parameters**:
 
@@ -32,6 +32,11 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
   - `table` — table name
   - `subscribe` — if `true`, transactions on the remote table are replicated locally
   - `publish` — if `true`, transactions on the local table are replicated to the remote node
+- `sendsTo` / `receivesFrom` _(optional)_ <VersionBadge version="v5.1.0" /> <VersionBadge type="changed" version="v5.2.0" /> — database-scoped controlled-flow entries for this node (see [Controlling Replication Flow](./overview.md#controlling-replication-flow)). Each entry is an object `{ database?, excludeTables? }`, or (less usefully) a bare string naming a peer, intended to authorize all databases for that peer rather than match a database name. An entry can also carry a `target` (on `sendsTo`) or `source` (on `receivesFrom`) naming the one peer it applies to; an entry with neither matches any peer. **Only the peer-agnostic object form — `{ database?, excludeTables? }`, with no `target`/`source` — is reliable today.** Harper's reciprocal `add_node_back` registration to the added peer carries the array over without rewriting each entry's peer reference for the new direction, so a bare string or a `target`/`source` value that's correct for your side of the connection ends up wrong on the peer's copy, and the peer's send-authority check silently rejects the subscription — replication doesn't happen ([harper-pro#710 - `add_node_back` does not rewrite peer-qualified `sendsTo`/`receivesFrom` entries](https://github.com/HarperFast/harper-pro/issues/710)). Use [config routes](./overview.md#controlling-replication-flow) for anything that needs to be scoped to one peer. Unlike a config route's `replicates.sendsTo` / `replicates.receivesFrom`, which describes the _local_ node's own direction, these describe the **added node's** perspective: `sendsTo` lists what the added node sends (what this node receives from it), and `receivesFrom` lists what the added node receives (what this node sends to it). If both `subscriptions` and `sendsTo`/`receivesFrom` are provided, `subscriptions` takes precedence and `sendsTo`/`receivesFrom` are ignored. To replicate all databases while excluding specific tables, use a wildcard entry (`excludeTables` with no `database`).
+
+  > **Note**: Because these entries aren't scoped to one peer, the resulting `hdb_nodes` record for the added node isn't restricted to the connection that created it — any other node that also holds the listed database(s) can match against it too. This also doesn't change how the local node advertises itself to the rest of the cluster: a node's own directional (non-mesh) `hdb_nodes` self-record is derived solely from its `harper-config.yaml` routes, so replicating `system` without collapsing to a full mesh requires directional routes in config, not just `add_node`/`set_node` scoping (see [Replicating the `system` database with controlled flow](./overview.md#replicating-the-system-database-with-controlled-flow)). Nor is the scoping durable: each node rewrites its own `hdb_nodes` row from its `harper-config.yaml` routes when it restarts or reloads components, and that row replicates, so directional entries an `add_node` call wrote onto the added node's row are superseded — a node with no directional routes goes back to advertising the legacy full-mesh record. Use config routes for any constraint that has to survive a restart or a `deploy_component` reload.
+
+  > **Changed in v5.2**: these parameters have been accepted since v5.1.0, but they only gate replication as described above from v5.2 on. Before v5.2, `add_node` wrote a blanket "sends everything" flag onto the added node's registry record alongside the entries, which authorized this node to receive every database from that node and left `sendsTo`'s `database` scoping inert; in the other direction, the send-authority check honored a `receivesFrom` entry only when it named both this node and the database, so the peer-agnostic object form recommended above did not authorize sending. As of v5.2 the blanket flag is gone — replication from the added node is limited to the databases its `sendsTo` entries name — and an entry that omits the peer or the database is treated as a wildcard by both checks. If you already call `add_node` / `set_node` with `sendsTo` / `receivesFrom`, re-check that scoping before upgrading — it can change in either direction. Databases that were replicating only because of the blanket flag stop replicating on v5.2; conversely, a peer-agnostic `receivesFrom` entry that v5.1's send check ignored becomes an active wildcard on v5.2, so it newly authorizes any peer that subscribes for the database it names.
 
 **Request**:
 
@@ -46,6 +51,19 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
 	}
 }
 ```
+
+**Request** (controlled flow, scoped per database):
+
+```json
+{
+	"operation": "add_node",
+	"hostname": "server-two",
+	"sendsTo": [{ "database": "cardata", "excludeTables": ["raw_telemetry"] }],
+	"receivesFrom": [{ "database": "config" }, { "database": "system" }]
+}
+```
+
+Read from the added node's perspective: `server-two` sends `cardata` (except `raw_telemetry`) to this node, and receives `config` and `system` from it.
 
 **Response**:
 

@@ -23,7 +23,21 @@ Resource classes have static methods that directly map to RESTful methods or HTT
 
 ## Resource Static Methods
 
-Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. They handle transaction setup, access checks, and request parsing automatically. These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
+Static methods are defined on a Resource class and are the preferred way to interact with tables and resources from application code. When invoked through an external request path, they handle transaction setup, access checks, and request parsing automatically. Direct calls from server-side code run in a trusted context and do not automatically apply the caller's role permissions; see [Server-side table reads](../components/javascript-environment.md#tables). These methods also map to RESTful HTTP verbs and can be overridden to define custom behavior for requests.
+
+### `static loadAsInstance?: boolean`
+
+> **New v5 code does not need this flag.** It is a v4-era compatibility flag that selects between two behavioral modes for a resource's **instance** methods. It has no effect on a static method you define yourself.
+>
+> When you override a static verb (`static get`, `static post`, …), your method _replaces_ Harper's built-in dispatch — including the code that reads `loadAsInstance`. Your static method always receives `(target, data)`, so the flag is irrelevant to it. This is a large part of why static methods are the recommended shape for custom endpoints: they sidestep the flag entirely.
+>
+> The flag does still apply in v5 to the legacy pattern of defining REST-mirroring **instance** verbs (instance `get`, `put`, `patch`, `post`, `delete`, `publish`, `search`), where it selects the argument order those methods receive and whether the record is preloaded onto the instance. Because that behavior is live rather than inert, **`static loadAsInstance = false;` cannot simply be deleted** from an existing resource — dropping the line reverses the argument order for those instance methods and will break them. Remove it only as part of converting them to static methods.
+>
+> The two modes are documented in full in the v4 reference — see [API Versions](../../reference_versioned_docs/version-v4/resources/resource-api.md#api-versions).
+>
+> For new code, prefer static methods and omit the flag. Reserve instance methods for record mutation via `update()` and for `validate()` — see [Resource Instance Methods](#resource-instance-methods).
+
+---
 
 ### `get(target: RequestTarget | Id | Query, context?: Resource | Context): Promise<object> | ExtendedIterable`
 
@@ -230,6 +244,8 @@ All properties are optional:
 | `startTime`          | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
 | `previousCount`      | Return the last N updates/messages. Cannot be used with `startTime`.                           |
 | `omitCurrent`        | Do not send the current/retained record as the first update.                                   |
+| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                          |
+| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.           |
 
 ---
 
@@ -446,6 +462,14 @@ class BlogSource extends Resource {
 Post.sourcedFrom(BlogSource);
 ```
 
+#### Read consistency across databases
+
+A resolver's reads are snapshot-consistent as long as every table it reads lives in the same [database](../database/overview.md#databases) — Harper pins a single transaction snapshot per database, so multiple `get()` calls into tables in that database always see the same point-in-time view, no matter how the resolver interleaves them.
+
+That snapshot is scoped per database. If a resolver reads from one database, `await`s something (an upstream fetch, another async call), and then reads from a second database, the second read is not guaranteed to reflect the same point in time as the first — it can observe writes that landed on the second database during the `await`.
+
+> **Note:** If a `sourcedFrom` resolver must assemble a self-consistent view from multiple tables, keep all of those tables in a single database. If it must span multiple databases, do not assume the combined result is atomic — design for skew between the sources instead.
+
 ---
 
 ### `getUpdatedTime(): number`
@@ -506,7 +530,7 @@ export class ProductInventory extends Resource {
 		'Aggregate inventory analytics computed over the Product catalog. ' +
 		'Read-only; the underlying Product table is the system of record.';
 
-	async get(id) {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -530,7 +554,7 @@ export class ProductInventory extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -558,7 +582,19 @@ The author writes against `properties` (the public API). Internal code that need
 
 ### `static outputSchemas?: { [verb: string]: JsonSchemaFragment }`
 
-Per-verb output schema overrides for programmatic Resources whose verb methods return a projection rather than the full record. When omitted, the MCP deriver falls back to `static properties` for the cheap verbs (`get`/`create`/`update`/`patch`) and a synthesized `{deleted: true, <pk>}` envelope for `delete`. `search_*` deliberately has no output schema.
+Per-verb output schema overrides for programmatic Resources whose verb methods return a projection rather than the full record. Only `get_*` derives a record-shaped output schema; the write verbs advertise fixed envelopes that do not vary with the record shape:
+
+| Verb                  | Output schema when no override is supplied                                        |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `get_*`               | The record shape, derived from the Resource's attributes                          |
+| `create_*`            | `{ id }` — the new record's primary key, typed by the primary-key attribute       |
+| `update_*`, `patch_*` | `{ ok }` — a boolean acknowledgement (`Table.put` / `Table.patch` return nothing) |
+| `delete_*`            | `{ deleted }` — a boolean; it does not carry the primary key                      |
+| `search_*`            | None. `search_*` deliberately registers no `outputSchema`                         |
+
+So `static outputSchemas` is the only way to describe what a write verb actually returns. `outputSchemas.search` is not read at all — a `search` entry has no effect on `tools/list`.
+
+A programmatic Resource that declares no attributes gets an empty record schema on `get_*`, because the derivation reads the internal `attributes` Array rather than `static properties` ([harper#1923](https://github.com/HarperFast/harper/issues/1923)). Until that is resolved, describe such a Resource's `get_*` result with `static outputSchemas.get`.
 
 ```typescript
 export class ProductInventory extends Resource {
@@ -579,7 +615,7 @@ export class ProductInventory extends Resource {
 		},
 	};
 
-	async get(id) {
+	static async get(target) {
 		/* returns the projection above */
 	}
 }
@@ -592,7 +628,7 @@ When `true`, the Resource is dropped from MCP tool registration and OpenAPI path
 ```typescript
 export class InternalDiagnostics extends Resource {
 	static hidden = true;
-	async get() {
+	static async get(target) {
 		/* ... */
 	}
 }
@@ -845,6 +881,8 @@ The following instances are also implemented on Resource instances for [backward
 - `create`
 - `subscribe`
 
+The arguments these instance methods receive depend on [`static loadAsInstance`](#static-loadasinstance-boolean). Overriding the equivalent static method avoids that dependency entirely and is preferred for new code.
+
 ## Concurrency and Safe Concurrent Writes
 
 When multiple writers may touch the same record concurrently, only atomic deltas are safe. Harper resolves deltas at commit time, so the committed result is exact regardless of how the writers interleave:
@@ -1072,7 +1110,8 @@ Properties:
 - `search` — The query/search string portion of the URL
 - `id` — Primary key derived from the path
 - `isCollection` — `true` when the request targets a collection
-- `checkPermission` — Set to indicate authorization should be performed; has `action`, `resource`, and `user` sub-properties
+- `rowFilter` — Synchronous JavaScript predicate applied to candidate records during search. It cannot be set by REST or QUERY request data.
+- `checkPermission` — Framework-owned, one-shot request to run legacy operation authorization. Harper arms it for permission-checked dispatches. Trusted server-side code making a subsequent direct Resource call may set it to `true`, causing built-in table gates to derive permissions from `context.user`. Never accept or copy this field or a permission object from client data.
 
 Standard `URLSearchParams` methods are available:
 

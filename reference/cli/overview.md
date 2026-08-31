@@ -95,21 +95,22 @@ kill -0 $(cat /path/to/hdb/hdb.pid)  # Check if process is running
 
 ## System Management Commands
 
-| Command                            | Description                                                  | Available Since |
-| ---------------------------------- | ------------------------------------------------------------ | --------------- |
-| `harper`                           | Run Harper in foreground mode (default behavior)             | v4.1.0          |
-| `harper run <path/to/app>`         | Run Harper application from any directory                    | v4.2.0          |
-| `harper dev <path/to/app>`         | Run Harper in dev mode with auto-restart and console logging | v4.2.0          |
-| `harper restart`                   | Restart Harper                                               | v4.1.0          |
-| `harper start`                     | Start Harper in background (daemon mode)                     | v4.1.0          |
-| `harper stop`                      | Stop a running Harper instance                               | v4.1.0          |
-| `harper login`                     | Log in to a Harper instance                                  | v5.0.0          |
-| `harper logout`                    | Log out of a Harper instance                                 | v5.0.0          |
-| `harper status`                    | Display Harper and clustering status                         | v4.1.0          |
-| `harper version`                   | Show installed Harper version                                | v4.1.0          |
-| `harper renew-certs`               | Renew Harper-generated self-signed certificates              | v4.1.0          |
-| `harper copy-db <source> <target>` | Copy a database with compaction                              | v4.1.0          |
-| `harper help`                      | Display all available CLI commands                           | v4.1.0          |
+| Command                            | Description                                                     | Available Since |
+| ---------------------------------- | --------------------------------------------------------------- | --------------- |
+| `harper`                           | Run Harper in foreground mode (default behavior)                | v4.1.0          |
+| `harper run <path/to/app>`         | Run Harper application from any directory                       | v4.2.0          |
+| `harper dev <path/to/app>`         | Run Harper in dev mode with auto-restart and console logging    | v4.2.0          |
+| `harper deploy`                    | Package and deploy the current directory or a package reference | v4.3.0          |
+| `harper restart`                   | Restart Harper                                                  | v4.1.0          |
+| `harper start`                     | Start Harper in background (daemon mode)                        | v4.1.0          |
+| `harper stop`                      | Stop a running Harper instance                                  | v4.1.0          |
+| `harper login`                     | Log in to a Harper instance                                     | v5.0.0          |
+| `harper logout`                    | Log out of a Harper instance                                    | v5.0.0          |
+| `harper status`                    | Display Harper and clustering status                            | v4.1.0          |
+| `harper version`                   | Show installed Harper version                                   | v4.1.0          |
+| `harper renew-certs`               | Renew Harper-generated self-signed certificates                 | v4.1.0          |
+| `harper copy-db <source> <target>` | Copy a database with compaction                                 | v4.1.0          |
+| `harper help`                      | Display all available CLI commands                              | v4.1.0          |
 
 See [CLI Commands](./commands.md) for detailed documentation on each command.
 
@@ -153,13 +154,20 @@ See [Operations API Commands](./operations-api-commands.md) for the complete lis
 
 The CLI can execute operations on remote Harper instances by passing the `target` parameter with the HTTP address of the remote instance.
 
-**Authentication**: Provide credentials via:
+### Authentication
 
+<VersionBadge type="changed" version="v5.2.0" />
+
+Provide credentials via:
+
+- **Dedicated authentication parameters**: Use `auth_username=<user> auth_password=<pass>` for one-off commands
+- **Target URL credentials**: Embed a complete username and password in the URL (supported, but not recommended because URLs are easily exposed)
+- **Environment variables and `.env` files**: Use `HARPER_CLI_TARGET` with `HARPER_CLI_USERNAME` and `HARPER_CLI_PASSWORD` (project-specific configuration)
+- **Token credentials**: `HARPER_CLI_REFRESH_TOKEN`, provisioned with [`harper login --for-ci`](./authentication.md#token-credentials-for-cicd) (recommended for CI/CD)
 - **Persistent Login**: `harper login` to store tokens (recommended for local development)
-- **Environment variables and `.env` files**: Use `HARPER_CLI_TARGET`, `HARPER_CLI_USERNAME`, and `HARPER_CLI_PASSWORD` (recommended for CI/CD and project-specific configuration)
-- **Parameters**: `username=<user> password=<pass>`
+- **Legacy parameters**: `username=<user> password=<pass>` remain a fallback when no higher-priority authentication source is available
 
-See [CLI Authentication](./authentication.md) for detailed information on authentication methods and best practices.
+This list is abbreviated and is **not** in precedence order. See [Authentication Precedence](./authentication.md#authentication-precedence) for the resolution order, which changed in v5.2.0, and for the preferred and legacy environment-variable namespaces. Configure one style per context rather than combining them.
 
 **Example: Persistent Login and `.env`**:
 
@@ -183,7 +191,7 @@ harper describe_database database=dev target=https://server.com:9925
 **Example: CLI Options**:
 
 ```bash
-harper describe_database database=dev target=https://server.com:9925 username=HDB_ADMIN password=password
+harper describe_database database=dev target=https://server.com:9925 auth_username=HDB_ADMIN auth_password="$ADMIN_PASSWORD"
 ```
 
 ## Development Mode

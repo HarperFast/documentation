@@ -11,7 +11,7 @@ Harper implements the [Model Context Protocol](https://modelcontextprotocol.io) 
 ## What MCP gives you
 
 - **Tool discovery and invocation.** LLM hosts get a typed list of operations they can call (`tools/list`) and a uniform JSON-RPC invocation envelope (`tools/call`). Per-tool input schemas come from Harper's operation catalog (operations profile) or from your `Table.attributes` and exported `Resource` classes (application profile).
-- **Resource exposure.** Synthetic `harper://` URIs surface metadata (server info, OpenAPI document, table schemas, operations catalog), and `https://` URIs mirror your application's REST surface so hosts can resolve real REST endpoints in-process.
+- **Resource exposure.** Synthetic `harper://` URIs surface metadata (server info, OpenAPI document, table schemas, operations catalog), and `harper+rest://` URIs mirror your application's REST surface so hosts can resolve real REST endpoints in-process. Components can also publish their own content under author-chosen URIs with a static `mcpResources` array.
 - **Server-push notifications.** `notifications/tools/list_changed` and `notifications/resources/list_changed` fire over an open Server-Sent Events channel when role mutations or schema changes alter what a session can see.
 - **Resource subscriptions.** <VersionBadge version="v5.1.10" /> Subscribe to a row-backed application resource with `resources/subscribe` and receive a `notifications/resources/updated` push whenever that record (or table) changes, driven by Harper's audit-log change feed. See [Resource Subscriptions](./subscriptions.md).
 - **Resumable notification streams.** <VersionBadge version="v5.1.10" /> A dropped GET-SSE connection can reconnect with a `Last-Event-ID` header and replay the notifications it missed from a bounded per-session buffer, so a brief network blip doesn't lose `list_changed` / `resources/updated` events. See [Resource Subscriptions](./subscriptions.md#resuming-a-dropped-stream).
@@ -46,7 +46,7 @@ Wraps Harper's operation catalog (the same set of operations the REST `/operatio
 Walks your application's exported `Resource` classes and generates one MCP tool per implemented REST verb. Mounts on the **application HTTP server** (the same listener that serves your REST endpoints).
 
 - For each exported Resource, Harper emits `get_<name>`, `search_<name>`, `create_<name>`, `update_<name>`, and `delete_<name>` tools when the corresponding verb is implemented on the prototype.
-- Input schemas are derived from `Table.attributes` and narrowed by your role's `attribute_permissions`.
+- Input schemas are derived from `Table.attributes`. They are built once at registration time and are identical for every caller — `attribute_permissions` is enforced when the tool runs, not reflected in the advertised schema. What RBAC filters is the tool _list_: `tools/list` omits a Resource's verb tools unless the caller holds the matching table-level permission.
 - Components can opt non-verb instance methods into the MCP surface by declaring a static `mcpTools` array on the Resource class.
 - A Resource is excluded from the MCP surface when its registration sets `exportTypes.mcp = false`.
 
