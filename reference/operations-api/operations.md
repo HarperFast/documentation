@@ -844,6 +844,7 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | --------------------------- | ----------------------------------------------------------------------- | ------------- |
 | `add_component`             | Creates a new component project from a template                         | super_user    |
 | `deploy_component`          | Deploys a component via payload (tar) or package reference (NPM/GitHub) | super_user    |
+| `revert_component`          | Puts a component's retained previous version back in service            | super_user    |
 | `package_component`         | Packages a component project into a base64-encoded tar                  | super_user    |
 | `drop_component`            | Deletes a component or a file within a component                        | super_user    |
 | `get_components`            | Lists all component files and config                                    | super_user    |
@@ -863,18 +864,69 @@ Detailed documentation: [Components Overview](../components/overview.md)
 
 ### `deploy_component`
 
+<VersionBadge type="changed" version="v5.3.0" />
+
 Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
+
+Across a cluster, `deploy_component` runs in two phases separated by an **all-nodes staging barrier**:
+
+1. **Stage** — the incoming version is downloaded/packed, extracted, and `npm install`ed into a hidden staging directory on **every** node, without touching the live component.
+2. **Activate** — only after every node reports a successful stage does any node atomically swap the staged copy into the live path.
+
+The barrier is what the two phases buy you: if a node can't fetch the package or fails `npm install`, it fails during staging and the live component is left untouched on **every** node, rather than leaving part of the cluster half-updated. That is the class of failure — by far the most common one — that a two-phase deploy eliminates.
+
+It is not, however, all-or-nothing at go-live. Activation still happens per node, so a swap that fails on one node after others have already gone live leaves the cluster running mixed versions until you resolve it, and there is deliberately no automatic rollback — see [activation failures](#activation-failures) below. The request and response shape are unchanged; the two phases are internal.
+
+:::note
+Two-phase deploy requires operation replication **and** replication of the `system` database, because the staging barrier is coordinated through a replicated deployment row.
+
+A deploy on a cluster where `system` is excluded from replication silently takes the legacy one-shot path instead: no staging barrier, and no retained previous version for [`revert_component`](#revert_component) to roll back to. The staged-phase parameters are not silently downgraded that way — `activate: false` and `deployment_id` are **rejected** with an explanatory error rather than going live unexpectedly, as is `two_phase: true` itself.
+:::
+
+:::note
+Deploying a **brand-new** component without a restart (`"restart": false`, or omitting `restart`) marks a restart as required — `get_status` reports `restartRequired: true`, and requests to the new component's routes return an actionable 404 explaining that a restart is needed. A never-loaded component can't serve its routes until Harper restarts, so this makes that state visible instead of silent. Each node reports this for itself, since whether the component was already active can differ per node. Redeploying a component that is **already** live does not set the flag: that component's own file watcher requests a restart only if the update actually needs one.
+:::
 
 Additional parameters:
 
 - `urlPath` — the HTTP URL path the component is mounted at (e.g. `"/api/v2"`). Must not contain `..` or `.` path segments. Persisted on the component's root-config entry; see [HTTP middleware routing](../http/overview.md#middleware-routing).
 - `host` <VersionBadge version="v5.2.0" /> — the virtual hostname the component is served on (e.g. `"api.example.com"`). Must be a bare hostname or IPv6 literal — no scheme, port, path, or brackets. Persisted alongside `urlPath`.
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
+- `activate` — set to `false` to **stage only** and stop before go-live. The build is prepared and verified on every node and the response returns a `deployment_id` in a `staged` state; nothing goes live. Activate it later by calling `deploy_component` again with that `deployment_id` (see below). Useful for pre-staging a release and flipping it live in a separate, fast step.
+- `deployment_id` — activate a previously-staged deployment (from an `activate: false` call). Normally nothing is re-fetched or re-installed: the build staged earlier is swapped live cluster-wide. If a node's staged tree is missing or incomplete by then — a restart or disk repair between staging and activation — that node re-sources the payload and rebuilds before swapping, so activation can take noticeably longer there and can fail on a package whose source or credential is no longer reachable. `project` is still required. For a `package` deploy you do not need to repeat `package` here: the identifier and credential references recorded when it was staged are recovered from the deployment and persisted to root config at activation, on every node — so a later restart or a newly joined peer reinstalls the version you activated.
+- `ignore_replication_errors` — treat replication/peer failures as non-fatal (best-effort deploy to a partially-available cluster). This also opts out of the stage barrier. Applies to both a full deploy and a `deployment_id` activate.
+- `deployment_timeout` — per-deploy budget (ms) for peers to receive the replicated deployment row; defaults to 120000.
+- `two_phase` — set to `false` to force the legacy single-phase (in-place) deploy instead of stage-then-activate.
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
 - `deployment_timeout` <VersionBadge version="v5.1.4" /> — how long, in milliseconds, a peer waits to receive the replicated deployment payload before failing (default: `120000`)
 - `ignore_replication_errors` <VersionBadge version="v5.1.4" /> — set to `true` to treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. By default a failed peer causes `deploy_component` to return a non-2xx status; the component is still deployed (and, if requested, restarted) on the origin node.
 
 `urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
+
+#### Deploy modes
+
+`activate`, `deployment_id`, `two_phase`, and `replicated` are not independent knobs — a request that asks for a staged phase without the machinery to support it is rejected rather than quietly doing something else. The valid combinations:
+
+| Request                                                                                                        | Result                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| No mode parameters, `system` replicated                                                                        | Two-phase stage → barrier → activate                                                    |
+| No mode parameters, `system` **not** replicated                                                                | Legacy one-shot deploy, no retained previous version                                    |
+| `two_phase: false`                                                                                             | Legacy one-shot deploy, no retained previous version                                    |
+| `replicated: false`                                                                                            | Legacy one-shot deploy on this node only, no retained previous version                  |
+| `ignore_replication_errors: true`                                                                              | Stage barrier **not enforced** — a node that fails to stage no longer blocks activation |
+| `activate: false`                                                                                              | Stage only; returns a `staged` `deployment_id`                                          |
+| `deployment_id`                                                                                                | Activate that staged deployment cluster-wide                                            |
+| `activate: false` or `deployment_id`, with `two_phase: false`, `replicated: false`, or `system` not replicated | **Rejected**                                                                            |
+| `two_phase: true` with `replicated: false` or `system` not replicated                                          | **Rejected**                                                                            |
+| `revert_on_failure` (any value)                                                                                | **Rejected** — see [activation failures](#activation-failures)                          |
+
+`revert_on_failure` was part of an earlier draft of this operation and is now refused outright rather than accepted and ignored, so a caller that was relying on it finds out.
+
+#### Activation failures
+
+If the activate phase fails on some nodes after others have already gone live, the deploy reports the split nodes and the deployment stays in an `activating` state rather than being rolled back automatically. Recover by rolling forward (stage and activate a known-good version) or by rolling back explicitly with [`revert_component`](#revert_component).
+
+There is deliberately no automatic rollback. Once a node is past the activation barrier, a peer reporting failure does not prove that peer did not activate — it can complete its swap and then fail, or die before replying — so automatically reverting "the failed nodes" risks rolling an untouched node an extra version back and leaving the cluster split three ways instead of converging it. A human deciding to roll forward or back is the only step that reliably converges the cluster.
 
 #### Deploy credentials (`credentials`)
 
@@ -924,7 +976,7 @@ Private git repository (token resolved from an existing secret):
 `credentials` replaces the earlier `registryAuth` field (renamed while the feature was in alpha, before it grew to carry git-host credentials). `registryAuth` is now rejected with an error directing you to `credentials`.
 :::
 
-The response includes a `deployment_id` that can be used to query the deployment record:
+A normal deploy (stage + activate):
 
 ```json
 {
@@ -936,31 +988,113 @@ The response includes a `deployment_id` that can be used to query the deployment
 }
 ```
 
-Response:
+Response — a rolling restart is driven by a separate replicated job, so its id comes back as `restartJobId`:
 
 ```json
 {
 	"deployment_id": "a3f8c2d1...",
-	"message": "Component deployed successfully"
+	"restartJobId": "b7d41e09...",
+	"message": "Successfully deployed: my-app, restarting Harper"
 }
 ```
 
+Without a restart (`"restart": false`, or omitted) the response carries no `restartJobId` and the message is just `Successfully deployed: my-app`.
+
+Stage now, activate later:
+
+**Stage request** (`activate: false`):
+
+```json
+{ "operation": "deploy_component", "project": "my-app", "package": "my-org/my-app#semver:v1.2.3", "activate": false }
+```
+
+**Stage response** (nothing is live yet; note the `staged` marker and the `deployment_id`):
+
+```json
+{ "deployment_id": "a3f8c2d1...", "project": "my-app", "staged": true, "message": "Staged component: my-app" }
+```
+
+**Activation request** (take the staged build live by passing its `deployment_id`):
+
+```json
+{ "operation": "deploy_component", "project": "my-app", "deployment_id": "a3f8c2d1...", "restart": "rolling" }
+```
+
+### `revert_component`
+
+<VersionBadge version="v5.3.0" />
+
+Puts a component's **retained previous version** back in service across the cluster. This is a fast rollback that resolves no package, decrypts no secret, downloads no artifact and runs no install — every node already has the bytes, and the swap is a single atomic directory rename per node.
+
+This is the rollback for the bad release you just shipped: deploy a new version, run your own health checks against it, and put the old one back if you are not happy — even when the cluster otherwise looks healthy.
+
+:::caution
+**Only a two-phase activation retains a previous version.** The retained copy is created by the activate phase, so `revert_component` can only roll back to a version that went live that way.
+
+A version deployed with `two_phase: false`, or deployed on a cluster where the `system` database is excluded from replication, leaves nothing to revert to — and the call fails, no matter how many times that component has been deployed. If rollback matters, confirm the deploy took the two-phase path rather than assuming repeated deploys have built up a rollback target.
+:::
+
+`to_deployment_id` is **required**, and names the deployment you expect to be live once the call returns:
+
+```json
+{
+	"operation": "revert_component",
+	"project": "my-app",
+	"to_deployment_id": "a3f8c2d1-...",
+	"restart": "rolling"
+}
+```
+
+Naming the target is what makes the operation safe to retry. If that version is **already live**, the call succeeds without changing anything — so a client that loses the response and retries cannot flip the rejected release back in. If it matches the retained previous version, the swap happens and the version it displaced becomes the new retained previous, so an explicitly targeted revert of a revert rolls forward again.
+
+| Parameter                   | Description                                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project`                   | **Required.** The component to revert.                                                                                                          |
+| `to_deployment_id`          | **Required.** The deployment you expect to be live afterwards. `list_deployments` reports it, and `deploy_component` returns it.                |
+| `restart`                   | `true` to restart immediately, or `"rolling"` for a rolling restart. **Optional** — omitted, the files are swapped but Harper is not restarted. |
+| `ignore_replication_errors` | Treat peer failures as non-fatal.                                                                                                               |
+| `deployment_timeout`        | Per-operation budget (ms) for peers.                                                                                                            |
+| `force`                     | Permit the operation on a protected core component name. Does **not** relax the `to_deployment_id` checks.                                      |
+
+`restart` being optional matters more here than on a deploy: a reverted component whose code is already loaded keeps serving the version you just rolled away from until something restarts it. Pass `restart: "rolling"` unless you are deliberately batching the restart yourself.
+
+The response reports `reverted` (`false` when the target was already live), `to_deployment_id`, and `from_deployment_id` — the version taken out of service, which is also recorded as `rollback_of` on the new `hdb_deployment` row for the audit trail.
+
+A revert needs no source credential. It puts the retained build back without re-fetching from the origin, so it works even when the token or deploy key that installed the current version has since expired or been revoked — which is often the situation you are in when you need to roll back.
+
+**Only the immediately previous version is retained**, so `revert_component` reaches back exactly one activation. It fails with "no previous version is retained" whenever there is no retained copy — a component deployed only once, or one whose deploys took the one-shot path described above — and refuses a `to_deployment_id` that is neither live nor the retained previous, naming what the component can actually be reverted to. To return to an older version, redeploy it with `deploy_component` — that is a deploy, not a revert.
+
+Reverting also rewrites the component's stored `package:` reference in `harperdb-config.yaml` and its entry in the boot-time application lock, as part of the same operation. So a revert is a config-level rollback too: a node provisioned _after_ the revert — a newly joined peer, or an existing node whose components directory is rebuilt — installs the version the cluster is actually running, not the one you reverted away from. Reverting away from a `package` deploy to a payload-deployed version removes the package reference entirely, for the same reason.
+
 ### Deployment Operations
 
-Harper records every `deploy_component` call in the `system.hdb_deployment` table, capturing the full lifecycle of a deployment including phase transitions (prepare → load → replicate → restart → success/failed), per-node outcomes, and a bounded event log of install output.
+Harper records every `deploy_component` call in the `system.hdb_deployment` table, capturing the full lifecycle of a deployment including phase transitions (`stage` → `activate` → `restart` → `success`/`failed`, or `prepare` → `replicate` → `restart` on the legacy single-phase path), per-node outcomes, and a bounded event log of install output.
+
+**Staged-build retention.** Deployments staged with `activate: false` leave their built files on disk until they are activated. Harper keeps only the most recent staged builds per component (default 5, configurable via the `deployment_stagingRetention_maxCount` configuration option); older not-yet-activated staged builds are evicted automatically when a new stage lands. Activating a `deployment_id` that has aged out of this window fails with "no staged build found."
+
+**Payload retention.** The `hdb_deployment` records themselves are always retained as the audit trail — retention only ever reclaims the stored tarball (`payload_blob`), never the row. Two configuration options bound it, and they answer different questions:
+
+| Option                                 | Default | Effect                                                                                                                            |
+| -------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `deployment_payloadRetention_maxSize`  | 10 MiB  | Reclaims **this** deploy's tarball right after it succeeds, if the tarball was larger than this. Bounds any single payload.       |
+| `deployment_payloadRetention_maxCount` | 1       | Keeps at most this many stored tarballs **per project**, newest first, dropping the rest after a successful deploy. Bounds total. |
+
+The default of `maxCount: 1` means only the current version's tarball is kept. It is deliberately conservative: retained payloads share the instance's disk with your own data, so several copies of a large application payload can quietly consume quota. Raise it if you want a wider window of deployments whose payload is still downloadable; set it to `0` to keep none.
+
+Pruning is automatic and best-effort — it never fails a deploy — and is skipped when a peer failed, since the older payloads are still the retry artifact in that case. A deployment whose payload has been reclaimed (automatically, or explicitly via [`delete_deployment_payload`](#delete_deployment_payload)) reports `payload_blob_present: false` and can no longer serve [`get_deployment_payload`](#get_deployment_payload); everything else about the record stays intact.
 
 ### `list_deployments`
 
 Returns a list of deployment records, newest first. All filter parameters are optional.
 
-| Parameter | Type   | Description                                      |
-| --------- | ------ | ------------------------------------------------ |
-| `project` | string | Filter to a specific component project           |
-| `status`  | string | Filter by status: `pending`, `success`, `failed` |
-| `since`   | number | Start of time range (Unix timestamp ms)          |
-| `until`   | number | End of time range (Unix timestamp ms)            |
-| `limit`   | number | Maximum number of results (default: 100)         |
-| `offset`  | number | Pagination offset                                |
+| Parameter | Type   | Description                              |
+| --------- | ------ | ---------------------------------------- |
+| `project` | string | Filter to a specific component project   |
+| `status`  | string | Filter by status (see below)             |
+| `since`   | number | Start of time range (Unix timestamp ms)  |
+| `until`   | number | End of time range (Unix timestamp ms)    |
+| `limit`   | number | Maximum number of results (default: 100) |
+| `offset`  | number | Pagination offset                        |
 
 ```json
 {
@@ -972,6 +1106,12 @@ Returns a list of deployment records, newest first. All filter parameters are op
 ```
 
 Response includes a `deployments` array and a `total` count. The `payload_blob` field is stripped from list responses for size; use `get_deployment_payload` to retrieve the tarball.
+
+Deployment statuses fall into three groups:
+
+- **Terminal** — `success`, `failed`, `rolled_back`. The deploy is over. Only these count as terminal internally, which is what gates `get_deployment_payload` and makes a payload eligible for retention pruning.
+- **Resting** — `staged`. An `activate: false` stage-and-stop, waiting to be activated or to age out of the staging-retention window. It is finished but not terminal, so its payload is deliberately still held: it is the source the pending activation needs.
+- **In flight** — `pending`, `extracting`, `installing`, `staging`, `loading`, `replicating`, `activating`, `reverting`, `restarting`. The phase the deployment is currently in; a record only stays in one of these while the deploy is running.
 
 ### `get_deployment`
 
@@ -986,22 +1126,22 @@ Returns a single deployment record by `deployment_id`. When called on an in-prog
 
 The deployment record includes:
 
-| Field                | Description                                                             |
-| -------------------- | ----------------------------------------------------------------------- |
-| `deployment_id`      | Unique identifier (content hash)                                        |
-| `project`            | Component project name                                                  |
-| `package_identifier` | Package reference or `payload` for tar uploads                          |
-| `status`             | `pending`, `success`, `failed`, or `rolled_back`                        |
-| `phase`              | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`      |
-| `event_log`          | Bounded log of install output and phase transitions (up to 200 entries) |
-| `peer_results`       | Per-node outcome map for replicated deployments                         |
-| `payload_hash`       | SHA-256 hash of the deployment tarball                                  |
-| `payload_size`       | Byte size of the deployment tarball                                     |
-| `started_at`         | Timestamp when deployment began                                         |
-| `completed_at`       | Timestamp when deployment finished                                      |
-| `user`               | User who initiated the deployment                                       |
-| `rollback_of`        | `deployment_id` of the deployment this rolls back, if applicable        |
-| `error`              | Error message for failed deployments                                    |
+| Field                | Description                                                                                                                                                                                                                                   |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deployment_id`      | Unique identifier (content hash)                                                                                                                                                                                                              |
+| `project`            | Component project name                                                                                                                                                                                                                        |
+| `package_identifier` | Package reference or `payload` for tar uploads                                                                                                                                                                                                |
+| `status`             | Any of the values listed under [`list_deployments`](#list_deployments) — `pending`, `extracting`, `installing`, `staging`, `staged`, `loading`, `replicating`, `activating`, `reverting`, `restarting`, `success`, `failed`, or `rolled_back` |
+| `phase`              | Current lifecycle phase: `stage`, `load`, `activate`, `restart` (or legacy `prepare`, `replicate`)                                                                                                                                            |
+| `event_log`          | Bounded log of install output and phase transitions (up to 200 entries)                                                                                                                                                                       |
+| `peer_results`       | Per-node outcome map for replicated deployments                                                                                                                                                                                               |
+| `payload_hash`       | SHA-256 hash of the deployment tarball                                                                                                                                                                                                        |
+| `payload_size`       | Byte size of the deployment tarball                                                                                                                                                                                                           |
+| `started_at`         | Timestamp when deployment began                                                                                                                                                                                                               |
+| `completed_at`       | Timestamp when deployment finished                                                                                                                                                                                                            |
+| `user`               | User who initiated the deployment                                                                                                                                                                                                             |
+| `rollback_of`        | `deployment_id` of the deployment this rolls back, if applicable                                                                                                                                                                              |
+| `error`              | Error message for failed deployments                                                                                                                                                                                                          |
 
 ### `get_deployment_payload`
 
