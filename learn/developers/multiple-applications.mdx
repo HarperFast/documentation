@@ -156,7 +156,7 @@ There are two ways to add applications to an instance.
 
 ### Declaratively, through the instance config
 
-Harper reads applications from the `harper-config.yaml` file in its root path (usually `~/hdb`). Each entry points to a package—a GitHub repository, an npm package, a tarball, a local path, or a URL—and, as shown in [Mounting an application](#mounting-an-application), carries that application's `host` and `urlPath`:
+Harper reads applications from the `harper-config.yaml` file in its root path (usually `~/hdb`). An entry may point to a package—a GitHub repository, an npm package, a tarball, a local path, or a URL—and may carry that application's `host` and `urlPath`, as shown in [Mounting an application](#mounting-an-application). Either half stands on its own: an entry with only a `package` installs an application served on the default chain, and an entry with only routing keys mounts a component that was deployed some other way, such as by `harper deploy`:
 
 ```yaml
 # ~/hdb/harper-config.yaml
