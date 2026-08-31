@@ -65,29 +65,35 @@ threads:
 - `maxHeapMemory` — Heap limit per thread (MB)
 - `heapSnapshotNearLimit` — Write a `.heapsnapshot` file when a thread nears its heap limit (loadable in Chrome DevTools Memory tab); _Default_: `false`. See [Worker Thread Debugging](./debugging.md#heap-snapshots-near-the-limit)
 - `debug` — Enable Node.js inspector; sub-options: `port`, `startingPort`, `host`, `waitForDebugger`. See [Worker Thread Debugging](./debugging.md)
-- `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load (via Node's `--import`) before any Harper or application module on each worker thread. Intended for instrumentation/APM agents that must load first to instrument subsequent module loads. Use the agent's ESM/register entry — e.g. `dd-trace/register.js`, which installs the ESM loader hooks that produce automatic instrumentation for `import`-loaded modules. As measured on dd-trace 6.x, that entry only registers the loader hooks and never calls `init()`, so `preload` on its own leaves the tracer uninitialized: it still hands out spans with plausible trace ids, but they are no-ops and nothing is ever exported. Pair it with `preloadRequire: dd-trace/init`, which is the entry that actually starts the tracer. `dd-trace/initialize.mjs` is not a single-entry shortcut around this pairing: it gates both its `init()` call and its loader-hook registration behind `isMainThread`, so under `--import` on a worker thread it starts nothing and registers nothing. Bare specifiers resolve against the `node_modules` of your installed [components](../components/overview.md) — so the agent can be shipped as a dependency of a deployed component — and absolute paths are also accepted. Applies to worker threads only (not under Bun).
+- `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load (via Node's `--import`) before any Harper or application module on each worker thread. Intended for instrumentation/APM agents that must load first to instrument subsequent module loads. `--import` evaluates the module as ESM, so this is the key for an agent's ESM/register entry — the one that installs Node's module loader hooks so modules loaded later by `import` can be instrumented. Installing loader hooks and starting an agent are separate steps, and which of an agent's entry points does which is agent-specific: some ship a single entry that does both, others split them across an `--import` entry and a `--require` entry, in which case set `preload` and `preloadRequire` together. Follow your agent's own documentation for worker-thread setup, and verify the result end to end against your collector. Bare specifiers resolve against the `node_modules` of your installed [components](../components/overview.md) — so the agent can be shipped as a dependency of a deployed component — and absolute paths are also accepted. Applies to worker threads only (not under Bun).
+
+:::warning The dd-trace values below are unverified
+They illustrate the split-entry case; they are not a Harper-validated APM configuration. The specifics are what dd-trace's own entry points do, observed by reading dd-trace 6.x: `dd-trace/register.js` registers the ESM loader hooks and never calls `init()`, so `preload` alone leaves the tracer uninitialized — it still hands out spans with plausible trace ids, but they are no-ops. `dd-trace/init` is the entry that calls `init()`. `dd-trace/initialize.mjs` is not a single-entry shortcut around that pairing: it gates both its `init()` call and its loader-hook registration behind `isMainThread`, so under `--import` on a worker thread it starts nothing and registers nothing.
+
+What those entry points do on their own is not an end-to-end result: Harper has not been validated to produce exported spans with usable trace context and clean shutdown under this configuration. Confirm the spans you expect actually arrive at your collector before relying on it.
+:::
 
 ```yaml
 threads:
-  preloadRequire: dd-trace/init # starts the tracer
+  preloadRequire: dd-trace/init # the entry that calls init()
   preload: dd-trace/register.js # ESM loader hooks for automatic instrumentation
 ```
 
-Or several modules. The `preloadRequire` pairing still applies — an agent listed here is subject to the same rule as when it is the only entry:
+Or several modules — a split-entry agent still needs both keys when it is one of several entries:
 
 ```yaml
 threads:
-  preloadRequire: dd-trace/init # still what starts the tracer
+  preloadRequire: dd-trace/init # the entry that calls init()
   preload:
     - dd-trace/register.js
     - /opt/instrumentation/agent.mjs
 ```
 
-- `preloadRequire` <VersionBadge version="v5.2.0" /> — Same as `preload`, but loads modules via Node's `--require` (CommonJS) instead of `--import`. Use this for agents that document the `--require` path (e.g. `dd-trace/init`, Dynatrace OneAgent). Same resolution rules as `preload`. For dd-trace, `dd-trace/init` is the entry that starts the tracer, and it does not register the ESM loader hooks — keep `preload: dd-trace/register.js` alongside it, as shown under `preload` above.
+- `preloadRequire` <VersionBadge version="v5.2.0" /> — Same as `preload`, but loads modules via Node's `--require` (CommonJS) instead of `--import`. `--require` runs the module's body, so this is the key for an agent's initialization entry — the entry documented for the `--require` path (e.g. `dd-trace/init`, Dynatrace OneAgent). Same resolution rules as `preload`. When an agent splits initialization from its ESM loader hooks, set both keys; see the note under `preload` above, including its caveat about the dd-trace specifics.
 
 ```yaml
 threads:
-  preloadRequire: dd-trace/init # starts the tracer; pair with preload (see above)
+  preloadRequire: dd-trace/init # pair with preload when ESM loader hooks are also needed
 ```
 
 ---
