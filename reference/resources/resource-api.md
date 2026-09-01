@@ -707,6 +707,8 @@ Returns the current context, which includes:
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
 
+`getContext()` is a Resource instance method. A static verb is passed the same context as an argument instead — `(target, context)` for `get`/`delete`, `(target, data, context)` for `put`/`patch`/`post` — or it can use the [`getContext()` export](#getcontext-context-1) from the `harper` module.
+
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 
 - `url` — Full local path including query string
@@ -731,11 +733,11 @@ Executes a Harper operations API call using this table as the target. Set `autho
 
 ### `getCurrentUser(): User | undefined`
 
-Returns the user associated with the current request, or `undefined` if no user is authenticated. The returned object exposes the username, role, and `role.permission` flags.
+Returns the user associated with the current request, or `undefined` if no user is authenticated. The returned object exposes the username, role, and `role.permission` flags. This is a Resource **instance** method; a static verb reads the same user from the context it is passed, as `context.user`:
 
 ```javascript
-async get(target) {
-	const user = this.getCurrentUser();
+static async get(_target, context) {
+	const user = context.user;
 	if (!user) return new Response(null, { status: 401 });
 	return { username: user.username, role: user.role };
 }
@@ -745,14 +747,14 @@ async get(target) {
 
 ### Session and Login from a Resource
 
-The context returned by `getContext()` exposes `login` and `session` for handling sign-in/out flows in a custom Resource. Sessions require `authentication.enableSessions: true` in `harperdb-config.yaml`.
+The request context exposes `login` and `session` for handling sign-in/out flows in a custom Resource. A static verb receives it as its trailing argument — `(target, data, context)` for `post`. Sessions require `authentication.enableSessions: true` in `harperdb-config.yaml`.
 
 ```typescript
 export class SignIn extends Resource {
-	async post(_target, data) {
-		const context = this.getContext();
+	static async post(_target, data, context) {
+		const { username, password } = await data;
 		try {
-			await context.login(data.username, data.password);
+			await context.login(username, password);
 		} catch {
 			return new Response('Invalid credentials', { status: 403 });
 		}
@@ -761,8 +763,7 @@ export class SignIn extends Resource {
 }
 
 export class SignOut extends Resource {
-	async post() {
-		const context = this.getContext();
+	static async post(_target, _data, context) {
 		if (!context.session) return new Response(null, { status: 401 });
 		await context.session.delete(context.session.id);
 		return new Response('Logged out', { status: 200 });
