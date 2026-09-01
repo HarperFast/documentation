@@ -707,7 +707,7 @@ Returns the current context, which includes:
 - `user` — User object with username, role, and authorization information
 - `transaction` — The current transaction
 
-`getContext()` is a Resource instance method. A static verb is passed the same context as an argument instead — `(target, context)` for `get`/`delete`, `(target, data, context)` for `put`/`patch`/`post` — or it can use the [`getContext()` export](#getcontext-context-1) from the `harper` module.
+`getContext()` is a Resource instance method. A static verb is not an instance, so it reads the context from the trailing argument the request path passes it — `(target, context)` for `get`/`delete`, `(target, data, context)` for `put`/`patch`/`post`. A direct server-side call supplies that argument only if the caller passes one, so use the [`getContext()` export](#getcontext-context-1) from the `harper` module when a static method must work on both paths.
 
 When triggered by HTTP, the context is the `Request` object with these additional properties:
 
@@ -764,14 +764,14 @@ export class SignIn extends Resource {
 
 export class SignOut extends Resource {
 	static async post(_target, _data, context) {
-		if (!context.session) return new Response(null, { status: 401 });
-		await context.session.delete(context.session.id);
+		if (!context.session?.user) return new Response(null, { status: 401 });
+		await context.session.update({ user: null });
 		return new Response('Logged out', { status: 200 });
 	}
 }
 ```
 
-`context.login(username, password)` verifies credentials and establishes the session cookie on success. To end a session, delete it via `context.session.delete(context.session.id)`.
+`context.login(username, password)` verifies credentials and establishes the session cookie on success. To end a session, clear its user with `context.session.update({ user: null })` — [`update`](../http/api.md#properties) is the session's only mutator. `context.session` is an empty object rather than `undefined` when sessions are enabled and the request carries no session cookie, so test `context.session?.user` to detect an established session.
 
 Cookie-based sessions are intended for browser clients. For non-browser clients (CLI tools, mobile apps, service-to-service), use JWT issuance — see [JWT Authentication](../security/jwt-authentication.md).
 
