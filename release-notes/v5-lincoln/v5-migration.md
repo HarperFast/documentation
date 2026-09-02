@@ -131,38 +131,26 @@ applications:
   allowedSpawnCommands: # see "Spawning new processes" above
     - npm
     - node
-  # allowedBuiltinModules: [] # if omitted, all Node.js built-ins are allowed
+  # allowedBuiltInModules: [] # if omitted, all Node.js built-ins are allowed
 ```
+
+Each of these settings is documented in full under [Module Loading](/reference/v5/components/module-loading). What follows is only what is likely to need attention when moving an application from v4.
 
 ### Module Loader Modes
 
-The `moduleLoader` setting selects how application modules are loaded:
+`moduleLoader` selects how application modules are loaded: `vm-current-context` (the default, sharing intrinsics with Harper), `vm` (a separate context and its own intrinsics per application), `native` (standard Node.js `import()`, with no application context), or `compartment` (SES Compartments; advanced and considerably heavier).
 
-- `vm-current-context` (default) — the VM module loader running in Harper's own context. Applications share intrinsics with Harper, which gives the best compatibility with packages that perform `instanceof` or other identity checks across the boundary. Application-specific values (`logger`, `config`, `server`, and the rest of the `harper` API) are provided through `import ... from 'harper'` (or `require('harper')` in CommonJS).
-- `vm` — the VM module loader running in a separate context per application, with its own intrinsics and a custom global object. This provides stronger isolation between applications, but the separate intrinsics are a common source of subtle incompatibilities (cross-context `instanceof`, frozen-prototype mismatches, and similar).
-- `native` — standard Node.js `import()` with no VM loader. Application-specific context (tagged logging, per-app `config`) is not available.
-- `compartment` — SES Compartment-based loading. Advanced and considerably heavier; only needed for specialized sandboxing requirements.
-
-For most applications the default is the right choice. Choose `vm` only if you specifically need separate per-application intrinsics, and `native` if the VM loader causes compatibility problems you cannot otherwise resolve.
-
-> Under `lockdown: ses`, the constrained (https-only) `fetch` is applied only in `vm` mode, which gives each application its own globals. In `vm-current-context` and `native` modes application code uses the standard global `fetch`; choose `vm` mode if you require the constrained `fetch`.
+For most applications the default is the right choice. Choose `vm` only if you specifically need separate per-application intrinsics, and `native` if the VM loader causes compatibility problems you cannot otherwise resolve. See [Module Loader Modes](/reference/v5/components/module-loading#module-loader-modes) for what each mode does to isolation, application context, and the constrained `child_process`.
 
 ### Intrinsic Lockdown
 
 The default lockdown mode (`freeze-after-load`) freezes JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all application code has loaded. This prevents prototype pollution attacks. If application code or a dependency modifies intrinsic prototypes at runtime (after startup), it will throw a TypeError.
 
-Available lockdown modes:
-
-- `freeze-after-load` — freeze intrinsics after all components have loaded (default)
-- `freeze` — freeze intrinsics before loading any application code
-- `ses` — full SES lockdown via the `ses` package (strictest; most likely to break packages that mutate built-ins)
-- `none` — no lockdown
-
-If a dependency modifies intrinsic prototypes and you need a temporary workaround, set `lockdown: none`.
+If a dependency modifies intrinsic prototypes and you need a temporary workaround, set `lockdown: none`. The other modes (`freeze`, `ses`) are covered under [Intrinsic Lockdown](/reference/v5/components/module-loading#intrinsic-lockdown).
 
 ### Allowed Directory
 
-In production, applications can only load modules from within their own directory tree (`allowedDirectory: app`). Attempting to load a module from outside that directory will throw. Dev mode installs default to `allowedDirectory: any`, so local development is typically unaffected.
+In production, applications can only load modules from within their own directory tree (`allowedDirectory: app`). Attempting to load a module from outside that directory will throw. Dev mode installs default to `allowedDirectory: any`, so this usually surfaces first in production rather than during local development.
 
 If your application legitimately needs to load files from outside its own directory in production, set:
 
@@ -170,22 +158,6 @@ If your application legitimately needs to load files from outside its own direct
 applications:
   allowedDirectory: any
 ```
-
-### Allowed Built-in Modules
-
-By default all Node.js built-in modules are accessible. To restrict which built-ins applications may import, set an explicit allowlist:
-
-```yaml
-applications:
-  allowedBuiltinModules:
-    - fs
-    - path
-    - http
-```
-
-### Dependency Loading
-
-By default (`dependencyLoader: auto`), npm packages that do not declare `harper` as a dependency are loaded with the native Node.js loader. Packages that do depend on `harper` are loaded through the VM loader so they receive application context. Set `dependencyLoader: app` to always use the VM loader for dependencies, or `native` to always use the native loader for packages.
 
 ### Disabling the VM Loader
 

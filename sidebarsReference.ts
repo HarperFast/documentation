@@ -165,6 +165,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'components/module-loading',
+					label: 'Module Loading',
+				},
+				{
+					type: 'doc',
 					id: 'components/scheduler',
 					label: 'Scheduler',
 				},
