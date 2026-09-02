@@ -120,7 +120,7 @@ The `blob.save()` method has been removed. Please use the `saveBeforeCommit` fla
 
 Harper v5 loads application modules through Node.js's VM module API, giving each application its own module cache and a `harper` module scoped to that application — the `logger` it exports is tagged with the application name, and `config` reflects that application's own configuration. By default (`vm-current-context`), applications share JavaScript intrinsics (`Object`, `Array`, `Promise`, and so on) with Harper. Sharing intrinsics avoids the compatibility problems that separate per-application intrinsics can cause — most commonly `instanceof` and other identity checks failing for values that cross the application/Harper boundary.
 
-All module loading behavior is controlled by the `applications` section in `harperdb-config.yaml`:
+All module loading behavior is controlled by the `applications` section in `harper-config.yaml`:
 
 ```yaml
 applications:
