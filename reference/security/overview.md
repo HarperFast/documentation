@@ -26,6 +26,16 @@ Harper supports three authentication methods:
 - [JWT Authentication](./jwt-authentication.md) — Token-based authentication using JSON Web Tokens. Clients authenticate once and receive short-lived operation tokens and longer-lived refresh tokens.
 - [mTLS Authentication](./mtls-authentication.md) — Mutual TLS certificate-based authentication.
 
+## Authentication and Route Ownership
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+On the application HTTP port, Harper attempts authentication before resolving which handler owns a request. A valid Harper credential establishes the Harper user as usual. When a Basic or Bearer credential is not recognized by Harper, Harper preserves the original `Authorization` header and defers the unauthorized response until a handler claims the request.
+
+A Harper-owned route returns the normal unauthorized response before running its operation. If no Harper route claims the request, a later application handler receives the unchanged header and can apply its own authentication scheme. If no handler claims the request, the request ends as not found. Authentication infrastructure failures are not deferred and remain fail-closed.
+
+This behavior is automatic and has no configuration option. Application handlers that accept non-Harper credentials are responsible for validating those credentials before serving protected content. See [HTTP request handling](../http/overview.md#authentication-and-fallthrough) for the middleware ownership contract.
+
 ## Certificate Management
 
 - [Certificate Management](./certificate-management.md) — Managing TLS certificates and Certificate Authorities for HTTPS and mTLS.
