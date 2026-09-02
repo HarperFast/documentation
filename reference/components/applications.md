@@ -66,6 +66,23 @@ harper deploy \
 
 > Use `package=$(pwd)` if your current directory is the application directory.
 
+## Shutdown Cleanup
+
+Applications with work that must complete, or be acknowledged outside the process, before a thread exits — buffered writes to flush, a registration to withdraw from an external service, a distributed lock to release — need a hook to do it when Harper stops or restarts. Restarts are frequent during local development, since `harper dev` restarts worker threads on every file change, and deploying with `restart=true` does the same on a running instance.
+
+Harper signals this by calling `scope.close()` on each worker thread, which emits a `'close'` event on the plugin API [`Scope`](./plugin-api.md#class-scope). Listen for it to run cleanup:
+
+```js
+export function handleApplication(scope) {
+	const service = startService();
+	scope.once('close', async () => {
+		await service.close();
+	});
+}
+```
+
+See [Cleanup on Shutdown](./plugin-api.md#cleanup-on-shutdown) for the full shutdown sequence, including how async cleanup is awaited and the time limit it must finish within.
+
 ## Remote Management
 
 Managing applications on a remote Harper instance uses the same operations as local management. The recommended approach is to log in first using `harper login` to store an authentication token:
@@ -172,7 +189,7 @@ harper deploy ref=9f8c2a1 restart=true replicated=true
 
 If a `ref` can't be resolved either way, the deploy stops rather than sending the name for the cluster to resolve. Run `git fetch` and retry, or pass a full commit SHA — that needs no resolution and is always accepted.
 
-A `ref` must also name something a clone can fetch: `refs/heads/*` and `refs/tags/*`, or a bare branch or tag name. Anything else — `refs/pull/123/head`, say — is rejected up front, even if your own checkout can resolve it, because the cluster could resolve that commit and still never check it out.
+**A full commit SHA is accepted directly.** An object ID is already immutable, so there is nothing to pin it to and no resolution is attempted — SHA-based rollbacks are always valid. Every other `ref` must name something a clone can fetch: `refs/heads/*` or `refs/tags/*` if you qualify it, or a bare branch or tag name that resolves locally or on the remote. A qualified ref outside those two namespaces — `refs/pull/123/head`, say — is rejected up front, even if your own checkout can resolve it, because the cluster could resolve that commit and still never check it out.
 
 **Commit and push first.** The cluster clones from the remote, so it only sees commits that have been pushed. `by_ref` warns in both directions: when the working tree is dirty (those changes won't be part of the deploy) and when the commit being deployed isn't on any remote branch (the cluster won't be able to clone it). The second check reads your local remote-tracking refs, so run `git fetch` if you get it for a commit you know you pushed.
 
