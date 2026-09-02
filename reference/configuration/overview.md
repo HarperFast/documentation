@@ -9,8 +9,8 @@ title: Configuration Overview
 
 Harper is configured through a [YAML](https://yaml.org/) file called `harper-config.yaml` located in the Harper root directory. By default the root directory is a folder named `hdb` in the home directory of the current user.
 
-:::note Instances upgraded from v4
-Before v5 this file was named `harperdb-config.yaml`, and that name is still supported. Harper looks for `harper-config.yaml` first and falls back to `harperdb-config.yaml` when only the older file is present, then writes later changes — including those made by `set_configuration` — back to whichever file it found. Upgrading does not rename the file, so an upgraded instance keeps its `harperdb-config.yaml` until you rename it. A fresh install always creates `harper-config.yaml`.
+:::note Which file your instance reads
+The active config file is the one named by `settings_path` in Harper's boot properties file (usually `~/.harperdb/hdb_boot_properties.file`); a `ROOTPATH` environment variable or `--ROOTPATH` argument overrides it. A fresh v5 install records `harper-config.yaml`, but an instance upgraded from v4 keeps whatever its boot properties already named — usually `harperdb-config.yaml`, which Harper still reads. Upgrading neither renames the file nor repoints `settings_path`, so renaming it alone will break startup; update `settings_path` in the same step, and avoid leaving both files in the root directory at once.
 :::
 
 Some configuration values are pre-populated in the config file on install, regardless of whether they are used.
