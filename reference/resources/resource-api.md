@@ -273,6 +273,7 @@ The cursor is a _last-processed_ position, so a cursor exactly at the floor is s
 Details worth knowing before relying on it:
 
 - **The time domain is the same one `startTime` uses**, so cursors compare directly with no conversion. Subscription events carry it as `localTime`.
+- **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the messages between them have already been pruned, which is the silent gap this method exists to expose.
 - **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so `cursor >= floor` means no entry of _any_ table in that database was pruned below the cursor. `deleteHistory()` on one table raises the floor for its siblings too.
 - **`Infinity` means the floor is unknown.** Treat no cursor as safe. This is what a database reports when its retention history cannot be accounted for — most commonly the first time it is opened by a version that records a floor, or after a migration between storage engines, which does not carry the audit log across. Consumers resync once and then get real values.
 - **It errs in one direction only.** The floor can ask for a resync that was not strictly necessary. It does not report a cursor as safe when history it needed is gone.
