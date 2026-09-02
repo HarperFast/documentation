@@ -1,0 +1,212 @@
+---
+title: Multiple Applications on One Cluster
+---
+
+# Multiple Applications on One Cluster
+
+A single Harper cluster can host any number of applications side by side. Because the database, cache, application logic, messaging, and search run within one distributed runtime, an application is not a group of containers wired together—it is a [component](/reference/v5/components/overview), a self-contained module that Harper loads and serves. You add an application to a cluster by registering another component, not by provisioning a new cluster.
+
+This guide covers how to run multiple applications on one cluster: how they coexist, how requests are routed to each one, how far you can separate them, and how to deploy them across every node.
+
+## Applications are components
+
+The unit you deploy in Harper is a component. In the [Operations API](/reference/v5/operations-api/overview) and CLI, "component" refers to an application—a collection of schemas, resources, routes, and static assets that Harper loads and serves.
+
+Two consequences follow:
+
+- **A cluster is a shared resource.** To run a new application, register another component on an existing cluster rather than creating a new cluster.
+- **Co-located applications share the runtime.** Because they run within the same converged process, one application's resources can access another application's tables through an in-process call—no cross-service HTTP and no separate connection pool.
+
+Harper isolates each application's module context automatically (see [What co-located applications share](#what-co-located-applications-share)), and it enforces one boundary per application: **routing**—which hostname and URL prefix an application answers on. Beyond that, co-located applications share the instance. Separate databases and distinct role names give you **data namespacing** and **workable access control**, but they are conventions you maintain rather than walls the runtime enforces. The sections below cover all three, and [When to co-locate](#when-to-co-locate) covers the cases where you should reach for a separate cluster instead.
+
+## What co-located applications share
+
+Harper runs as a single process. Every co-located application shares that process and its worker threads, so it is worth being precise about what is isolated between applications and what is not.
+
+- **Module contexts are isolated.** Harper loads each application's JavaScript in its own module context using Node.js's VM module loader, giving every application a distinct module cache. One application's modules, imports, and module-scoped state are not visible to another, so two applications can depend on different packages—or different versions of the same package—without colliding.
+- **The data layer and Harper APIs are shared.** The objects you reach through the `harper` package or as globals—`tables`, `databases`, and the rest—are the same live, process-wide objects in every application. A record written by one application is immediately visible to every other, and any application can read or write another's tables in-process. This is what makes co-location efficient, and it is why separate databases are a [namespacing convention](#namespacing-data-by-database) rather than an enforced boundary.
+- **Users, roles, and sessions are instance-wide.** Harper's RBAC belongs to the instance, not to an application. Every application's `roles.yaml` reconciles into the same instance-wide role registry, and a user authenticates against the instance as a whole. See [Access control is instance-wide](#access-control-is-instance-wide).
+- **The process is shared.** Because every application runs in one process, operational actions apply to all of them: restarting the instance restarts every co-located application, and applications cannot change the process working directory. Plan restarts and deployments with the whole instance in mind.
+
+For the full model, see the [JavaScript Environment](/reference/v5/components/javascript-environment) reference.
+
+## Structuring each application
+
+Every Harper application is configured with a `config.yaml` file in the root of its directory. This file specifies which built-in plugins the application uses—`rest`, the `graphqlSchema` loader, custom JavaScript resources, static file serving, and others:
+
+```yaml
+# listings-api/config.yaml
+rest: true
+graphqlSchema:
+  files: '*.graphql'
+jsResource:
+  files: 'resources.js'
+roles:
+  files: 'roles.yaml'
+static:
+  files: 'web/**'
+  urlPath: 'assets'
+```
+
+A `config.yaml` **completely replaces** the default configuration; it is not merged with Harper's defaults. Each application therefore defines its own surface area explicitly. Paths declared here are internal to the application—they position a plugin _within_ the application, not on the instance. Where the application itself is served is a separate, deployment-time decision, covered next.
+
+For the full list of options, see the [Component Configuration](/reference/v5/components/overview#configuration) and [Built-In Extensions](/reference/v5/components/overview#built-in-extensions-reference) reference pages.
+
+## Routing requests to each application
+
+Applications on the same instance share a single HTTP listener and port (`9926` by default). Every request enters one layered middleware chain, and routing determines which application handles it. Harper routes by **hostname**, **URL prefix**, or both, with no dispatch code in the application.
+
+### Mounting an application
+
+<VersionBadge version="v5.2.0" />
+
+Where an application is served is a deployment concern, so declare it on that application's entry in the root `harper-config.yaml` (usually `~/hdb/harper-config.yaml`)—not in the application's own `config.yaml`, which a given environment cannot remap:
+
+```yaml
+# ~/hdb/harper-config.yaml
+listings-api:
+  package: my-org/listings-api#v1.4.0
+  host: listings.example.com
+  urlPath: /v1
+admin-dashboard:
+  package: my-org/admin-dashboard#v0.9.0
+  host: admin.example.com
+```
+
+Every handler the application registers—HTTP, WebSocket, and upgrade—is then served under that mount, and Harper removes the `urlPath` prefix from the pathname before invoking the chain. Application code addresses itself mount-relative and does not need to know where it is mounted. A request that matches no mounted chain falls through to the default middleware chain.
+
+Because routing lives in the root config, the same application package can be mounted at a different hostname or path per environment without editing the application. An entry does not need a `package`—routing applies to any application in the components root, however it was deployed.
+
+The same values can be set at deploy time:
+
+```bash
+harper deploy_component \
+  project=listings-api \
+  package=my-org/listings-api#v1.4.0 \
+  host=listings.example.com \
+  urlPath=/v1
+```
+
+Harper selects the most specific matching mount: host and path together, then host alone, then path alone, with longer path prefixes taking precedence. Host matching ignores the port and is case-insensitive; IPv6 hosts are given as a bare literal (`::1`), not bracketed. For the complete rules, see [HTTP middleware routing](/reference/v5/http/overview#middleware-routing) and the [`deploy_component`](/reference/v5/operations-api/operations#deploy_component) parameters.
+
+### Placing routes within an application
+
+A plugin's own `urlPath`, declared in the application's `config.yaml`, positions that plugin _within_ the application. The mount composes with it rather than replacing it, so an application's internal structure survives being relocated: with the `config.yaml` and root config above, `web/**` is served at `listings.example.com/v1/assets/`. A plugin that declares no `urlPath` is served at the mount itself.
+
+When a plugin's `urlPath` is `.` or begins with `./`, Harper prepends the plugin name automatically.
+
+An application can also declare `host` on an individual plugin, but a `host` on the root-config entry overrides it—the operator's choice of hostname wins over the one the application shipped.
+
+### What a mount does not do
+
+A mount is a routing prefix, not an isolation boundary. Two limits matter when several applications share an instance:
+
+- **A mount does not namespace resources.** REST endpoint paths come from the resources and tables an application exports, and those exports land in a single instance-wide registry. Mounting namespaces the external URL an application answers on; it does not make two applications' exports independent. Two applications that both export a `User` resource still conflict, wherever each is mounted. Give each application uniquely named resources or, preferably, its own database.
+- **A mount does not host-constrain Fastify routes.** [`fastifyRoutes`](/reference/v5/fastify-routes/overview) registers as a global fallback outside the routed middleware chain, so those routes answer on every hostname. A `urlPath` mount does apply—it becomes the Fastify route prefix—but a `host` mount does not, and Harper refuses to load a host-mounted application that declares `fastifyRoutes` rather than silently serving it unconstrained. Port those routes to [custom resources](/reference/v5/resources/overview) or `server.http()` before mounting the application by host.
+
+### Custom dispatch in the middleware chain
+
+Components add handlers to the chain with the [`server.http()`](/reference/v5/http/api#serverhttplistener-options) API. Each handler either returns a `Response` to handle the request or calls `next(request)` to pass it to the next handler:
+
+```js
+server.http((request, next) => {
+	if (request.headers.get('x-app-target') === 'listings') return handleListings(request);
+	return next(request);
+});
+```
+
+Handlers run in registration order; `name`, `before`, and `after` position an entry explicitly relative to another.
+
+`server.http()` accepts `host` and `urlPath` directly, which is the programmatic equivalent of the root-config mount:
+
+```js
+server.http(handleAdmin, { host: 'admin.example.com', urlPath: '/api' });
+```
+
+Reach for the middleware chain when a mount is not enough—to dispatch on a custom header, as above, to rewrite a path before it reaches an application, or to resolve a target host at runtime by branching on `request.host` inside a handler. For fixed hostnames and prefixes, prefer the declarative mount: Harper matches it before any handler code runs, and an operator can change it without a code change. See the [HTTP API](/reference/v5/http/api) reference for the full `Request` object and the [`HttpOptions`](/reference/v5/http/api#httpoptions) matching and ordering rules.
+
+### Serving multiple domains over HTTPS
+
+When serving several hostnames over TLS, configure a certificate per domain with [SNI](/reference/v5/http/tls#multi-domain-certificates-sni): define `tls` as an array with a `host` entry for each domain. SNI selects the certificate; the mount's `host` selects the application's middleware chain—the two are independent and both are needed to serve an application on its own HTTPS domain.
+
+## Namespacing data by database
+
+Give each application its own database. Its tables then belong to it by name, its resources address them without qualification, and the applications do not collide in the table namespace.
+
+This is namespacing, not enforced isolation. `databases` is a process-wide object, so every co-located component can reach every database through it—a database boundary is a convention that well-behaved application code respects, and nothing in the runtime prevents buggy or untrusted component code from crossing it. Treat co-located applications as sharing one trust domain, and vet component code the way you would vet code you are adding to the same service.
+
+That shared access is also what makes co-location useful: when one application needs data from another—an `admin-dashboard` reading from the `listings-api`—it queries the table directly, in-process, rather than opening a network connection to another service.
+
+When a boundary has to hold against code you do not fully trust, or against a security or compliance requirement, put the application on a separate instance or cluster. That is the only boundary Harper enforces for data.
+
+## Access control is instance-wide
+
+Each application can include its own [`roles.yaml`](/reference/v5/users-and-roles/configuration) file, which is convenient—but the roles it declares are not scoped to that application. Harper reconciles every declared role into the instance's single role registry: a role that does not exist is created, and a role that already exists has its permissions overwritten to match the declaration. Users and sessions authenticate against the instance as a whole, and a user's role applies wherever they are authenticated, not just within the application that defined it.
+
+Two practices keep this workable when several applications share an instance:
+
+- **Prefix role names per application.** `listings-reader` and `admin-dashboard-reader` are two roles; two applications that both declare `reader` are one role, and whichever loads last wins—silently changing the permissions the other application expects.
+- **Scope each role's permissions to that application's database.** A user-defined role grants nothing unless it is granted explicitly, so a role that names only its own database cannot read another application's tables even though the RBAC system is shared. Grant a role access to a second application's database only when that access is intended.
+
+Because the permission model is shared, "different access rules per application" means different roles within one RBAC system, not separate systems. If two applications must not share a user directory or a role namespace at all, run them on separate instances.
+
+## Registering multiple applications
+
+There are two ways to add applications to an instance.
+
+### Declaratively, through the instance config
+
+Harper reads applications from the `harper-config.yaml` file in its root path (usually `~/hdb`). An entry may point to a package—a GitHub repository, an npm package, a tarball, a local path, or a URL—and may carry that application's `host` and `urlPath`, as shown in [Mounting an application](#mounting-an-application). Either half stands on its own: an entry with only a `package` installs an application served on the default chain, and an entry with only routing keys mounts a component that was deployed some other way, such as by `harper deploy`:
+
+```yaml
+# ~/hdb/harper-config.yaml
+listings-api:
+  package: my-org/listings-api#v1.4.0
+inventory-service:
+  package: my-org/inventory-service#v2.1.0
+admin-dashboard:
+  package: my-org/admin-dashboard#v0.9.0
+```
+
+Reference a Git repository with a semver tag to lock each application to a specific, reproducible version. Harper translates these entries into a `package.json` file, runs an install to resolve them, and loads each as a component. The entry name is arbitrary and does not need to match a package dependency name.
+
+### Imperatively, through the CLI
+
+To deploy from an application directory, run `harper deploy` inside the project. This packages the current directory and sends it to the active instance:
+
+```bash
+cd listings-api
+harper deploy
+```
+
+A payload deploy like this cannot carry `host` or `urlPath`; mount a payload-deployed application by adding those keys to its entry in the root `harper-config.yaml`.
+
+For local iteration, `harper dev .` runs the application and watches for file changes, restarting worker threads on edit. See the [Applications reference](/reference/v5/components/applications) for the complete set of deployment options.
+
+## Deploying across the cluster
+
+The preceding sections deploy an application to a single instance. To deploy it across every node in the cluster, include the `replicated=true` parameter.
+
+When deploying in a clustered environment, set `replicated=true` to spread the deployment to all nodes:
+
+```bash
+harper deploy_component \
+  project=listings-api \
+  package=https://github.com/my-org/listings-api#v1.4.0 \
+  target=https://cluster-node-1.example.com:9925 \
+  replicated=true
+```
+
+`target` points to a node's operations endpoint. `replicated=true` sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
+
+:::note
+Restart afterward to apply the changes—for example, `harper restart target=https://cluster-node-1.example.com:9925 replicated=true`.
+:::
+
+On Harper Fabric, a single `harper deploy` from the project directory deploys the application across regions, with replication, routing, and failover managed by the platform.
+
+## When to co-locate
+
+Co-locate applications on one cluster when they share a data domain, benefit from in-process access to each other's tables, or are small enough that separate clusters would sit mostly idle. This covers common cases such as an API, its admin interface, a background worker, and a public site. Co-located applications share a trust domain, so this works best when the same team owns the code, or when you would be willing to run it all in one service.
+
+Use separate clusters when applications require independent scaling, have significantly different availability needs, or need a boundary the runtime actually enforces—tenancy, compliance, an untrusted or third-party component, or a user directory that must not be shared. Choose based on the workload rather than defaulting to one cluster per service.

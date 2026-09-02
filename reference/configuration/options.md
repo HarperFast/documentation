@@ -239,6 +239,9 @@ replication:
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
 - `enableRootCAs` — Verify against Node.js Mozilla CA store; _Default_: `true`
 - `blobTimeout` — Blob transfer timeout (ms); _Default_: `120000`
+- `blobGapReconnectMs` — Interval (ms) for the blob-gap watchdog: when a transient blob save failure pins a replication resume cursor, the connection is forced to reconnect on this cadence so the gapped blob is re-streamed and, during a bulk copy, the copy resumes from the last banked cursor. Lower values heal gaps faster at the cost of more reconnects on a link whose faults never heal; _Default_: the `blobTimeout` value
+- `copyCursorFlushBytes` — Bytes of applied bulk-copy data between durable flushes of the copy resume cursor (RocksDB); _Default_: `67108864`
+- `copyCursorFlushIntervalMs` — Maximum time (ms) between durable flushes of the bulk-copy resume cursor (RocksDB); _Default_: `5000`
 - `blobSendDrainTimeout` — Maximum time (ms) a worker waits for in-flight replication blob **sends** to finish before shutting down during a restart, so a rolling restart (e.g., a component deploy reload) doesn't interrupt a transfer in progress. Only sends that are still making progress are waited on; `0` disables draining; _Default_: `600000`
 - `failOver` — Failover to alternate node if peer unreachable; _Default_: `true`
 - `shard` — Shard ID for traffic routing; see [Sharding](../replication/sharding.md)
@@ -266,9 +269,10 @@ storage:
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)
 - `compactOnStartKeepBackup` — Retain compaction backups; _Default_: `false`
-- `maxTransactionQueueTime` — Max time a single write commit may stay unsettled before Harper starts rejecting writes with 503; see [Storage Tuning](../database/storage-tuning.md#storagemaxtransactionqueuetime); _Default_: `45s`
+- `maxTransactionQueueTime` — Per-thread write-commit duration threshold for HTTP 503 backpressure; see [Storage Tuning](../database/storage-tuning.md#storagemaxtransactionqueuetime); _Default_: `45s`
 - `noReadAhead` — Advise OS against read-ahead; _Default_: `false`
 - `prefetchWrites` — Prefetch before write transactions; _Default_: `true`
+- `randomAccessFields` <VersionBadge version="v5.1.0" /> — Encode records as typed random-access structures, so a single field can be read without decoding the whole record. Best for tables whose records have a stable set of fields with stable types; leave off for wide, sparse, or variably typed schemas. Read by each table when its store opens, so a change applies to existing tables on restart, and ignored entirely by tables declaring the [`@table(randomAccessFields:)`](../database/schema.md#randomaccessfields) directive; _Default_: `false`. See [Storage Tuning — Record Encoding](../database/storage-tuning.md#storagerandomaccessfields)
 - `path` — Database files directory; _Default_: `<rootPath>/database`
 - `backupPath` — Directory for managed database backups (created by [`create_backup`](../backups/operations.md#create_backup)), one subdirectory per database; _Default_: `<rootPath>/backup` (Added in: v5.2.0)
 - `blobPaths` — Blob storage directory or directories; _Default_: `<rootPath>/blobs` (Added in: v4.5.0)
@@ -350,6 +354,37 @@ Root directory for all Harper persistent data, config, logs, and components.
 ```yaml
 rootPath: /var/lib/harper
 ```
+
+---
+
+## `agent`
+
+Added in: v5.2.0
+
+Built-in Harper agent — an LLM loop that operates this instance through Harper's own operations, scoped filesystem access, followup scheduling, the V8 inspector, and outbound HTTP. Disabled by default, so it never incurs LLM cost unless you turn it on. Driven through the [Agent operations](../operations-api/operations.md#agent), which also describe the privilege boundary before you enable it.
+
+```yaml
+agent:
+  enabled: true
+  model: default
+  maxTurns: 50
+  autoApprove: false
+  allowDestructive: false
+  user: hdb_agent
+```
+
+- `enabled` — Enable the agent component; _Default_: `false`
+- `provider` — Recorded on the session but **not yet used to route the model call** — only `model` reaches the provider. Set the provider through the [`models`](../models/overview.md#configuration) configuration instead
+- `model` — Model id override, passed through to the model call; _Default_: the [`models`](../models/overview.md#configuration) generative default
+- `maxTurns` — Maximum tool-call iterations in a single run; _Default_: `50`
+- `maxCostUsd` — Intended per-run cost ceiling. **Not enforced** — it is a stored setting only, and nothing checks spend against it; _Default_: `5.00`
+- `autoApprove` — Run without per-action approval gates; _Default_: `false`
+- `allowDestructive` — Include the tools marked destructive in the agent's toolset: `write_file`, the inspector's code-evaluation tools, and any operations tool carrying MCP's [`destructiveHint`](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). When `false` they are removed entirely rather than gated. That hint comes from a curated set in core which does not cover every damaging operation, so this is not a complete safety boundary on its own — see [Agent operations](../operations-api/operations.md#agent); _Default_: `false`
+- `user` — Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
+- `componentsScope` — Filesystem write scope for component edits, relative to `rootPath`; _Default_: the full `componentsRoot`
+- `systemPromptAppend` — Operator text appended to the agent's system prompt
+
+`enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only. `enabled` is the exception worth knowing: it cannot switch the agent on, because with the agent disabled at startup no agent operation is registered at all.
 
 ---
 

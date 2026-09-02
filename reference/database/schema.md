@@ -73,14 +73,16 @@ type MyTable @table {
 
 Optional arguments:
 
-| Argument       | Type      | Default                       | Description                                                                 |
-| -------------- | --------- | ----------------------------- | --------------------------------------------------------------------------- |
-| `table`        | `String`  | type name                     | Override the table name                                                     |
-| `database`     | `String`  | `"data"`                      | Database to place the table in                                              |
-| `expiration`   | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)               |
-| `eviction`     | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed |
-| `scanInterval` | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                              |
-| `replicate`    | `Boolean` | true                          | Enable replication of this table                                            |
+| Argument             | Type      | Default                       | Description                                                                                 |
+| -------------------- | --------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `table`              | `String`  | type name                     | Override the table name                                                                     |
+| `database`           | `String`  | `"data"`                      | Database to place the table in                                                              |
+| `expiration`         | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                               |
+| `eviction`           | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                 |
+| `scanInterval`       | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                              |
+| `replicate`          | `Boolean` | true                          | Enable replication of this table                                                            |
+| `cacheControl`       | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table |
+| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                     |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
@@ -126,6 +128,23 @@ If the server starts at 12:05, the first eviction runs at 12:15 — not 12:20. T
 
 Eviction removes non-indexed record data, but it does _not_ remove a record from its secondary indexes. If an evicted record matches a search query, Harper fetches the full record from the source on demand to satisfy the query. This means indexes remain fully functional even when most of the data has been evicted.
 
+#### `randomAccessFields`
+
+<VersionBadge version="v5.1.0" />
+
+Encodes this table's records as typed random-access structures, so a single field can be read without decoding the whole record. It suits tables whose records carry a stable set of fields with stable types, and should be left off for wide, sparse, or variably typed schemas. See [Storage Tuning — Record Encoding](./storage-tuning.md#storagerandomaccessfields) for the trade-off and for how to check where a table sits against the structure bound.
+
+Declaring the argument _pins_ this table's encoding when the table is created: the table keeps it regardless of the [`storage.randomAccessFields`](../configuration/options.md#storage) setting, which otherwise applies to every table that does not declare it. That cuts both ways — a fleet-wide change to the global setting will not move a table that pins its own encoding, and editing the argument later does not repin an existing table. Omit the argument when creating a new table to follow the global setting instead.
+
+```graphql
+type Reading @table(randomAccessFields: true) {
+	id: ID @primaryKey
+	sensorId: String @indexed
+	celsius: Float
+	recordedAt: Int
+}
+```
+
 **Examples:**
 
 ```graphql
@@ -162,6 +181,37 @@ type Event @table(database: "analytics", expiration: 86400) {
 
 **Replication:** Replication is enabled by default for all tables. Note that if you disable replication on a table and re-enable it later, it will not catch-up on previous writes during when the replication was disabled.
 
+#### `cacheControl`
+
+<VersionBadge version="v5.2.0" />
+
+The `cacheControl` argument sets a `Cache-Control` header value emitted on anonymous (unauthenticated) GET/HEAD `200`/`304` responses for this table. It is designed for tables whose content is public and safe for shared caches (CDNs, reverse proxies) to store.
+
+```graphql
+type Product @table(cacheControl: "public, max-age=60") @export {
+	id: Long @primaryKey
+	name: String
+	price: Float
+}
+```
+
+Key semantics:
+
+- **Anonymous reads only.** The header is emitted only when the request carries no authenticated principal. Authenticated responses instead receive an identity floor of `Cache-Control: private, no-cache` (plus `Vary: Authorization`/`Cookie`) — the table declaration is not inherited by authenticated reads.
+- **Explicit opt-in required.** Anonymous readability alone does not cause Harper to emit shared-cache headers, because a table gated on request attributes (IP, headers, etc.) could leak across a URL-keyed cache. The `cacheControl` declaration is the explicit statement that the content is safe to cache publicly.
+- **Never on 401 responses.** A rejected request always gets `Cache-Control: private, no-cache` regardless of any declaration.
+- **Visible in `describe_table`.** The value is stored with the table schema and surfaces in the Operations API's `describe_table` output.
+
+The declaration can equivalently be made as a `static cacheControl` property on an exported JavaScript resource class:
+
+```javascript
+export class Product extends tables.Product {
+	static cacheControl = 'public, max-age=60';
+}
+```
+
+See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the full caching behavior and how `Cache-Control` interacts with authentication headers.
+
 ### `@export`
 
 Exposes the table as an externally accessible resource endpoint, available via REST, MQTT, and other interfaces.
@@ -173,6 +223,12 @@ type MyTable @table @export(name: "my-table") {
 ```
 
 The optional `name` parameter specifies the URL path segment (e.g., `/my-table/`). Without `name`, the type name is used.
+
+`@export` alone does not serve HTTP traffic — REST must also be enabled for the application, either explicitly with `rest: true` in its `config.yaml` or by Harper's built-in default for a component directory that has no configuration file at all. See [REST Overview / Tables and Their Automatic Endpoints](../rest/overview.md#tables-and-their-automatic-endpoints) for the endpoints an exported table produces and the exact conditions.
+
+:::warning `@export` is a routing directive, not an access control
+Omitting `@export` removes the REST/MQTT route for a table (callers get 404), but it does **not** protect the data. The table still exists in the database and remains accessible through the Operations API and SQL, subject to RBAC, to administrators and roles with the required operation and table permissions. For table-level confidentiality, omit the table from a role's grants or set its table-level `read` permission to `false` rather than relying on the absence of an export route. To protect individual fields, configure `attribute_permissions` as a whitelist: list every field the role may read and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+:::
 
 ### `@sealed`
 
@@ -187,7 +243,7 @@ type StrictRecord @table @sealed {
 
 ### `@hidden` (Type Directive)
 
-Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use `attribute_permissions` on roles to control data access.
+Suppresses the type from introspectable surfaces — MCP tool descriptors and the OpenAPI document. The table still exists; data is still queryable through Harper's other interfaces subject to RBAC. `@hidden` is a **metadata-visibility** directive, not an access-control mechanism: use table-level role permissions to control access to the table and `attribute_permissions` to control access to individual fields.
 
 ```graphql
 type InternalConfig @table @hidden {
@@ -195,6 +251,10 @@ type InternalConfig @table @hidden {
 	value: String
 }
 ```
+
+:::warning `@hidden` does not restrict data access
+`@hidden` only suppresses a type or field from generated API specs and MCP tool schemas. The underlying data remains available on every surface through which the table is reachable — REST, MQTT, and GraphQL when the table is exported, plus SQL and the Operations API — subject to the user's role permissions. Do not use `@hidden` as a confidentiality control. To restrict access to a table, omit it from a role's grants or set its table-level `read` permission to `false`. To restrict access to an individual field, configure role `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
+:::
 
 `@hidden` is also available as a [field directive](#hidden-field-directive) to suppress individual attributes.
 
@@ -344,7 +404,7 @@ The `@expiresAt` field is authoritative over the table-level [`expiration`](#tab
 
 ### `@hidden` (Field Directive)
 
-Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table; data is still queryable through other interfaces subject to RBAC. Use this for fields that should not appear in introspectable surfaces.
+Suppresses the field from MCP tool descriptors and the OpenAPI document. The attribute still exists in the table and can be returned through every surface on which the table is reachable (REST GET, MQTT, and GraphQL when exported, plus SQL and the Operations API), subject to the user's field permissions. Use this for fields that should not appear in generated specs or tool schemas, not to restrict data access.
 
 ```graphql
 type Customer @table {
@@ -358,7 +418,7 @@ type Customer @table {
 }
 ```
 
-`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the data-access enforcement mechanism.
+`@hidden` is a metadata-visibility directive, not access control: `attribute_permissions` on roles remains the field-level data-access enforcement mechanism. To prevent a role from reading a field value, configure `attribute_permissions` as a whitelist: list every permitted field and omit the restricted field (or list it with `read: false`). Also account for the [filter side-channel on exported Resources](../users-and-roles/overview.md#filter-side-channel-for-read-restricted-attributes).
 
 ## Relationships
 
@@ -467,6 +527,8 @@ tables.Product.setComputedAttribute('totalPrice', (record) => {
 ```
 
 Computed properties are not included in query results by default — use `select` to include them explicitly.
+
+Computed properties that read other tables use the same [trusted server-side authorization context](../components/javascript-environment.md#tables) as other direct `tables` or `databases` calls. Do not expose protected cross-read data through a computed property when access depends on the caller.
 
 ### Computed Indexes
 

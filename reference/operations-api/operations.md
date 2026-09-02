@@ -47,7 +47,7 @@ Detailed documentation: [Database Overview](../database/overview.md)
 
 ### `describe_all`
 
-Returns the definitions of all databases and tables within the database. Record counts above 5000 records are estimated; the response includes `estimated_record_range` when estimated. To force an exact count (requires full table scan), include `"exact_count": true`.
+Returns the definitions of all databases and tables within the database. Record counts above 5000 records are estimated; the response includes `estimated_record_range` when estimated. To force an exact count (requires full table scan), include `"exact_count": true`. Each table definition includes the [record-structure dictionary fields](#describe_table) described for `describe_table`.
 
 ```json
 { "operation": "describe_all" }
@@ -55,7 +55,7 @@ Returns the definitions of all databases and tables within the database. Record 
 
 ### `describe_database`
 
-Returns all table definitions within the specified database.
+Returns all table definitions within the specified database. Each table definition includes the [record-structure dictionary fields](#describe_table) described for `describe_table`.
 
 ```json
 { "operation": "describe_database", "database": "dev" }
@@ -68,6 +68,43 @@ Returns the definition of a specific table.
 ```json
 { "operation": "describe_table", "table": "dog", "database": "dev" }
 ```
+
+<VersionBadge type="changed" version="v5.2.5" />
+
+Alongside the schema, the response carries the size of the table's **record-structure dictionaries**
+— the physical record layouts Harper has seen for this table. They are how you check whether a table
+is getting
+[random-access field encoding](../database/storage-tuning.md#storagerandomaccessfields) and how much
+room it has left before novel layouts stop receiving it:
+
+| Field                      | Description                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `typed_structures_enabled` | Whether random-access (typed) encoding is enabled for this table                     |
+| `typed_structure_count`    | Structures in the random-access dictionary                                           |
+| `typed_structure_limit`    | Bound past which novel record shapes are stored without random-access field encoding |
+| `classic_structure_count`  | Structures in the classic named-record dictionary                                    |
+
+A typed structure is minted per distinct _shape_, where shape means the ordered list of fields plus
+the encoded type and width each field's value takes — so `{a, b}` and `{b, a}` are different shapes,
+and so are `{v: 1}`, `{v: 70000}`, and `{v: "ok"}`. Dictionary size therefore tracks the variety of
+shapes a table has ever written, not its column count, and it only grows: structures are never
+pruned, because stored records, transaction-log entries, and replication backlogs all reference them
+by id. A classic structure keys on the ordered field names alone, so `classic_structure_count` moves
+only when a table writes a field-name set it has not written before, and it stops at 32 — the
+classic dictionary's own bound, which is why the response carries no limit field for it.
+
+[`storage.randomAccessFields`](../configuration/options.md#storage) defaults to off, so `typed_structures_enabled: false` with
+`typed_structure_count: 0` is the normal state for most tables — that is typed encoding being
+disabled, not spare headroom. Where it is enabled, reaching `typed_structure_limit` is not an error:
+records with novel shapes past that point still write and read correctly, but are stored without
+random-access field encoding, which makes reading individual fields of large records slower. Harper
+logs a warning when a thread first observes the bound, but that depends on which thread served the
+writes and whether it has loaded the dictionary — the counts here are the reliable signal.
+
+To keep the typed dictionary small, write records in a consistent field order, avoid making the _set_
+of present fields vary per write (nest volatile or optional fields inside one sub-object rather than
+adding and removing top-level fields), keep a given field to one value type across records, and
+expect a small fixed number of extra shapes from numeric fields whose values cross a width boundary.
 
 ### `create_database`
 
@@ -543,13 +580,24 @@ Detailed documentation: [JWT Authentication](../security/jwt-authentication.md)
 
 ### `create_authentication_tokens`
 
-Does not require prior authentication. Returns `operation_token` (short-lived JWT) and `refresh_token` (long-lived JWT).
+Does not require prior authentication when called with `username`/`password`. Returns `operation_token` (short-lived JWT) and `refresh_token` (long-lived JWT).
 
 ```json
 {
 	"operation": "create_authentication_tokens",
 	"username": "my-user",
 	"password": "my-password"
+}
+```
+
+With `role` as an inline role object, instead mints a single **scoped token** whose bearer is limited to the embedded permissions — requires an authenticated `super_user` caller; `username` is attribution only and must not name an existing user (defaults to `scoped:<minter>`); no refresh token is issued and the token cannot be revoked before expiry. See [JWT Authentication / Scoped Tokens](../security/jwt-authentication.md#scoped-tokens-inline-role).
+
+```json
+{
+	"operation": "create_authentication_tokens",
+	"username": "reporting-service",
+	"role": { "permission": { "operations": ["read_only"] } },
+	"expires_in": "7d"
 }
 ```
 
@@ -661,7 +709,11 @@ The user the policy names is the privilege boundary: a matching run gets that us
 	"audience": "https://my-instance.harperdb.io:9925/",
 	"user": "ci-deploy",
 	"operations": ["deploy_component", "get_deployment", "restart_service"],
-	"claims": { "repository_id": "67890", "environment": "production" }
+	"claims": {
+		"repository_id": "67890",
+		"workflow_ref": "HarperFast/my-app/.github/workflows/deploy.yml@refs/heads/main",
+		"environment": "production"
+	}
 }
 ```
 
@@ -687,9 +739,11 @@ A scoped token also cannot trade itself for a browser session: `create_authentic
 
 A constrained claim that is **absent** from the token fails rather than passes, so a policy cannot be weakened by an issuer that stops emitting a claim.
 
+**An http(s) audience must be the exact string the CI client asks for**, which means an explicit port and a trailing slash — `https://my-instance.example.com:9925/`, not `https://my-instance.example.com`. This is checked for **every** issuer, not only GitHub Actions, and the shorter form is rejected at write time. The audience is matched byte-for-byte at verification, and the CLI requests its token for the normalized target, which supplies `:9925` and the trailing slash — so a policy written without them could never authenticate. An audience that is not an http(s) URL (an `api://` identifier, a bare GUID) is not constrained.
+
 **The audience should identify this instance.** For GitHub Actions, Harper rejects the provider's shared default — anything shaped like `https://github.com/<owner>` — because that value is shared by every repository under the owner, so accepting it would make a token minted by any of them valid here.
 
-That check is a guard against the one known-dangerous value, not a proof of correctness: Harper does not compare the audience against its own identity, so an arbitrary or mistyped value is accepted at write time and instead fails to match at exchange time, when the CLI derives the audience from its target URL. Use the instance URL your CI targets. For an issuer with no registered profile the audience is not checked for specificity at all, and the required `sub` pin is what binds the policy to one principal.
+That check is a guard against the one known-dangerous value, not a proof of correctness: Harper does not compare the audience against its own identity, so an arbitrary or mistyped value is accepted at write time and instead fails to match at exchange time, when the CLI derives the audience from its target URL. Use the instance URL your CI targets. For an issuer with no registered profile the audience is not checked for _specificity_ — the canonical-form rule above still applies — and the required `sub` pin is what binds the policy to one principal.
 
 ##### Policy specificity for GitHub Actions
 
@@ -762,6 +816,8 @@ Lists every policy, **including disabled ones**, sorted by `id`. **super_user on
 
 Returns `{ "policies": [ ... ] }`. Each entry carries `id`, `issuer`, `audience`, `claims`, `user`, `operations` (`null` when unscoped), `enabled`, `description`, `updated_by`, and timestamps.
 
+An entry may also carry **`invalid_reason`** — set when the policy cannot currently authenticate anyone, because it is malformed or because the user it names was deleted or deactivated after the policy was written. Check for it first when diagnosing a rejected exchange: the exchange will not say what failed, so a policy you expected to match that carries an `invalid_reason` is the fastest explanation available.
+
 #### `drop_oidc_trust`
 
 Stops every workflow that matched the policy from exchanging again. **super_user only.** Fails with `404` if no policy has that `id`.
@@ -815,6 +871,8 @@ Additional parameters:
 - `host` <VersionBadge version="v5.2.0" /> — the virtual hostname the component is served on (e.g. `"api.example.com"`). Must be a bare hostname or IPv6 literal — no scheme, port, path, or brackets. Persisted alongside `urlPath`.
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
+- `deployment_timeout` <VersionBadge version="v5.1.4" /> — how long, in milliseconds, a peer waits to receive the replicated deployment payload before failing (default: `120000`)
+- `ignore_replication_errors` <VersionBadge version="v5.1.4" /> — set to `true` to treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. By default a failed peer causes `deploy_component` to return a non-2xx status; the component is still deployed (and, if requested, restarted) on the origin node.
 
 `urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
 
@@ -1320,6 +1378,174 @@ Manage in-memory application status values. Status types: `primary`, `maintenanc
 ```json
 { "operation": "set_status", "id": "primary", "status": "active" }
 ```
+
+---
+
+## Agent
+
+<VersionBadge version="v5.2.0" />
+
+Operations for driving Harper's built-in agent — an LLM loop that operates the instance through Harper's own operations, scoped filesystem access, followup scheduling, the V8 inspector, and outbound HTTP. The loop runs on the main thread, so an active run competes with Harper's other main-thread work; prefer running exploratory prompts against a node that is not serving production traffic.
+
+The agent component is **disabled by default**. Enable it with `agent.enabled: true` in `harper-config.yaml` (see [`agent`](../configuration/options.md#agent)) and configure a generative model under [`models`](../models/overview.md#configuration). With the component disabled at startup none of these operations are registered, so calling one is an unknown-operation error rather than a permission or state error.
+
+All six operations are `super_user` by default. They participate in the role [`operations` allowlist](../users-and-roles/overview.md#operation-permissions), so a non-`super_user` role can be granted a scoped subset without granting full `super_user` — either individual names (`operations: ['agent_prompt', 'get_agent_session']`) or the built-in [`agent` permission group](../users-and-roles/overview.md#operation-permissions), which covers all of these except `set_agent_config`. Note that the read operations are not caller-scoped: a role granted `get_agent_session` or `list_agent_sessions` reads every session on the instance, including transcripts of runs it did not start. Because a transcript records the _arguments and output_ of every tool call, and those calls ran as `agent.user`, delegating a read operation hands that role the results of work done at the agent's privilege — table contents, log excerpts, configuration — regardless of its own permissions. Delegate the read operations only to roles you would trust with the agent itself.
+
+:::warning
+Anyone who can call `agent_prompt` can direct whatever the agent does. Understand the boundary before enabling it:
+
+- `agent.user` (default: a `super_user` bootstrap identity) governs only the **operations** tools. Setting it to a restricted user narrows those, and nothing else.
+- The agent's other tools — scoped filesystem access, outbound `http_fetch`, followup scheduling, and the V8 inspector — run at the Harper process's own privilege, whatever `agent.user` is. (The inspector tools additionally need `threads.debug`, and fail with an explanatory error without it.)
+- `http_fetch` blocks only the known cloud-metadata hostnames and the IPv4 link-local range `169.254.0.0/16`, and it checks the literal hostname you pass — a name that resolves to a blocked address is not caught, and redirects are followed without re-checking. Every other host, including anything private or internal the server can route to, is reachable. Reading is ungated too: `read_file` covers the log and configuration directories as well as the component tree, so an enabled agent puts a read path and an egress path in the same toolset. Treat it as an outbound network client and apply egress policy to the host.
+- With the default `agent.allowDestructive: false`, destructive tools (including filesystem writes) are removed from the toolset entirely. Turning it on admits component writes, and component code is executed by the Harper process — a write is effectively code execution at process privilege.
+- Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
+- That set is an explicit list in core rather than a prefix match, and it is not a list of every damaging operation, so `allowDestructive` and `autoApprove` are not a boundary by themselves. The component operations are the ones to know about: `drop_component` and `deploy_component` are both off the set, so opting either into [`mcp.operations.allow`](../mcp/configuration.md#mcpoperationsallow) puts it in the agent's toolset where `allowDestructive: false` does not remove it and no approval gates it — and `deploy_component` writes code the Harper process then executes. Vet anything you add to that allow list on its own merits rather than assuming these two settings cover it.
+  :::
+
+| Operation              | Description                                                   | Role Required |
+| ---------------------- | ------------------------------------------------------------- | ------------- |
+| `agent_prompt`         | Starts or continues an agent session and kicks off a run      | super_user    |
+| `get_agent_session`    | Returns a session: status, full transcript, pending approvals | super_user    |
+| `list_agent_sessions`  | Lists agent sessions                                          | super_user    |
+| `approve_agent_action` | Approves or denies a gated tool call and resumes the run      | super_user    |
+| `cancel_agent_run`     | Cancels a run and marks the session aborted                   | super_user    |
+| `set_agent_config`     | Updates agent settings in memory for the life of the process  | super_user    |
+
+### Sessions and run status
+
+Each conversation is a session, persisted to `system.hdb_agent_session` so transcripts survive a restart. Runs are asynchronous: `agent_prompt` returns as soon as the run is started, and you poll `get_agent_session` for progress and results.
+
+Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — and each tool call is recorded with its arguments as well as its output, so a bearer token in an `http_fetch` header or a secret in a `set_configuration` call is stored verbatim. Treat a prompt and everything a run passes to a tool as durably recorded, and keep credentials out of both.
+
+The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it, and a backup of `system` to carry them as well. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
+
+A run does not resume across a restart, and nothing reconciles session status at startup: a session the restart caught in `running` or `awaiting_approval` keeps that status indefinitely, so polling never terminates and `agent_prompt` rejects it with a 409. Clear it with [`cancel_agent_run`](#cancel_agent_run), which reports `"signalledLiveRun": false` because there is no live run left to signal.
+
+A session's `status` is one of:
+
+| Status              | Meaning                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `idle`              | Created, or resumable — no run in flight                                                      |
+| `running`           | A run is in progress                                                                          |
+| `awaiting_approval` | Paused on one or more destructive tool calls; see `pendingApprovals`                          |
+| `completed`         | The run ended without throwing — a final answer, or the `maxTurns` ceiling; check `lastError` |
+| `aborted`           | Cancelled by an operator via `cancel_agent_run`                                               |
+| `error`             | The run failed; `lastError` carries the message                                               |
+
+`completed` also covers hitting the `agent.maxTurns` ceiling — in that case `lastError` reads `Reached maxTurns=<n> without a final answer.`, so check it before treating a completed session as finished.
+
+### `agent_prompt`
+
+Sends a prompt to the agent. Omit `session_id` to start a new session; supply one to continue an existing conversation. Returns immediately with the session id and `"status": "running"`.
+
+| Parameter    | Type   | Description                                                     |
+| ------------ | ------ | --------------------------------------------------------------- |
+| `message`    | string | The instruction for the agent. **Required**, must be non-empty. |
+| `session_id` | string | Existing session to continue. Omit to create a new session.     |
+
+```json
+{
+	"operation": "agent_prompt",
+	"message": "Create a component called inventory with a Product table keyed by sku, then verify it responds over REST."
+}
+```
+
+Response:
+
+```json
+{ "session_id": "3f7c...", "status": "running" }
+```
+
+A session that is `running` or `awaiting_approval` rejects a new prompt with a 409 — resolve the pending approval or cancel the run first.
+
+### `get_agent_session`
+
+Returns the full session record: `status`, `user` (the Operations API caller who created the session, falling back to `agent.user`), the `messages` transcript (user, assistant, and tool messages, including tool calls and their observations), `pendingApprovals`, `model`, `provider`, `createdAt`/`updatedAt`, and `lastError`. This is the polling endpoint for a run in flight.
+
+```json
+{ "operation": "get_agent_session", "session_id": "3f7c..." }
+```
+
+Unknown `session_id` returns a 404.
+
+### `list_agent_sessions`
+
+Lists agent sessions.
+
+| Parameter | Type    | Description                              |
+| --------- | ------- | ---------------------------------------- |
+| `limit`   | integer | Maximum sessions to return. Default 100. |
+
+```json
+{ "operation": "list_agent_sessions", "limit": 20 }
+```
+
+Response:
+
+```json
+{ "sessions": [{ "session_id": "3f7c...", "status": "completed", "...": "..." }] }
+```
+
+Through v5.2.4 the result order is not chronological — session ids are UUIDs and the listing walks them in reverse key order — and `limit` is applied by that scan, so once there are more sessions than `limit` the ones left out are an arbitrary subset rather than the oldest. On those versions, request a `limit` above your session count and sort on `updatedAt` or `createdAt` yourself if you need recency. The ordering is fixed in core by [harper#2268](https://github.com/HarperFast/harper/issues/2268) — check the release notes for the version it ships in.
+
+### `approve_agent_action`
+
+When `agent.autoApprove` is off (the default), any tool call the agent makes to a destructive operation pauses the run and lands in the session's `pendingApprovals`. This operation resolves one of them and resumes the run. Each entry carries its identifier in an `id` field — pass that as `approval_id` — alongside `toolName`, `arguments`, and `reason`.
+
+| Parameter     | Type    | Description                                                                      |
+| ------------- | ------- | -------------------------------------------------------------------------------- |
+| `session_id`  | string  | **Required.**                                                                    |
+| `approval_id` | string  | The `id` of the entry in `get_agent_session`'s `pendingApprovals`. **Required.** |
+| `approved`    | boolean | `true` to approve (default). `false` denies the call.                            |
+
+```json
+{
+	"operation": "approve_agent_action",
+	"session_id": "3f7c...",
+	"approval_id": "9b21...",
+	"approved": true
+}
+```
+
+Both decisions resume the loop: an approval executes the saved tool call, and a denial hands the refusal back to the model as an observation so it can adjust. Neither ends the run — use `cancel_agent_run` for that. If a single turn produced several gated calls, the session stays `awaiting_approval` until every one of them is resolved. Resolving an already-resolved approval is an error.
+
+Whether a tool is treated as destructive at all is governed by `agent.allowDestructive`: when it is `false` (the default), destructive tools are removed from the agent's toolset entirely rather than gated. Which tools carry that mark is fixed in core — `write_file`, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) — so an operation outside it (`drop_component` and `deploy_component` among them) is neither removed nor gated.
+
+### `cancel_agent_run`
+
+Cancels a session's run, clears any followups it scheduled, and marks the session `aborted`. Works on a paused (`awaiting_approval`) or `idle` session as well as an actively running one.
+
+```json
+{ "operation": "cancel_agent_run", "session_id": "3f7c..." }
+```
+
+Response:
+
+```json
+{ "cancelled": true, "signalledLiveRun": true }
+```
+
+`cancelled` is `false` if the session had already reached a terminal state (`completed`, `aborted`, `error`). `signalledLiveRun` reports whether there was an in-flight run to abort — a paused session yields `false` while still being marked aborted.
+
+One gap is worth knowing: changing `allowDestructive` with [`set_agent_config`](#set_agent_config) rebuilds the toolset, and followups scheduled before that change are no longer tracked, so a later cancel does not clear them. A stray followup starts a fresh run even after a cancel and even with `enabled` set to `false`. If a run has scheduled followups, avoid toggling `allowDestructive` mid-session, and restart the node if one escapes.
+
+### `set_agent_config`
+
+Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent).
+
+```json
+{ "operation": "set_agent_config", "autoApprove": false, "maxTurns": 20 }
+```
+
+Three limits are worth knowing:
+
+- **The change is in-memory and not persisted.** It applies for the life of the process and is lost on restart; edit `harper-config.yaml` for a durable change.
+- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
+- **`enabled` is not a kill switch.** It cannot turn the agent on — if it was off at startup, this operation does not exist. Setting it to `false` only makes subsequent `agent_prompt` calls return 409; a run already in flight continues, and `approve_agent_action` still resumes a paused one. Use `cancel_agent_run` to stop a run.
+
+### MCP access
+
+When the [MCP server](../mcp/overview.md) is enabled with the operations profile, `agent_prompt`, `get_agent_session`, `list_agent_sessions`, `approve_agent_action`, and `cancel_agent_run` are also exposed as MCP tools, with no allow-list entry required. They dispatch through the same authorization path as the operations above, and are listed only for users whose role could call them. `set_agent_config` is deliberately not exposed over MCP — it is an operator action.
 
 ---
 

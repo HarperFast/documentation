@@ -19,6 +19,7 @@ on:
       - 'docusaurus.config.ts'
       - 'package-lock.json'
       - 'package.json'
+      - 'historic-redirects.ts'
       - 'redirects.ts'
       - 'sidebars*.ts'
       - 'versions.json'

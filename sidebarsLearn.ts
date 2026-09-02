@@ -43,6 +43,11 @@ const sidebarsLearn: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'developers/multiple-applications',
+					label: 'Multiple Applications on One Cluster',
+				},
+				{
+					type: 'doc',
 					id: 'developers/caching-with-harper',
 					label: 'Caching with Harper',
 				},

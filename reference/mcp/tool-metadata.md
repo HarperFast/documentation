@@ -39,8 +39,14 @@ For operations tools, the descriptor fields are sourced from:
 | `description`                 | Hand-authored entry in the operations descriptions catalog; falls back to a generic template when an operator opts in a non-cataloged operation |
 | `inputSchema`                 | Hand-curated JSON Schema in the operations input-schemas catalog; falls back to `{ type: 'object', additionalProperties: true }`                |
 | `annotations.readOnlyHint`    | `true` if the operation matches a read-only prefix (`describe_`, `list_`, `search_`, `get_`, `read_`) or is the literal `system_information`    |
-| `annotations.destructiveHint` | `true` for operations in the curated destructive set (`drop_*`, `delete_*`, `restart`, `set_configuration`, etc.)                               |
+| `annotations.destructiveHint` | `true` for operations in the curated destructive set — an explicit list, not a prefix match; see below                                          |
 | `annotations.idempotentHint`  | Default empty; opt-in per operation after end-to-end verification that the second call produces the same observable outcome                     |
+
+The curated destructive set is enumerated in core rather than matched by prefix, and this is its full membership:
+
+`drop_schema`, `drop_database`, `drop_table`, `drop_attribute`, `drop_user`, `drop_role`, `delete`, `delete_files_before`, `delete_records_before`, `delete_audit_logs_before`, `delete_transaction_logs_before`, `delete_deployment_payload`, `delete_backup`, `purge_backups`, `restore_backup`, `restart`, `restart_service`, `set_configuration`, `remove_node`.
+
+Operations that look destructive but are absent from it carry no hint — `drop_component`, `deploy_component`, `drop_waf_rule`, `delete_secret`, and `remove_certificate` among them — so do not read the hint as an inventory of what an operation can damage.
 
 Operations registered outside core (for example, `cluster_status` from harper-pro) don't have catalog entries; they fall back to the generic description template until the per-operation metadata registry lands.
 
@@ -48,15 +54,15 @@ Operations registered outside core (for example, `cluster_status` from harper-pr
 
 For verb tools generated from exported Resources:
 
-| Field                         | Source                                                                                                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                        | `${verb}_${sanitized-path}` (e.g. `get_Product`, `search_Customer`)                                                                                                                            |
-| `description`                 | Composed: `[ResourceClass.description \n\n] ${verb sentence} ${runtime RBAC note}`                                                                                                             |
-| `inputSchema`                 | Derived per verb from `ResourceClass.attributes` and the caller's `attribute_permissions`. Per-attribute `description` propagates to `inputSchema.properties[*].description`                   |
-| `outputSchema`                | Derived per verb from `ResourceClass.attributes` for `get_*` / `create_*` / `update_*` / `patch_*`. `delete_*` returns `{ deleted: true, <pk> }`. `search_*` deliberately omits `outputSchema` |
-| `annotations.readOnlyHint`    | `true` on `get_*` and `search_*`                                                                                                                                                               |
-| `annotations.destructiveHint` | `true` on `delete_*`                                                                                                                                                                           |
-| `annotations.idempotentHint`  | `true` on `update_*` (PUT semantics); other verbs default off                                                                                                                                  |
+| Field                         | Source                                                                                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                        | `${verb}_${sanitized-path}` (e.g. `get_Product`, `search_Customer`)                                                                                                                           |
+| `description`                 | Composed: `[ResourceClass.description \n\n] ${verb sentence} ${runtime RBAC note}`                                                                                                            |
+| `inputSchema`                 | Derived per verb from `ResourceClass.attributes`, once at registration time and identical for every caller. Per-attribute `description` propagates to `inputSchema.properties[*].description` |
+| `outputSchema`                | The full record shape on `get_*`; fixed envelopes on `create_*` (`{ id }`), `update_*` / `patch_*` (`{ ok }`), and `delete_*` (`{ deleted }`). `search_*` deliberately omits `outputSchema`   |
+| `annotations.readOnlyHint`    | `true` on `get_*` and `search_*`                                                                                                                                                              |
+| `annotations.destructiveHint` | `true` on `delete_*`                                                                                                                                                                          |
+| `annotations.idempotentHint`  | `true` on `update_*` (PUT semantics); other verbs default off                                                                                                                                 |
 
 `static description` and `static properties` on the Resource class override the auto-derived values. `static outputSchemas[verb]` overrides per-verb output schemas. `static mcp.annotations[verb]` overrides annotations per verb. `static hidden === true` suppresses the entire Resource from MCP listing.
 
@@ -137,9 +143,9 @@ Harper also publishes a small set of synthetic resources via the MCP `resources/
 | `harper://operations`          | operations  | User-filtered operations catalog                      |
 | `harper://openapi`             | application | Full OpenAPI 3.0.3 document                           |
 | `harper://schema/{db}/{table}` | application | Per-table schema, filtered by `attribute_permissions` |
-| `https://{host}/{path}`        | application | Application HTTP Resources, in-process                |
+| `harper+rest://{host}/{path}`  | application | Application HTTP Resources, in-process                |
 
-For `harper://schema/{db}/{table}` and `https://{host}/{path}` entries, the descriptor description prepends `Table.description` / `ResourceClass.description` when present.
+For `harper://schema/{db}/{table}` and `harper+rest://{host}/{path}` entries, the descriptor description prepends `Table.description` / `ResourceClass.description` when present. Application Resources were listed under `https://{host}/{path}` before 5.1.18 <VersionBadge type="changed" version="v5.1.18" />; legacy `http(s)://` URIs are still accepted on `resources/read` and `resources/subscribe`. See [`harper+rest://` URIs](./tools-and-resources.md#harperrest-uris).
 
 ## See also
 
