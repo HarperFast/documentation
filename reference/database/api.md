@@ -242,6 +242,7 @@ import { type RequestTargetOrId, tables, createBlob } from 'harper';
 export class Photo extends tables.Photo {
 	static async post(target: RequestTargetOrId, record: any) {
 		const body = await record;
+		if (!body) return new Response('A JSON body is required', { status: 400 });
 		if (body.data) {
 			body.data = createBlob(Buffer.from(body.data, body.encoding || 'base64'), {
 				type: body.contentType || 'application/octet-stream',

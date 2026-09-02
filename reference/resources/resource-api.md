@@ -737,7 +737,7 @@ Returns the user associated with the current request, or `undefined` if no user 
 
 ```javascript
 static async get(_target, context) {
-	const user = context.user;
+	const user = context?.user;
 	if (!user) return new Response(null, { status: 401 });
 	return { username: user.username, role: user.role };
 }
@@ -752,7 +752,7 @@ The request context exposes `login` and `session` for handling sign-in/out flows
 ```typescript
 export class SignIn extends Resource {
 	static async post(_target, data, context) {
-		const { username, password } = await data;
+		const { username, password } = (await data) ?? {};
 		try {
 			await context.login(username, password);
 		} catch {
@@ -764,14 +764,14 @@ export class SignIn extends Resource {
 
 export class SignOut extends Resource {
 	static async post(_target, _data, context) {
-		if (!context.session?.user) return new Response(null, { status: 401 });
+		if (!context?.session?.user) return new Response(null, { status: 401 });
 		await context.session.update({ user: null });
 		return new Response('Logged out', { status: 200 });
 	}
 }
 ```
 
-`context.login(username, password)` verifies credentials and establishes the session cookie on success. To end a session, clear its user with `context.session.update({ user: null })` — [`update`](../http/api.md#properties) is the session's only mutator. `context.session` is an empty object rather than `undefined` when sessions are enabled and the request carries no session cookie, so test `context.session?.user` to detect an established session.
+`context.login(username, password)` verifies credentials and establishes the session cookie on success. To end a session, clear its user with `context.session.update({ user: null })` — [`update`](../http/api.md#properties) is the session's only mutator. `context.session` is an empty object rather than `undefined` when sessions are enabled and the request carries no session cookie, so test `context?.session?.user` to detect an established session.
 
 Cookie-based sessions are intended for browser clients. For non-browser clients (CLI tools, mobile apps, service-to-service), use JWT issuance — see [JWT Authentication](../security/jwt-authentication.md).
 
