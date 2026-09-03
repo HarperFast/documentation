@@ -34,7 +34,7 @@ Authentication runs before the default middleware chain determines route ownersh
 
 A Harper-owned handler settles that deferred authentication failure before responding. This prevents an unrecognized credential from turning a protected Harper route into anonymous access. A handler that calls `next(request)` without claiming the route leaves the credential available to later application middleware. This allows an unmounted catch-all handler to authenticate and proxy an open-ended set of application URLs without registering each URL with `urlPath`.
 
-An application receiving a deferred credential must validate it using its own authentication scheme. If no handler claims the request, Harper returns not found rather than treating the existence of an `Authorization` header as proof that the URL belongs to Harper. Internal Harper authentication errors remain fail-closed. See [Security](../security/overview.md#authentication-and-route-ownership) for the security boundary.
+An application receiving a deferred credential must validate it using its own authentication scheme, and the response it produces is returned unchanged — Harper does not replace an application's `WWW-Authenticate` challenge or turn its `401` into a login-page redirect. If no handler claims the request, Harper returns not found rather than treating the existence of an `Authorization` header as proof that the URL belongs to Harper. Internal Harper authentication errors remain fail-closed. See [Security](../security/overview.md#authentication-and-route-ownership) for the security boundary.
 
 ### Middleware routing
 

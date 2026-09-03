@@ -34,6 +34,10 @@ On the application HTTP port, Harper attempts authentication before resolving wh
 
 A Harper-owned route returns the normal unauthorized response before running its operation. If no Harper route claims the request, a later application handler receives the unchanged header and can apply its own authentication scheme. If no handler claims the request, the request ends as not found. Authentication infrastructure failures are not deferred and remain fail-closed.
 
+When a request carries a deferred credential, Harper does not rewrite the unauthorized response that comes back. An application handler's own `401` — including its `WWW-Authenticate` challenge for its own scheme — is returned to the client as the handler wrote it, and Harper does not substitute its own challenge or redirect the request to a configured login page. A Harper-owned route settling the deferred credential answers exactly as it did before this behavior existed.
+
+A WebSocket or MQTT-over-WebSocket upgrade carrying an unrecognized credential is closed with WebSocket close code `3000` rather than being established as an anonymous connection.
+
 This behavior is automatic and has no configuration option. Application handlers that accept non-Harper credentials are responsible for validating those credentials before serving protected content. See [HTTP request handling](../http/overview.md#authentication-and-fallthrough) for the middleware ownership contract.
 
 ## Certificate Management
