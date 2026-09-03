@@ -259,25 +259,30 @@ Subscription catch-up (`startTime`) reads the audit log, and the audit log is pr
 
 ```javascript
 const floor = tables.Product.oldestRetainedAuditTime();
-if (cursor >= floor) {
-	// nothing after `cursor` has been pruned; resume incrementally
-	subscription = await tables.Product.subscribe({ startTime: cursor });
-} else {
-	// history this consumer needs has been pruned; re-read the table instead
+if (cursor < floor) {
+	// definite: history this consumer needs has been pruned; re-read the table instead
 	await fullResync();
+} else {
+	// retention has not pruned anything after `cursor`. This is a PRUNING check only — it cannot
+	// see a database that was restored or checkpointed (see the rollback limit below), so resume
+	// here only where a rollback is not a case you have to handle.
+	subscription = await tables.Product.subscribe({ startTime: cursor });
 }
 ```
 
-The cursor is a _last-processed_ position, so a cursor exactly at the floor is safe — everything below it has already been handled.
+The cursor is a _last-processed_ position, so a cursor exactly at the floor passes: everything below it has already been handled, and everything above it is still retained.
 
 Details worth knowing before relying on it:
 
 - **The time domain is the same one `startTime` uses**, so cursors compare directly with no conversion. Subscription events carry it as `localTime`.
 - **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the messages between them have already been pruned, which is the silent gap this method exists to expose.
-- **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so `cursor >= floor` means no entry of _any_ table in that database was pruned below the cursor. `deleteHistory()` on one table raises the floor for its siblings too.
+- **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so `cursor >= floor` means no entry of _any_ table in that database was pruned _after_ the cursor. It says nothing about entries below the cursor — those are older than the floor and may well be gone, which is the floor's whole purpose. `deleteHistory()` on one table raises the floor for its siblings too.
 - **`Infinity` means the floor is unknown.** Treat no cursor as safe. This is what a database reports when its retention history cannot be accounted for — most commonly the first time it is opened by a version that records a floor, or after a migration between storage engines, which does not carry the audit log across. Consumers resync once and then get real values.
 - **Across retention pruning it errs in one direction only.** The floor can ask for a resync that was not strictly necessary. It does not report a cursor as safe when a prune removed history that cursor needed.
-- **It is not a database-generation check, so it cannot see a rollback.** Restoring a backup, or opening a RocksDB checkpoint, replaces a database's state with a copy of an earlier state — and reinstalls that copy's floor along with it. A cursor saved after the copy point then compares as safe against a floor that predates it, even though the database no longer holds a change stream describing the rollback. Treat this method as a check for retention pruning, not as the only gate on resuming across a restore.
+- **It is not a database-generation check, so it cannot see a rollback.**
+
+  > **Caution:** Restoring a backup, or opening a RocksDB checkpoint, replaces a database's state with a copy of an earlier state — and reinstalls that copy's floor along with it. A cursor saved after the copy point then compares as safe against a floor that predates it, even though the database no longer holds a change stream describing the rollback. Treat this method as a check for retention pruning, not as the only gate on resuming across a restore.
+
 - **It is a reading at a moment in time.** Retention can advance between this call and the `subscribe()` that follows it. The window is milliseconds against a retention window normally measured in days, and losing that race leaves you with the truncated replay you would have had anyway — but it is not a lock.
 - Throws if the database has no audit log at all.
 
