@@ -265,19 +265,19 @@ if (!(cursor >= floor)) {
 	// conservative: history this consumer needs may have been pruned; re-read the table instead
 	await fullResync();
 } else {
-	// retention has not pruned anything after `cursor`. This is a PRUNING check only — it cannot
+	// retention has not pruned anything after a valid `cursor`. This is a PRUNING check only — it cannot
 	// see a database that was restored or checkpointed (see the rollback limit below), so resume
 	// here only where a rollback is not a case you have to handle.
 	subscription = await tables.Product.subscribe({ startTime: cursor });
 }
 ```
 
-The cursor is a _last-processed_ position, so a cursor exactly at the floor passes: everything below it has already been handled, and nothing above it has been pruned as of this reading.
+The cursor is a _last-processed_ position, so a _valid_ cursor exactly at the floor passes: everything below it has already been handled, and nothing above it has been pruned as of this reading.
 
 Details worth knowing before relying on it:
 
 - **The time domain is the same one `startTime` uses**, so cursors compare directly with no conversion. Subscription events carry it as `localTime`.
-- **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the messages between them have already been pruned, which is the silent gap this method exists to expose.
+- **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the consumer's real position sits below the floor and the entries that position still needed are already gone, which is the silent gap this method exists to expose.
 - **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so for a valid cursor, `cursor >= floor` means no entry of _any_ table in that database was pruned _after_ the cursor. It says nothing about entries below the cursor — those are older than the floor and may well be gone, which is the floor's whole purpose. `deleteHistory()` on one table raises the floor for its siblings too.
 - **`Infinity` means the floor is unknown.** Treat no cursor as safe. A database reports it when no floor was ever recorded successfully — it is read-only, or the metadata write failed or was unavailable — or when the recorded metadata does not decode. A prune that runs on a database with no floor records this same value, which is not a separate cause: it means the recording is what did not land.
 - **A database's starting floor is stamped when it is first opened, not derived from its history.** It is set at that moment, so it sits _above_ audit entries the database still retains. On a node upgraded with a week of retained history, every cursor saved before the upgrade therefore falls below it and resyncs once — with nothing having been pruned. Do not read that first resync as evidence of lost history. After it, the floor rises only when history is actually pruned — by retention, or by `deleteHistory()`. A restore or checkpoint is the exception to that direction: it replaces the floor with the copy's, which can be lower (see the rollback limit below). Re-read the floor on each resume rather than caching it — retention can advance between reads. Re-reading will not reveal a restore, though: the reinstalled lower floor still passes a cursor saved after the copy point.
