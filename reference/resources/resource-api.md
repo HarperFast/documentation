@@ -259,7 +259,9 @@ Subscription catch-up (`startTime`) reads the audit log, and the audit log is pr
 
 ```javascript
 const floor = tables.Product.oldestRetainedAuditTime();
-if (cursor < floor) {
+// negated rather than `cursor < floor`: an unset or non-numeric cursor compares false either way,
+// and this spelling sends it to the resync branch instead of starting live with no catch-up
+if (!(cursor >= floor)) {
 	// conservative: history this consumer needs may have been pruned; re-read the table instead
 	await fullResync();
 } else {
@@ -270,7 +272,7 @@ if (cursor < floor) {
 }
 ```
 
-The cursor is a _last-processed_ position, so a cursor exactly at the floor passes: everything below it has already been handled, and everything above it is still retained.
+The cursor is a _last-processed_ position, so a cursor exactly at the floor passes: everything below it has already been handled, and nothing above it has been pruned as of this reading.
 
 Details worth knowing before relying on it:
 
