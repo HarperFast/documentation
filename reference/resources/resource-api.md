@@ -253,14 +253,14 @@ All properties are optional:
 
 <VersionBadge version="v5.3.0" />
 
-The oldest point in the audit log that retention has not pruned away — the retention floor. A cursor below it has definitely lost history; a cursor at or above it has not been pruned, which is not on its own a guarantee that resuming is safe (see the limits below).
+The oldest point in the audit log that retention has not pruned away — the retention floor. A cursor below it may have lost history, and the floor cannot certify otherwise; a cursor at or above it has not been pruned, which is not on its own a guarantee that resuming is safe (see the limits below).
 
 Subscription catch-up (`startTime`) reads the audit log, and the audit log is pruned on a retention window (`logging.auditRetention`). A consumer that saves a cursor, disconnects, and resumes past that window would otherwise receive a replay that quietly begins after the messages it missed. This method is how a consumer detects that instead:
 
 ```javascript
 const floor = tables.Product.oldestRetainedAuditTime();
 if (cursor < floor) {
-	// definite: history this consumer needs has been pruned; re-read the table instead
+	// conservative: history this consumer needs may have been pruned; re-read the table instead
 	await fullResync();
 } else {
 	// retention has not pruned anything after `cursor`. This is a PRUNING check only — it cannot
