@@ -30,6 +30,8 @@ The API surface is three methods:
 
 Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing). Every model call is recorded for [observability and usage accounting](./analytics).
 
+Configured models are also reachable over HTTP by unmodified OpenAI SDK / LangChain.js clients through the [OpenAI-Compatible Gateway](./openai-gateway).
+
 ## Configuration
 
 Models are configured in the `models` section of `harper-config.yaml`, split by capability into `embedding` and `generative` maps. Each key is a logical model name; each entry names a `backend` plus backend-specific settings:
