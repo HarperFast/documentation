@@ -6,11 +6,11 @@ title: Module Loading
 
 <VersionBadge version="v5.0.0" />
 
-By default, Harper loads each application's JavaScript through Node.js's [VM module API](https://nodejs.org/api/vm.html) rather than a plain `import()`. Every application gets its own module cache, so two co-located applications can depend on different packages — or different versions of the same package — without colliding, and one application's module-scoped state is not visible to another.
+By default, Harper loads each application's JavaScript through Node.js's [VM module API](https://nodejs.org/api/vm.html) rather than a plain `import()`. Every application gets its own module cache for the modules that loader handles, so two co-located applications can depend on different packages — or different versions of the same package — without colliding, and one application's module-scoped state is not visible to another. Dependencies that Harper routes to the native loader are the exception — see [Dependency Loading](#dependency-loading).
 
 The loader is also what makes application context work. It gives each application a `harper` module scoped to that application: the `logger` it exports is tagged with the application name, and `config` reflects that application's own configuration. Under the VM loaders it additionally substitutes a constrained [`child_process`](./javascript-environment.md#child-processes) module.
 
-Everything on this page is controlled by the `applications` section of `harperdb-config.yaml`:
+Everything on this page is controlled by the `applications` section of `harper-config.yaml`:
 
 ```yaml
 applications:
@@ -26,20 +26,38 @@ applications:
 
 See [Configuration Options](../configuration/options.md#applications) for the settings in the context of the full configuration file.
 
+:::note Defaults changed during v5.0
+
+The defaults above are the current ones. Earlier v5.0 releases behaved differently, so check your version before reasoning about which isolation model you are on:
+
+| Setting            | v5.0.0 default | Current default                    |
+| ------------------ | -------------- | ---------------------------------- |
+| `lockdown`         | `freeze`       | `freeze-after-load`, since v5.0.2  |
+| `moduleLoader`     | `vm`           | `vm-current-context`, since v5.1.0 |
+| `allowedDirectory` | not available  | `app`, since v5.0.4                |
+
+The `moduleLoader` change matters most: on v5.0.x an application runs under `vm` with its own intrinsics, which is the mode that causes cross-context `instanceof` to fail.
+
+:::
+
 ## Module Loader Modes
 
 `moduleLoader` selects how application modules are loaded. The choice determines how much isolation you get, and it has consequences beyond isolation — notably whether application context is available at all, and whether Harper's constrained `child_process` reaches your code.
 
 | Mode                           | Module cache | Intrinsics         | Global object  | Application context (`logger`, `config`) | Constrained `child_process` |
 | ------------------------------ | ------------ | ------------------ | -------------- | ---------------------------------------- | --------------------------- |
-| `vm-current-context` (default) | Per app      | Shared with Harper | Harper's       | Yes                                      | Yes                         |
-| `vm`                           | Per app      | Separate per app   | Custom per app | Yes                                      | Yes                         |
+| `vm-current-context` (default) | Per app\*    | Shared with Harper | Harper's       | Yes                                      | Yes                         |
+| `vm`                           | Per app\*    | Separate per app   | Custom per app | Yes                                      | Yes                         |
 | `native`                       | Shared       | Shared with Harper | Harper's       | No                                       | No                          |
-| `compartment`                  | Per app      | SES-managed        | Custom per app | Yes                                      | No                          |
+| `compartment`                  | Per app\*    | SES-managed        | Custom per app | Yes                                      | No                          |
+
+\* Applies to modules the application loader handles. Dependencies routed to the native loader share Node's process-wide cache — see [Dependency Loading](#dependency-loading).
 
 ### `vm-current-context` (default)
 
-The VM module loader running in Harper's own context. Applications get their own module cache but share JavaScript intrinsics (`Object`, `Array`, `Promise`, and so on) with Harper.
+<VersionBadge type="changed" version="v5.1.0" />
+
+The VM module loader running in Harper's own context, and the default since v5.1.0 (v5.0.x defaulted to `vm`). Applications get their own module cache but share JavaScript intrinsics (`Object`, `Array`, `Promise`, and so on) with Harper.
 
 Sharing intrinsics gives the best compatibility with packages that perform `instanceof` or other identity checks on values crossing the application/Harper boundary. It is the right choice for almost every application.
 
@@ -61,11 +79,13 @@ The trade-off is that application context is lost: there is no per-application m
 
 SES `Compartment`-based loading, using the [`ses`](https://www.npmjs.com/package/ses) implementation of the proposed Compartment API. One compartment per application, created on demand because it is considerably heavier than the other modes.
 
-Advanced; only needed for specialized sandboxing requirements. Note that compartments resolve built-in modules through Node directly, so Harper's constrained `child_process` is bypassed entirely under this mode — the spawn allowlist, the mandatory `name` option, the single-process lock, and the `execSync` block all disappear together.
+Advanced; only needed for specialized sandboxing requirements.
 
-### Constrained `fetch`
+:::warning Compartments bypass the constrained `child_process`
 
-Under `lockdown: ses`, the modes that build a custom global object (`vm` and `compartment`) also install an https-only `fetch` in that global. Under `vm-current-context` and `native`, application code uses the standard global `fetch`.
+Compartments resolve built-in modules through Node directly. Harper's substituted `child_process` is not applied under this mode. The spawn allowlist, the mandatory `name` option, the single-process lock, and the `execSync` block all disappear together, so component code can spawn any command, once per worker thread. Keep process-spawning code under `vm-current-context` or `vm`.
+
+:::
 
 ## Dependency Loading
 
@@ -85,19 +105,23 @@ The default is a deliberate compromise: packages that depend on `harper` want ap
 
 - `freeze-after-load` (default) — freeze intrinsics after all components have loaded, so component initialization can still modify them.
 - `freeze` — freeze intrinsics before any application code loads.
-- `ses` — full SES lockdown via the `ses` package. Strictest, and the most likely to break packages that mutate built-ins. Also enables the constrained `fetch` described above.
+- `ses` — full SES lockdown via the `ses` package. Strictest, and the most likely to break packages that mutate built-ins.
 - `none` — no lockdown.
 
 Under the default, application code or a dependency that modifies an intrinsic prototype at runtime — after startup — throws a `TypeError`. If a dependency does this and you need a temporary workaround, set `lockdown: none`.
 
 ## Allowed Directory
 
+<VersionBadge version="v5.0.4" />
+
 `allowedDirectory` restricts where application modules may be loaded from.
 
 - `app` (default) — an application may only load modules from within its own directory tree. Loading from outside it throws `Can not load module at <path> outside of allowed path <path>`.
 - `any` — no restriction.
 
-The check resolves symlinks first and then compares the real path against the application's own directory as a prefix. Dev-mode installs set `allowedDirectory: any`, so local development is typically unaffected; production installs get `app`.
+The check resolves symlinks before comparing against the application's own directory. It applies to imports the application module loader handles; imports that Node's loader resolves are not subject to it, so treat this as a configuration guardrail rather than a security boundary.
+
+Dev-mode installs set `allowedDirectory: any`, so local development is typically unaffected; production installs get `app`.
 
 If an application legitimately needs to load files from outside its own directory in production:
 
@@ -119,6 +143,8 @@ applications:
 ```
 
 Matching strips a `node:` prefix and compares the first path segment, so allowlisting `fs` also permits `node:fs/promises`. A built-in that is not on the list throws `Module <name> is not allowed to be imported` when the module is linked, not at the call site. The key is matched case-insensitively, so an existing `allowedBuiltinModules` in your configuration keeps working.
+
+Like `allowedDirectory`, this applies to imports the application module loader handles rather than to every import an application can make — a configuration guardrail, not a security boundary.
 
 Allowlisting `child_process` still yields Harper's constrained substitute under the VM loaders, not Node's unmodified module.
 
