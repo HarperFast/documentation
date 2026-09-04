@@ -253,30 +253,39 @@ All properties are optional:
 
 <VersionBadge version="v5.3.0" />
 
-The oldest point in the audit log from which an incremental catch-up is still complete — the retention floor.
+The point in the audit log at or after which retention has pruned nothing — the retention floor. It is a lower bound, not a measurement of the oldest surviving entry: the log routinely still holds entries older than it. A cursor below it may have lost history, and the floor cannot certify otherwise; a valid cursor at or above it has not had history pruned after it, which is not on its own a guarantee that resuming is safe (see the limits below).
 
 Subscription catch-up (`startTime`) reads the audit log, and the audit log is pruned on a retention window (`logging.auditRetention`). A consumer that saves a cursor, disconnects, and resumes past that window would otherwise receive a replay that quietly begins after the messages it missed. This method is how a consumer detects that instead:
 
 ```javascript
 const floor = tables.Product.oldestRetainedAuditTime();
-if (cursor >= floor) {
-	// every change after `cursor` is still in the log; resume incrementally
-	subscription = await tables.Product.subscribe({ startTime: cursor });
-} else {
-	// history this consumer needs has been pruned; re-read the table instead
+// negated rather than `cursor < floor`: an unset or non-numeric cursor is never `>=` the floor,
+// so this spelling sends it to the resync branch instead of starting live with no catch-up
+if (!(cursor >= floor)) {
+	// conservative: history this consumer needs may have been pruned; re-read the table instead
 	await fullResync();
+} else {
+	// retention has not pruned anything after a valid `cursor`. This is a PRUNING check only — it cannot
+	// see a database that was restored or checkpointed (see the rollback limit below), so resume
+	// here only where a rollback is not a case you have to handle.
+	subscription = await tables.Product.subscribe({ startTime: cursor });
 }
 ```
 
-The cursor is a _last-processed_ position, so a cursor exactly at the floor is safe — everything below it has already been handled.
+The cursor is a _last-processed_ position, so a _valid_ cursor exactly at the floor passes: everything below it has already been handled, and nothing above it has been pruned as of this reading.
 
 Details worth knowing before relying on it:
 
 - **The time domain is the same one `startTime` uses**, so cursors compare directly with no conversion. Subscription events carry it as `localTime`.
-- **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the messages between them have already been pruned, which is the silent gap this method exists to expose.
-- **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so `cursor >= floor` means no entry of _any_ table in that database was pruned below the cursor. `deleteHistory()` on one table raises the floor for its siblings too.
-- **`Infinity` means the floor is unknown.** Treat no cursor as safe. This is what a database reports when its retention history cannot be accounted for — most commonly the first time it is opened by a version that records a floor, or after a migration between storage engines, which does not carry the audit log across. Consumers resync once and then get real values.
-- **It errs in one direction only.** The floor can ask for a resync that was not strictly necessary. It does not report a cursor as safe when history it needed is gone.
+- **Only a subscription event's `localTime` is a valid cursor here.** `getHistory()` also yields a `localTime`, but that one is the entry's origin version, which a backdated or replicated write makes differ from the audit-log position this floor describes. Do not persist `getHistory().localTime` and compare it against the floor: it can pass `cursor >= floor` while the consumer's real position sits below the floor, where the entries that position still needed may already be gone and the floor cannot certify otherwise — which is the silent gap this method exists to expose.
+- **The floor is database-scoped, not per-table.** All tables in a database share one audit log, so for a valid cursor, `cursor >= floor` means no entry of _any_ table in that database was pruned _after_ the cursor. It says nothing about entries below the _floor_ — those may well be gone, which is the floor's whole purpose. `deleteHistory()` on one table raises the floor for its siblings too.
+- **`Infinity` means the floor is unknown.** Treat no cursor as safe. A database reports it when no floor was ever recorded successfully — it is read-only, or the metadata write failed or was unavailable — or when the recorded metadata does not decode. A prune that runs on a database with no floor records this same value, which is not a separate cause: it means the recording is what did not land.
+- **A database's starting floor is stamped when it is first opened, not derived from its history.** It is set at that moment, so it sits _above_ audit entries the database still retains. On a node upgraded with a week of retained history, every cursor saved before the upgrade therefore falls below it and resyncs once — with nothing having been pruned. Do not read that first resync as evidence of lost history. After it, the floor rises only when history is actually pruned — by retention, or by `deleteHistory()`. A restore or checkpoint is the exception to that direction: it replaces the floor with the copy's, which can be lower (see the rollback limit below). Re-read the floor on each resume rather than caching it — retention can advance between reads. Re-reading will not reveal a restore, though: the reinstalled lower floor still passes a cursor saved after the copy point.
+- **Across retention pruning, and given a valid cursor, it errs in one direction only.** The floor can ask for a resync that was not strictly necessary. It does not report a cursor as safe when a prune removed history that cursor needed. A persisted `getHistory().localTime` is outside that guarantee, not an exception to it: being an origin version, it can overstate the consumer's real position in the audit log and so pass while that real position sits below the floor (see the validity bullet above).
+- **It is not a database-generation check, so it cannot see a rollback.**
+
+  > **Caution:** Restoring a backup, or opening a RocksDB checkpoint, replaces a database's state with a copy of an earlier state — and reinstalls that copy's floor along with it. A cursor saved after the copy point then compares as safe against a floor that predates it, even though the database no longer holds a change stream describing the rollback. Treat this method as a check for retention pruning, not as the only gate on resuming across a restore.
+
 - **It is a reading at a moment in time.** Retention can advance between this call and the `subscribe()` that follows it. The window is milliseconds against a retention window normally measured in days, and losing that race leaves you with the truncated replay you would have had anyway — but it is not a lock.
 - Throws if the database has no audit log at all.
 
