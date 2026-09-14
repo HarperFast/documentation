@@ -1,0 +1,328 @@
+---
+title: Safe Deployments and Rollback
+sidebar_position: 6
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+[Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx) gets an
+immutable artifact onto your cluster from a pipeline. This guide is about what
+happens around that call: how to limit who sees a change, what evidence justifies
+expanding it, and how to reverse it when the evidence says stop.
+
+Harper makes reversal unusually cheap, because your application is a component
+deployed from an immutable reference, so rolling back is deploying the previous
+reference. There is no image to rebuild and no instance to replace. That only
+helps if the previous reference is still addressable and someone has done it
+before under calm conditions, which is what makes rollback a designed capability
+rather than a hope.
+
+## What You Will Learn
+
+- How to separate build, deploy, activate, and expose into four decisions with
+  four different control points
+- The change loop, and what counts as evidence at each step
+- Five rollout patterns and the Harper operations behind each
+- What `"restart": true` and `"restart": "rolling"` actually do, which is not what
+  most people assume
+- How to classify a change so you reverse the right thing, and why reversing the
+  wrong thing can cause data loss
+
+## Prerequisites
+
+- A cluster of at least three nodes, so you can hold one out of rotation and still
+  meet capacity
+- A working pipeline that deploys from an immutable reference
+  ([Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx))
+- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx),
+  since every pattern here depends on being able to move traffic
+- [Monitoring and Triage](./monitoring-and-triage.mdx), since every gate here
+  depends on being able to compare versions
+
+## Separate four decisions
+
+Most bad deployments come from collapsing these into one action.
+
+| Decision     | The question                              | Harper control point                                                                            |
+| ------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Build**    | What immutable artifact exists?           | A pinned package reference, a versioned tarball, a checksum, a dependency lock                  |
+| **Deploy**   | Which nodes have that artifact installed? | `deploy_component`, with `replicated` true or false                                             |
+| **Activate** | Which code path is actually enabled?      | `urlPath` and `host` mounting, component configuration, a feature flag, a header or tenant rule |
+| **Expose**   | Which production traffic reaches it?      | Traffic layer weights, the availability flag, cohort or geography targeting                     |
+
+Once these are separate you get options that do not exist otherwise. You can
+install an artifact on every node and activate it nowhere. You can activate a
+route and expose it only to internal traffic. And when something is wrong you can
+reverse exposure in seconds without touching what is installed, which is the
+fastest containment action available to you.
+
+`urlPath` mounts a component at an HTTP path.
+`host` <VersionBadge version="v5.2.0" /> serves it on a virtual hostname. Both are
+persisted on the component's root config entry, so they are part of the deployed
+state rather than a runtime toggle. See
+[HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
+
+## The change loop
+
+1. **Preflight.** Confirm the target version, the component inventory from
+   `get_components`, `cluster_status` convergence, peer capacity with one node
+   held out, backup posture if data is at risk, and that the previous known-good
+   artifact is still addressable.
+
+2. **Limit.** Choose the smallest cohort that produces useful evidence. One
+   drained node, an internal cohort, a low-risk geography, a tenant set, or a
+   small weighted slice. Smaller is better right up until the sample is too small
+   to distinguish signal from noise.
+
+3. **Observe.** Compare the new and old versions on the same metrics: request
+   success, latency at your SLO percentile, worker saturation, logs and traces,
+   data correctness, replication behavior, and downstream errors. Comparison
+   against the other cohort is the point. Absolute numbers on the new version tell
+   you much less.
+
+4. **Decide.** Advance, hold, stop, or roll back, against thresholds declared
+   before you started, with a named owner. Missing telemetry is a failed gate, not
+   a pass.
+
+5. **Expand.** Increase exposure only after minimum sample and hold conditions
+   pass, and keep enough healthy capacity in the old version to reverse.
+
+6. **Close.** Verify uniform artifact and configuration across nodes, restore
+   intended traffic, record the actual outcome, and keep the evidence with the
+   change record.
+
+Declaring thresholds in step 4 before step 2 is the part that gets skipped and the
+part that matters. A threshold invented while looking at a live graph is not a
+threshold, it is a negotiation, and it always resolves toward shipping.
+
+## Five rollout patterns
+
+| Pattern                       | How Harper is used                                                                   | Fits when, and watch out for                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Isolated node validation      | Drain one node, deploy with `"replicated": false`, validate, re-admit a small cohort | Strongest infrastructure and component validation. Requires N+1 capacity and node targeting                       |
+| Replicated rolling deployment | `deploy_component` with `"replicated": true` and `"restart": "rolling"`              | Efficient once you trust the artifact. Rolling alone is not progressive delivery, add traffic and telemetry gates |
+| Feature-targeted release      | Deploy compatible code broadly, activate by flag, header, tenant, or geography       | Best when behavior can separate from code placement. Guard flag ownership and cleanup                             |
+| Parallel environment          | Deploy to a separate node pool, shift traffic after validation                       | Strong isolation and fast reversal. Write ownership and replication between pools need real design                |
+| Regional progression          | Promote the same artifact region by region, exposing each after local gates          | Good locality and blast radius control. One region does not predict every traffic shape                           |
+
+Isolated node validation, concretely:
+
+<Tabs>
+  <TabItem value="isolated" label="1. Validate on one node">
+
+```json
+{
+	"operation": "deploy_component",
+	"project": "orders-api",
+	"package": "https://artifacts.example.net/orders-api-2.4.1.tgz",
+	"replicated": false,
+	"restart": true
+}
+```
+
+Drain the node first, deploy, run your readiness route and journey synthetic
+against it directly, then admit a bounded cohort.
+
+  </TabItem>
+  <TabItem value="propagate" label="2. Propagate the qualified artifact">
+
+```json
+{
+	"operation": "deploy_component",
+	"project": "orders-api",
+	"package": "https://artifacts.example.net/orders-api-2.4.1.tgz",
+	"replicated": true,
+	"restart": "rolling"
+}
+```
+
+Same immutable reference, now cluster-wide. Poll the returned `restartJobId` with
+[`get_job`](/reference/v5/operations-api/operations#get_job), and poll
+[`get_deployment`](/reference/v5/operations-api/operations#get_deployment) until
+the deployment reports success rather than treating the response as completion.
+
+  </TabItem>
+</Tabs>
+
+Prefer a pinned version or an immutable tarball over a moving branch reference.
+A branch moves, so you can neither audit what was running yesterday nor redeploy
+it.
+
+## What restart actually does
+
+This is worth reading carefully, because the naming invites a wrong assumption.
+
+**`"restart": true`** restarts the HTTP worker threads on the node handling the
+call, and waits for that restart to finish before responding. A successful
+response therefore means every worker on that node is serving the new code. Until
+a worker has been replaced it is still running the previous code, and on platforms
+where replacements share a listening port it keeps accepting connections during
+the changeover. The wait follows the restart's own progress rather than a fixed
+timeout, so the response can take tens of seconds on a slow install with many
+worker threads.
+
+**`"restart": "rolling"`** does not restart inline. It starts a replicated
+`restart_service` job and returns a `restartJobId` for you to poll. Use this when
+your caller has a short request timeout.
+
+Two consequences for your pipeline. A caller with an aggressive HTTP timeout
+should use `"rolling"` and poll, because giving up on `true` does not stop the
+restart, it just leaves you without the result. And a failed restart does not fail
+the deploy: the component is installed and replicated either way, so your pipeline
+needs to check both outcomes separately rather than assuming one implies the
+other.
+
+Two parameters worth setting deliberately on replicated deploys:
+
+- `deployment_timeout` <VersionBadge version="v5.1.4" /> is how long a peer waits
+  for the replicated payload before failing, defaulting to 120000 ms. Raise it for
+  large components or slow links.
+- `ignore_replication_errors` <VersionBadge version="v5.1.4" /> treats a peer that
+  fails to receive the deploy as non-fatal. By default a failed peer makes the
+  whole operation return a non-2xx status, while the component is still deployed
+  on the origin node. Decide which behavior you want before you need it, because
+  the default leaves you in a mixed-version state with a failed response, and that
+  is a confusing thing to reason about mid-incident.
+
+## Configuration changes are deployments too
+
+A configuration change carries the same risk as a code change and gets less
+ceremony, which is backwards.
+
+`set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />
+to apply a change across the cluster in one call, with per-node outcomes in the
+response. To finish the change cluster-wide, follow with `restart_service` using
+`"replicated": true`, which restarts nodes one at a time.
+
+```json
+{
+	"operation": "set_configuration",
+	"logging_level": "info",
+	"replicated": true
+}
+```
+
+:::danger
+Only replicate cluster-appropriate parameters. Node-local values such as ports,
+`node.hostname`, file paths, TLS material, and `replication.hostname`, `url`, or
+`routes` would overwrite every peer's own values. Replicating one of these is a
+cluster-wide outage delivered in a single API call.
+:::
+
+Two more things to hold onto. A change takes effect only after a restart, so a
+node that has been reconfigured and not restarted is running the old
+configuration while reporting the new one. And `get_status` reports a
+`restartRequired` flag, but it tracks component and code restarts rather than
+configuration changes, so it will not tell you a configuration change is still
+pending. Track pending configuration in your change record instead, and read back
+`get_configuration` after the restart to confirm.
+
+## Rollback is a designed capability
+
+Classify the change before choosing a reversal path, because these have different
+compatibility requirements, different authorities, and very different blast
+radii:
+
+| Change type            | Reversal                                          | Watch out for                                                       |
+| ---------------------- | ------------------------------------------------- | ------------------------------------------------------------------- |
+| Component release      | Deploy the previous immutable reference           | The previous artifact must still be addressable                     |
+| Feature behavior       | Deactivate the flag, no deploy needed             | Fastest reversal available. Requires the flag to have been built in |
+| Traffic exposure       | Restore prior weights or set the node unavailable | Fastest containment. Does not undo anything already written         |
+| Configuration          | `set_configuration` back, then restart            | Needs a restart, so it is not instant                               |
+| Harper runtime version | Version-specific procedure                        | Mixed versions change replication and deploy behavior               |
+| Schema or data         | Forward repair or restore                         | See the warning below                                               |
+
+Practices that make each of these real:
+
+- **Keep the previous package addressable and rehearse redeploying it** before
+  launch, not during an incident.
+- **Prefer expand-then-contract schema evolution.** Add the new shape, migrate,
+  then remove the old shape in a separate change. Destructive schema behavior is
+  operation and version dependent, so each destructive change needs an exact
+  written procedure and verification on every node.
+- **Use the same gates for rollback as for forward movement.** Availability,
+  journey synthetic, peer stability, data validation, traffic reconciliation. A
+  rollback is a deployment and can fail like one.
+
+:::warning
+If a release changed the meaning of persisted data, code rollback alone will not
+fix it, and restoring a database to undo application code is usually the wrong
+move. A restore rolls back every write in the window, including all the valid
+ones, so it can violate your RPO in order to fix a code bug. Define forward repair
+or replay for these cases instead. See
+[Backup and Recovery](./backup-and-recovery.mdx).
+:::
+
+### Prove it
+
+Rehearse a stopped rollout end to end on a non-production cluster:
+
+1. Declare a threshold before you start, for example "stop if journey success on
+   the new cohort is more than 0.5 percent below the control cohort over five
+   minutes."
+2. Deploy a component that fails that threshold deliberately, to a bounded cohort.
+3. Detect it through your dashboards rather than because you know what you did.
+4. Reverse it, and time from decision to restored traffic. That number is your
+   release RTO, and it belongs in your reliability plan.
+5. Verify uniform state afterwards: `get_components` on every node, and
+   `list_deployments` showing the reversal.
+
+The step people fail is 5. A partially reversed cluster looks fine on a dashboard
+because the healthy majority dominates the average.
+
+## Operational notes
+
+- **Version parity is an operating requirement.** Mixed Harper versions in a
+  cluster change replication and deployment behavior, so a rollout that stalls
+  halfway is a state you want to detect and exit, not sit in.
+- **Keep deploy credentials in your delivery platform's secret store**, use TLS
+  and least privilege, and retain the operation result as change evidence. See
+  [secrets](/reference/v5/security/secrets).
+- **Component deployment can replicate, so a deploy is a cluster event.** Keep
+  isolated single-node deployment available for validation, because if the only
+  deployment path you have is replicated then you have no way to test anything on
+  one node.
+- **Flag cleanup is part of the release.** A feature flag with no owner and no
+  removal date becomes permanent configuration that nobody understands, and it
+  will eventually be the thing nobody can explain during an incident.
+- **Record who decided, not only what happened.** Named decision authority is what
+  makes a stop gate function under pressure, and it costs nothing to write down in
+  advance.
+
+## Readiness checklist
+
+- [ ] Artifacts are immutable and referenced by pinned version, never by branch
+- [ ] Deploy and expose are separate actions in your pipeline
+- [ ] The previous known-good artifact is addressable, and redeploying it has been
+      rehearsed
+- [ ] Cohort ladder defined, from smallest useful sample to full exposure
+- [ ] Stop thresholds and hold times declared before the rollout starts
+- [ ] A named decision owner for advance, hold, stop, and roll back
+- [ ] Pipeline polls `get_deployment` and the restart job separately, rather than
+      treating the deploy response as completion
+- [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
+- [ ] Configuration changes go through the same change record as code
+- [ ] `get_configuration` read back after every configuration change
+- [ ] Schema changes follow expand-then-contract, with destructive operations
+      documented per node
+- [ ] Forward repair defined for changes that alter persisted meaning
+- [ ] Measured release RTO recorded from a rehearsed reversal
+
+## Additional Resources
+
+- [Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx) for the
+  pipeline mechanics and deploy credentials
+- [`deploy_component` reference](/reference/v5/operations-api/operations#deploy_component)
+  for every parameter including `urlPath`, `host`, and replication controls
+- [Applications reference](/reference/v5/components/applications) for component
+  structure and the full component operation set
+- [Deployment records](/reference/v5/operations-api/operations#deployment-operations)
+  for `list_deployments` and `get_deployment`
+- [HTTP middleware routing](/reference/v5/http/overview#middleware-routing) for
+  `urlPath` and `host` activation
+- [Configuration operations](/reference/v5/configuration/operations) for
+  `set_configuration` and restart requirements
+- [Database schema](/reference/v5/database/schema) for schema evolution
+- [Multiple Applications on One Cluster](../developers/multiple-applications.mdx)
+  for running more than one component side by side
