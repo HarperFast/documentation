@@ -1,0 +1,199 @@
+---
+title: Reliability Plan Template
+sidebar_position: 10
+---
+
+The [Production Readiness Checklist](./production-readiness-checklist.mdx) asks
+the questions. This is the document that holds the answers.
+
+Copy it, keep one per service, and keep it where your on-call can reach it during
+an incident rather than in a wiki nobody remembers. It is deliberately short.
+A reliability plan that takes a day to read is a reliability plan nobody consults
+at 3am.
+
+Example values are included in italics to show the intended level of specificity.
+Replace them.
+
+---
+
+## 1. Service identity
+
+| Field              | Value                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| Service name       | _orders-api_                                               |
+| Business owner     | _name, team_                                               |
+| Technical owner    | _name, team_                                               |
+| On-call rotation   | _link to schedule_                                         |
+| Escalation path    | _first, second, and decision authority for a stop_         |
+| Harper deployment  | _Fabric cluster, or self-managed, with cluster identifier_ |
+| Harper version     | _5.2.x, per node_                                          |
+| Plan last reviewed | _date_                                                     |
+| Next review due    | _date_                                                     |
+
+## 2. Critical journeys
+
+The user-facing paths that must work. Everything else in this plan is stated per
+journey, so this table defines the scope of all of it.
+
+| Journey          | Description                   | Databases and tables involved | Downstream dependencies | Owner |
+| ---------------- | ----------------------------- | ----------------------------- | ----------------------- | ----- |
+| _submit order_   | _POST through the public API_ | _orders.orders, orders.items_ | _pricing, payments_     |       |
+| _browse catalog_ | _cached read_                 | _catalog.products_            | _none_                  |       |
+
+## 3. Objectives
+
+| Journey | Availability target | Measurement boundary | Recovery time objective | Recovery point objective | Exclusions                                 |
+| ------- | ------------------- | -------------------- | ----------------------- | ------------------------ | ------------------------------------------ |
+|         | _99.95%_            | _at the CDN edge_    | _15 min from detection_ | _5 min_                  | _planned maintenance, third-party outages_ |
+
+Monthly unavailability budget: _21 min 55 sec at 99.95%_
+
+Error budget policy: _what changes when the remaining budget falls below a
+threshold, and who decides_
+
+## 4. Architecture and topology
+
+- Node count and `F`, the tolerated simultaneous loss: _5 nodes, F = 1_
+- Failure domain layout: _how nodes are distributed, and the proof that domains are independent_
+- Traffic layer and routing: _what fronts Harper, and how it selects nodes_
+- Replication scope: _which databases, which tables excluded, and whether `system` is in scope_
+- Sharding in use: _yes or no, and where_
+- Storage engine per database: _per database_
+
+## 5. Capacity
+
+| Measurement                | Value | Conditions                                       | Date measured |
+| -------------------------- | ----- | ------------------------------------------------ | ------------- |
+| Peak required throughput   |       | _per journey_                                    |               |
+| Tested per-node throughput |       | _data volume, query mix, peer synchronizing y/n_ |               |
+| Target utilization         |       | _derived from latency at the SLO percentile_     |               |
+| Surviving capacity at `F`  |       | _measured in the drain drill, not calculated_    |               |
+
+Maintenance policy when a drain would breach `F`: _pause, add capacity, or accept
+with documented duration_
+
+## 6. Traffic admission
+
+- Liveness probe: _endpoint, interval, threshold_
+- Availability flag: _`status-check` deployed how, and who may set it_
+- Readiness route: _path, and the dependencies it checks_
+- Journey synthetic: _what it does, from where, how often_
+- Drain sequence: _link to runbook_
+- Return sequence, including stability window: _link to runbook_
+- Measured time to zero traffic after drain: _value, date_
+- Measured node re-entry time including convergence: _value, date_
+
+## 7. Replication
+
+- Measured convergence time under load, per critical database: _value, date_
+- Measured full synchronization time for a new node: _value, date_
+- Admission gate threshold, and how it compares to convergence: _value_
+- Non-commutative operations and their handling: _operation, and the owner, serialization point, or coordinator_
+- Certificate expiry dates and alert lead time: _dates_
+
+## 8. Deployment and change
+
+- Artifact source and reference format: _registry or git, pinned version format_
+- Cohort ladder: _one node, internal, 5 percent, 25 percent, full_
+- Stop thresholds and hold times: _stated numerically_
+- Decision authority for advance, hold, stop, roll back: _name or role_
+- Restart mode used, and how completion is confirmed: _`rolling`, polling the job_
+- Measured release reversal time: _value, date_
+- Forward repair procedures for data-affecting releases: _link_
+- Change record location: _link_
+
+## 9. Observability
+
+- Dashboard location: _link_
+- Alerts configured, with thresholds and destinations: _table or link_
+- Metric export path: _Grafana on Fabric, or Prometheus scrape_
+- Log destination and retention: _system, retention period_
+- Deployment annotations enabled: _yes or no_
+- Triage runbook: _link_
+- Measured time to detection, per drill: _value, date_
+
+## 10. Backup and recovery
+
+| Database | Mechanism | Cadence | Retention | Off-host destination | Last verified | Last restore drill | Measured restore time | Measured data loss |
+| -------- | --------- | ------- | --------- | -------------------- | ------------- | ------------------ | --------------------- | ------------------ |
+|          |           |         |           |                      |               |                    |                       |                    |
+
+- Restore authority: _who may execute a restore_
+- Restore constraints per database: _online, or offline only because a component holds it open_
+- `system` database restore procedure: _offline only, link to runbook_
+- Failure classes assigned to restore versus forward repair: _table_
+
+## 11. Scenario responses
+
+| Scenario                           | Mechanism | Runbook | What proves it works | Last exercised |
+| ---------------------------------- | --------- | ------- | -------------------- | -------------- |
+| _single node loss_                 |           |         |                      |                |
+| _node return after restart_        |           |         |                      |                |
+| _node replacement_                 |           |         |                      |                |
+| _failure domain loss_              |           |         |                      |                |
+| _region loss_                      |           |         |                      |                |
+| _bad release, no data change_      |           |         |                      |                |
+| _bad release that changed data_    |           |         |                      |                |
+| _accidental destructive operation_ |           |         |                      |                |
+| _storage loss on one node_         |           |         |                      |                |
+| _certificate expiry_               |           |         |                      |                |
+| _downstream dependency outage_     |           |         |                      |                |
+
+## 12. Degraded modes
+
+| Journey | Condition                       | Declared behavior                           | Who may invoke | Automatic or manual |
+| ------- | ------------------------------- | ------------------------------------------- | -------------- | ------------------- |
+|         | _pricing service unavailable_   | _serve last known price, flag the response_ |                |                     |
+|         | _node behind on replication_    | _remove from rotation_                      |                |                     |
+|         | _cluster below capacity budget_ | _shed non-critical traffic_                 |                |                     |
+
+## 13. Security and access
+
+- Operator roles and privileges: _who has what_
+- `super_user` credential inventory and rotation: _link, schedule_
+- Operations API network restriction: _how enforced_
+- Certificate inventory and expiry alerts: _link_
+- Deploy credential custody: _secret store, rotation method_
+- Administrative access logging, including host-level: _system_
+
+## 14. Open risks
+
+Accepted gaps, each with an owner and a date. This section existing and being
+honest is worth more than it being empty.
+
+| Risk | Impact if realized | Why accepted | Owner | Review date |
+| ---- | ------------------ | ------------ | ----- | ----------- |
+|      |                    |              |       |             |
+
+## 15. Revision history
+
+| Date | Author | Change | Trigger                                              |
+| ---- | ------ | ------ | ---------------------------------------------------- |
+|      |        |        | _launch, version upgrade, topology change, incident_ |
+
+---
+
+## Keeping this current
+
+Most of the numbers in this plan are properties of a Harper version, a data
+volume, a topology, and a set of components. All four change, so the numbers
+expire. Re-measure and revise after:
+
+- A Harper version upgrade
+- A topology change, including adding or removing nodes
+- Significant data growth
+- Any incident that produced a surprise
+
+Date every number. An undated measurement in a reliability plan is worse than a
+blank field, because a blank field prompts someone to go and measure.
+
+## Additional Resources
+
+- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the
+  gate that populates this plan
+- [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) for how
+  to derive sections 3 and 11
+- [Backup and Recovery](./backup-and-recovery.mdx) for section 10
+- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for
+  section 8
+- [Monitoring and Triage](./monitoring-and-triage.mdx) for section 9

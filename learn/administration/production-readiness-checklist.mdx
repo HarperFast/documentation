@@ -1,0 +1,230 @@
+---
+title: Production Readiness Checklist
+sidebar_position: 9
+---
+
+This is the aggregated launch gate for the whole Administration track. Every item
+appears in one of the earlier guides, which is where the reasoning lives. This
+page exists so you have one thing to work down before a launch, and one thing to
+hand to a reviewer who asks how you operate Harper.
+
+Copy it into your own runbook and adapt it. It is a starting point for your gate,
+not a substitute for having one.
+
+## How to use this
+
+Each item is a claim about your deployment. A claim counts when there is evidence:
+a measured number with a date, a written procedure, a configured alert, or a
+completed drill. "We know about that" is not evidence, and neither is a passing
+intention.
+
+Some items will not apply to you, and that is fine. Mark them not applicable with
+a reason rather than deleting them, so a reviewer can see the decision was made
+rather than missed.
+
+Three things are worth deciding before you start:
+
+- **Who signs off.** A gate with no named approver is a document, not a gate.
+- **What "outstanding" means.** Some items can be accepted as gaps with an owner
+  and a date. Decide in advance which ones cannot.
+- **When you run it again.** This is not a one-time launch artifact. Re-run it
+  after a Harper version upgrade, a topology change, or significant data growth,
+  since most of the measured numbers expire.
+
+## Service definition
+
+From [How Harper Runs in Production](./how-harper-runs-in-production.mdx).
+
+- [ ] Critical user journeys named, with an owner for each
+- [ ] Ports confirmed from `get_configuration` rather than assumed
+- [ ] Operations API not reachable from the public internet
+- [ ] Harper version recorded per node, with an alert on drift
+- [ ] Databases listed, with replication scope confirmed from `cluster_status`
+- [ ] Storage engine recorded per database
+- [ ] Components and versions recorded from `get_components`
+- [ ] Downstream dependencies named, with their failure behavior understood
+- [ ] Fabric or self-managed responsibilities understood and divided
+
+## Capacity and topology
+
+From [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx).
+
+- [ ] `F`, the tolerated simultaneous node loss, declared explicitly and visible to
+      change operators
+- [ ] Per-node throughput measured with your own application code, data shape, and
+      query mix
+- [ ] Measurement taken with a peer synchronizing, not on an idle cluster
+- [ ] Target utilization derived from latency at your SLO percentile
+- [ ] `(N - F) x per-node x utilization >= peak` verified with real numbers
+- [ ] Measurement conditions recorded alongside the number, and dated
+- [ ] Topology's "what must be proven" satisfied, including independence of failure
+      domains
+- [ ] Maintenance policy states what happens when a drain would breach `F`
+- [ ] Storage growth thresholds set, separately from request-rate thresholds
+
+## Health and traffic admission
+
+From
+[Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
+
+- [ ] Liveness, availability flag, application readiness, and journey synthetic all
+      exist as separate signals
+- [ ] `@harperdb/status-check` deployed, declared in `config.yaml` rather than by
+      hand
+- [ ] Traffic layer health check points at `GET /status` on the application port
+- [ ] Availability flag confirmed to be outside replication scope
+- [ ] Readiness route scoped to one journey's dependencies, with a timeout on every
+      downstream call
+- [ ] Readiness response includes the component version
+- [ ] Drain sequence documented, with measured time to zero traffic
+- [ ] Return sequence documented, including convergence verification and a
+      stability window before full weight
+- [ ] Measured node re-entry time recorded
+
+## Replication
+
+From [Operating Replication](./operating-replication.mdx).
+
+- [ ] Replication scope read off the running cluster, from every node
+- [ ] Whether the `system` database is in scope is a deliberate, documented
+      decision
+- [ ] Identity provisioning procedure matches that decision
+- [ ] Tables that must commit together confirmed to be in one database
+- [ ] Durable topology constraints live in `harper-config.yaml` routes, not only in
+      `add_node` calls
+- [ ] Measured convergence time recorded under load, per critical database
+- [ ] Alerts on missing peers, sustained latency growth, stalled
+      `lastCommitConfirmed`, and the receive-time gap
+- [ ] Non-commutative operations identified and given an owner, a serialization
+      point, or an external coordinator
+- [ ] Replication certificate expiry tracked with an alert
+- [ ] Replication interruption and recovery exercise completed and dated
+
+## Deployment and rollback
+
+From [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
+
+- [ ] Artifacts immutable, referenced by pinned version rather than by branch
+- [ ] Deploy and expose are separate actions in the pipeline
+- [ ] Previous known-good artifact addressable, and redeploying it rehearsed
+- [ ] Cohort ladder defined, from smallest useful sample to full exposure
+- [ ] Stop thresholds and hold times declared before a rollout begins
+- [ ] Named decision owner for advance, hold, stop, and roll back
+- [ ] Pipeline polls the deployment record and the restart job separately
+- [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
+- [ ] Configuration changes go through the same change record as code
+- [ ] `get_configuration` read back after every configuration change
+- [ ] Node-local parameters never replicated
+- [ ] Schema changes follow expand then contract, with destructive operations
+      documented and verified per node
+- [ ] Forward repair defined for changes that alter persisted meaning
+- [ ] Measured release reversal time recorded from a rehearsal
+
+## Observability
+
+From [Monitoring and Triage](./monitoring-and-triage.mdx).
+
+- [ ] A dashboard exists that can place a symptom at edge, traffic layer, node,
+      replication, data, or change
+- [ ] Alerts on journey success and latency at the SLO percentile, not the mean
+- [ ] Alerts on worker utilization and task queue latency, with thresholds derived
+      from measured capacity
+- [ ] Alerts on replication convergence lag
+- [ ] Alerts on storage headroom and backup age
+- [ ] Metrics exported off the node
+- [ ] `analytics.replicate` setting known and deliberate
+- [ ] Structured logs include component, version, node, request id, operation,
+      duration, and outcome
+- [ ] Logs centralized off the node
+- [ ] Deployments annotated onto dashboards
+- [ ] Triage sequence written where on-call can find it
+- [ ] Fault injection drill completed, with time to detection recorded
+
+## Backup and recovery
+
+From [Backup and Recovery](./backup-and-recovery.mdx).
+
+- [ ] Failure classes enumerated, each with the mechanism that addresses it
+- [ ] Recovery point and recovery time stated per database
+- [ ] Mechanism chosen per database according to its storage engine
+- [ ] No database in scope uses per-table storage paths, or the exclusion is known
+      and accepted
+- [ ] Backup cadence matches the stated recovery point
+- [ ] Backup volume sized against the full cost, including the non-incremental
+      transaction-log and blob snapshots
+- [ ] Off-host copy exists in a destination that does not share a failure domain
+- [ ] Managed repository copies take the whole per-database directory, quiesced or
+      from an atomic snapshot
+- [ ] `verify_backup` runs on a schedule
+- [ ] Blob integrity understood to be unverified by `verify_backup`
+- [ ] Restore constraints documented for user databases, component-held databases,
+      and `system`
+- [ ] Restore authority named, and restore execution logged
+- [ ] Restore drill completed and dated, with measured recovery time and actual
+      data loss
+- [ ] `system` database restore rehearsed offline
+
+## Objectives
+
+From [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx).
+
+- [ ] Recovery point, recovery time, and availability stated per journey with the
+      measurement boundary named
+- [ ] Exclusions documented
+- [ ] Every scenario in the scenario map has a named mechanism
+- [ ] Availability target converted to minutes per month
+- [ ] Error budget policy states what changes when the budget runs low
+- [ ] Backup cadence reconciled against recovery point
+- [ ] Restore time plus detection time reconciled against recovery time
+- [ ] Convergence time reconciled against the admission gate
+- [ ] Every unreconciled gap has an owner and a date
+- [ ] Degraded modes declared per journey, with authority to invoke them
+
+## Security and access
+
+- [ ] Least privilege enforced for operators, applications, and automation
+- [ ] `super_user` credentials inventoried, with a rotation procedure
+- [ ] Operations API restricted to administrative networks
+- [ ] TLS material inventoried, with expiry alerts for both application and
+      replication certificates
+- [ ] Deploy credentials held in a secret store, not in pipeline configuration
+- [ ] Administrative access logged, including CLI access on the hosts
+- [ ] Filesystem access on nodes understood to permit offline restore without an
+      API credential
+
+## Ownership and runbooks
+
+- [ ] On-call rotation and escalation path defined
+- [ ] Runbooks exist for drain, return, deploy, reverse, restore, and cluster
+      expansion
+- [ ] Every runbook has been executed by someone other than its author
+- [ ] Change record location known, and used
+- [ ] Incident and postmortem process defined
+- [ ] A named owner for this checklist, and a date for the next review
+
+## Exercises completed
+
+Record the date of the most recent run of each. An undated exercise is an
+undocumented one.
+
+| Exercise                                  | Guide                                                                    | Last run | Result |
+| ----------------------------------------- | ------------------------------------------------------------------------ | -------- | ------ |
+| Service boundary inventory                | [How Harper Runs in Production](./how-harper-runs-in-production.mdx)     |          |        |
+| Drain and return under load               | [Health Checks](./health-checks-and-traffic-admission.mdx)               |          |        |
+| Peak-load drain and rejoin                | [Sizing](./sizing-a-harper-cluster.mdx)                                  |          |        |
+| Replication interruption and recovery     | [Operating Replication](./operating-replication.mdx)                     |          |        |
+| Fault injection and time to detection     | [Monitoring and Triage](./monitoring-and-triage.mdx)                     |          |        |
+| Stopped rollout and reversal              | [Safe Deployments](./safe-deployments-and-rollback.mdx)                  |          |        |
+| Restore drill, user database              | [Backup and Recovery](./backup-and-recovery.mdx)                         |          |        |
+| Restore drill, `system` database, offline | [Backup and Recovery](./backup-and-recovery.mdx)                         |          |        |
+| Scenario tabletop                         | [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) |          |        |
+
+## Additional Resources
+
+- [Reliability Plan Template](./reliability-plan-template.mdx) for the document
+  that holds the answers this checklist asks for
+- Every guide in this section, linked per group above
+- [Security overview](/reference/v5/security/overview) and
+  [certificate management](/reference/v5/security/certificate-management)
+- [Configuration options](/reference/v5/configuration/options) for the settings
+  referenced throughout
