@@ -122,6 +122,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'models/openai-gateway',
+					label: 'OpenAI-Compatible Gateway',
+				},
+				{
+					type: 'doc',
 					id: 'models/analytics',
 					label: 'Analytics',
 				},
