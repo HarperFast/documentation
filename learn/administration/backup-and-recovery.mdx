@@ -73,6 +73,7 @@ A backup is a whole-database copy: all tables, the transaction log, and any
 file-backed blobs. So a restored database keeps its `read_audit_log` history as of
 the backup point.
 
+:::warning
 Two limitations to check against your own deployment now rather than later:
 
 - **Managed backups require RocksDB.** For LMDB databases your options are
@@ -82,6 +83,8 @@ Two limitations to check against your own deployment now rather than later:
   operations at all. Database-level custom storage paths are fine. If someone has
   configured per-table paths, your backup strategy for that database does not
   exist yet and you need to know that before launch.
+
+:::
 
 ## Create and retain managed backups
 
