@@ -116,7 +116,7 @@ Creates a new database.
 
 ### `drop_database`
 
-Drops a database and all its tables/records. Supports `"replicated": true` to propagate to all cluster nodes.
+Drops a database and all its tables/records. **Replicates to all cluster nodes by default** — pass `"replicated": false` to drop it on this node only.
 
 ```json
 { "operation": "drop_database", "database": "dev" }
@@ -137,7 +137,7 @@ Creates a new table. Optional fields: `database` (defaults to `data`), `attribut
 
 ### `drop_table`
 
-Drops a table and all associated records. Supports `"replicated": true`.
+Drops a table and all associated records. **Replicates to all cluster nodes by default** — pass `"replicated": false` to drop it on this node only.
 
 ```json
 { "operation": "drop_table", "database": "dev", "table": "dog" }
@@ -863,7 +863,7 @@ Detailed documentation: [Components Overview](../components/overview.md)
 
 ### `deploy_component`
 
-Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
+Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Replicates to all cluster nodes by default; pass `"replicated": false` to deploy to this node only. Supports `"restart": true` or `"restart": "rolling"`.
 
 Additional parameters:
 

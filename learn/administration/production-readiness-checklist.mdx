@@ -72,7 +72,8 @@ From
 - [ ] `@harperdb/status-check` deployed, declared in `config.yaml` rather than by
       hand
 - [ ] Traffic layer health check points at `GET /status` on the application port
-- [ ] Availability flag confirmed to be outside replication scope
+- [ ] Availability flag storage still declares `replicate: false`, if you forked the
+      component or persist it yourself
 - [ ] Readiness route scoped to one journey's dependencies, with a timeout on every
       downstream call
 - [ ] Readiness response includes the component version

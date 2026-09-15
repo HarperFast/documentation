@@ -327,7 +327,7 @@ Creates a new component project in the component root directory using a template
 - `install_command` _(optional)_ — Install command. Defaults to `npm install`
 - `install_timeout` _(optional)_ — Install timeout in milliseconds. Defaults to `300000` (5 minutes)
 - `install_allow_scripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
-- `replicated` _(optional)_ — Replicate to all cluster nodes
+- `replicated` _(optional)_ — Replicate to all cluster nodes. Defaults to `true`; pass `false` to apply on this node only
 
 ```json
 {
@@ -345,7 +345,7 @@ Deploys a component using a package reference or a base64-encoded `.tar` payload
 - `payload` _(optional)_ — Base64-encoded `.tar` file content
 - `force` _(optional)_ — Allow deploying over protected core components. Defaults to `false`
 - `restart` _(optional)_ — `true` for immediate restart, `'rolling'` for sequential cluster restart
-- `replicated` _(optional)_ — Replicate to all cluster nodes
+- `replicated` _(optional)_ — Replicate to all cluster nodes. Defaults to `true`; pass `false` to apply on this node only
 - `install_command` _(optional)_ — Install command override
 - `install_timeout` _(optional)_ — Install timeout override in milliseconds
 - `install_allow_scripts` _(optional)_ — Allow install scripts to run. Defaults to `false`, which causes `--ignore-scripts` to be passed to the install command (this is ignored with `install_command`).
@@ -366,7 +366,7 @@ Deletes a component project or a specific file within it.
 
 - `project` _(required)_ — Project name
 - `file` _(optional)_ — Path relative to project folder. If omitted, deletes the entire project
-- `replicated` _(optional)_ — Replicate deletion to all cluster nodes
+- `replicated` _(optional)_ — Replicate the deletion to all cluster nodes. Defaults to `true`; pass `false` to apply on this node only
 - `restart` _(optional)_ — Restart Harper after dropping
 
 ```json
@@ -425,7 +425,7 @@ Creates or updates a file within a component project.
 - `file` _(required)_ — Path relative to project folder
 - `payload` _(required)_ — File content to write
 - `encoding` _(optional)_ — File encoding. Defaults to `utf8`
-- `replicated` _(optional)_ — Replicate update to all cluster nodes
+- `replicated` _(optional)_ — Replicate the update to all cluster nodes. Defaults to `true`; pass `false` to apply on this node only
 
 ```json
 {
@@ -447,7 +447,7 @@ For deploying from private repositories, SSH keys must be registered on the Harp
 - `host` _(required)_ — Host alias for SSH config (used in `package` URL)
 - `hostname` _(required)_ — Actual domain (e.g., `github.com`)
 - `known_hosts` _(optional)_ — Public SSH keys of the host. Auto-retrieved for `github.com`
-- `replicated` _(optional)_ — Replicate to all cluster nodes
+- `replicated` _(optional)_ — Replicate to all cluster nodes. Defaults to `true`; pass `false` to apply on this node only
 
 ```json
 {

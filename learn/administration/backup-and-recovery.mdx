@@ -123,12 +123,22 @@ references.
 
 :::warning
 The incremental behavior applies to the RocksDB data files only. **The
-transaction-log snapshot, and the blob snapshot for a database with file-backed
-blobs, are copied in full on every backup.** With a large audit-retention window
-or many blobs, frequent backups cost considerably more disk than the
-data-only view suggests. Pass `exclude_blobs: true` to skip blobs when that is
-appropriate, and size your backup volume against the full cost rather than the
-incremental one.
+transaction-log snapshot is copied in full on every backup.** With a large
+audit-retention window that is real, recurring disk cost that the data-only view
+hides, so size your backup volume against it rather than against the incremental
+figure.
+
+Blobs behave differently and are easy to over-budget. Each backup captures a full
+set of blobs, but the files are hard-linked rather than copied when the backup
+directory and the blob storage share a filesystem, which is the default layout. In
+that case the extra space is near zero. They become genuine full copies only when
+the two live on different filesystems, so putting backups on a separate volume is
+a real cost decision rather than a free one. Pass `exclude_blobs: true` to skip
+blobs when that is appropriate.
+
+One consequence for disaster recovery: because the blob snapshot is hard-linked,
+copying a backup repository with an ordinary recursive copy materializes every
+blob as a full, separate file at the destination.
 :::
 
 Do not use `list_backups` sizes for capacity planning. The `size` and
@@ -162,11 +172,16 @@ retained managed backups off the node:
 # Pull a snapshot of the current state from a running node
 harper get_backup database=data out=./data-$(date +%Y%m%dT%H%M%S).tar.gz
 
-# Or pull from another node, which also clones that node's database onto this one
+# Or pull a snapshot of another node, writing it to a file here
 harper get_backup database=data target=https://node-2.example.com:9925 out=./data.tar.gz
 ```
 
-Note that `get_backup` always streams the current state. It cannot download a
+`target=` only changes which node the snapshot is read from. It writes a file and
+nothing else: it does not restore, import, or clone that node's database onto the
+local one. Turning the file into a live database is a separate, deliberate restore
+step, performed with Harper stopped.
+
+Note also that `get_backup` always streams the current state. It cannot download a
 historical managed backup, so it is a way to take a fresh off-host copy, not a way
 to export your retention history.
 
@@ -189,8 +204,11 @@ nothing else.
 `verify_checksum` is `true`, which is slower, and the framing of the
 transaction-log snapshot, which is always checked.
 
-**The blob snapshot is not verified.** If your database has file-backed blobs,
-verification does not tell you they are intact, and only a real restore does.
+**Blob contents are not verified.** Verification confirms that a backup which
+recorded blobs still has its blob snapshot present, and fails the backup as corrupt
+if that snapshot is missing. It does not check the individual blob files for size,
+checksum, or readability. So verification can pass on a backup whose blobs are
+damaged, and only a real restore proves they are intact.
 
 More generally, a verified backup is a well-formed backup, not a proven recovery.
 The only evidence that your recovery works is a restore you have actually
@@ -302,15 +320,17 @@ that it is the target than a promise you cannot keep.
 - [ ] No database in scope uses per-table storage paths, or its exclusion is known
       and accepted
 - [ ] Backup cadence matches the stated recovery point per database
-- [ ] Backup volume sized against the full cost, including non-incremental
-      transaction-log and blob snapshots
+- [ ] Backup volume sized against the non-incremental transaction-log snapshot,
+      and against full blob copies if the backup and blob paths are on different
+      filesystems
 - [ ] An off-host copy exists in a destination that does not share a failure
       domain
 - [ ] Managed repository copies take the whole `<backupPath>/<database>` directory,
       quiesced or from an atomic snapshot
 - [ ] `verify_backup` runs on a schedule, with `verify_checksum` at least
       periodically
-- [ ] Blob integrity understood to be unverified by `verify_backup`
+- [ ] Blob contents understood to be unchecked by `verify_backup`, which confirms
+      only that the blob snapshot is present
 - [ ] Restore constraints documented for user databases, component-held databases,
       and `system`
 - [ ] Restore authority named, and restore execution logged
