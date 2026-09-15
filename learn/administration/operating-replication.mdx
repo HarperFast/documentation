@@ -55,7 +55,7 @@ replication:
 
 ```graphql
 type LocalTableForNode @table(replicate: false) {
-	id: ID!
+	id: ID! @primaryKey
 	name: String!
 }
 ```
@@ -101,35 +101,53 @@ directional configuration mistakes survive into production.
 :::warning
 Whether the `system` database is in your replication scope is the highest-stakes
 scoping question in a Harper cluster, because `system` holds `hdb_user`,
-`hdb_role`, and `hdb_nodes`. Users and roles propagate only when `system` is
-replicated, and a node that receives `system` must be trusted with its contents,
-including encrypted secret rows. Confirm your own answer from `cluster_status` and
-your configuration, and read
+`hdb_role`, and `hdb_nodes`. **It is in scope by default**, since the default
+replication scope is every database, so unless someone has narrowed it your users
+and roles already propagate and every node that receives `system` must be trusted
+with its contents, including encrypted secret rows. That is usually what you want,
+but it should be a decision rather than a surprise. Confirm your own answer from
+`cluster_status` and your configuration, and read
 [replicating the system database with controlled flow](/reference/v5/replication/overview#replicating-the-system-database-with-controlled-flow)
 before changing it.
 :::
 
 ## What moves automatically, and what does not
 
-| Object or change            | Behavior                                                                                                   | What it means for you                                                                                         |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Data mutations              | Insert, update, upsert, delete, and bulk load replicate for tables in scope                                | Monitor connections, latency, and convergence for the databases that serve critical journeys                  |
-| Transactions                | Replicated atomically, and a transaction may span multiple tables                                          | Tables that need to commit together must live in the same database                                            |
-| A brand new node            | Downloads the full database from the first node it connects to, then enters incremental replication        | Budget the transfer, and expect load on the source node while it happens                                      |
-| A returning node            | Resynchronizes automatically to catch up on the transactions it missed                                     | This is not a full copy. A routine restart is much cheaper than a node replacement, so budget them separately |
-| Component deployment        | `deploy_component` supports `"replicated": true` for cluster-wide propagation                              | Useful once an artifact is trusted. Keep single-node deployment available for validation                      |
-| Configuration               | `set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />                        | Never replicate node-local parameters. See the warning below                                                  |
-| Users and roles             | Propagate only when the `system` database is in replication scope                                          | If `system` is out of scope, identity must be provisioned on every node by your own automation                |
-| Node registry (`hdb_nodes`) | Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes |
-| Destructive schema changes  | Behavior is operation and version dependent                                                                | Treat as high risk. Write an exact procedure, and verify the result on every node                             |
+| Object or change            | Behavior                                                                                                                        | What it means for you                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Data mutations              | Insert, update, upsert, delete, and bulk load replicate for tables in scope                                                     | Monitor connections, latency, and convergence for the databases that serve critical journeys                  |
+| Transactions                | Replicated atomically, and a transaction may span multiple tables                                                               | Tables that need to commit together must live in the same database                                            |
+| A brand new node            | Requests a full copy of each in-scope database from every peer it has no resume cursor for, then enters incremental replication | Budget N transfers, not one. See the note below before sizing a join                                          |
+| A returning node            | Resynchronizes automatically to catch up on the transactions it missed                                                          | This is not a full copy. A routine restart is much cheaper than a node replacement, so budget them separately |
+| Component deployment        | `deploy_component` replicates by default; pass `"replicated": false` to hold it to one node                                     | Cluster-wide is the default, so single-node validation is the case you must ask for                           |
+| Configuration               | `set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />                                             | Never replicate node-local parameters. See the warning below                                                  |
+| Users and roles             | Propagate when the `system` database is in replication scope, which is the default                                              | If you narrow scope to exclude `system`, identity must be provisioned on every node by your own automation    |
+| Node registry (`hdb_nodes`) | Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload                      | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes |
+| Destructive schema changes  | `drop_database` and `drop_table` replicate by default; `drop_attribute` does not                                                | A drop is a cluster-wide event unless you pass `"replicated": false`. Verify the result on every node         |
 
-The two rows most likely to bite you are the returning node and the node registry.
+The three rows most likely to bite you are the returning node, the new node, and
+the node registry.
 
 On the returning node: it is common to see a routine restart budgeted as though it
 were a full resynchronization, which makes teams avoid restarts they should be
 comfortable with. A node whose databases have never synced does download them in
 full. A node that was briefly offline catches up on what it missed. Measure both
 on your own data volume once, and use the right number for the right situation.
+
+On the new node, the cost is larger than "one copy from one peer," because the
+full-copy decision is made per peer and per database rather than once against a
+bootstrap source. A joining node requests a full copy from every peer it has no
+resume cursor for. And because replication is bidirectional, each established peer
+independently decides it has no cursor for the newcomer and requests a full copy
+_from_ it as well. Joining a cluster of N peers is therefore N inbound transfers
+plus N outbound transfers of the new node's own (empty) databases, not a single
+stream from one source.
+
+The practical consequences are worth planning around. Load lands on every existing
+peer at once rather than on one, so a join during peak traffic is a capacity event
+for the whole cluster. If you want a single designated source instead, `add_node`
+accepts `isLeader: true`, which tells the joining node to request its full copy
+from that peer alone.
 
 On the registry: a node's advertised record is derived from its configuration
 file, and it replicates. That means a topology constraint you applied
@@ -195,6 +213,21 @@ it is the one that tells you a returning node is not ready for traffic yet.
 `sendingMessage` appears while a transaction is actively being sent and is absent
 when the socket is idle, so its absence is not a fault.
 
+Two things will mislead you if you automate on that pair without knowing them.
+The gap only means "behind" while transactions are actually arriving: on an idle
+source both stamps freeze, and the gap sits at whatever constant it last reached
+rather than signalling lag. And because the two stamps come from two different
+clocks, skew between peers is added to the gap directly, so calibrate your
+threshold against a healthy baseline rather than treating the raw number as
+replication delay.
+
+:::tip
+While a database is taking a full copy, these timing fields render as the literal
+string `"Copying"` rather than a date. Anything that parses them as timestamps
+will fail on a joining node, which is exactly the node you most want to be
+watching. Handle that value explicitly.
+:::
+
 Inventory `system.hdb_nodes` alongside this and compare it to your intended
 topology. Configuration intent and live peer state should agree, and the node's
 own row is in there too, not just its peers.
@@ -206,7 +239,7 @@ own row is in there too, not just its peers.
 - Sustained growth in `latency`, judged against your own baseline
 - `lastCommitConfirmed` not advancing on a peer while writes are occurring
 - A `lastReceivedRemoteTime` to `lastReceivedLocalTime` gap exceeding your
-  admission budget
+  admission budget, evaluated only while writes are flowing
 - Repeated reconnects, which are visible in the logs even when a point-in-time
   status check looks healthy
 - Version or configuration drift between peers
@@ -241,6 +274,12 @@ The `replication-latency` metric from
 continuous version of the same measurement: the difference between the source
 commit timestamp and local time, reported per node, database, and table. Use the
 sentinel for a definitive answer during a change, and the metric for a dashboard.
+
+Note that `replication-latency` is not recorded for the `system` database. Since
+`system` is in replication scope by default and carries your users and roles, a
+dashboard built only on this metric will show nothing for the database that
+propagates identity. Use the sentinel, or the `cluster_status` receive-time pair,
+if you need to watch `system` convergence.
 
 ## Consistency belongs in the application design
 

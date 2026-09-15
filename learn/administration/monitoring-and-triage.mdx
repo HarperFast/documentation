@@ -65,7 +65,7 @@ dashboard. This much belongs on a pager:
 | Event loop backpressure                | `main-thread-utilization`, the `taskQueueLatency` attribute        | Rises before throughput drops, so it is an early warning rather than a postmortem input  |
 | Replication convergence lag            | `replication-latency`, or the receive-time gap in `cluster_status` | A node serving stale data looks healthy on every other signal                            |
 | Write commit time                      | `transaction-commit-time` <VersionBadge version="v5.2.0" />        | Storage-level degradation shows here before it shows in request latency                  |
-| Write queue depth growing              | `write-transaction-queue-depth`                                    | A growing queue means the node is accepting work faster than it can commit it            |
+| Write queue depth growing              | `write-transaction-queue-depth` <VersionBadge version="v5.2.0" />  | A growing queue means the node is accepting work faster than it can commit it            |
 | Storage headroom                       | `storage-volume` free, and `database-size`                         | Disk exhaustion is an outage with no graceful degradation                                |
 | Missing peer                           | `cluster_status`                                                   | Covered in [Operating Replication](./operating-replication.mdx)                          |
 | Backup age exceeding RPO               | `list_backups`                                                     | The failure you will not notice until you need it                                        |
@@ -102,9 +102,29 @@ and scrape it into whatever you already run:
 	"operation": "deploy_component",
 	"project": "prometheus-exporter",
 	"package": "@harperdb/prometheus-exporter",
-	"restart": true
+	"restart": "rolling"
 }
 ```
+
+Once deployed, the scrape endpoint is `/<project>/metrics` on the application
+port, so the call above exposes it at `/prometheus-exporter/metrics`. The route is
+authorized, so give your scraper a credential rather than expecting it to be open.
+
+:::warning
+**The exporter does not cover every metric in the alert table above.** It
+translates the request and replication metrics, including `success`, `duration`,
+and `replication-latency`, but it does not currently export
+`main-thread-utilization` and its `taskQueueLatency` attribute,
+`transaction-commit-time`, `write-transaction-queue-depth`, `database-size`,
+`storage-volume`, or `table-size`. The `utilization` it does expose is a thread
+utilization figure drawn from `system_information`, which is not the same as the
+analytics `utilization` metric.
+
+For the saturation, commit-time, and storage rows you will need to query
+`hdb_analytics` directly or collect `system_information` on your own schedule.
+Check what your version actually exports before you build a dashboard on the
+assumption that everything above arrives in Prometheus.
+:::
 
   </TabItem>
 </Tabs>
@@ -138,14 +158,15 @@ to discover it after building panels on the wrong assumption.
 
 ## Logs you can use during an incident
 
-Harper's `logger` global writes structured entries from component code:
+Harper's `logger` global takes a message plus a context object from component
+code:
 
 ```javascript
 logger.info('order submitted', {
 	component: 'orders-api',
-	version: process.env.APP_VERSION,
-	node: process.env.HARPER_NODE_NAME,
-	requestId: context.requestId,
+	version: process.env.APP_VERSION, // whatever your build injects
+	node: server.hostname,
+	requestId: context.requestId, // requires http.logging.id, see below
 	operation: 'submit',
 	durationMs: elapsed,
 	outcome: 'ok',
@@ -157,6 +178,34 @@ the operation, its duration, the outcome, and a safe error class. That field set
 is what lets you answer "was this only the new version" and "was this only one
 node" without guessing, and those are the first two questions in almost every
 incident.
+
+Three details in that example need care:
+
+- **The node name comes from `server.hostname`**, not an environment variable.
+  Harper does not set a node-name variable in the process environment, and
+  `server.hostname` is the same identity analytics uses, so it is what correlates
+  with your metrics.
+- **`context.requestId` is only populated when `http.logging.id` is enabled**, and
+  HTTP request logging is off by default. Without it the field is `undefined` and
+  you silently lose your correlation id. Either enable it in
+  [logging configuration](/reference/v5/logging/configuration) or generate an id
+  in your own code.
+- **`APP_VERSION` is yours to inject.** Harper does not provide it. Set it in your
+  deployment so the log line can name the build.
+
+:::warning
+Harper's logger is built on Node's `Console`, so this renders as a formatted text
+line, not JSON. The context object is inspected into the message rather than
+emitted as separate fields:
+
+```text
+[main/3] [info]: order submitted { component: 'orders-api', version: '2.4.1', ... }
+```
+
+That is fine for reading during an incident, but a log pipeline cannot key on
+`component` or `outcome` without parsing the line. If you need queryable fields,
+serialize the context yourself and log a single JSON string.
+:::
 
 Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The
 default is `warn`, and `notify` is always logged regardless of level. Choose

@@ -47,7 +47,7 @@ Most bad deployments come from collapsing these into one action.
 | Decision     | The question                              | Harper control point                                                                            |
 | ------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Build**    | What immutable artifact exists?           | A pinned package reference, a versioned tarball, a checksum, a dependency lock                  |
-| **Deploy**   | Which nodes have that artifact installed? | `deploy_component`, with `replicated` true or false                                             |
+| **Deploy**   | Which nodes have that artifact installed? | `deploy_component`, with `"replicated": false` to hold it to one node                           |
 | **Activate** | Which code path is actually enabled?      | `urlPath` and `host` mounting, component configuration, a feature flag, a header or tenant rule |
 | **Expose**   | Which production traffic reaches it?      | Traffic layer weights, the availability flag, cohort or geography targeting                     |
 
@@ -56,6 +56,19 @@ install an artifact on every node and activate it nowhere. You can activate a
 route and expose it only to internal traffic. And when something is wrong you can
 reverse exposure in seconds without touching what is installed, which is the
 fastest containment action available to you.
+
+:::danger
+**`replicated` is opt-out, not opt-in.** A `deploy_component` call with no
+`replicated` field replicates to every peer. So does `add_component`,
+`drop_component`, `set_component_file`, `set_env_value`, `delete_env_value`, and
+the destructive `drop_database` and `drop_table`. Only `"replicated": false`
+changes anything; `"replicated": true` is the default spelled out.
+
+This is the opposite of what most operators assume, and it is why the single-node
+validation pattern below has to say `false` explicitly. If you intend to touch one
+node, you must say so. ([`set_configuration`](/reference/v5/configuration/operations)
+is the deliberate exception: it replicates only when you ask.)
+:::
 
 `urlPath` mounts a component at an HTTP path.
 `host` <VersionBadge version="v5.2.0" /> serves it on a virtual hostname. Both are
@@ -137,10 +150,13 @@ against it directly, then admit a bounded cohort.
 }
 ```
 
-Same immutable reference, now cluster-wide. Poll the returned `restartJobId` with
-[`get_job`](/reference/v5/operations-api/operations#get_job), and poll
-[`get_deployment`](/reference/v5/operations-api/operations#get_deployment) until
-the deployment reports success rather than treating the response as completion.
+Same immutable reference, now cluster-wide. The deploy itself is finished when the
+call returns, so the thing still outstanding is the restart: poll the returned
+`restartJobId` with
+[`get_job`](/reference/v5/operations-api/operations#get_job). Read
+[`get_deployment`](/reference/v5/operations-api/operations#get_deployment) for the
+per-peer detail the response summarizes away, including which peers received the
+artifact and which failed.
 
   </TabItem>
 </Tabs>
@@ -149,29 +165,66 @@ Prefer a pinned version or an immutable tarball over a moving branch reference.
 A branch moves, so you can neither audit what was running yesterday nor redeploy
 it.
 
+:::tip
+A pinned registry version such as `@my-org/orders-api@2.4.1` is the
+best-travelled form. If you pin a tarball URL instead, note that a bare `https://`
+URL pointing at `github.com`, `gitlab.com`, or `bitbucket.org` is treated as a git
+clone rather than a download, so a GitHub release asset URL will not behave the
+way the example above does. Host release tarballs somewhere neutral, or use a
+registry version.
+:::
+
 ## What restart actually does
 
 This is worth reading carefully, because the naming invites a wrong assumption.
 
-**`"restart": true`** restarts the HTTP worker threads on the node handling the
-call, and waits for that restart to finish before responding. A successful
-response therefore means every worker on that node is serving the new code. Until
-a worker has been replaced it is still running the previous code, and on platforms
-where replacements share a listening port it keeps accepting connections during
-the changeover. The wait follows the restart's own progress rather than a fixed
-timeout, so the response can take tens of seconds on a slow install with many
-worker threads.
+**`"restart": true`** starts a restart of the HTTP worker threads on the node
+handling the call and returns immediately, without waiting for it. A `200` means
+the deploy succeeded and a restart has been requested. It does not mean the new
+code is serving yet. Until a worker has been replaced it is still running the
+previous code, and on platforms where replacements share a listening port it keeps
+accepting connections during the changeover.
 
-**`"restart": "rolling"`** does not restart inline. It starts a replicated
-`restart_service` job and returns a `restartJobId` for you to poll. Use this when
-your caller has a short request timeout.
+**`"restart": "rolling"`** does not restart inline either, but it is observable.
+It starts a replicated `restart_service` job and returns a `restartJobId` you can
+poll with [`get_job`](/reference/v5/operations-api/operations#get_job). That job
+walks the cluster **one node at a time**, waiting for each node to come back
+before starting the next, so the cluster keeps serving throughout.
 
-Two consequences for your pipeline. A caller with an aggressive HTTP timeout
-should use `"rolling"` and poll, because giving up on `true` does not stop the
-restart, it just leaves you without the result. And a failed restart does not fail
-the deploy: the component is installed and replicated either way, so your pipeline
-needs to check both outcomes separately rather than assuming one implies the
-other.
+:::warning
+**On a cluster, prefer `"rolling"`.** `"restart": true` is forwarded verbatim to
+every peer, and peers are dispatched in parallel, so a replicated deploy with
+`"restart": true` restarts every node in the cluster at roughly the same moment.
+That is a cluster-wide availability event, not a node-local one. Reserve
+`"restart": true` for a single-node or development instance, and use `"rolling"`
+anywhere you care about staying up. See
+[Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx).
+:::
+
+Two more consequences for your pipeline. Neither restart mode reports completion
+in the deploy response, so if you need to know the new code is live, poll the
+rolling restart job or probe the nodes themselves. And a failed restart does not
+fail the deploy: the component is installed and replicated either way, so your
+pipeline needs to check both outcomes separately rather than assuming one implies
+the other.
+
+### Waiting for the restart
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+From v5.3.0, `"restart": true` waits for the worker restart to finish before
+responding, rather than returning as soon as it has been requested. The wait
+follows the restart's own progress rather than a fixed timeout, so the call can
+take tens of seconds on a slow install with many worker threads, with a hard
+ceiling of ten minutes.
+
+Two things do not change, and both matter more than the wait itself. A caller that
+gives up early does not stop the restart, it only loses the result. And the
+response still does not carry the restart's outcome: a restart that stalls, times
+out, or leaves workers on the old code is reported in the node's log, not to you.
+So even on v5.3.0, treat a `200` as "the deploy landed and a restart ran," and
+confirm the version actually serving through your readiness route or journey
+synthetic rather than through the deploy response.
 
 Two parameters worth setting deliberately on replicated deploys:
 
@@ -299,8 +352,11 @@ because the healthy majority dominates the average.
 - [ ] Cohort ladder defined, from smallest useful sample to full exposure
 - [ ] Stop thresholds and hold times declared before the rollout starts
 - [ ] A named decision owner for advance, hold, stop, and roll back
-- [ ] Pipeline polls `get_deployment` and the restart job separately, rather than
-      treating the deploy response as completion
+- [ ] Pipeline polls the restart job rather than treating the deploy response as
+      proof the new code is serving
+- [ ] `"replicated": false` used deliberately wherever a change is meant to reach
+      one node only, since replication is the default
+- [ ] Cluster deploys use `"restart": "rolling"`, not `"restart": true`
 - [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
 - [ ] Configuration changes go through the same change record as code
 - [ ] `get_configuration` read back after every configuration change

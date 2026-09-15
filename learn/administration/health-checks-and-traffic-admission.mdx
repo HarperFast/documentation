@@ -67,20 +67,35 @@ other component:
 }
 ```
 
-Or declare it in your application's `config.yaml`, which is the better option
-because it makes the availability contract part of your deployed artifact rather
-than a manual step someone has to remember on a new node:
+Or declare it in the root `harper-config.yaml`, so the component is part of the
+node's configuration rather than something an operator has to remember to deploy:
 
 ```yaml
 status-check:
   package: '@harperdb/status-check'
 ```
 
-Once deployed, the route answers with a status code rather than a body:
+:::note
+That entry belongs in the root `harper-config.yaml` (in the Harper `rootPath`,
+typically `~/hdb`), not in an application's own `config.yaml`. The two files look
+alike but behave differently: in the root config the entry name is free-form, while
+in a component's `config.yaml` it must match a `package.json` dependency. A
+component `config.yaml` also **replaces** Harper's default component
+configuration outright instead of merging with it, so a file containing only this
+entry would switch off the `rest`, `graphqlSchema`, `jsResource`, and
+`fastifyRoutes` defaults your application relies on. See
+[applications](/reference/v5/components/applications).
+:::
+
+Once deployed, the route's contract is its status code, which is what lets a load
+balancer consume it without parsing anything:
 
 - `GET /status` returns `200` when the node is available, `404` when it is not
 - `POST /status` marks the node available (authenticated)
 - `DELETE /status` marks the node unavailable (authenticated)
+
+It does also return a body, which is useful when you are checking by hand: a short
+message on `200`, and an RFC 9457 problem-details document on `404`.
 
 <Tabs>
   <TabItem value="curl" label="curl">
@@ -118,11 +133,16 @@ Operations API and not at your application's root. A `404` is the node telling t
 traffic layer to stop sending work, and it will keep saying so until something
 sets it back.
 
-:::warning
-Whatever mechanism you use to persist the availability flag, keep it out of
-replication scope. A flag that replicates would let one node's maintenance state
-propagate to its peers, which turns a routine drain into an outage. If you are
-scoping replication by hand, confirm this explicitly rather than assuming it. See
+:::note
+The availability flag is node-local out of the box. The component stores it in a
+table declared `replicate: false`, and the Operations API's own status values are
+stored the same way, so neither propagates to peers.
+
+That is the property you want, and it is worth knowing why: a flag that replicated
+would let one node's maintenance state reach its peers, turning a routine drain
+into a cluster-wide outage. So the rule is to preserve it rather than to establish
+it. If you fork the component or persist the flag some other way, keep
+`replicate: false` on whatever holds it. See
 [Operating Replication](./operating-replication.mdx).
 :::
 
@@ -154,15 +174,19 @@ converted a partial degradation into a full outage yourself.
 Add a resource to your application's `resources.js`:
 
 ```javascript
+import { Resource, tables } from 'harper';
+
 export class Readiness extends Resource {
 	static async get() {
 		const checks = {};
 
 		// A bounded read against the table this journey serves.
 		// Keep it to a single primary-key lookup, never a scan.
+		// A missing record resolves to undefined rather than throwing,
+		// so check the result as well as catching a storage fault.
 		try {
-			await tables.Product.get('readiness-probe-sentinel');
-			checks.data = 'ok';
+			const sentinel = await tables.Product.get('readiness-probe-sentinel');
+			checks.data = sentinel ? 'ok' : 'failed';
 		} catch (error) {
 			checks.data = 'failed';
 		}
@@ -187,10 +211,24 @@ export class Readiness extends Resource {
 }
 ```
 
-Enable the `jsResource` plugin in `config.yaml` if it is not already, and the
-route is served at `/Readiness` on the application port. See
+The `jsResource` plugin is enabled by default, so the route is served at
+`/Readiness` on the application port as soon as the class is exported. See
 [Harper Applications in Depth](../developers/harper-applications-in-depth.mdx) for
 the resource and export mechanics.
+
+:::note
+Because the handler is a `static` method, it replaces Harper's built-in dispatch
+along with the authorization check that lives inside it, so `GET /Readiness` is
+unauthenticated. That is what a load balancer probe needs, and it is why the
+endpoint must not return anything you would not publish. Keep the response to
+check names and outcomes, never connection strings, credentials, or internal
+hostnames.
+
+If you rewrite this as an instance `get()` instead, authorization comes back and
+defaults to `super_user` only, which will make your probe start failing with an
+authorization error rather than a readiness one. In that form you need
+`allowRead() { return true; }` to keep it reachable.
+:::
 
 Two details in that example are the point of it. The timeout on the downstream
 call means a slow dependency cannot make your readiness check hang, which would
@@ -288,7 +326,8 @@ than people assume, because it includes convergence rather than just startup.
 - [ ] `@harperdb/status-check` deployed, declared in `config.yaml` rather than
       deployed by hand
 - [ ] Traffic layer health check points at `GET /status` on `9926`
-- [ ] Availability flag confirmed to be outside replication scope
+- [ ] Availability flag storage still declares `replicate: false`, if you forked the
+      component or persist it yourself
 - [ ] An application readiness route exists, scoped to one journey's dependencies
 - [ ] Every downstream call in the readiness route has a timeout
 - [ ] Readiness response includes the component version
