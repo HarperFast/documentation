@@ -246,7 +246,7 @@ That last constraint has an escape hatch worth knowing before you need it. Setti
 components, while the database, Operations API, and HTTP server come up normally:
 
 ```bash
-HARPER_SAFE_MODE=1 harper
+HARPER_SAFE_MODE=1 harper run
 ```
 
 Because no component loads, nothing holds a user database open, so a restore that
@@ -275,14 +275,34 @@ then has to rejoin peers that never rolled back, so sequence it deliberately:
 1. Take the node out of rotation with the availability flag, per
    [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
    Never restore a node that is serving traffic.
-2. Decide what should happen to replication for the restored database, and do that
-   deliberately. Whether the restored data should propagate, or be overwritten by
-   peers, is a decision with two very different outcomes, and it is not a decision
-   to improvise.
-3. Perform the restore, online or offline according to the table above.
-4. Verify data expectations locally before any peer sees the node.
-5. Re-admit the node through the full return sequence, including convergence
+2. **Isolate it from its peers.** This is a separate action from step 1, and the
+   step most likely to be skipped. See the warning below.
+3. Decide what should happen to the restored data: whether it should propagate to
+   peers, or be overwritten by them. Those are two very different outcomes and it
+   is not a decision to improvise once the node is back on the mesh.
+4. Perform the restore, online or offline according to the table above.
+5. Verify data expectations locally before any peer sees the node.
+6. Re-admit the node through the full return sequence, including convergence
    verification.
+
+:::danger
+**The availability flag does not stop replication.** It tells your traffic layer
+to stop sending user requests. Replication is a separate path: peer connections
+stay up, and the node keeps exchanging transactions the whole time it is "out of
+rotation."
+
+So a node that is drained but still connected is not isolated. Restore it in place
+and the rolled-back database is live on the mesh immediately, before you have
+validated anything. Two things can then happen, both bad: peers overwrite your
+restored data with newer transactions, or your rolled-back state propagates
+outward to peers that were never affected.
+
+Isolation is its own step. Stopping Harper and restoring offline is the
+unambiguous way to get it, which is a further argument for the offline path in a
+cluster even where the table above permits an online restore. If you restore
+online, you must have removed the node from the replication topology first, and
+put it back deliberately in step 6.
+:::
 
 ## What backups cannot fix
 
@@ -360,6 +380,8 @@ that it is the target than a promise you cannot keep.
 - [ ] Restore constraints documented for user databases, component-held databases,
       and `system`
 - [ ] Restore authority named, and restore execution logged
+- [ ] Restore procedure isolates the node from replication, not just from user
+      traffic, since the availability flag does not stop peer exchange
 - [ ] Safe mode known as the way to restore a database a component holds open,
       and to reach a node a broken component stopped
 - [ ] Restore drill completed and dated, with measured recovery time and recovery
