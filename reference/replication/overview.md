@@ -360,11 +360,16 @@ The following data operations are replicated across the cluster:
 - Delete
 - Bulk loads (CSV data load, CSV file load, CSV URL load, import from S3)
 
-**Destructive schema operations are not replicated**: `drop_database`, `drop_table`, and `drop_attribute` must be run on each node independently.
+**Destructive schema operations differ from each other, so check before you run one:**
 
-Users and roles are not replicated across the cluster by default. They do propagate when the `system` database (where `hdb_user` and `hdb_role` live) is included in replication; as of v5.2 this no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow).
+- `drop_database` and `drop_table` **replicate to the whole cluster by default**, like the other operations that accept a `replicated` flag. Pass `"replicated": false` to drop on one node only.
+- `drop_attribute` is not replicated and must be run on each node independently.
 
-Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
+Note that `replicated` is opt-out rather than opt-in across the operations that support it: omitting the flag replicates. [`set_configuration`](../configuration/operations.md#set-configuration) is the deliberate exception, replicating only when you pass `"replicated": true`, because configuration bodies routinely carry node-local values.
+
+Users and roles **do** propagate by default. They live in the `system` database, and the default replication scope is every database, so `system` is in scope unless you have narrowed it. As of v5.2 replicating `system` no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow). If you narrow the scope to exclude `system`, users and roles stop propagating and must be provisioned on every node by your own automation.
+
+Certain management operations — including component deployment and rolling restarts — are replicated across the cluster as well, following the same opt-out rule described above.
 
 ## Inspecting Cluster Configuration
 

@@ -1,0 +1,251 @@
+---
+title: Monitoring and Triage
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+A dashboard is useful when it lets an operator place a symptom. Users are seeing errors: is it the edge, the traffic layer, one node, the replication path, a downstream dependency, or the change someone shipped twenty minutes ago? A dashboard that shows CPU across the cluster cannot answer that, which is why it gets ignored during incidents.
+
+This guide builds monitoring around the boundaries you can actually act on, names the specific Harper metrics worth alerting on, and gives you a triage sequence short enough to run under pressure.
+
+## What You Will Learn
+
+- The layers a Harper symptom can live in, and the minimum signal for each
+- Which Harper metrics are worth an alert, by name, and which are only worth a dashboard
+- How to get metrics out of Harper, on Fabric and self-managed
+- How to preload an APM or tracing agent so it can instrument your application
+- How to write log entries that are still useful during an incident
+- A triage sequence that narrows a Harper incident in about five minutes
+
+## Prerequisites
+
+- A cluster with your application deployed and taking traffic
+- A `super_user` credential for the Operations API
+- Somewhere to send metrics: [Grafana](/fabric/grafana-integration) on Fabric, or a Prometheus-compatible system for self-managed
+- [Operating Replication](./operating-replication.mdx), since replication signals are half of what you will watch
+
+## Monitor at the boundaries you operate
+
+| Layer              | Minimum signals                                                                            | Where they come from                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| User and edge      | Success, latency, correctness, broken out by geography and cohort                          | Your synthetic journey, real-user telemetry, CDN and traffic layer logs                   |
+| HTTP and component | Request rate, error rate, latency percentiles, active component version, availability flag | `success` and `duration` metrics, `GET /status`, your readiness route                     |
+| Node resources     | CPU, memory, worker utilization, task queue latency, disk, restarts                        | `system_information`, `utilization`, `main-thread-utilization`, host or container metrics |
+| Replication        | Peer connections, per-database sockets, latency, convergence lag                           | `cluster_status`, `replication-latency`, `system.hdb_nodes`                               |
+| Data               | Read and write rate, transaction commit time, queue depth, freshness                       | `transaction-commit-time`, write and read transaction queue depth, your own sentinel      |
+| Storage            | Database size, volume free space, table growth                                             | `database-size`, `storage-volume`, `table-size`                                           |
+| Change             | Component and config version, cohort, operator, start and end, outcome                     | `list_deployments`, `get_deployment`, `get_components`, `get_configuration` read-back     |
+| Recovery           | Backup age, job state, verification result, last restore drill                             | `list_backups`, `verify_backup`, `get_job`                                                |
+
+The Change row is the one teams leave out and the one that resolves incidents fastest. Most production symptoms correlate with something a human did, so being able to overlay deployments onto a latency graph is worth more than another resource metric.
+
+## The signals worth an alert
+
+Harper records a large standard metric set automatically. Most of it belongs on a dashboard. This much belongs on a pager:
+
+| Alert on                               | Metric or source                                                   | Why this one                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Journey success rate below SLO         | `success`, by resource path and method                             | The only signal that maps directly to user impact                                        |
+| Journey latency at your SLO percentile | `duration`, by resource path and method                            | Alert on the percentile in your SLO, never on the mean                                   |
+| Worker saturation                      | `utilization`, per worker thread                                   | Percentage of time the worker was processing requests. This is your real headroom signal |
+| Event loop backpressure                | `main-thread-utilization`, the `taskQueueLatency` attribute        | Rises before throughput drops, so it is an early warning rather than a postmortem input  |
+| Replication convergence lag            | `replication-latency`, or the receive-time gap in `cluster_status` | A node serving stale data looks healthy on every other signal                            |
+| Write commit time                      | `transaction-commit-time` <VersionBadge version="v5.2.0" />        | Storage-level degradation shows here before it shows in request latency                  |
+| Write queue depth growing              | `write-transaction-queue-depth` <VersionBadge version="v5.2.0" />  | A growing queue means the node is accepting work faster than it can commit it            |
+| Storage headroom                       | `storage-volume` free, and `database-size`                         | Disk exhaustion is an outage with no graceful degradation                                |
+| Missing peer                           | `cluster_status`                                                   | Covered in [Operating Replication](./operating-replication.mdx)                          |
+| Backup age exceeding RPO               | `list_backups`                                                     | The failure you will not notice until you need it                                        |
+
+Two notes on how to set these. Alert on the percentile that appears in your SLO, because a mean latency graph will look fine through an incident that is failing your slowest ten percent of users. And set saturation thresholds from the per-node capacity work in [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) rather than from a generic number, since the point where latency leaves your SLO is specific to your application and your data.
+
+## Get the metrics out
+
+Harper stores analytics locally in `hdb_raw_analytics` and aggregates them into `hdb_analytics`. You can query those directly, but for a real monitoring setup
+export them.
+
+<Tabs>
+  <TabItem value="fabric" label="Fabric">
+
+Use the [Grafana integration](/fabric/grafana-integration). It ships dashboards over Harper's analytics without you building a pipeline, which is the fastest path to the alert list above.
+
+  </TabItem>
+  <TabItem value="self-managed" label="Self-managed">
+
+Deploy [`@harperdb/prometheus-exporter`](https://github.com/HarperFast/prometheus-exporter) and scrape it into whatever you already run:
+
+```json
+{
+	"operation": "deploy_component",
+	"project": "prometheus-exporter",
+	"package": "@harperdb/prometheus-exporter",
+	"restart": "rolling"
+}
+```
+
+Once deployed, the scrape endpoint is `/<project>/metrics` on the application port, so the call above exposes it at `/prometheus-exporter/metrics`. The route is authorized, so give your scraper a credential rather than expecting it to be open.
+
+:::warning
+**The exporter does not cover every metric in the alert table above.** It translates the request and replication metrics, including `success`, `duration`, and `replication-latency`, but it does not currently export `main-thread-utilization` and its `taskQueueLatency` attribute, `transaction-commit-time`, `write-transaction-queue-depth`, `database-size`, `storage-volume`, or `table-size`. The `utilization` it does expose is a thread utilization figure drawn from `system_information`, which is not the same as the analytics `utilization` metric.
+
+For the saturation, commit-time, and storage rows you will need to query `hdb_analytics` directly or collect `system_information` on your own schedule. Check what your version actually exports before you build a dashboard on the assumption that everything above arrives in Prometheus.
+:::
+
+  </TabItem>
+</Tabs>
+
+To find out what is actually available on your version rather than guessing from documentation:
+
+```json
+{
+	"operation": "list_metrics",
+	"metric_types": ["builtin", "custom"]
+}
+```
+
+Then [`describe_metric`](/reference/v5/analytics/operations#describe_metric) for the shape of any one of them.
+
+Your application can add its own metrics with [`server.recordAnalytics()`](/reference/v5/http/api#serverrecordanalyticsvalue-metric-path-method-type), which is how you get business-level signals such as checkout completion onto the same dashboard as node saturation. That correlation is usually what tells you whether a technical symptom matters.
+
+:::tip
+Check `analytics.replicate` in the [analytics configuration](/reference/v5/analytics/overview#analytics-configuration) before building dashboards. Whether metrics stay node-local or replicate changes what a cluster-wide query means, and it is easier to decide that deliberately than to discover it after building panels on the wrong assumption.
+:::
+
+## Run an APM or tracing agent
+
+Harper's own metrics tell you how the node is behaving. They do not give you distributed traces across your application code and its downstream calls, which is what you want when a journey is slow and you need to know where the time went. That comes from an instrumentation agent, and an agent has to load before the code it instruments.
+
+Two configuration keys put a module on each worker thread's startup, ahead of Harper's own modules and yours:
+
+```yaml
+threads:
+  preloadRequire: dd-trace/init # the entry that calls init()
+  preload: dd-trace/register.js # ESM loader hooks for automatic instrumentation
+```
+
+`threads.preload` (Added in: v5.2.0) loads a module via Node's `--import`, which is how an agent installs the loader hooks that let it instrument modules imported later. `threads.preloadRequire` (Added in: v5.2.0) uses `--require`, which runs the module body and is typically how an agent's initialization entry actually starts it. Both are documented under [threads configuration](/reference/v5/configuration/options#threads).
+
+Installing loader hooks and starting the agent are two different jobs, and which of your agent's entry points does which is specific to that agent. Some ship one entry that does both; others split them, in which case set both keys. The example above is the split-entry case, and it is the one that produces the most confusing failure: with only the hooks loaded, a tracer will hand out spans with plausible trace ids that are no-ops and export nothing, so your instrumentation looks installed and your collector stays empty.
+
+Two constraints worth knowing before you plan around this. Both keys apply to worker threads only, and neither works under Bun. And bare specifiers resolve against the `node_modules` of your installed components, so an agent can ship as a dependency of a deployed component rather than as a host-level install.
+
+Whatever agent you use, follow its own worker-thread documentation, and finish by confirming spans actually arrive at your collector rather than assuming the configuration took.
+
+## Logs you can use during an incident
+
+Harper's `logger` global takes a message plus a context object from component code:
+
+```javascript
+logger.info('order submitted', {
+	component: 'orders-api',
+	version: process.env.APP_VERSION, // whatever your build injects
+	node: server.hostname,
+	requestId: context.requestId, // requires http.logging.id, see below
+	operation: 'submit',
+	durationMs: elapsed,
+	outcome: 'ok',
+});
+```
+
+Include the component and its version, the node, a request or trace identifier, the operation, its duration, the outcome, and a safe error class. That field set is what lets you answer "was this only the new version" and "was this only one node" without guessing, and those are the first two questions in almost every incident.
+
+Three details in that example need care:
+
+- **The node name comes from `server.hostname`**, not an environment variable. Harper does not set a node-name variable in the process environment, and `server.hostname` is the same identity analytics uses, so it is what correlates with your metrics.
+- **`context.requestId` is only populated when `http.logging.id` is enabled**, and HTTP request logging is off by default. Without it the field is `undefined` and you silently lose your correlation id. Either enable it in [logging configuration](/reference/v5/logging/configuration) or generate an id in your own code.
+- **`APP_VERSION` is yours to inject.** Harper does not provide it. Set it in your deployment so the log line can name the build.
+
+:::warning
+Harper's logger is built on Node's `Console`, so this renders as a formatted text line, not JSON. The context object is inspected into the message rather than emitted as separate fields:
+
+```text
+[main/3] [info]: order submitted { component: 'orders-api', version: '2.4.1', ... }
+```
+
+That is fine for reading during an incident, but a log pipeline cannot key on `component` or `outcome` without parsing the line. If you need queryable fields, serialize the context yourself and log a single JSON string.
+:::
+
+Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The default is `warn`, and `notify` is always logged regardless of level. Choose levels deliberately: a production log at `debug` is a log nobody can read, and one at `error` only has the incidents in it and none of the context.
+
+`console.log` output does not reach the log files unless `logging.console` is enabled, so unstructured console output is not a production record. Centralize logs off the node, because the node you most need logs from is the one you are about to restart.
+
+Read logs through the API when you need them from a specific node:
+
+```json
+{
+	"operation": "read_log",
+	"limit": 200,
+	"level": "error"
+}
+```
+
+## The five-minute triage sequence
+
+Run these in order. The goal is not diagnosis, it is narrowing.
+
+1. **Confirm and bound the impact.** What journey, starting exactly when, in which geography or cohort, and which component version is live. Without a start time you cannot correlate anything.
+
+2. **Compare the public route against a direct node call.** Request the same journey through your traffic layer, then directly against each node on `9926`. If direct calls succeed and the public route fails, you are looking at the traffic layer or the availability flag, not at Harper.
+
+3. **Check admission state on every node.** `GET /status` on `9926` and your readiness route. A node advertising unavailable is a node deliberately or accidentally out of rotation, and finding that here saves a lot of time.
+
+4. **Compare a suspect node against a healthy peer.** Same call, both nodes, then diff:
+
+   ```json
+   {
+   	"operation": "system_information",
+   	"attributes": ["cpu", "memory", "threads", "harperdb_processes"]
+   }
+   ```
+
+   Differences between peers are more informative than absolute values, because they tell you whether this is one node or the whole cluster.
+
+5. **Check the replication path.** `cluster_status` for the databases this journey needs. Look for a missing peer, `connected: false`, or a widening gap between `lastReceivedRemoteTime` and `lastReceivedLocalTime`, which means stale reads.
+
+6. **Correlate with the last change.** `list_deployments` for what shipped and when, and `get_configuration` read back against what you believe is configured. Remember that a configuration change applied without a restart leaves a node running something other than its stated configuration.
+
+7. **Contain with the smallest reversible action.** Stop a ramp, drain one node, deactivate a feature, restore prior traffic weights, or isolate suspected data. Record the decision, who made it, and the next decision deadline.
+
+Two rules make this sequence work. Silence is a failed gate: if telemetry is missing for the thing you are checking, treat that as a negative signal rather than skipping the step. And containment comes before root cause. You can diagnose after users are being served again.
+
+### Prove it
+
+Pick a fault and inject it on a non-production cluster, then time yourself. Good candidates: saturate one node's workers, block the replication port on one peer, make a downstream dependency return errors, or deploy a component that fails on one route.
+
+Measure three things. How long until an alert fired. How long until an operator following the sequence above could name the layer. And whether any step gave a misleading answer, which is the most valuable output of the drill, because a misleading signal during a real incident costs more than a missing one.
+
+## Operational notes
+
+- **Node-level dashboards, not cluster averages.** A cluster average conceals the single node doing twice the work, which is the most common cause of a latency complaint that looks like nothing on a dashboard.
+- **Watch measured request distribution, not configured weights.** Per-node request counts are the ground truth. Sticky sessions, DNS caching, and connection reuse all skew actual distribution away from intent.
+- **Annotate deployments onto your graphs.** If your monitoring supports annotations, feed `list_deployments` into them. This single change resolves more incidents faster than any additional metric.
+- **`read_audit_log` needs transaction logging enabled** and is a heavier tool for reconstructing what changed in a table. Know before an incident whether you have it on, because turning it on afterwards does not help.
+- **Protect your telemetry surfaces.** `read_log` and `get_components` can expose configuration and source detail, so they are `super_user` operations for a reason. Restrict and log their use.
+
+## Readiness checklist
+
+- [ ] A dashboard exists that can place a symptom at edge, traffic layer, node, replication, data, or change
+- [ ] Alerts on journey success and latency at the SLO percentile, not the mean
+- [ ] Alerts on worker `utilization` and `taskQueueLatency`, thresholds derived from measured per-node capacity
+- [ ] Alerts on replication convergence lag and missing peers
+- [ ] Alerts on storage headroom and backup age
+- [ ] Metrics exported off the node, via Grafana on Fabric or the Prometheus exporter self-managed
+- [ ] If you run an APM agent, both `threads.preload` and `threads.preloadRequire` set as that agent requires, with spans confirmed at the collector
+- [ ] `analytics.replicate` setting known and deliberate
+- [ ] Structured logging includes component, version, node, request id, operation, duration, and outcome
+- [ ] Logs centralized off the node
+- [ ] Deployments annotated onto dashboards
+- [ ] Triage sequence written down where on-call can find it
+- [ ] Fault injection drill completed, with time-to-detection recorded
+
+## Additional Resources
+
+- [Analytics overview](/reference/v5/analytics/overview) for the full standard metric catalog and configuration options
+- [Analytics operations](/reference/v5/analytics/operations) for `list_metrics` and `describe_metric`
+- [Grafana integration](/fabric/grafana-integration) for Fabric dashboards
+- [`@harperdb/prometheus-exporter`](https://github.com/HarperFast/prometheus-exporter) for self-managed metric scraping
+- [Logging overview](/reference/v5/logging/overview), [configuration](/reference/v5/logging/configuration), and [operations](/reference/v5/logging/operations)
+- [HTTP API reference](/reference/v5/http/api) for `server.recordAnalytics()`
+- [Fabric logging](/fabric/logging) for log access on Fabric
+- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for the gates these signals feed
