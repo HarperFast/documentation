@@ -69,8 +69,8 @@ From
 
 - [ ] Liveness, availability flag, application readiness, and journey synthetic all
       exist as separate signals
-- [ ] `@harperdb/status-check` deployed, declared in `config.yaml` rather than by
-      hand
+- [ ] `@harperdb/status-check` deployed, declared in the root `harper-config.yaml`
+      rather than by hand
 - [ ] Traffic layer health check points at `GET /status` on the application port
 - [ ] Availability flag storage still declares `replicate: false`, if you forked the
       component or persist it yourself
@@ -161,6 +161,8 @@ From [Backup and Recovery](./backup-and-recovery.mdx).
 - [ ] Restore constraints documented for user databases, component-held databases,
       and `system`
 - [ ] Restore authority named, and restore execution logged
+- [ ] Restore procedure isolates the node from replication, not just from user
+      traffic
 - [ ] Restore drill completed and dated, with measured recovery time and actual
       data loss
 - [ ] `system` database restore rehearsed offline

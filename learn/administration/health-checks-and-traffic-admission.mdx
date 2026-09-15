@@ -230,6 +230,21 @@ authorization error rather than a readiness one. In that form you need
 `allowRead() { return true; }` to keep it reachable.
 :::
 
+The sentinel is a record you create once, on purpose, and leave alone. Seed it on
+every node before you point anything at this route, or readiness will report
+`failed` forever and you will have built a probe that never passes:
+
+```bash
+curl -s -X PUT https://my-node.example.com:9926/Product/readiness-probe-sentinel \
+  -H 'Content-Type: application/json' \
+  -u 'admin:password' \
+  -d '{"name":"readiness probe sentinel","description":"do not delete"}'
+```
+
+Give it a name that says what it is, because the next person to find it will be
+deciding whether it is safe to delete. If your table replicates, seeding it once
+is enough; if it does not, seed it per node.
+
 Two details in that example are the point of it. The timeout on the downstream
 call means a slow dependency cannot make your readiness check hang, which would
 make the node look dead to a probe rather than unready. And returning the version
@@ -244,17 +259,22 @@ skip.
 <Tabs>
   <TabItem value="drain" label="Draining">
 
-1. **Declare it unavailable.** `DELETE /status` on the target node.
-2. **Verify traffic actually stopped.** Watch request volume on the target fall to
+1. **Confirm the peers can carry it, before you drain anything.** The remaining
+   nodes have to stay inside their capacity budget with this node gone. If they
+   cannot, stop here and do not drain: see
+   [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx). Checking this after
+   the traffic has already moved is how a maintenance window becomes an incident.
+2. **Declare it unavailable.** `DELETE /status` on the target node.
+3. **Verify traffic actually stopped.** Watch request volume on the target fall to
    zero and rise on its peers. Do not trust the configured weight; check the
    measured request count from
    [analytics](/reference/v5/analytics/overview) or your traffic layer's own
    metrics. Health check intervals, DNS TTLs, and client-side connection reuse all
    add delay here, and the delay is yours to measure.
-3. **Confirm the peers can carry it.** The remaining nodes have to be inside their
-   capacity budget with this node gone. If they are not, stop: see
-   [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx).
-4. **Do the work.** Restart, upgrade, reconfigure, or investigate.
+4. **Watch the peers absorb it.** If they are going outside budget despite step 1,
+   abort: `POST /status` to put this node back in rotation, and re-plan the change
+   for a lower-traffic window or with added capacity.
+5. **Do the work.** Restart, upgrade, reconfigure, or investigate.
 
   </TabItem>
   <TabItem value="return" label="Returning">
@@ -323,8 +343,8 @@ than people assume, because it includes convergence rather than just startup.
 
 ## Readiness checklist
 
-- [ ] `@harperdb/status-check` deployed, declared in `config.yaml` rather than
-      deployed by hand
+- [ ] `@harperdb/status-check` deployed, declared in the root `harper-config.yaml`
+      rather than deployed by hand
 - [ ] Traffic layer health check points at `GET /status` on `9926`
 - [ ] Availability flag storage still declares `replicate: false`, if you forked the
       component or persist it yourself

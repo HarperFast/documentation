@@ -35,11 +35,11 @@ during an incident that the answer was the target all along.
 
 ## State the three per journey
 
-| Term                     | The question it answers              | How to state it so it is testable                                           |
-| ------------------------ | ------------------------------------ | --------------------------------------------------------------------------- |
-| Recovery point objective | How much recent data may be lost     | Per database, in units of time, measured against your backup timestamp      |
-| Recovery time objective  | How long until service is restored   | Per journey, measured from detection to verified service, not from decision |
-| Availability target      | How much unavailability is permitted | Per journey, as minutes per month, with the measurement boundary named      |
+| Term                     | The question it answers              | How to state it so it is testable                                                                  |
+| ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Recovery point objective | How much recent data may be lost     | Per database, in units of time, measured against your backup timestamp                             |
+| Recovery time objective  | How long until service is restored   | Per journey, measured from the moment the journey starts failing, not from the moment someone acts |
+| Availability target      | How much unavailability is permitted | Per journey, as minutes per month, with the measurement boundary named                             |
 
 Three details make the difference between a testable statement and a slogan.
 
@@ -47,10 +47,12 @@ Three details make the difference between a testable statement and a slogan.
 differently, matter differently, and recover differently. One cluster-wide number
 overcommits on the cheap journey and undercommits on the expensive one.
 
-**Recovery time starts at detection, not at decision.** The gap between something
-breaking and someone knowing is part of the outage, and it is often the largest
-part. Measuring from the moment a human decided to act produces a number that
-flatters your automation and misleads your planning.
+**Recovery time starts when the journey breaks, not when someone acts on it.**
+Detection is inside the clock, not before it, and the gap between something
+breaking and someone knowing is often the largest part of an outage. Starting the
+count at the moment a human decided to act, or even at the moment an alert fired,
+produces a number that flatters your automation and misleads your planning. Your
+users were already down for all of it.
 
 **Name the measurement boundary.** Availability measured at your CDN edge and
 availability measured at a Harper node are different quantities, and the
@@ -88,20 +90,20 @@ plan, because the number no longer means what it appears to.
 For each scenario, know the mechanism, and know what must be proven for the
 mechanism to count. The right-hand column is the whole exercise.
 
-| Scenario                              | Primary mechanism                                 | What must be proven                                                                                  |
-| ------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Single node loss                      | Peer capacity plus traffic removal                | `(N - F)` capacity under load, measured time to remove traffic, no user-visible errors in transition |
-| Node returns after a restart          | Incremental catch-up plus an admission gate       | Measured convergence time, and an admission gate that does not admit before convergence completes    |
-| Node replacement or scale-out         | Full database synchronization to the new node     | Measured full-sync duration at your data volume, and the load it puts on the source node             |
-| Failure domain loss                   | Topology spread across independent domains        | No shared power or network fault, and surviving capacity inside the budget                           |
-| Region loss                           | Multi-region topology plus route change           | Data authority per region, route propagation time, and declared degraded behavior                    |
-| Bad release, no data change           | Release reversal                                  | Measured release reversal time, and the previous artifact still addressable                          |
-| Bad release that changed data meaning | Forward repair, not restore                       | A written repair or replay procedure, rehearsed on representative data                               |
-| Accidental destructive operation      | Restore from backup                               | Measured restore time and actual data loss, from a real drill                                        |
-| Storage loss on one node              | Off-host backup copy                              | A restorable off-host copy, taken by the correct procedure for your mechanism                        |
-| Corruption propagated by replication  | Point-in-time restore plus a replication decision | A rehearsed sequence that includes what happens to peers                                             |
-| Replication certificate expiry        | Certificate lifecycle management                  | Expiry dates tracked, with an alert far enough ahead to act                                          |
-| Downstream dependency outage          | Declared degraded mode                            | The journey's behavior when the dependency is down, verified rather than assumed                     |
+| Scenario                              | Primary mechanism                                         | What must be proven                                                                                  |
+| ------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Single node loss                      | Peer capacity plus traffic removal                        | `(N - F)` capacity under load, measured time to remove traffic, no user-visible errors in transition |
+| Node returns after a restart          | Incremental catch-up plus an admission gate               | Measured convergence time, and an admission gate that does not admit before convergence completes    |
+| Node replacement or scale-out         | Full database synchronization to the new node             | Measured full-sync duration at your data volume, and the load it puts on the source node             |
+| Failure domain loss                   | Topology spread across independent domains                | No shared power or network fault, and surviving capacity inside the budget                           |
+| Region loss                           | Multi-region topology plus route change                   | Data authority per region, route propagation time, and declared degraded behavior                    |
+| Bad release, no data change           | Release reversal                                          | Measured release reversal time, and the previous artifact still addressable                          |
+| Bad release that changed data meaning | Forward repair, not restore                               | A written repair or replay procedure, rehearsed on representative data                               |
+| Accidental destructive operation      | Restore from backup                                       | Measured restore time and actual data loss, from a real drill                                        |
+| Storage loss on one node              | Off-host backup copy                                      | A restorable off-host copy, taken by the correct procedure for your mechanism                        |
+| Corruption propagated by replication  | Restore the last good backup, plus a replication decision | A rehearsed sequence that includes what happens to peers                                             |
+| Replication certificate expiry        | Certificate lifecycle management                          | Expiry dates tracked, with an alert far enough ahead to act                                          |
+| Downstream dependency outage          | Declared degraded mode                                    | The journey's behavior when the dependency is down, verified rather than assumed                     |
 
 Two rows in that table are the ones most often missing. Node replacement is
 budgeted as though it were a restart, when it is a full synchronization and can be
@@ -217,7 +219,8 @@ would have hurt you.
 ## Readiness checklist
 
 - [ ] Recovery point stated per database, in time units
-- [ ] Recovery time stated per journey, measured from detection
+- [ ] Recovery time stated per journey, measured from the start of failure and
+      including detection time
 - [ ] Availability stated per journey, with the measurement boundary named
 - [ ] Exclusions documented
 - [ ] Every scenario in the map has a named mechanism

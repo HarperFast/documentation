@@ -198,13 +198,16 @@ Then:
   what is deployed, including which extensions are present
 - [`list_deployments`](/reference/v5/operations-api/operations#list_deployments)
   for what changed and when
+- [`registration_info`](/reference/v5/operations-api/operations#registration_info)
+  for the Harper version, which `system_information` does not report (it returns
+  the node and npm versions, not Harper's)
 - `cluster_status` for the peers and databases actually connected
 
 Fill in a boundary record you can keep:
 
 | Item                    | Value for your deployment                             |
 | ----------------------- | ----------------------------------------------------- |
-| Harper version          | From `system_information`                             |
+| Harper version          | From `registration_info`                              |
 | Node count and roles    | From `cluster_status` and your topology intent        |
 | Ports in use            | From `get_configuration`                              |
 | Databases               | Which exist, and which replicate                      |

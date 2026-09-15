@@ -369,7 +369,7 @@ Note that `replicated` is opt-out rather than opt-in across the operations that 
 
 Users and roles **do** propagate by default. They live in the `system` database, and the default replication scope is every database, so `system` is in scope unless you have narrowed it. As of v5.2 replicating `system` no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow). If you narrow the scope to exclude `system`, users and roles stop propagating and must be provisioned on every node by your own automation.
 
-Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
+Certain management operations — including component deployment and rolling restarts — are replicated across the cluster as well, following the same opt-out rule described above.
 
 ## Inspecting Cluster Configuration
 

@@ -1377,7 +1377,7 @@ Valid attribute names are `system`, `time`, `cpu`, `memory`, `disk`, `network`, 
 
 ### `set_status` / `get_status` / `clear_status`
 
-Manage application-defined status values. Status types: `primary`, `maintenance`, `availability` (availability only accepts `'Available'` or `'Unavailable'`).
+Manage application status values. The status types are fixed — `primary`, `maintenance`, `availability` — while the value you store against each is yours to define (availability only accepts `'Available'` or `'Unavailable'`).
 
 Values are **persisted**, stored in the `hdb_status` table in the `system` database, so they survive a restart. That table is declared `replicate: false`, so a status set on one node stays on that node and does not propagate to peers — which is what makes these values usable as node-local coordination markers.
 

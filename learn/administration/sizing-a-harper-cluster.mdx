@@ -98,7 +98,7 @@ An average conceals the one node that is about to tip.
 curl -s -X POST https://my-node.example.com:9925/ \
   -H 'Content-Type: application/json' \
   -u 'admin:password' \
-  -d '{"operation":"system_information","attributes":["cpu","memory","threads","harperdb_processes"]}'
+  -d '{"operation":"system_information","attributes":["cpu","memory","disk","network","threads","harperdb_processes"]}'
 ```
 
   </TabItem>
@@ -113,7 +113,7 @@ await fetch('https://my-node.example.com:9925/', {
 	},
 	body: JSON.stringify({
 		operation: 'system_information',
-		attributes: ['cpu', 'memory', 'threads', 'harperdb_processes'],
+		attributes: ['cpu', 'memory', 'disk', 'network', 'threads', 'harperdb_processes'],
 	}),
 });
 ```
