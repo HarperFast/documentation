@@ -6,33 +6,22 @@ sidebar_position: 3
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Most clusters get sized by dividing expected peak throughput by measured per-node
-throughput and rounding up. That arithmetic produces a cluster that is exactly
-large enough to handle a good day, which means the first node failure during peak
-traffic becomes a user-visible outage.
+Most clusters get sized by dividing expected peak throughput by measured per-node throughput and rounding up. That arithmetic produces a cluster that is exactly large enough to handle a good day, which means the first node failure during peak traffic becomes a user-visible outage.
 
-Sizing Harper starts from a different question. Not "how much traffic do we
-have," but "how many nodes are we willing to lose at once, and can the survivors
-carry the load." This guide gives you the capacity rule that follows from that,
-what to include when you measure a node, and how to turn an availability target
-into an operating budget you can actually spend.
+Sizing Harper starts from a different question. Not "how much traffic do we have," but "how many nodes are we willing to lose at once, and can the survivors carry the load." This guide gives you the capacity rule that follows from that, what to include when you measure a node, and how to turn an availability target into an operating budget you can actually spend.
 
 ## What You Will Learn
 
 - The capacity invariant that sizes for the failure state, with a worked example
-- What to include in a per-node throughput measurement, and the three things
-  people leave out
+- What to include in a per-node throughput measurement, and the three things people leave out
 - Why maintenance is a planned failure, and what that means for change windows
 - How to choose a topology from your objectives rather than from a diagram
-- How to convert an availability SLO into minutes per month, and what each tier
-  demands of your automation
+- How to convert an availability SLO into minutes per month, and what each tier demands of your automation
 
 ## Prerequisites
 
-- [How Harper Runs in Production](./how-harper-runs-in-production.mdx), and your
-  service boundary inventory
-- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx),
-  because capacity headroom is meaningless if traffic cannot be moved off a node
+- [How Harper Runs in Production](./how-harper-runs-in-production.mdx), and your service boundary inventory
+- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx), because capacity headroom is meaningless if traffic cannot be moved off a node
 - A load generation tool and a non-production cluster you can push to saturation
 - A stated peak throughput requirement for your critical journeys
 
@@ -44,15 +33,9 @@ The rule:
 (N - F) x tested per-node throughput x target utilization >= required peak throughput
 ```
 
-Where `N` is your node count, `F` is the largest simultaneous node loss the design
-tolerates, and target utilization is the fraction of measured capacity you are
-willing to run at, which should leave room for latency to stay acceptable rather
-than merely for requests to complete.
+Where `N` is your node count, `F` is the largest simultaneous node loss the design tolerates, and target utilization is the fraction of measured capacity you are willing to run at, which should leave room for latency to stay acceptable rather than merely for requests to complete.
 
-Worked example. Suppose your critical journey needs 12,000 requests per second at
-peak, a node sustains 5,000 requests per second in your own test with acceptable
-latency, you will run at 70 percent utilization, and you want to survive losing
-one node:
+Worked example. Suppose your critical journey needs 12,000 requests per second at peak, a node sustains 5,000 requests per second in your own test with acceptable latency, you will run at 70 percent utilization, and you want to survive losing one node:
 
 ```text
 Required surviving capacity = 12,000 / 0.7        = 17,143 req/s
@@ -60,36 +43,20 @@ Surviving nodes needed      = 17,143 / 5,000      = 3.43 -> 4
 N                           = 4 + F (1)           = 5 nodes
 ```
 
-Five nodes, not three. The naive calculation gives 12,000 / 5,000 = 2.4, rounded
-up to 3, and that cluster degrades the moment anything goes wrong.
+Five nodes, not three. The naive calculation gives 12,000 / 5,000 = 2.4, rounded up to 3, and that cluster degrades the moment anything goes wrong.
 
-Two things to notice. Increasing `F` from 1 to 2 costs you one more node here, not
-double the cluster, so tolerating a second simultaneous failure is often cheaper
-than people expect at this size. And the utilization factor is doing as much work
-as `F` is: sizing to 100 percent of measured capacity means your "surviving"
-nodes are at saturation, where latency degrades long before throughput does.
+Two things to notice. Increasing `F` from 1 to 2 costs you one more node here, not double the cluster, so tolerating a second simultaneous failure is often cheaper than people expect at this size. And the utilization factor is doing as much work as `F` is: sizing to 100 percent of measured capacity means your "surviving" nodes are at saturation, where latency degrades long before throughput does.
 
 ## Measure a node honestly
 
-The per-node number in that formula is the one most likely to be wrong, because
-benchmark conditions are kinder than production. Include all of this:
+The per-node number in that formula is the one most likely to be wrong, because benchmark conditions are kinder than production. Include all of this:
 
-- **Representative application code, data shape, and query mix.** A Harper node
-  runs your component logic in the same process as the data access, so your code
-  is part of the capacity measurement in a way it would not be for a standalone
-  database. A synthetic key-value benchmark tells you very little about the node's
-  capacity to serve your journey.
-- **Realistic downstream latency.** If your resource calls an upstream pricing
-  service, its latency occupies worker capacity on the node.
-- **Replication catch-up load.** A node that is feeding a recovering peer is doing
-  work that does not appear in its own request metrics. Measure with a peer
-  synchronizing, because that is precisely the state you will be in when you are
-  already down a node.
-- **Traffic imbalance.** Configured weights express intent. Actual request
-  distribution is what consumes capacity, and it is rarely even.
+- **Representative application code, data shape, and query mix.** A Harper node runs your component logic in the same process as the data access, so your code is part of the capacity measurement in a way it would not be for a standalone database. A synthetic key-value benchmark tells you very little about the node's capacity to serve your journey.
+- **Realistic downstream latency.** If your resource calls an upstream pricing service, its latency occupies worker capacity on the node.
+- **Replication catch-up load.** A node that is feeding a recovering peer is doing work that does not appear in its own request metrics. Measure with a peer synchronizing, because that is precisely the state you will be in when you are already down a node.
+- **Traffic imbalance.** Configured weights express intent. Actual request distribution is what consumes capacity, and it is rarely even.
 
-Measure each node separately rather than dividing a cluster total by node count.
-An average conceals the one node that is about to tip.
+Measure each node separately rather than dividing a cluster total by node count. An average conceals the one node that is about to tip.
 
 <Tabs>
   <TabItem value="curl" label="curl">
@@ -121,39 +88,23 @@ await fetch('https://my-node.example.com:9925/', {
   </TabItem>
 </Tabs>
 
-Watch CPU, memory, event loop and worker pressure from the `threads` attribute,
-disk, and network, and pair them with request rate and latency from
-[analytics](/reference/v5/analytics/overview). The number you want is not the
-point where requests start failing. It is the point where your journey's latency
-leaves your SLO, which arrives earlier.
+Watch CPU, memory, event loop and worker pressure from the `threads` attribute, disk, and network, and pair them with request rate and latency from [analytics](/reference/v5/analytics/overview). The number you want is not the point where requests start failing. It is the point where your journey's latency leaves your SLO, which arrives earlier.
 
 :::tip
-Record the conditions alongside the number: Harper version, node size, data
-volume, query mix, and whether a peer was synchronizing. A per-node capacity
-figure without its conditions is not reusable, and six months later nobody will
-remember whether the test included replication load.
+Record the conditions alongside the number: Harper version, node size, data volume, query mix, and whether a peer was synchronizing. A per-node capacity figure without its conditions is not reusable, and six months later nobody will remember whether the test included replication load.
 :::
 
 ## Maintenance is a planned failure
 
-Draining a node for a deploy, an upgrade, or an investigation consumes exactly the
-same headroom that a node failure does. So a cluster sized for `F = 1` is running
-at `F = 0` for the duration of every maintenance window, with no tolerance left.
+Draining a node for a deploy, an upgrade, or an investigation consumes exactly the same headroom that a node failure does. So a cluster sized for `F = 1` is running at `F = 0` for the duration of every maintenance window, with no tolerance left.
 
-The operating rule that follows: if draining one node means the service can no
-longer tolerate its declared `F`, pause the change. Either wait for lower traffic,
-or add capacity for the window, or accept and document the reduced tolerance for a
-bounded period. What you should not do is treat the maintenance window as free
-because nothing is technically broken.
+The operating rule that follows: if draining one node means the service can no longer tolerate its declared `F`, pause the change. Either wait for lower traffic, or add capacity for the window, or accept and document the reduced tolerance for a bounded period. What you should not do is treat the maintenance window as free because nothing is technically broken.
 
-This is also the argument for sizing `F` at 2 in a cluster that deploys
-frequently. It is not paranoia about correlated hardware failure. It is that you
-want to be able to deploy during business hours and still survive an incident.
+This is also the argument for sizing `F` at 2 in a cluster that deploys frequently. It is not paranoia about correlated hardware failure. It is that you want to be able to deploy during business hours and still survive an incident.
 
 ## Choose a topology from objectives
 
-Pick the pattern that matches the failures you actually need to survive, and know
-what you have to prove for it to count.
+Pick the pattern that matches the failures you actually need to survive, and know what you have to prove for it to count.
 
 | Pattern                              | When it fits                                                        | What you must prove                                                                               |
 | ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
@@ -162,22 +113,13 @@ what you have to prove for it to count.
 | Multiple regions                     | Regional impairment or user locality is a real requirement          | Data authority per region, route propagation time, convergence, degraded-mode behavior            |
 | Edge or on-premises peers            | Data locality or residency constrains where data can live           | Replication scope per location, identity provisioning, backup path from each site                 |
 
-The right-hand column is the useful one. A topology diagram is a claim, and the
-claim is only true once you have exercised it. "Multiple failure domains" means
-nothing if both domains draw from the same power feed, and you will not discover
-that from your provider's documentation.
+The right-hand column is the useful one. A topology diagram is a claim, and the claim is only true once you have exercised it. "Multiple failure domains" means nothing if both domains draw from the same power feed, and you will not discover that from your provider's documentation.
 
-Note that adding a node is a data movement event as well as a capacity event,
-since a Harper node carries data along with request handling. A node whose
-databases have never synchronized downloads them in full before it is useful, so
-scaling out is not instantaneous and cannot be your response to an unexpected
-traffic spike. Size ahead of demand.
+Note that adding a node is a data movement event as well as a capacity event, since a Harper node carries data along with request handling. A node whose databases have never synchronized downloads them in full before it is useful, so scaling out is not instantaneous and cannot be your response to an unexpected traffic spike. Size ahead of demand.
 
 ## Turn the SLO into a budget
 
-An availability target is a quantity of unavailability you are permitted to spend
-per month. Written that way it becomes an operating constraint rather than an
-aspiration.
+An availability target is a quantity of unavailability you are permitted to spend per month. Written that way it becomes an operating constraint rather than an aspiration.
 
 | Monthly SLO | Approximate maximum unavailability | What it demands                                                                                                                                          |
 | ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -185,58 +127,34 @@ aspiration.
 | 99.95%      | 21 min 55 sec                      | Automated node removal and a rehearsed release reversal become necessary                                                                                 |
 | 99.99%      | 4 min 23 sec                       | Node failure must be close to transparent. Detection, traffic removal, and validation have to be automated, because no human response fits in the budget |
 
-Figures assume a 30.44 day month. Your contractual definition, exclusions, and
-measurement boundary may differ, and the boundary matters more than the number:
-availability measured at your CDN edge and availability measured at the Harper
-node are different quantities.
+Figures assume a 30.44 day month. Your contractual definition, exclusions, and measurement boundary may differ, and the boundary matters more than the number: availability measured at your CDN edge and availability measured at the Harper node are different quantities.
 
-The practical consequence is that the SLO tier determines how much automation you
-need, not how many nodes. At three nines a person can be paged, look at a
-dashboard, and drain a node. At four nines that same sequence has already spent
-the entire month's budget.
+The practical consequence is that the SLO tier determines how much automation you need, not how many nodes. At three nines a person can be paged, look at a dashboard, and drain a node. At four nines that same sequence has already spent the entire month's budget.
 
 ### Prove it
 
-Run the failure state rather than calculating it. On a cluster carrying
-representative load at your expected peak:
+Run the failure state rather than calculating it. On a cluster carrying representative load at your expected peak:
 
 1. Record per-node request rate, latency, and saturation as a baseline.
-2. Drain one node using the sequence from
-   [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
-3. Measure what the survivors do: request rate, latency at your SLO percentile,
-   CPU and worker pressure, and whether any user-visible errors appeared during
-   the transition.
-4. While still down a node, bring the drained node back and let it synchronize, so
-   the survivors are carrying peak traffic and feeding a recovering peer at the
-   same time. This is the real worst case and it is the one nobody tests.
-5. Compare measured surviving capacity against your invariant. If step 4 pushed
-   latency out of SLO, your target utilization is too high or your `N` is too low.
+2. Drain one node using the sequence from [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
+3. Measure what the survivors do: request rate, latency at your SLO percentile, CPU and worker pressure, and whether any user-visible errors appeared during the transition.
+4. While still down a node, bring the drained node back and let it synchronize, so the survivors are carrying peak traffic and feeding a recovering peer at the same time. This is the real worst case and it is the one nobody tests.
+5. Compare measured surviving capacity against your invariant. If step 4 pushed latency out of SLO, your target utilization is too high or your `N` is too low.
 
 ## Operational notes
 
-- **Utilization targets belong per journey, not per cluster.** A write-heavy
-  journey and a cached read journey consume very different resources on the same
-  node, so a single cluster-wide utilization figure will be wrong for both.
-- **Re-measure after a version upgrade.** Per-node capacity is a property of a
-  Harper version, your component code, and your data volume. All three change.
-- **Watch measured distribution, not configured weights.** Per-node request counts
-  from analytics are the ground truth. A misconfigured weight, a sticky session
-  policy, or DNS caching can leave one node doing far more work than the topology
-  claims.
-- **Storage growth is a capacity dimension too.** Disk headroom, compaction
-  behavior, and backup space all scale with data volume rather than with request
-  rate, so they need their own thresholds. See
-  [compaction](/reference/v5/database/compaction).
-- **On Fabric, cluster shape is managed but the invariant is unchanged.** You are
-  still choosing `N` and living with `F`.
+- **Utilization targets belong per journey, not per cluster.** A write-heavy journey and a cached read journey consume very different resources on the same node, so a single cluster-wide utilization figure will be wrong for both.
+- **Re-measure after a version upgrade.** Per-node capacity is a property of a Harper version, your component code, and your data volume. All three change.
+- **Watch measured distribution, not configured weights.** Per-node request counts from analytics are the ground truth. A misconfigured weight, a sticky session policy, or DNS caching can leave one node doing far more work than the topology claims.
+- **Storage growth is a capacity dimension too.** Disk headroom, compaction behavior, and backup space all scale with data volume rather than with request rate, so they need their own thresholds. See [compaction](/reference/v5/database/compaction).
+- **On Fabric, cluster shape is managed but the invariant is unchanged.** You are still choosing `N` and living with `F`.
 
 ## Readiness checklist
 
 - [ ] `F` declared explicitly, and written down where change operators will see it
 - [ ] Per-node throughput measured with your own application code and data shape
 - [ ] Measurement taken with a peer synchronizing, not on an idle cluster
-- [ ] Target utilization set from latency at your SLO percentile, not from request
-      success
+- [ ] Target utilization set from latency at your SLO percentile, not from request success
 - [ ] `(N - F) x per-node x utilization >= peak` verified with real numbers
 - [ ] Measurement conditions recorded alongside the capacity figure
 - [ ] Maintenance policy states what happens when a drain would breach `F`
@@ -246,16 +164,10 @@ representative load at your expected peak:
 
 ## Additional Resources
 
-- [Analytics overview](/reference/v5/analytics/overview) and
-  [analytics operations](/reference/v5/analytics/operations) for per-node request
-  and latency metrics
+- [Analytics overview](/reference/v5/analytics/overview) and [analytics operations](/reference/v5/analytics/operations) for per-node request and latency metrics
 - [Grafana integration](/fabric/grafana-integration) for dashboards on Fabric
-- [`@harperdb/prometheus-exporter`](https://github.com/HarperFast/prometheus-exporter)
-  for self-managed metrics scraping
-- [Storage tuning](/reference/v5/database/storage-tuning) for the durability and
-  throughput trade-offs available per database
+- [`@harperdb/prometheus-exporter`](https://github.com/HarperFast/prometheus-exporter) for self-managed metrics scraping
+- [Storage tuning](/reference/v5/database/storage-tuning) for the durability and throughput trade-offs available per database
 - [Compaction](/reference/v5/database/compaction) for storage growth behavior
-- [Replication overview](/reference/v5/replication/overview) for peer
-  synchronization behavior when adding or returning a node
-- [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) for
-  scenario-level targets built on this capacity model
+- [Replication overview](/reference/v5/replication/overview) for peer synchronization behavior when adding or returning a node
+- [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) for scenario-level targets built on this capacity model

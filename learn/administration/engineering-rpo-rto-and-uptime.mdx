@@ -3,35 +3,25 @@ title: Engineering RPO, RTO, and Uptime
 sidebar_position: 8
 ---
 
-Recovery point, recovery time, and availability are usually written down once, in
-a document nobody consults, as three numbers that were never checked against a
-mechanism. This guide is about making them real: stating them per journey,
-mapping each failure scenario to the mechanism that addresses it, and reconciling
-the targets against numbers you have actually measured.
+Recovery point, recovery time, and availability are usually written down once, in a document nobody consults, as three numbers that were never checked against a mechanism. This guide is about making them real: stating them per journey, mapping each failure scenario to the mechanism that addresses it, and reconciling the targets against numbers you have actually measured.
 
-If a target and a measurement disagree, one of them has to change. The point of
-doing this deliberately is that you get to choose which, rather than finding out
-during an incident that the answer was the target all along.
+If a target and a measurement disagree, one of them has to change. The point of doing this deliberately is that you get to choose which, rather than finding out during an incident that the answer was the target all along.
 
 ## What You Will Learn
 
-- How to state recovery point, recovery time, and availability so they are
-  testable rather than aspirational
+- How to state recovery point, recovery time, and availability so they are testable rather than aspirational
 - A scenario-to-mechanism map, with what has to be proven for each to count
-- How to convert an availability target into a monthly budget, and what each tier
-  demands of your automation
+- How to convert an availability target into a monthly budget, and what each tier demands of your automation
 - How to reconcile stated targets against the numbers measured in earlier guides
 - Why one storage setting can silently invalidate your stated recovery point
 - Why declaring your degraded modes is as important as declaring your targets
 
 ## Prerequisites
 
-- Measured numbers from the earlier guides: per-node capacity, convergence time,
-  node re-entry time, release reversal time, and restore time
+- Measured numbers from the earlier guides: per-node capacity, convergence time, node re-entry time, release reversal time, and restore time
 - [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for the capacity model
 - [Backup and Recovery](./backup-and-recovery.mdx) for the recovery mechanisms
-- A named owner who can approve or reject a target, because this exercise produces
-  decisions rather than data
+- A named owner who can approve or reject a target, because this exercise produces decisions rather than data
 
 ## State the three per journey
 
@@ -43,52 +33,25 @@ during an incident that the answer was the target all along.
 
 Three details make the difference between a testable statement and a slogan.
 
-**Per journey, not per cluster.** A catalog browse and an order submission fail
-differently, matter differently, and recover differently. One cluster-wide number
-overcommits on the cheap journey and undercommits on the expensive one.
+**Per journey, not per cluster.** A catalog browse and an order submission fail differently, matter differently, and recover differently. One cluster-wide number overcommits on the cheap journey and undercommits on the expensive one.
 
-**Recovery time starts when the journey breaks, not when someone acts on it.**
-Detection is inside the clock, not before it, and the gap between something
-breaking and someone knowing is often the largest part of an outage. Starting the
-count at the moment a human decided to act, or even at the moment an alert fired,
-produces a number that flatters your automation and misleads your planning. Your
-users were already down for all of it.
+**Recovery time starts when the journey breaks, not when someone acts on it.** Detection is inside the clock, not before it, and the gap between something breaking and someone knowing is often the largest part of an outage. Starting the count at the moment a human decided to act, or even at the moment an alert fired, produces a number that flatters your automation and misleads your planning. Your users were already down for all of it.
 
-**Name the measurement boundary.** Availability measured at your CDN edge and
-availability measured at a Harper node are different quantities, and the
-difference is exactly the part of the stack you may not control. Whichever you
-choose, say so in the same sentence as the number.
+**Name the measurement boundary.** Availability measured at your CDN edge and availability measured at a Harper node are different quantities, and the difference is exactly the part of the stack you may not control. Whichever you choose, say so in the same sentence as the number.
 
 ### One storage setting can override your recovery point
 
-Your recovery point objective is a statement about how much acknowledged data you
-can afford to lose. One configuration option can quietly make that statement
-false.
+Your recovery point objective is a statement about how much acknowledged data you can afford to lose. One configuration option can quietly make that statement false.
 
-[`storage.writeAsync`](/reference/v5/database/storage-tuning#storagewriteasync)
-defaults to `false`. Set it to `true` and Harper stops calling `fsync` on commit,
-so a write returns as soon as it is queued to the operating system's page cache.
-Throughput on write-heavy workloads improves substantially. The cost is that a
-power loss or OS crash between the commit and the flush to disk loses the most
-recent transactions, even though your application was told they succeeded. The
-database stays structurally consistent; only the newest writes are gone.
+[`storage.writeAsync`](/reference/v5/database/storage-tuning#storagewriteasync) defaults to `false`. Set it to `true` and Harper stops calling `fsync` on commit, so a write returns as soon as it is queued to the operating system's page cache. Throughput on write-heavy workloads improves substantially. The cost is that a power loss or OS crash between the commit and the flush to disk loses the most recent transactions, even though your application was told they succeeded. The database stays structurally consistent; only the newest writes are gone.
 
-The trap is that this is invisible to everything else in this guide. Backup
-timestamps look right, replication looks healthy, and no alert fires. You discover
-it the first time a node loses power, which is also the first time the gap between
-your stated recovery point and your real one matters.
+The trap is that this is invisible to everything else in this guide. Backup timestamps look right, replication looks healthy, and no alert fires. You discover it the first time a node loses power, which is also the first time the gap between your stated recovery point and your real one matters.
 
-So treat it as an RPO decision rather than a performance one. Enabling it is
-defensible when the data is reproducible from an upstream source, when the
-workload is bulk ingest that can simply be re-run, or when peers acknowledge
-writes before the loss window opens. Outside those cases, leave it off. If it is
-on anywhere, record which databases and say so next to the recovery point in your
-plan, because the number no longer means what it appears to.
+So treat it as an RPO decision rather than a performance one. Enabling it is defensible when the data is reproducible from an upstream source, when the workload is bulk ingest that can simply be re-run, or when peers acknowledge writes before the loss window opens. Outside those cases, leave it off. If it is on anywhere, record which databases and say so next to the recovery point in your plan, because the number no longer means what it appears to.
 
 ## Map scenarios to mechanisms
 
-For each scenario, know the mechanism, and know what must be proven for the
-mechanism to count. The right-hand column is the whole exercise.
+For each scenario, know the mechanism, and know what must be proven for the mechanism to count. The right-hand column is the whole exercise.
 
 | Scenario                              | Primary mechanism                                         | What must be proven                                                                                  |
 | ------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -105,10 +68,7 @@ mechanism to count. The right-hand column is the whole exercise.
 | Replication certificate expiry        | Certificate lifecycle management                          | Expiry dates tracked, with an alert far enough ahead to act                                          |
 | Downstream dependency outage          | Declared degraded mode                                    | The journey's behavior when the dependency is down, verified rather than assumed                     |
 
-Two rows in that table are the ones most often missing. Node replacement is
-budgeted as though it were a restart, when it is a full synchronization and can be
-much slower. And the downstream dependency row usually has no answer at all, which
-means the answer is whatever the code happens to do.
+Two rows in that table are the ones most often missing. Node replacement is budgeted as though it were a restart, when it is a full synchronization and can be much slower. And the downstream dependency row usually has no answer at all, which means the answer is whatever the code happens to do.
 
 ## Convert availability into a budget
 
@@ -120,23 +80,15 @@ An availability target is a quantity of unavailability you may spend per month.
 | 99.95%         | 21 min 55 sec                      | Automated traffic removal and a rehearsed release reversal become necessary rather than nice                                            |
 | 99.99%         | 4 min 23 sec                       | Node failure has to be close to transparent. Detection, traffic removal, and validation must be automated, since no human response fits |
 
-Figures assume a 30.44 day month. Your contractual definition, exclusions, and
-measurement boundary may differ.
+Figures assume a 30.44 day month. Your contractual definition, exclusions, and measurement boundary may differ.
 
-Read down that right-hand column rather than the middle one. The tier you choose
-determines how much automation you are committing to build, not how many nodes you
-buy. Adding nodes without automating detection and traffic removal moves you
-across the table's rows without moving you down its column.
+Read down that right-hand column rather than the middle one. The tier you choose determines how much automation you are committing to build, not how many nodes you buy. Adding nodes without automating detection and traffic removal moves you across the table's rows without moving you down its column.
 
-Treat the budget as spendable. If the month's remaining budget is small, that is
-an argument for pausing discretionary change, and if it is large, that is
-permission to ship. An error budget that never changes anyone's behavior is
-just a number in a document.
+Treat the budget as spendable. If the month's remaining budget is small, that is an argument for pausing discretionary change, and if it is large, that is permission to ship. An error budget that never changes anyone's behavior is just a number in a document.
 
 ## Reconcile targets against measurements
 
-This is the step that turns the exercise into engineering. Fill in both columns
-and look for rows where they disagree.
+This is the step that turns the exercise into engineering. Fill in both columns and look for rows where they disagree.
 
 | Commitment                  | Measured from                                                                            | Your target | Your measurement |
 | --------------------------- | ---------------------------------------------------------------------------------------- | ----------- | ---------------- |
@@ -152,85 +104,50 @@ and look for rows where they disagree.
 
 Three reconciliations catch most problems:
 
-- **Backup cadence against recovery point.** If you back up every six hours, your
-  recovery point cannot be one hour, no matter what the document says.
-- **Restore time plus detection time against recovery time.** Recovery time
-  includes noticing. A twenty minute restore behind a forty minute detection gap
-  is a one hour recovery.
-- **Convergence time against your admission gate.** If your gate admits a node
-  faster than it converges, you are serving stale data on purpose and calling it
-  availability.
+- **Backup cadence against recovery point.** If you back up every six hours, your recovery point cannot be one hour, no matter what the document says.
+- **Restore time plus detection time against recovery time.** Recovery time includes noticing. A twenty minute restore behind a forty minute detection gap is a one hour recovery.
+- **Convergence time against your admission gate.** If your gate admits a node faster than it converges, you are serving stale data on purpose and calling it availability.
 
-Where a target and a measurement disagree, the resolution is one of three things:
-invest in the mechanism, relax the target, or accept the gap explicitly with an
-owner and a date. All three are legitimate. Leaving it unreconciled is not.
+Where a target and a measurement disagree, the resolution is one of three things: invest in the mechanism, relax the target, or accept the gap explicitly with an owner and a date. All three are legitimate. Leaving it unreconciled is not.
 
 ## Declare your degraded modes
 
-Between fully working and fully down there is a range of states, and if you have
-not decided what they should be, the code has decided for you.
+Between fully working and fully down there is a range of states, and if you have not decided what they should be, the code has decided for you.
 
-For each critical journey, write down what happens when a dependency is
-unavailable, when a node is behind on replication, and when the cluster is below
-its capacity budget. Reads served from slightly stale data may be entirely
-acceptable for a catalog and entirely unacceptable for a balance check, and the
-right answer differs by journey rather than by system.
+For each critical journey, write down what happens when a dependency is unavailable, when a node is behind on replication, and when the cluster is below its capacity budget. Reads served from slightly stale data may be entirely acceptable for a catalog and entirely unacceptable for a balance check, and the right answer differs by journey rather than by system.
 
-Then decide who can declare a degraded mode, and whether the declaration is
-manual or automatic. A degraded mode nobody is authorized to invoke is not a
-degraded mode.
+Then decide who can declare a degraded mode, and whether the declaration is manual or automatic. A degraded mode nobody is authorized to invoke is not a degraded mode.
 
 ### Prove it
 
 Two passes, and both are needed.
 
-**Tabletop the whole scenario table.** For each row, walk through who detects it,
-what they do, what mechanism carries the recovery, and what evidence confirms
-success. Rows where the group cannot answer without speculating are the gaps, and
-finding them costs an hour rather than an outage.
+**Tabletop the whole scenario table.** For each row, walk through who detects it, what they do, what mechanism carries the recovery, and what evidence confirms success. Rows where the group cannot answer without speculating are the gaps, and finding them costs an hour rather than an outage.
 
-**Then run one real drill per scenario class**, spread over a quarter rather than
-attempted in a day. The classes are: node loss, node return, node replacement,
-release reversal, restore, and dependency failure. Record the date, the measured
-numbers, what surprised you, and what you changed as a result.
+**Then run one real drill per scenario class**, spread over a quarter rather than attempted in a day. The classes are: node loss, node return, node replacement, release reversal, restore, and dependency failure. Record the date, the measured numbers, what surprised you, and what you changed as a result.
 
-The surprises are the deliverable. A drill that goes exactly as expected has
-confirmed your documentation. A drill that does not has found the thing that
-would have hurt you.
+The surprises are the deliverable. A drill that goes exactly as expected has confirmed your documentation. A drill that does not has found the thing that would have hurt you.
 
 ## Operational notes
 
-- **Recovery numbers expire.** Every measurement here is a property of a Harper
-  version, a data volume, a topology, and a set of components. Re-measure after
-  version upgrades and significant data growth, and date every number you record.
-- **Uptime and recovery targets belong in the same document as the mechanism.** A
-  target stored separately from its supporting evidence drifts from reality within
-  a quarter.
-- **Do not let a single incident rewrite your targets.** Adjust targets from
-  measurement and business need, not from the last thing that went wrong.
-- **Exclusions matter as much as the number.** Planned maintenance, third-party
-  dependency failures, and client-side problems are usually excluded from an
-  availability calculation. Whether yours excludes them changes the number
-  substantially, so it belongs in writing.
-- **A target you cannot measure is not a target.** If nothing in your monitoring
-  produces the number in your commitment, the first investment is measurement, not
-  more nodes.
+- **Recovery numbers expire.** Every measurement here is a property of a Harper version, a data volume, a topology, and a set of components. Re-measure after version upgrades and significant data growth, and date every number you record.
+- **Uptime and recovery targets belong in the same document as the mechanism.** A target stored separately from its supporting evidence drifts from reality within a quarter.
+- **Do not let a single incident rewrite your targets.** Adjust targets from measurement and business need, not from the last thing that went wrong.
+- **Exclusions matter as much as the number.** Planned maintenance, third-party dependency failures, and client-side problems are usually excluded from an availability calculation. Whether yours excludes them changes the number substantially, so it belongs in writing.
+- **A target you cannot measure is not a target.** If nothing in your monitoring produces the number in your commitment, the first investment is measurement, not more nodes.
 
 ## Readiness checklist
 
 - [ ] Recovery point stated per database, in time units
-- [ ] Recovery time stated per journey, measured from the start of failure and
-      including detection time
+- [ ] Recovery time stated per journey, measured from the start of failure and including detection time
 - [ ] Availability stated per journey, with the measurement boundary named
 - [ ] Exclusions documented
 - [ ] Every scenario in the map has a named mechanism
-- [ ] Every mechanism has its "what must be proven" satisfied or explicitly
-      outstanding
+- [ ] Every mechanism has its "what must be proven" satisfied or explicitly outstanding
 - [ ] Availability target converted to minutes per month
 - [ ] Error budget policy states what changes when the budget runs low
 - [ ] Backup cadence reconciled against recovery point
-- [ ] `storage.writeAsync` confirmed off, or the databases it is on for recorded
-      alongside their recovery point
+- [ ] `storage.writeAsync` confirmed off, or the databases it is on for recorded alongside their recovery point
 - [ ] Restore time plus detection time reconciled against recovery time
 - [ ] Convergence time reconciled against the traffic admission gate
 - [ ] Every unreconciled gap has an owner and a date
@@ -240,17 +157,11 @@ would have hurt you.
 
 ## Additional Resources
 
-- [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for the capacity
-  invariant behind the surviving-capacity commitment
-- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx)
-  for drain, admission, and failback timing
+- [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for the capacity invariant behind the surviving-capacity commitment
+- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx) for drain, admission, and failback timing
 - [Operating Replication](./operating-replication.mdx) for convergence measurement
-- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for release
-  reversal timing
-- [Backup and Recovery](./backup-and-recovery.mdx) for restore timing and
-  mechanism limits
+- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for release reversal timing
+- [Backup and Recovery](./backup-and-recovery.mdx) for restore timing and mechanism limits
 - [Monitoring and Triage](./monitoring-and-triage.mdx) for time to detection
-- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the
-  gate this feeds
-- [Reliability Plan Template](./reliability-plan-template.mdx) for where to record
-  the results
+- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the gate this feeds
+- [Reliability Plan Template](./reliability-plan-template.mdx) for where to record the results

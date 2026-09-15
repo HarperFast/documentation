@@ -3,16 +3,11 @@ title: Reliability Plan Template
 sidebar_position: 10
 ---
 
-The [Production Readiness Checklist](./production-readiness-checklist.mdx) asks
-the questions. This is the document that holds the answers.
+The [Production Readiness Checklist](./production-readiness-checklist.mdx) asks the questions. This is the document that holds the answers.
 
-Copy it, keep one per service, and keep it where your on-call can reach it during
-an incident rather than in a wiki nobody remembers. It is deliberately short.
-A reliability plan that takes a day to read is a reliability plan nobody consults
-at 3am.
+Copy it, keep one per service, and keep it where your on-call can reach it during an incident rather than in a wiki nobody remembers. It is deliberately short. A reliability plan that takes a day to read is a reliability plan nobody consults at 3am.
 
-Example values are included in italics to show the intended level of specificity.
-Replace them.
+Example values are included in italics to show the intended level of specificity. Replace them.
 
 ---
 
@@ -32,8 +27,7 @@ Replace them.
 
 ## 2. Critical journeys
 
-The user-facing paths that must work. Everything else in this plan is stated per
-journey, so this table defines the scope of all of it.
+The user-facing paths that must work. Everything else in this plan is stated per journey, so this table defines the scope of all of it.
 
 | Journey          | Description                   | Databases and tables involved | Downstream dependencies | Owner |
 | ---------------- | ----------------------------- | ----------------------------- | ----------------------- | ----- |
@@ -48,8 +42,7 @@ journey, so this table defines the scope of all of it.
 
 Monthly unavailability budget: _21 min 55 sec at 99.95%_
 
-Error budget policy: _what changes when the remaining budget falls below a
-threshold, and who decides_
+Error budget policy: _what changes when the remaining budget falls below a threshold, and who decides_
 
 ## 4. Architecture and topology
 
@@ -69,8 +62,7 @@ threshold, and who decides_
 | Target utilization         |       | _derived from latency at the SLO percentile_     |               |
 | Surviving capacity at `F`  |       | _measured in the drain drill, not calculated_    |               |
 
-Maintenance policy when a drain would breach `F`: _pause, add capacity, or accept
-with documented duration_
+Maintenance policy when a drain would breach `F`: _pause, add capacity, or accept with documented duration_
 
 ## 6. Traffic admission
 
@@ -158,8 +150,7 @@ with documented duration_
 
 ## 14. Open risks
 
-Accepted gaps, each with an owner and a date. This section existing and being
-honest is worth more than it being empty.
+Accepted gaps, each with an owner and a date. This section existing and being honest is worth more than it being empty.
 
 | Risk | Impact if realized | Why accepted | Owner | Review date |
 | ---- | ------------------ | ------------ | ----- | ----------- |
@@ -175,25 +166,19 @@ honest is worth more than it being empty.
 
 ## Keeping this current
 
-Most of the numbers in this plan are properties of a Harper version, a data
-volume, a topology, and a set of components. All four change, so the numbers
-expire. Re-measure and revise after:
+Most of the numbers in this plan are properties of a Harper version, a data volume, a topology, and a set of components. All four change, so the numbers expire. Re-measure and revise after:
 
 - A Harper version upgrade
 - A topology change, including adding or removing nodes
 - Significant data growth
 - Any incident that produced a surprise
 
-Date every number. An undated measurement in a reliability plan is worse than a
-blank field, because a blank field prompts someone to go and measure.
+Date every number. An undated measurement in a reliability plan is worse than a blank field, because a blank field prompts someone to go and measure.
 
 ## Additional Resources
 
-- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the
-  gate that populates this plan
-- [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) for how
-  to derive sections 3 and 11
+- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the gate that populates this plan
+- [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx) for how to derive sections 3 and 11
 - [Backup and Recovery](./backup-and-recovery.mdx) for section 10
-- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for
-  section 8
+- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for section 8
 - [Monitoring and Triage](./monitoring-and-triage.mdx) for section 9
