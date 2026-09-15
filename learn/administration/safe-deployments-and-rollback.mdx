@@ -71,7 +71,7 @@ is the deliberate exception: it replicates only when you ask.)
 :::
 
 `urlPath` mounts a component at an HTTP path.
-`host` <VersionBadge version="v5.2.0" /> serves it on a virtual hostname. Both are
+`host` (Added in: v5.2.0) serves it on a virtual hostname. Both are
 persisted on the component's root config entry, so they are part of the deployed
 state rather than a runtime toggle. See
 [HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
@@ -228,10 +228,10 @@ synthetic rather than through the deploy response.
 
 Two parameters worth setting deliberately on replicated deploys:
 
-- `deployment_timeout` <VersionBadge version="v5.1.4" /> is how long a peer waits
+- `deployment_timeout` (Added in: v5.1.4) is how long a peer waits
   for the replicated payload before failing, defaulting to 120000 ms. Raise it for
   large components or slow links.
-- `ignore_replication_errors` <VersionBadge version="v5.1.4" /> treats a peer that
+- `ignore_replication_errors` (Added in: v5.1.4) treats a peer that
   fails to receive the deploy as non-fatal. By default a failed peer makes the
   whole operation return a non-2xx status, while the component is still deployed
   on the origin node. Decide which behavior you want before you need it, because
@@ -243,7 +243,7 @@ Two parameters worth setting deliberately on replicated deploys:
 A configuration change carries the same risk as a code change and gets less
 ceremony, which is backwards.
 
-`set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />
+`set_configuration` supports `"replicated": true` (Added in: v5.2.0)
 to apply a change across the cluster in one call, with per-node outcomes in the
 response. To finish the change cluster-wide, follow with `restart_service` using
 `"replicated": true`, which restarts nodes one at a time.
