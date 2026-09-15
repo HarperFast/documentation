@@ -79,6 +79,14 @@ The `operations` field in a permission object restricts which Operations API cal
 
 Operations normally restricted to `super_user` can be selectively granted by including them in the list. If `operations` is not set, the role can call any non-`super_user` operation, subject to table CRUD permissions.
 
+The field scopes an ordinary role; it is not a way to narrow an administrator. Three limits follow from that, and each one surprises people:
+
+- **`super_user` and `cluster_user` roles cannot carry an allowlist at all.** `add_role` and `alter_role` reject any permission that sets either flag alongside other keys, so the combination is a validation error rather than a restricted admin. Authorization also clears a `super_user` role before the allowlist is consulted.
+- **`structure_user` roles bypass the allowlist for DDL only.** `create_table`, `create_attribute`, `drop_table`, and `drop_attribute` are reachable regardless of the list — plus `create_database`/`drop_database` when `structure_user` is `true`. When it is an array of database names, that carve-out applies only to those databases. Every other operation is still gated normally.
+- **`sql` is not gated by this field.** SQL statements are authorized against table CRUD permissions on their own path, so listing `sql` neither grants nor restricts them, and omitting it does not prevent a role from running SQL. This matters when reading the `read_only` and `standard_user` groups below, both of which include the name.
+
+The value must be an array of strings. A non-array value is rejected on write, and a role that already holds one (for example a pre-5.0 role that granted a database named `operations`) can prevent the instance from loading its user cache — see [HarperFast/harper#2194](https://github.com/HarperFast/harper/issues/2194).
+
 **Permission Groups**
 
 Groups expand to a predefined set of operations and can be mixed with individual operation names:
