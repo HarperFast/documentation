@@ -93,7 +93,7 @@ For a RocksDB database the stream is a `tar` archive, gzipped by default. It con
 
 ```bash
 harper get_backup database=data out=./data.tar.gz
-# or pull from another node — this clones that node's database onto the current one
+# or read the snapshot from another node, still writing it to a file here
 harper get_backup database=data target=https://node-2.example.com:9925 out=./data.tar.gz
 ```
 
