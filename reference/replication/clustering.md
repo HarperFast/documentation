@@ -171,12 +171,12 @@ Returns an array of status objects from the cluster, including active WebSocket 
 					"database": "data",
 					"connected": true,
 					"latency": 0.7,
-					"thread_id": 1,
+					"threadId": 1,
 					"nodes": ["server-2.domain.com"],
 					"lastCommitConfirmed": "Wed, 12 Feb 2025 19:09:34 GMT",
 					"lastReceivedRemoteTime": "Wed, 12 Feb 2025 16:49:29 GMT",
 					"lastReceivedLocalTime": "Wed, 12 Feb 2025 16:50:59 GMT",
-					"lastSendTime": "Wed, 12 Feb 2025 16:50:59 GMT"
+					"sendingMessage": "Wed, 12 Feb 2025 16:50:59 GMT"
 				}
 			]
 		}
@@ -194,6 +194,8 @@ Returns an array of status objects from the cluster, including active WebSocket 
 | `lastReceivedRemoteTime` | Timestamp (from the originating node) of the last received transaction                                                              |
 | `lastReceivedLocalTime`  | Local time when the last transaction was received. A gap between this and `lastReceivedRemoteTime` suggests the node is catching up |
 | `sendingMessage`         | Timestamp of the transaction actively being sent. Absent when waiting for the next transaction                                      |
+
+While a database is taking its initial full copy, these timing fields hold the literal string `"Copying"` rather than a timestamp. Anything that parses them as dates needs to handle that value, since a node taking a full copy is exactly the node you are most likely to be watching.
 
 ---
 

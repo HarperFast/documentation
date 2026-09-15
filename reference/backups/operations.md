@@ -68,7 +68,7 @@ harper list_backups database=data
 
 <VersionBadge version="v5.2.0" /> <EngineBadge engines="RocksDB" />
 
-Verifies a managed backup's RocksDB file sizes — and their checksums when `verify_checksum` is `true` (slower) — together with the framing of its transaction-log snapshot (always checked). The blob snapshot is not verified. Through a running server this runs as a background [job](../operations-api/operations.md#jobs). `backup_id` is required.
+Verifies a managed backup's RocksDB file sizes — and their checksums when `verify_checksum` is `true` (slower) — together with the framing of its transaction-log snapshot (always checked). For a backup that recorded blobs, verification confirms the blob snapshot is still present and fails the backup as corrupt if it is missing, but it does not check individual blob files for size, checksum, or readability — so verification can pass on a backup whose blob contents are damaged. Through a running server this runs as a background [job](../operations-api/operations.md#jobs). `backup_id` is required.
 
 ```json
 { "operation": "verify_backup", "database": "data", "backup_id": 1, "verify_checksum": true }

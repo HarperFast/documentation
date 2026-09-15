@@ -1338,14 +1338,14 @@ Detailed documentation: [WAF Operations and Rule Schema](../web-application-fire
 
 Operations for restarting Harper and managing system state.
 
-| Operation            | Description                                           | Role Required |
-| -------------------- | ----------------------------------------------------- | ------------- |
-| `restart`            | Restarts the Harper instance                          | super_user    |
-| `restart_service`    | Restarts a specific Harper service                    | super_user    |
-| `system_information` | Returns detailed host system metrics                  | super_user    |
-| `set_status`         | Sets an application-specific status value (in-memory) | super_user    |
-| `get_status`         | Returns a previously set status value                 | super_user    |
-| `clear_status`       | Removes a status entry                                | super_user    |
+| Operation            | Description                               | Role Required |
+| -------------------- | ----------------------------------------- | ------------- |
+| `restart`            | Restarts the Harper instance              | super_user    |
+| `restart_service`    | Restarts a specific Harper service        | super_user    |
+| `system_information` | Returns detailed host system metrics      | super_user    |
+| `set_status`         | Sets an application-specific status value | super_user    |
+| `get_status`         | Returns a previously set status value     | super_user    |
+| `clear_status`       | Removes a status entry                    | super_user    |
 
 ### `restart`
 
@@ -1365,7 +1365,11 @@ Restarts a specific service. `service` must be one of: `http`, `http_workers`, `
 
 ### `system_information`
 
-Returns system metrics including CPU, memory, disk, network, and Harper process info. Optionally filter by `attributes` array (e.g., `["cpu", "memory", "replication"]`).
+Returns system metrics including CPU, memory, disk, network, and Harper process info. Optionally filter by an `attributes` array (e.g., `["cpu", "memory", "threads"]`).
+
+Valid attribute names are `system`, `time`, `cpu`, `memory`, `disk`, `network`, `harperdb_processes`, `table_size`, `metrics`, and `threads`. Omitting `attributes` returns all of them.
+
+> **Unrecognized attribute names are silently ignored**, not rejected. A typo produces a smaller response rather than an error, so if a section you asked for is missing, check the spelling before you check the node.
 
 ```json
 { "operation": "system_information" }
@@ -1373,7 +1377,11 @@ Returns system metrics including CPU, memory, disk, network, and Harper process 
 
 ### `set_status` / `get_status` / `clear_status`
 
-Manage in-memory application status values. Status types: `primary`, `maintenance`, `availability` (availability only accepts `'Available'` or `'Unavailable'`). Status is not persisted across restarts.
+Manage application-defined status values. Status types: `primary`, `maintenance`, `availability` (availability only accepts `'Available'` or `'Unavailable'`).
+
+Values are **persisted**, stored in the `hdb_status` table in the `system` database, so they survive a restart. That table is declared `replicate: false`, so a status set on one node stays on that node and does not propagate to peers — which is what makes these values usable as node-local coordination markers.
+
+These are a coordination primitive for your own automation: Harper stores and returns them but does not change its own behavior based on them, so they are not a substitute for a real health check. A `get_status` call with no `id` additionally returns Harper-derived state, including a `restartRequired` flag that tracks pending component and code restarts (not configuration changes).
 
 ```json
 { "operation": "set_status", "id": "primary", "status": "active" }
