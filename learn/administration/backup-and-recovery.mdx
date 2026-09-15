@@ -113,6 +113,12 @@ Every backup operation runs from the CLI under the same name. With the server
 running the CLI forwards to the server; with it stopped the command operates
 directly on the files.
 
+`get_backup` is the exception. It streams from a running server and has no offline
+form, so with Harper stopped it fails as an unknown command. If you need a copy
+off a node that is down, start it, or take the backup directory or a volume
+snapshot instead. Worth knowing before an incident, because a stopped node is
+exactly when you reach for it.
+
   </TabItem>
 </Tabs>
 
@@ -231,6 +237,23 @@ open does not fail your request. It fails inside the job, so you find out from
 `get_job` rather than from the response. Harper does not track which component
 uses which database, so it cannot selectively stop one.
 
+:::tip
+That last constraint has an escape hatch worth knowing before you need it. Setting
+`HARPER_SAFE_MODE` to any value starts Harper without loading any applications or
+components, while the database, Operations API, and HTTP server come up normally:
+
+```bash
+HARPER_SAFE_MODE=1 harper
+```
+
+Because no component loads, nothing holds a user database open, so a restore that
+would fail inside its job can run online. It is also how you get back in when a
+broken component is what stopped Harper in the first place, since the Operations
+API is available to inspect, repair, or remove it. Traffic should stay off the
+node either way. See
+[safe mode](/reference/v5/configuration/overview#harper_safe_mode).
+:::
+
 Two more constraints worth writing into your procedure:
 
 - **`target_database` requires the server stopped.** Restoring into a separate
@@ -334,6 +357,8 @@ that it is the target than a promise you cannot keep.
 - [ ] Restore constraints documented for user databases, component-held databases,
       and `system`
 - [ ] Restore authority named, and restore execution logged
+- [ ] Safe mode known as the way to restore a database a component holds open,
+      and to reach a node a broken component stopped
 - [ ] Restore drill completed and dated, with measured recovery time and recovery
       point
 - [ ] `system` database restore rehearsed offline

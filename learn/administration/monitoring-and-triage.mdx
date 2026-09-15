@@ -22,6 +22,7 @@ short enough to run under pressure.
 - Which Harper metrics are worth an alert, by name, and which are only worth a
   dashboard
 - How to get metrics out of Harper, on Fabric and self-managed
+- How to preload an APM or tracing agent so it can instrument your application
 - How to write log entries that are still useful during an incident
 - A triage sequence that narrows a Harper incident in about five minutes
 
@@ -155,6 +156,47 @@ before building dashboards. Whether metrics stay node-local or replicate changes
 what a cluster-wide query means, and it is easier to decide that deliberately than
 to discover it after building panels on the wrong assumption.
 :::
+
+## Run an APM or tracing agent
+
+Harper's own metrics tell you how the node is behaving. They do not give you
+distributed traces across your application code and its downstream calls, which is
+what you want when a journey is slow and you need to know where the time went.
+That comes from an instrumentation agent, and an agent has to load before the code
+it instruments.
+
+Two configuration keys put a module on each worker thread's startup, ahead of
+Harper's own modules and yours:
+
+```yaml
+threads:
+  preloadRequire: dd-trace/init # the entry that calls init()
+  preload: dd-trace/register.js # ESM loader hooks for automatic instrumentation
+```
+
+[`threads.preload`](/reference/v5/configuration/options#threads)
+
+<VersionBadge version="v5.2.0" /> loads a module via Node's `--import`, which is how an agent installs the loader hooks
+that let it instrument modules imported later. [`threads.preloadRequire`](/reference/v5/configuration/options#threads)
+<VersionBadge version="v5.2.0" /> uses `--require`, which runs the module body and is typically how an agent's
+initialization entry actually starts it.
+
+Installing loader hooks and starting the agent are two different jobs, and which
+of your agent's entry points does which is specific to that agent. Some ship one
+entry that does both; others split them, in which case set both keys. The example
+above is the split-entry case, and it is the one that produces the most confusing
+failure: with only the hooks loaded, a tracer will hand out spans with plausible
+trace ids that are no-ops and export nothing, so your instrumentation looks
+installed and your collector stays empty.
+
+Two constraints worth knowing before you plan around this. Both keys apply to
+worker threads only, and neither works under Bun. And bare specifiers resolve
+against the `node_modules` of your installed components, so an agent can ship as a
+dependency of a deployed component rather than as a host-level install.
+
+Whatever agent you use, follow its own worker-thread documentation, and finish by
+confirming spans actually arrive at your collector rather than assuming the
+configuration took.
 
 ## Logs you can use during an incident
 
@@ -316,6 +358,8 @@ misleading signal during a real incident costs more than a missing one.
 - [ ] Alerts on storage headroom and backup age
 - [ ] Metrics exported off the node, via Grafana on Fabric or the Prometheus
       exporter self-managed
+- [ ] If you run an APM agent, both `threads.preload` and `threads.preloadRequire`
+      set as that agent requires, with spans confirmed at the collector
 - [ ] `analytics.replicate` setting known and deliberate
 - [ ] Structured logging includes component, version, node, request id, operation,
       duration, and outcome

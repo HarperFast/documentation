@@ -21,6 +21,7 @@ during an incident that the answer was the target all along.
 - How to convert an availability target into a monthly budget, and what each tier
   demands of your automation
 - How to reconcile stated targets against the numbers measured in earlier guides
+- Why one storage setting can silently invalidate your stated recovery point
 - Why declaring your degraded modes is as important as declaring your targets
 
 ## Prerequisites
@@ -55,6 +56,32 @@ flatters your automation and misleads your planning.
 availability measured at a Harper node are different quantities, and the
 difference is exactly the part of the stack you may not control. Whichever you
 choose, say so in the same sentence as the number.
+
+### One storage setting can override your recovery point
+
+Your recovery point objective is a statement about how much acknowledged data you
+can afford to lose. One configuration option can quietly make that statement
+false.
+
+[`storage.writeAsync`](/reference/v5/database/storage-tuning#storagewriteasync)
+defaults to `false`. Set it to `true` and Harper stops calling `fsync` on commit,
+so a write returns as soon as it is queued to the operating system's page cache.
+Throughput on write-heavy workloads improves substantially. The cost is that a
+power loss or OS crash between the commit and the flush to disk loses the most
+recent transactions, even though your application was told they succeeded. The
+database stays structurally consistent; only the newest writes are gone.
+
+The trap is that this is invisible to everything else in this guide. Backup
+timestamps look right, replication looks healthy, and no alert fires. You discover
+it the first time a node loses power, which is also the first time the gap between
+your stated recovery point and your real one matters.
+
+So treat it as an RPO decision rather than a performance one. Enabling it is
+defensible when the data is reproducible from an upstream source, when the
+workload is bulk ingest that can simply be re-run, or when peers acknowledge
+writes before the loss window opens. Outside those cases, leave it off. If it is
+on anywhere, record which databases and say so next to the recovery point in your
+plan, because the number no longer means what it appears to.
 
 ## Map scenarios to mechanisms
 
@@ -199,6 +226,8 @@ would have hurt you.
 - [ ] Availability target converted to minutes per month
 - [ ] Error budget policy states what changes when the budget runs low
 - [ ] Backup cadence reconciled against recovery point
+- [ ] `storage.writeAsync` confirmed off, or the databases it is on for recorded
+      alongside their recovery point
 - [ ] Restore time plus detection time reconciled against recovery time
 - [ ] Convergence time reconciled against the traffic admission gate
 - [ ] Every unreconciled gap has an owner and a date
