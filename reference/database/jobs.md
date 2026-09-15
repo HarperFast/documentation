@@ -100,7 +100,7 @@ Ingests CSV data from a URL.
 
 Imports CSV or JSON files from an AWS S3 bucket.
 
-<VersionBadge type="changed" version="v5.3.0" /> — the AWS SDK backing this operation is an optional peer dependency. Install it where Harper can resolve it — in the Harper instance root (`rootPath`) or globally alongside Harper — with `npm install @aws-sdk/client-s3 @aws-sdk/lib-storage`. Without it, the operation fails with a `501` error naming this command.
+<VersionBadge type="changed" version="v5.3.0" /> — the AWS SDK backing this operation is an optional peer dependency. Install it where Harper can resolve it: run `npm install @aws-sdk/client-s3 @aws-sdk/lib-storage` from the Harper instance root (`rootPath`), or — when Harper itself is installed globally — `npm install --global @aws-sdk/client-s3 @aws-sdk/lib-storage`. Without it, the operation fails with a `501` error naming this command.
 
 - `operation` _(required)_ — `import_from_s3`
 - `database` _(optional)_ — target database; defaults to `data`
