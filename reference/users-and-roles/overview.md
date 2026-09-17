@@ -81,15 +81,37 @@ Operations normally restricted to `super_user` can be selectively granted by inc
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-Gate one runs ahead of every other privilege check on the role. Earlier v5 releases reached the `structure_user` carve-out and the SQL path without consulting the list, so a role could call operations its list omitted; both are now gated.
+Gate one admits nothing the list omits, whatever else the role carries. Earlier v5 releases let table DDL and SQL around it; both now go through it.
 
-Three consequences are worth stating directly, because the field scopes an ordinary role and is not a way to narrow an administrator:
+So grant by listing, and build a role up rather than trying to narrow `super_user` — `add_role` and `alter_role` reject `super_user` or `cluster_user` set to `true` alongside any other key. A role that maintains one database's tables and queries them with SQL:
 
-- **`super_user` and `cluster_user` roles cannot carry an allowlist at all.** `add_role` and `alter_role` reject any permission that sets either flag to `true` alongside other keys, so the combination is a validation error rather than a restricted administrator. Grant the operations you want to delegate to an ordinary role instead.
-- **`structure_user` narrows which databases DDL reaches; it does not widen which operations are reachable.** `create_table`, `create_attribute`, `drop_table`, and `drop_attribute` must appear in the list like anything else, and `structure_user` then restricts them to its named databases, or to every database when it is `true`. `create_database` and `drop_database` additionally require `structure_user: true`. A role whose list omits an operation cannot perform it whatever `structure_user` is set to.
-- **`sql` must be listed for a role to run SQL.** Listing it grants the SQL interface, not unrestricted DML through it: statements are still authorized against table CRUD permissions, which is what separates `read_only` (no writes) from `standard_user`. Both groups include `sql`, so a role built from either keeps it.
+```json
+{
+	"operation": "add_role",
+	"role": "orders_maintainer",
+	"permission": {
+		"operations": ["sql", "create_table", "drop_table"],
+		"structure_user": ["orders_db"],
+		"orders_db": {
+			"tables": {
+				"orders": {
+					"read": true,
+					"insert": true,
+					"update": false,
+					"delete": false,
+					"attribute_permissions": []
+				}
+			}
+		}
+	}
+}
+```
 
-The value must be an array of strings, and a non-array value is rejected on write. A role that already holds one — for example a pre-5.0 role that granted a database named `operations`, before the key became reserved — can prevent the instance from loading its user cache; see [HarperFast/harper#2194](https://github.com/HarperFast/harper/issues/2194).
+`sql` has to be listed or the role cannot run SQL at all. Listing it grants the interface, not the data: the statement is still checked against the table permissions above, so this role can `SELECT` and `INSERT` on `orders` and nothing else. That check is what separates the `read_only` and `standard_user` groups below, which both include `sql`.
+
+`create_table` and `drop_table` have to be listed too, and `structure_user` then limits them to `orders_db`. `create_database` and `drop_database` additionally require `structure_user: true`.
+
+The value must be an array of strings; a non-array value is rejected on write. A role that already holds one — a pre-5.0 role that granted a database named `operations`, before the key became reserved — can stop the instance loading its user cache ([harper#2194](https://github.com/HarperFast/harper/issues/2194)).
 
 **Permission Groups**
 
