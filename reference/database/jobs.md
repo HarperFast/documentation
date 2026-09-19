@@ -100,6 +100,8 @@ Ingests CSV data from a URL.
 
 Imports CSV or JSON files from an AWS S3 bucket.
 
+<VersionBadge type="changed" version="v5.3.0" /> — the AWS SDK backing this operation is an optional peer dependency. The official Harper Docker image ships with it preinstalled; for npm installs, install it where Harper can resolve it: run `npm install @aws-sdk/client-s3 @aws-sdk/lib-storage` from the Harper instance root (`rootPath`), or — when Harper itself is installed globally — `npm install --global @aws-sdk/client-s3 @aws-sdk/lib-storage`. Without it, the operation fails with a `501` error naming this command.
+
 - `operation` _(required)_ — `import_from_s3`
 - `database` _(optional)_ — target database; defaults to `data`
 - `table` _(required)_ — target table
@@ -161,6 +163,8 @@ Exports table data to a local file in JSON or CSV format.
 Exports table data to an AWS S3 bucket in JSON or CSV format.
 
 <VersionBadge type="changed" version="v4.3.0" /> — `search_by_conditions` added as a supported search operation
+
+<VersionBadge type="changed" version="v5.3.0" /> — the AWS SDK backing this operation is an optional peer dependency; see the installation note under [Import from S3](#import-from-s3). Without it, the operation fails with a `501` error.
 
 - `operation` _(required)_ — `export_to_s3`
 - `format` _(required)_ — `json` or `csv`
