@@ -81,7 +81,7 @@ Operations normally restricted to `super_user` can be selectively granted by inc
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-Gate one admits nothing the list omits, whatever else the role carries. Earlier v5 releases let table DDL and SQL around it; both now go through it.
+An operation the list omits is denied whatever else the role carries — the list is checked ahead of every other permission on the role. Earlier v5 releases let table DDL and SQL around it; both now go through it.
 
 So grant by listing, and build a role up rather than trying to narrow `super_user` — `add_role` and `alter_role` reject `super_user` or `cluster_user` set to `true` alongside any other key. A role that maintains one database's tables and queries them with SQL:
 
