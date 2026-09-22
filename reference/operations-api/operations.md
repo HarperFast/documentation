@@ -849,6 +849,9 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | `get_components`            | Lists all component files and config                                    | super_user    |
 | `get_component_file`        | Returns the contents of a file within a component                       | super_user    |
 | `set_component_file`        | Creates or updates a file within a component                            | super_user    |
+| `get_env_keys`              | Lists the key names in a component's `.env` file (never values)         | super_user    |
+| `set_env_value`             | Sets one or many `.env` keys, preserving the rest of the file           | super_user    |
+| `delete_env_value`          | Removes one or many `.env` keys, leaving the rest intact                | super_user    |
 | `list_deployments`          | Lists deployment records with optional filters                          | super_user    |
 | `get_deployment`            | Fetches a single deployment record by ID; supports SSE streaming        | super_user    |
 | `get_deployment_payload`    | Returns the tarball stored for a deployment                             | super_user    |
@@ -1034,6 +1037,112 @@ An ordinary redeploy sets nothing: the component's watched files are handled by 
 The flag is evaluated per node. A peer applying the replicated deploy checks its own directory state, since whether the component was already active can differ from node to node.
 
 Until the restart happens, a request to a route of a never-loaded component returns a 404 naming the component and saying a restart may be needed, instead of the generic 404. That fuller message is returned only to an authenticated `super_user`. The difference between the two responses would otherwise report which component directories exist on disk.
+
+### Environment File Operations
+
+<VersionBadge version="v5.2.0" />
+
+Three operations edit a component's `.env` file without ever returning a value. They let an editor (Studio, CI, your own tooling) rotate one key without seeing — or accidentally clobbering — the other secrets in the file.
+
+| Operation          | Description                                                     | Role Required |
+| ------------------ | --------------------------------------------------------------- | ------------- |
+| `get_env_keys`     | Lists the key names in a component's `.env` file — never values | super_user    |
+| `set_env_value`    | Sets one or many keys, preserving the rest of the file          | super_user    |
+| `delete_env_value` | Removes one or many keys, leaving the rest intact               | super_user    |
+
+All three take a `project` (the component directory name) and an optional `file`, which defaults to `.env`. `file` must name an env file — `.env` or `.env.<suffix>` such as `.env.local` — and is rejected otherwise. Key names must match `[A-Za-z0-9_.-]+`, the character set the `.env` parser accepts.
+
+`set_env_value` and `delete_env_value` replicate, so an edit reaches every node in the cluster.
+
+:::note
+`get_component_file` on a `.env` file returns a **masked** body: `protected: true`, the `keys` array, and a `message` of one `KEY=********` line per key. `get_components` likewise flags such files with `protected: true`. Template files — `.env.example`, `.env.sample`, `.env.template` — hold placeholders rather than secrets, so they are returned verbatim and are not masked.
+
+`set_component_file` is **not** blocked on a `.env` file; it overwrites the file verbatim with whatever payload you send. Use `set_env_value` when you want to change one key and keep the others.
+
+This is disclosure protection for the editor surface, not a security boundary — component code can still read the real values from `process.env`.
+:::
+
+#### `get_env_keys`
+
+```json
+{
+	"operation": "get_env_keys",
+	"project": "my-app",
+	"file": ".env"
+}
+```
+
+Response:
+
+```json
+{
+	"file": ".env",
+	"keys": ["API_KEY", "DB_URL"],
+	"size": 62,
+	"mtime": "2026-02-11T18:04:22.000Z"
+}
+```
+
+Returns an error if the file does not exist.
+
+#### `set_env_value`
+
+Supply exactly one of `key` + `value` (a single entry) or `values` (a key-to-value map). Every other line in the file — comments, blank lines, untouched keys, and their formatting — is left exactly as it was; existing keys are replaced in place and new keys are appended. The file (and the project directory) is created if it does not exist.
+
+```json
+{
+	"operation": "set_env_value",
+	"project": "my-app",
+	"key": "API_KEY",
+	"value": "rotated-value"
+}
+```
+
+```json
+{
+	"operation": "set_env_value",
+	"project": "my-app",
+	"values": { "API_KEY": "rotated-value", "DB_URL": "postgres://user:pass@host/db" }
+}
+```
+
+Response:
+
+```json
+{
+	"message": "Successfully set env value(s) in .env",
+	"keys": ["API_KEY", "DB_URL"]
+}
+```
+
+`keys` is the file's key list after the write — the request value is never echoed back.
+
+Harper quotes the value as needed so the `.env` parser reads back exactly what you sent, including spaces, `#`, quotes, backslashes, and newlines. One combination cannot be represented: a value containing a single quote (`'`) together with a double quote, a backslash, or a carriage return is rejected with a `400`.
+
+A value may also be an `enc:v1:` ciphertext envelope rather than plaintext — see [Encrypted Environment Values](../environment-variables/encrypted-values.md).
+
+#### `delete_env_value`
+
+Supply exactly one of `key` (a single name) or `keys` (an array of names).
+
+```json
+{
+	"operation": "delete_env_value",
+	"project": "my-app",
+	"keys": ["API_KEY", "DB_URL"]
+}
+```
+
+Response:
+
+```json
+{
+	"message": "Successfully deleted env value(s) from .env",
+	"keys": []
+}
+```
+
+Returns an error if the file does not exist. Removing a key that is not present is not an error.
 
 ### Deployment Operations
 
