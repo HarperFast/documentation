@@ -238,16 +238,17 @@ Called for MQTT subscribe commands. Returns a `Subscription` — an `AsyncIterab
 
 All properties are optional:
 
-| Property             | Description                                                                                                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                                                                                                                     |
-| `startTime`          | Resume after a local audit-log cursor; all events at that cursor are excluded. Cannot be used with `previousCount`.                                                                             |
-| `previousCount`      | Return up to the last N accepted updates/messages, capped at 1,000. Cannot be used with `startTime`.                                                                                            |
-| `includeSuperseded`  | Include record mutations superseded by a later version. Defaults to `false`, or `true` when `rawEvents` is enabled. An explicit value overrides that default. <VersionBadge version="v5.3.0" /> |
-| `rawEvents`          | Return raw audit events rather than reconstructing full records. Defaults to `false`.                                                                                                           |
-| `omitCurrent`        | Do not send the current/retained record as the first update.                                                                                                                                    |
-| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                                                                                                                           |
-| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.                                                                                                            |
+| Property             | Description                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                                                                                                                                                           |
+| `startTime`          | Resume after a local audit-log cursor; all events at that cursor are excluded. Cannot be used with `previousCount`.                                                                                                                   |
+| `previousCount`      | Return up to the last N accepted updates/messages, capped at 1,000. Cannot be used with `startTime`.                                                                                                                                  |
+| `includeSuperseded`  | Include record mutations superseded by a later version. Defaults to `false`, or `true` when `rawEvents` is enabled. An explicit value overrides that default. <VersionBadge version="v5.3.0" />                                       |
+| `includeOrigin`      | Add the origin node to every event built from an audit record, as `nodeId` (this node's local short id for it) and `nodeName` (its globally stable name). JavaScript API only; defaults to `false`. <VersionBadge version="v5.3.0" /> |
+| `rawEvents`          | Return raw audit events rather than reconstructing full records. Defaults to `false`.                                                                                                                                                 |
+| `omitCurrent`        | Do not send the current/retained record as the first update.                                                                                                                                                                          |
+| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                                                                                                                                                                 |
+| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.                                                                                                                                                  |
 
 #### Superseded record updates
 
@@ -275,6 +276,19 @@ for await (const event of subscription) {
 With `includeSuperseded: true`, record values are reconstructed for each historical version, unless `rawEvents` is enabled. This option applies to live delivery too. Delivery still depends on retained audit history and subscription filters; it does not provide an exactly-once guarantee.
 
 `rawEvents: true` preserves its existing default of including superseded events. Set `includeSuperseded: false` explicitly to apply the same version and missing-record checks while retaining raw event payloads.
+
+#### Origin identity
+
+<VersionBadge version="v5.3.0" />
+
+`includeOrigin: true` adds two fields to every event built from an audit record — live delivery, `startTime` catch-up, `previousCount` history and single-record history:
+
+- `nodeId` — the origin node's short id in the serving node's per-database id space (`0` is the serving node itself). Ids are assigned per node, so this value is not comparable across nodes.
+- `nodeName` — the origin node's globally stable name (its `node.hostname`). Use this to keep one cursor per origin, the shape replication resumes with, so a cursor carried to another node cannot skip writes from an origin that was lagging when the cursor advanced.
+
+`end_txn`, the initial current-state events and the current value of a single-record subscription carry neither field: they describe current state, not a log position. If an event's origin cannot be resolved, the subscription ends with a `SubscriptionOriginError` (`code: 'SUBSCRIPTION_ORIGIN_UNRESOLVED'`) rather than deliver or skip the event.
+
+Events of one transaction can share a `localTime`, and `startTime` excludes every event at the cursor, so persist a per-origin position `(nodeName, localTime)` only after an event with a greater `localTime` from that origin, or an `end_txn` (with `supportsTransactions: true`), has been delivered. With the RocksDB transaction log, `localTime` is the origin's own log position and is comparable across nodes; with LMDB it is assigned by the receiving node and is meaningful only there. The option is available to JavaScript subscribers; MQTT, WebSocket and SSE deliveries do not carry it.
 
 ---
 
