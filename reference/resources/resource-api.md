@@ -281,12 +281,12 @@ With `includeSuperseded: true`, record values are reconstructed for each histori
 
 <VersionBadge version="v5.3.0" />
 
-`includeOrigin: true` adds two fields to every event built from an audit record — live delivery, `startTime` catch-up, `previousCount` history and single-record history:
+`includeOrigin: true` adds two fields to every event built from an audit record — live delivery, `startTime` catch-up, `previousCount` history, and single-record history:
 
 - `nodeId` — the origin node's short id in the serving node's per-database id space (`0` is the serving node itself). Ids are assigned per node, so this value is not comparable across nodes.
-- `nodeName` — the origin node's globally stable name (its `node.hostname`). Use this to keep one cursor per origin, the shape replication resumes with, so a cursor carried to another node cannot skip writes from an origin that was lagging when the cursor advanced.
+- `nodeName` — the origin node's globally stable name (its `node.hostname`). Use this to keep one cursor per origin, the shape that replication resumes with, so a cursor carried to another node cannot skip writes from an origin that was lagging when the cursor advanced.
 
-`end_txn`, the initial current-state events and the current value of a single-record subscription carry neither field: they describe current state, not a log position. If an event's origin cannot be resolved, the subscription ends with a `SubscriptionOriginError` (`code: 'SUBSCRIPTION_ORIGIN_UNRESOLVED'`) rather than deliver or skip the event.
+`end_txn`, the initial current-state events and the current value of a single-record subscription carry neither field: they describe current state, not a log position. If an event's origin cannot be resolved, the subscription ends with a `SubscriptionOriginError` (`code: 'SUBSCRIPTION_ORIGIN_UNRESOLVED'`) rather than delivering or skipping the event.
 
 Events of one transaction can share a `localTime`, and `startTime` excludes every event at the cursor, so persist a per-origin position `(nodeName, localTime)` only after an event with a greater `localTime` from that origin, or an `end_txn` (with `supportsTransactions: true`), has been delivered. With the RocksDB transaction log, `localTime` is the origin's own log position and is comparable across nodes; with LMDB it is assigned by the receiving node and is meaningful only there. The option is available to JavaScript subscribers; MQTT, WebSocket and SSE deliveries do not carry it.
 
