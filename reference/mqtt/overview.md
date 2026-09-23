@@ -97,7 +97,7 @@ Harper is designed for distributed, low-latency message delivery. Messages are d
 
 In a distributed cluster, messages may arrive out of order due to network topology. The behavior depends on whether the message is retained or non-retained:
 
-- **Retained messages** (published with `retain: true`, or written via PUT/upsert) maintain eventual consistency across the cluster. Harper keeps the message with the latest timestamp as the winning record state. An out-of-order earlier message will not be re-delivered to clients; the cluster converges to the most recent state.
+- **Retained messages** (published with `retain: true`, or written via PUT/upsert) maintain eventual consistency across the cluster. Harper keeps the message with the latest timestamp as the winning record state. Ordinary subscriptions skip superseded updates. Durable QoS 1/2 subscriptions include superseded versions, so their delivered history can include older updates even though the stored record converges to the most recent state.
 - **Non-retained messages** are always delivered to local subscribers when received, even if they arrive out of order. Every message is delivered, prioritizing completeness over strict ordering.
 
 **Non-retained messages** are suited for applications like chat where every message must be delivered. **Retained messages** are suited for sensor readings or state updates where only the latest value matters.
