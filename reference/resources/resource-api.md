@@ -253,7 +253,7 @@ All properties are optional:
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-By default, table subscriptions skip record mutations whose version differs from the current stored record's version. This applies both to catch-up with `startTime` or `previousCount` and to live delivery. If a record was updated at versions 2, 3, and 4 before catch-up begins, and version 4 is still current, the subscription delivers only version 4. Current deletion tombstones are eligible for delivery; older updates or deletions superseded by a later write are skipped. Published messages are independent events and are not suppressed by this version check.
+By default, table subscriptions skip record mutations whose version differs from the current stored record's version. This applies both to catch-up with `startTime` or `previousCount` and to live delivery. If a record was updated at versions 2, 3, and 4 before catch-up begins, and version 4 is still current, the subscription delivers only version 4. Current deletion tombstones are eligible for delivery; older updates or deletions superseded by a later write are skipped. When no stored record exists, only actual delete audit events are delivered; older puts, patches, invalidations, and relocations are skipped, so eviction is not reported as deletion. Published messages are independent events and are not suppressed by this version check.
 
 `startTime` is a local audit-log cursor, not a record version. Audit events expose this cursor as `localTime`, which multiple events in a transaction can share. Resuming with `startTime` excludes all events at that cursor, so callers must account for shared cursors before checkpointing.
 
@@ -274,7 +274,7 @@ for await (const event of subscription) {
 
 With `includeSuperseded: true`, record values are reconstructed for each historical version, unless `rawEvents` is enabled. This option applies to live delivery too. Delivery still depends on retained audit history and subscription filters; it does not provide an exactly-once guarantee.
 
-`rawEvents: true` preserves its existing default of including superseded events. Set `includeSuperseded: false` explicitly to apply the same version check while retaining raw event payloads.
+`rawEvents: true` preserves its existing default of including superseded events. Set `includeSuperseded: false` explicitly to apply the same version and missing-record checks while retaining raw event payloads.
 
 ---
 
