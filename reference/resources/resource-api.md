@@ -241,8 +241,8 @@ All properties are optional:
 | Property             | Description                                                                                                                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                                                                                                                     |
-| `startTime`          | Resume after a local audit-log timestamp, such as a previously received event's `localTime`. Cannot be used with `previousCount`.                                                               |
-| `previousCount`      | Return up to the last N eligible updates/messages. Cannot be used with `startTime`.                                                                                                             |
+| `startTime`          | Resume after a local audit-log cursor; all events at that cursor are excluded. Cannot be used with `previousCount`.                                                                             |
+| `previousCount`      | Return up to the last N accepted updates/messages, capped at 1,000. Cannot be used with `startTime`.                                                                                            |
 | `includeSuperseded`  | Include record mutations superseded by a later version. Defaults to `false`, or `true` when `rawEvents` is enabled. An explicit value overrides that default. <VersionBadge version="v5.3.0" /> |
 | `rawEvents`          | Return raw audit events rather than reconstructing full records. Defaults to `false`.                                                                                                           |
 | `omitCurrent`        | Do not send the current/retained record as the first update.                                                                                                                                    |
@@ -255,7 +255,9 @@ All properties are optional:
 
 By default, table subscriptions skip record mutations whose version differs from the current stored record's version. This applies both to catch-up with `startTime` or `previousCount` and to live delivery. If a record was updated at versions 2, 3, and 4 before catch-up begins, and version 4 is still current, the subscription delivers only version 4. Current deletion tombstones are eligible for delivery; older updates or deletions superseded by a later write are skipped. Published messages are independent events and are not suppressed by this version check.
 
-`startTime` is a local audit-log cursor, not a record version. Use an event's `localTime` to resume after that event. Catch-up reads retained audit history; `previousCount` may return fewer events because of superseded versions, filters, or the bounded history scan.
+`startTime` is a local audit-log cursor, not a record version. Audit events expose this cursor as `localTime`, which multiple events in a transaction can share. Resuming with `startTime` excludes all events at that cursor, so callers must account for shared cursors before checkpointing.
+
+`previousCount` counts accepted events: superseded or filtered events do not consume the requested count. The request is capped at 1,000 events, and scanning stops after 10,000 in-scope audit entries or the end of retained history, so fewer events may be returned.
 
 Before v5.3.0, non-raw catch-up could include superseded mutations even though non-raw live delivery suppressed them. Consumers that need historical transitions can opt in:
 
