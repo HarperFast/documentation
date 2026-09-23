@@ -75,7 +75,7 @@ mqtt.connect('mqtts://harper.example.com:8883', {
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-Retained publications (`retain: true`) write records, so reconnect catch-up now skips superseded record versions, matching live delivery. If a topic was updated three times while a client was offline, catch-up delivers its current state rather than each intermediate state. Non-retained publications remain independent messages and are not suppressed by this version check. Catch-up is limited by audit-log retention. See [Superseded record updates](../resources/resource-api.md#superseded-record-updates).
+Durable subscriptions with QoS 1 or 2 explicitly include superseded record versions during both live delivery and reconnect catch-up. This preserves delivery of intermediate retained publications (`retain: true`), even though ordinary table subscriptions now default to current-state delivery. Non-retained publications remain independent messages. Catch-up is limited by audit-log retention. See [Superseded record updates](../resources/resource-api.md#superseded-record-updates).
 
 **Session expiry** — In MQTT v5, the `sessionExpiryInterval` property on `CONNECT` controls how long the session is retained after the client disconnects. With `sessionExpiryInterval: 0` (or a clean session connect), Harper deletes the session record at disconnect. Connecting with the same client ID and `clean: true` also explicitly deletes any existing durable session.
 
