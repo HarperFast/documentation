@@ -238,14 +238,41 @@ Called for MQTT subscribe commands. Returns a `Subscription` — an `AsyncIterab
 
 All properties are optional:
 
-| Property             | Description                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                    |
-| `startTime`          | Start from a past time (catch-up of historical messages). Cannot be used with `previousCount`. |
-| `previousCount`      | Return the last N updates/messages. Cannot be used with `startTime`.                           |
-| `omitCurrent`        | Do not send the current/retained record as the first update.                                   |
-| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                          |
-| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.           |
+| Property             | Description                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `includeDescendants` | Include all updates with an id prefixed by the subscribed id (e.g. `sub/*`)                                                                                                    |
+| `startTime`          | Resume after a local audit-log timestamp, such as a previously received event's `localTime`. Cannot be used with `previousCount`.                                              |
+| `previousCount`      | Return up to the last N eligible updates/messages. Cannot be used with `startTime`.                                                                                            |
+| `includeSuperseded`  | Include record mutations superseded by a later version. Defaults to `false`, or `true` when `rawEvents` is enabled. An explicit value overrides that default. Added in v5.3.0. |
+| `rawEvents`          | Return raw audit events rather than reconstructing full records. Defaults to `false`.                                                                                          |
+| `omitCurrent`        | Do not send the current/retained record as the first update.                                                                                                                   |
+| `rowFilter`          | Synchronous JavaScript predicate applied to authoritative row values.                                                                                                          |
+| `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.                                                                                           |
+
+#### Superseded record updates
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+By default, table subscriptions skip record mutations whose version differs from the current stored record's version. This applies both to catch-up with `startTime` or `previousCount` and to live delivery. If a record was updated at versions 2, 3, and 4 before catch-up begins, and version 4 is still current, the subscription delivers only version 4. Current deletion tombstones are eligible for delivery; older updates or deletions superseded by a later write are skipped. Published messages are independent events and are not suppressed by this version check.
+
+`startTime` is a local audit-log cursor, not a record version. Use an event's `localTime` to resume after that event. Catch-up reads retained audit history; `previousCount` may return fewer events because of superseded versions, filters, or the bounded history scan.
+
+Previously, catch-up could include superseded mutations even though live delivery suppressed them. Consumers that need historical transitions can opt in:
+
+```javascript
+const subscription = await Product.subscribe({
+	startTime: lastLocalTime,
+	includeSuperseded: true,
+});
+
+for await (const event of subscription) {
+	processEvent(event);
+}
+```
+
+With `includeSuperseded: true`, record values are reconstructed for each historical version, unless `rawEvents` is enabled. This option applies to live delivery too. Delivery still depends on retained audit history and subscription filters; it does not provide an exactly-once guarantee.
+
+`rawEvents: true` preserves its existing default of including superseded events. Set `includeSuperseded: false` explicitly to apply the same version check while retaining raw event payloads.
 
 ---
 
