@@ -1472,12 +1472,12 @@ With an `id`, it returns that one status record:
 { "operation": "get_status" }
 ```
 
-| Field              | Description                                                                                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `systemStatus`     | Every status record set with `set_status`                                                                                                                                 |
-| `componentStatus`  | Per-component health, aggregated across threads: `name` plus a `status` of `healthy`, `warning`, `error`, `loading`, or `unknown`                                         |
-| `restartRequired`  | Whether a restart is pending on this node — set by a deploy that did not restart (see [Deploying without a restart](#deploying-without-a-restart)) and cleared on restart |
-| `middlewareChains` | The resolved HTTP, upgrade, and WebSocket middleware order (v5.2.0). Present only when the request passes `middleware: true`                                              |
+| Field              | Description                                                                                                                                                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `systemStatus`     | Every status record set with `set_status`                                                                                                                                                                                                                                                                                                  |
+| `componentStatus`  | Per-component health, aggregated across threads: `name` plus a `status` of `healthy`, `warning`, `error`, `loading`, or `unknown`                                                                                                                                                                                                          |
+| `restartRequired`  | Whether a restart is pending on this node — set by a deploy that did not restart (see [Deploying without a restart](#deploying-without-a-restart)) or by a component install that finished after startup stopped waiting for it (see [`deployment.startupInstallTimeout`](../configuration/options.md#deployment)), and cleared on restart |
+| `middlewareChains` | The resolved HTTP, upgrade, and WebSocket middleware order (v5.2.0). Present only when the request passes `middleware: true`                                                                                                                                                                                                               |
 
 `restartRequired` is per node: it reports the node that served the request, not the cluster.
 
