@@ -406,16 +406,18 @@ agent:
 
 ## `deployment`
 
-Retention for what `deploy_component` leaves behind. See [`deploy_component`](../operations-api/operations.md#deploy_component).
+Retention for what `deploy_component` leaves behind, and how long startup waits for component installs. See [`deploy_component`](../operations-api/operations.md#deploy_component).
 
 ```yaml
 deployment:
+  startupInstallTimeout: 600000
   payloadRetention:
     maxSize: 10485760
   stagingRetention:
     maxCount: 5
 ```
 
+- `startupInstallTimeout` <VersionBadge version="v5.3.0" /> — Milliseconds. The longest startup waits for component installs before it opens listeners. A component whose install is still running at the deadline keeps installing in the background; meanwhile the node serves the version already installed, or nothing for a component that was never installed. When that install finishes, Harper flags a restart as needed (`restartRequired` in [`get_status`](../operations-api/operations.md#set_status--get_status--clear_status)) and does not restart on its own. Startup logs the components it is still waiting for every 60 seconds. `0` waits indefinitely, which was the behavior before v5.3.0; _Default_: `600000` (10 minutes)
 - `payloadRetention.maxSize` <VersionBadge version="v5.1.15" /> — Bytes. After a successful deploy, a payload larger than this has its stored tarball (`payload_blob`) dropped from the `hdb_deployment` row; the row and its metadata stay. Set it very high to retain every payload; _Default_: `10485760` (10 MiB)
 - `stagingRetention.maxCount` <VersionBadge version="v5.3.0" /> — How many complete, unactivated staged builds may remain per component under `<componentsRoot>/.deploy-staging`. The newest survive; older ones are removed at the start of that component's next deploy and at startup, and `drop_component` removes all of them. `0` keeps none. This bounds dormant builds only, not a disk quota: staging directories that belong to an in-flight or unsettled deploy are never touched; _Default_: `5`
 
