@@ -88,7 +88,7 @@ Modifies an existing Harper instance in the cluster. Will attempt to add the nod
 - `revoked_certificates` _(optional)_ — array of revoked certificate serial numbers
 - `shard` _(optional)_ — shard number to assign to this node
 - `subscriptions` _(optional)_ — array of subscription objects (same structure as `add_node`)
-- `sendsTo` / `receivesFrom` _(optional)_ <VersionBadge version="v5.1.0" /> <VersionBadge type="changed" version="v5.2.0" /> — same structure and directional meaning as in [Add Node](#add-node) above (this node is the one being updated, so the fields describe its send/receive perspective exactly as they do there for the added node). See Add Node for the v5.1/v5.2 gating change and the `add_node_back` peer-rewrite caveat. As with `subscriptions`, if both are provided, `subscriptions` takes precedence and `sendsTo`/`receivesFrom` are ignored.
+- `sendsTo` / `receivesFrom` _(optional)_ — same structure and directional meaning as in [Add Node](#add-node) above: they describe the `hostname` node's perspective, not this node's. See Add Node for the v5.1/v5.2 gating history and the `add_node_back` peer-rewrite caveat. As with `subscriptions`, if both are provided, `subscriptions` takes precedence and `sendsTo`/`receivesFrom` are ignored.
 
 **Request**:
 
