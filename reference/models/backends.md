@@ -7,7 +7,7 @@ title: Backends
 
 <VersionBadge version="v5.1.0" />
 
-Four model backends ship with Harper. Each model entry in the [`models` configuration](./overview#configuration) selects one with its `backend` field.
+Four provider backends ship with Harper, serving `embedding` and `generative` entries. Each model entry in the [`models` configuration](./overview#configuration) selects one with its `backend` field. `decision` entries are served by the built-in [generative decision adapter](#generative-decision-adapter) or by a [custom decision backend](#decision-backends).
 
 | Backend     | Embeddings | Generation | Streaming | Tools           |
 | ----------- | ---------- | ---------- | --------- | --------------- |
@@ -135,6 +135,62 @@ models:
 
 The model identifier's vendor prefix (`anthropic.`, `meta.`, `amazon.titan-`, `cohere.`, `mistral.`) determines the request/response format Harper uses; an unrecognized prefix is rejected with an error. Tool support depends on the underlying model family. Bedrock embedding APIs accept one text per request, so batch `embed()` calls are issued sequentially.
 
+## Generative decision adapter
+
+<VersionBadge version="v5.3.0" />
+
+Serves [`models.decide()`](./api#decide) over any configured generative model, so decisions work without a dedicated decision backend. It is selected with `backend: generative` under `models.decision` and is the only built-in for that kind; the four provider backends are rejected under `decision`, and `generative` is rejected under `embedding` or `generative`.
+
+```yaml
+models:
+  generative:
+    default:
+      backend: openai
+      apiKey: ${OPENAI_API_KEY}
+      model: gpt-4o-mini
+  decision:
+    default:
+      backend: generative
+      generative: default # the generative logical name to sample
+      samples: 5
+```
+
+| Field              | Default     | Description                                                                                                                                     |
+| ------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generative`       | `'default'` | Logical name of the generative model to sample, resolved at call time — a reload of that entry is picked up without touching the decision entry |
+| `samples`          | `5`         | Completions per decision, 1 to 25. The distribution is the vote frequency, so `samples` sets its granularity                                    |
+| `concurrency`      | `5`         | Completions in flight at once, 1 to 25, never more than `samples`                                                                               |
+| `temperature`      | backend     | Sampling temperature passed to every sample; higher values spread the votes                                                                     |
+| `requestTimeoutMs` | —           | Budget for the whole decision, composed with the caller's `AbortSignal`                                                                         |
+
+For each call the adapter translates the decision schema into a JSON Schema, asks the generative model for `samples` completions with `responseFormat: { schema }`, parses each one, and reports each allowed value's share of the votes as its probability — including zero for values that received none. The state is part of every sample's prompt, so a decision costs `samples` times its tokens. `calibrated` is always `false`: vote frequencies are a sampling estimate, not a calibrated probability. The generative backend must honor `responseFormat: { schema }` ([OpenAI](#openai) and [Ollama](#ollama) do; [Anthropic](#anthropic) ignores it): a sample that is not valid JSON inside the schema fails the whole decision rather than being dropped from the vote, and any samples still in flight are cancelled first.
+
+Each sample flows through `models.generate()`, so it is routed, recorded, and billed as a `generate` call of its own; the `decide` row in [analytics](./analytics) carries the decision's latency but no token counts, so tokens are never counted twice.
+
+## Decision backends
+
+<VersionBadge version="v5.3.0" />
+
+A `decision` backend implements `decide(state, schema, opts)` and returns the distribution over the schema's allowed values. Fine-tuned classifiers, zero-shot NLI models, cross-encoders, and hosted decision models fit this shape without pretending to be a `generative` backend. Register one programmatically with [`defineBackend()`](#definebackend) and [`registerBackend('decision', …)`](#registerbackend), or select it from `models.decision` config as a [config-selectable backend](#config-selectable-backends):
+
+```yaml
+models:
+  decision:
+    default:
+      backend: '@acme/harper-decision' # a module that registers a decision backend
+      apiKey: ${ACME_API_KEY}
+      fallback: [llm]
+    llm:
+      backend: generative
+```
+
+The backend returns `{ status: 'completed', output, usage? }` where `output` is:
+
+- for a leaf schema, `{ distribution: [{ value, probability }, …], calibrated? }` — one entry for every allowed value, with probabilities that sum to one;
+- for an object schema, `{ fields: { [property]: { distribution } } }` — one such distribution per property.
+
+Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too, but it must be a most-probable outcome. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call.
+
 ## Custom backends
 
 <VersionBadge version="v5.1.15" />
@@ -149,26 +205,28 @@ Custom backends can be added two ways: **registered programmatically** (below), 
 models.defineBackend(spec: DefineBackendSpec): ModelBackend
 ```
 
-A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` are supplied; `tools` and `adapters` cannot be inferred from method presence, so declare them explicitly.
+A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` / `decide` are supplied; `tools`, `adapters`, and `calibrated` cannot be inferred from method presence, so declare them explicitly.
 
-| Field            | Type       | Default | Description                                                          |
-| ---------------- | ---------- | ------- | -------------------------------------------------------------------- |
-| `name`           | `string`   | —       | Backend name, used in analytics and error messages (required)        |
-| `embed`          | `function` | —       | `embed(input, opts)` implementation, if the backend embeds           |
-| `generate`       | `function` | —       | `generate(input, opts)` implementation, if the backend generates     |
-| `generateStream` | `function` | —       | `generateStream(input, opts)` implementation, if the backend streams |
-| `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                               |
-| `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection              |
+| Field            | Type       | Default | Description                                                                                                        |
+| ---------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `name`           | `string`   | —       | Backend name, used in analytics and error messages (required)                                                      |
+| `embed`          | `function` | —       | `embed(input, opts)` implementation, if the backend embeds                                                         |
+| `generate`       | `function` | —       | `generate(input, opts)` implementation, if the backend generates                                                   |
+| `generateStream` | `function` | —       | `generateStream(input, opts)` implementation, if the backend streams                                               |
+| `decide`         | `function` | —       | `decide(state, schema, opts)` implementation, if the backend decides — see [Decision backends](#decision-backends) |
+| `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                                                                             |
+| `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection                                                            |
+| `calibrated`     | `boolean`  | `false` | Whether the probabilities `decide` returns are calibrated; selectable with `requires: ['calibrated']`              |
 
-`embed` and `generate` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed` and `{ content, finishReason }` for `generate`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied. A backend that supplies only `generateStream` still satisfies `generate()`: Harper drains the stream into a single result.
+`embed`, `generate`, and `decide` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed`, `{ content, finishReason }` for `generate`, and a distribution (or per-field distributions) for `decide`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied. A backend that supplies only `generateStream` still satisfies `generate()`: Harper drains the stream into a single result.
 
 ### registerBackend()
 
 ```typescript
-models.registerBackend(kind: 'embedding' | 'generative', id: string, backend: ModelBackend): void
+models.registerBackend(kind: 'embedding' | 'generative' | 'decision', id: string, backend: ModelBackend): void
 ```
 
-Registers `backend` under the logical name `id` for the given `kind`. A method on `models` (reachable as `models.registerBackend(...)` / `scope.models.registerBackend(...)`). Register during component initialization (for example, in `handleApplication`) so the backend is in place before requests arrive; the registry is process-wide, so each worker thread that loads the component registers its own instance.
+Registers `backend` under the logical name `id` for the given `kind`; an `embedding` backend must implement `embed`, a `generative` backend `generate` or `generateStream`, and a `decision` backend `decide`. A method on `models` (reachable as `models.registerBackend(...)` / `scope.models.registerBackend(...)`). Register during component initialization (for example, in `handleApplication`) so the backend is in place before requests arrive; the registry is process-wide, so each worker thread that loads the component registers its own instance.
 
 Use a provider-namespaced `id` (e.g. `local:bge-small`) to avoid collisions when more than one component registers backends.
 
@@ -215,4 +273,4 @@ The `backend` specifier is resolved as:
 - an **instance-root-relative path** (`./backends/local.js`) — resolved against the Harper instance root.
 - an **absolute path**.
 
-The factory has the signature `({ logicalName, kind, config }) => void | Promise<void>` and registers via [`models.registerBackend`](#registerbackend); it receives the config entry with `${VAR}` placeholders already resolved. A `backend` that is neither a built-in nor an importable module is logged and skipped at startup, leaving other entries unaffected.
+The factory has the signature `({ logicalName, kind, config }) => void | Promise<void>` and registers via [`models.registerBackend`](#registerbackend); it receives the config entry with `${VAR}` placeholders already resolved, and `kind` is `embedding`, `generative`, or `decision` according to the map the entry sits in. A `backend` that is neither a built-in nor an importable module is logged and skipped at startup, leaving other entries unaffected.

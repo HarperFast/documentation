@@ -7,7 +7,7 @@ title: Models
 
 <VersionBadge version="v5.1.0" />
 
-Harper provides a unified API for calling AI models — text embeddings and text generation — from application code. Models are configured by an operator under logical names; application code requests a model by its logical name and Harper routes the call to the configured backend (Ollama, OpenAI, Anthropic, or Amazon Bedrock) — or to a [custom backend](./backends#custom-backends) a component registers. Swapping providers is a configuration change, not a code change — [Local Development](./local-development) uses this to run the same application against local models in development and hosted providers in production. A logical name can also name an ordered group of backends to try, and calls can require specific capabilities — see [Routing & Fallback](./routing).
+Harper provides a unified API for calling AI models — text embeddings, text generation, and typed decisions — from application code. Models are configured by an operator under logical names; application code requests a model by its logical name and Harper routes the call to the configured backend (Ollama, OpenAI, Anthropic, or Amazon Bedrock) — or to a [custom backend](./backends#custom-backends) a component registers. Swapping providers is a configuration change, not a code change — [Local Development](./local-development) uses this to run the same application against local models in development and hosted providers in production. A logical name can also name an ordered group of backends to try, and calls can require specific capabilities — see [Routing & Fallback](./routing).
 
 The API is exposed as a single process-wide `models` object:
 
@@ -16,23 +16,27 @@ import { models } from 'harper';
 
 const [vector] = await models.embed('What is Harper?');
 const reply = await models.generate('Describe the Harper resource API in one sentence.');
+const route = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] });
 ```
 
 The same object is available as `scope.models` in component scopes and as the `models` global. All three refer to the same instance.
 
-The API surface is three methods:
+The API surface is four methods:
 
-| Method                                                           | Purpose                                    |
-| ---------------------------------------------------------------- | ------------------------------------------ |
-| [`models.embed(input, options?)`](./api#embed)                   | Convert text to embedding vectors          |
-| [`models.generate(input, options?)`](./api#generate)             | Generate a completion for a prompt or chat |
-| [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced      |
+| Method                                                           | Purpose                                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`models.embed(input, options?)`](./api#embed)                   | Convert text to embedding vectors                                 |
+| [`models.generate(input, options?)`](./api#generate)             | Generate a completion for a prompt or chat                        |
+| [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced                             |
+| [`models.decide(state, schema, options?)`](./api#decide)         | Choose from a closed set, with a probability distribution over it |
 
-Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing). Every model call is recorded for [observability and usage accounting](./analytics).
+Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that votes over structured completions from any configured generative model. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing). Every model call is recorded for [observability and usage accounting](./analytics).
 
 ## Configuration
 
-Models are configured in the `models` section of `harper-config.yaml`, split by capability into `embedding` and `generative` maps. Each key is a logical model name; each entry names a `backend` plus backend-specific settings:
+<VersionBadge type="changed" version="v5.3.0" />
+
+Models are configured in the `models` section of `harper-config.yaml`, split by capability into `embedding`, `generative`, and `decision` maps. Each key is a logical model name; each entry names a `backend` plus backend-specific settings:
 
 ```yaml
 models:
@@ -49,6 +53,11 @@ models:
     fast:
       backend: ollama
       model: mistral:7b
+  decision:
+    default:
+      backend: generative # vote over structured completions from generative.default
+      generative: default
+      samples: 5
 ```
 
 The logical name `default` is used when application code does not pass an explicit `model` option. Calling a logical name that is not configured throws an error.

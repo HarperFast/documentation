@@ -33,7 +33,7 @@ A call to the `default` model tries `openai` first; if it fails, the call falls 
 
 A call can require capabilities of the backend it lands on. The router keeps only the candidates whose `capabilities()` satisfy the requirement, in group order.
 
-- **`opts.requires`** — an explicit list of capabilities (`embed`, `generate`, `stream`, `tools`, `adapters`).
+- **`opts.requires`** — an explicit list of capabilities (`embed`, `generate`, `stream`, `tools`, `adapters`, `decide`, `calibrated`). For example, `models.decide(state, schema, { requires: ['calibrated'] })` routes to a decision backend that reports calibrated probabilities.
 - **Tools auto-require `tools`** — a `generate()` call whose input carries a `tools` array routes to a tools-capable candidate in the group instead of erroring on a backend that can't do tools.
 
 ```javascript
@@ -51,7 +51,7 @@ If no candidate in the group satisfies the required capabilities, the call throw
 
 ## Fallback on error
 
-When a candidate fails, `embed` / `generate` record the attempt and try the next candidate. Every attempt — success or failure — is written to [model-call analytics](./analytics), so a fallthrough is observable.
+When a candidate fails, `embed` / `generate` / `decide` record the attempt and try the next candidate. Every attempt — success or failure — is written to [model-call analytics](./analytics), so a fallthrough is observable.
 
 - **Any backend error falls through** to the next candidate — the facade's default is to fall back on any error. Candidates are heterogeneous (a limit or input error on one backend may succeed on another with different constraints), so _filtering_ which errors should skip the fallback is a router or caller policy, not something the facade decides.
 - **A caller abort short-circuits.** If the call's `signal` is already aborted, the loop stops and surfaces the abort rather than spending another backend call.
@@ -71,7 +71,7 @@ interface ModelRouter {
 }
 
 interface RouteRequest {
-	kind: 'embedding' | 'generative';
+	kind: 'embedding' | 'generative' | 'decision';
 	logicalName: string; // from opts.model; defaults to 'default'
 	requires: Capability[]; // capabilities the chosen backend must satisfy
 	hints?: Record<string, unknown>; // free-form (tenant, prompt size, …) for custom policies

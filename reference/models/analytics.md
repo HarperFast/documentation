@@ -11,7 +11,7 @@ Every model call is recorded for observability and usage accounting, at two leve
 
 ## Per-call log: `hdb_model_calls`
 
-Each `embed()`, `generate()`, and `generateStream()` call writes one row to the `hdb_model_calls` system table — on success and on failure. With `toolMode: 'auto'`, each backend round inside the loop records its own row (the outer loop itself does not add one).
+Each `embed()`, `generate()`, `generateStream()`, and `decide()` call writes one row to the `hdb_model_calls` system table — on success and on failure. With `toolMode: 'auto'`, each backend round inside the loop records its own row (the outer loop itself does not add one). With the [generative decision adapter](./backends#generative-decision-adapter), each vote sample is a `generate` row of its own, and the `decide` row carries the decision's latency but no token counts. A `decide()` call rejected for a malformed schema or state writes no row.
 
 | Field               | Description                                                                                                     |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -19,7 +19,7 @@ Each `embed()`, `generate()`, and `generateStream()` call writes one row to the 
 | `app`               | Resource path of the calling resource, when called from one                                                     |
 | `model`             | Logical model name the caller used                                                                              |
 | `backend`           | Backend that served the call (`ollama`, `openai`, …); `unknown` for pre-dispatch failures                       |
-| `method`            | `embed`, `generate`, or `generateStream`                                                                        |
+| `method`            | `embed`, `generate`, `generateStream`, or `decide`                                                              |
 | `prompt_tokens`     | Prompt token count, when the backend reported usage                                                             |
 | `completion_tokens` | Completion token count, when the backend reported usage                                                         |
 | `embedding_tokens`  | Embedding token count, when the backend reported usage                                                          |
@@ -44,7 +44,7 @@ Query it like any table, for example through the operations API:
 
 Each call also increments Harper's aggregate analytics (visible in `hdb_raw_analytics` alongside the other [analytics metrics](../analytics/overview)):
 
-- `model-embed`, `model-generate`, `model-generateStream` — call counts
-- `model-embed-tokens`, `model-generate-tokens`, `model-generateStream-tokens` — token totals
+- `model-embed`, `model-generate`, `model-generateStream`, `model-decide` — call counts
+- `model-embed-tokens`, `model-generate-tokens`, `model-generateStream-tokens`, `model-decide-tokens` — token totals
 
 Metrics are broken down by backend name, so usage can be charted per provider.
