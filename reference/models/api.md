@@ -103,7 +103,7 @@ Errors detected before the call starts (unknown model name, missing capability) 
 
 ## decide()
 
-<VersionBadge version="v5.3.0" /> <VersionBadge type="changed" version="v5.4.0" />
+<VersionBadge version="v5.3.0" />
 
 ```typescript
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
@@ -164,7 +164,7 @@ A malformed schema, or a `state` that is not a string or a JSON-serializable obj
 
 ## getDecision()
 
-<VersionBadge version="v5.4.0" />
+<VersionBadge version="v5.3.0" />
 
 ```typescript
 models.getDecision<T>(id: string): Promise<DecisionRecord<T> | undefined>
@@ -186,7 +186,7 @@ Reads the durable record of a decision: the schema it was asked over (the input 
 
 ## recordOutcome()
 
-<VersionBadge version="v5.4.0" />
+<VersionBadge version="v5.3.0" />
 
 ```typescript
 models.recordOutcome<T>(id: string, outcome: OutcomeReport): Promise<DecisionRecord<T>>
