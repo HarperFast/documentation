@@ -359,6 +359,7 @@ Write semantics:
 - An update that does not touch the source field leaves the vector unchanged.
 - Setting the source field to `null` sets the vector to `null`.
 - Replicated writes and audit-log replays do not re-embed — the vector travels with the record, and only the node that accepted the original write calls the model.
+- <VersionBadge type="changed" version="v5.3.0" /> On a read-only node the embedding is not computed: writes cannot commit there, and a caching table serves a record filled from its source without computing the vector or caching the row.
 
 Multiple `@embed` attributes on one type are computed concurrently.
 

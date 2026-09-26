@@ -7,7 +7,7 @@ title: API
 
 <VersionBadge version="v5.1.0" />
 
-The `models` object exposes four methods. All of them accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error — capability checks run up front, before any request is made.
+The `models` object exposes six methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate stored decisions and take no model options. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
 
 ## embed()
 

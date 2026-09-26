@@ -226,7 +226,7 @@ Custom backends can be added two ways: **registered programmatically** (below), 
 models.defineBackend(spec: DefineBackendSpec): ModelBackend
 ```
 
-A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` / `decide` / `scoreChoices` are supplied; `tools`, `adapters`, and `calibrated` cannot be inferred from method presence, so declare them explicitly.
+A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` / `decide` / `scoreChoices` are supplied; `tools`, `adapters`, `calibrated`, `structuredOutput`, `noMatch`, `calibratedNoMatch` and `maxScoredChoices` cannot be inferred from method presence, so declare them explicitly; a backend that leaves them out is never routed calls that require them.
 
 | Field               | Type       | Default | Description                                                                                                                                                          |
 | ------------------- | ---------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
