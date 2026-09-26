@@ -55,7 +55,7 @@ models:
       model: mistral:7b
   decision:
     default:
-      backend: generative # score generative.default's log-probabilities, or vote over its structured completions
+      backend: generative
       generative: default
       samples: 5
 ```
