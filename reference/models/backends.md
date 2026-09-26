@@ -186,10 +186,10 @@ models:
 
 The backend returns `{ status: 'completed', output, usage? }` where `output` is:
 
-- for a leaf schema, `{ distribution: [{ value, probability }, …], calibrated? }` — one entry for every allowed value, with probabilities that sum to one;
+- for a leaf schema, `{ distribution: [{ value, probability }, …], calibrated?, signature? }` — one entry for every allowed value, with probabilities that sum to one;
 - for an object schema, `{ fields: { [property]: { distribution } } }` — one such distribution per property.
 
-Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too; it must be a most-probable outcome, and on a tie it leads the distribution. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call, for object schemas too. When the caller passed `requires: ['calibrated']` and the output reports `calibrated: false`, that attempt is recorded as a failure after the request and the next candidate is tried.
+Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too; it must be a most-probable outcome, and on a tie it leads the distribution. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call, for object schemas too. When the caller passed `requires: ['calibrated']` and the output reports `calibrated: false`, that attempt is recorded as a failure after the request and the next candidate is tried. An optional `signature` string names the configuration that produced the scores (sampling, scoring method, prompt revision); it is stored with the [decision record](./analytics#durable-decisions) so calibration can be keyed per configuration. The built-in adapter reports its generative logical name, sample count and temperature.
 
 ## Custom backends
 

@@ -29,7 +29,7 @@ Each `embed()`, `generate()`, `generateStream()`, and `decide()` call writes a r
 | `success`           | Whether the call completed                                                                                      |
 | `error_code`        | On failure: `backend_error`, `aborted`, `capability_unsupported`, `backend_not_found`, or `pending_unsupported` |
 
-Rows are buffered in memory and flushed every 10 seconds, or immediately once 1,000 rows accumulate; rows older than 90 days are purged. Buffered rows may be lost on abrupt shutdown — treat the table as operational telemetry, not an audit log.
+Rows are buffered in memory and flushed every 10 seconds, or immediately once 1,000 rows accumulate; rows older than 90 days are purged. Buffered rows may be lost on abrupt shutdown — treat the table as operational telemetry, not an audit log. Decisions themselves are kept durably in [`hdb_model_decisions`](#durable-decisions).
 
 Query it like any table, for example through the operations API:
 
@@ -39,6 +39,25 @@ Query it like any table, for example through the operations API:
 	"database": "system",
 	"table": "hdb_model_calls",
 	"conditions": [{ "search_attribute": "success", "search_type": "equals", "search_value": false }]
+}
+```
+
+## Durable decisions
+
+<VersionBadge version="v5.4.0" />
+
+Every `decide()` call also commits one row to the `hdb_model_decisions` system table before it returns, and each outcome recorded with [`recordOutcome()`](./api#recordoutcome) adds a row to `hdb_model_outcomes`. Unlike the per-call log, these rows are written through the resource API, replicate to every node, and are never buffered or dropped; `Decision.id` is the decision row's key, and its `callId` links back to the `hdb_model_calls` row.
+
+`hdb_model_decisions` holds one immutable row per decision: `id`, `callId`, `at`, `expiresAt`, `tenant`, `app`, `backend`, `model`, `signature`, `configHash`, `schema` (the allowed values, without descriptions), `schemaHash` (of the full schema), `value`, `probability`, `distribution`, `fields`, and `calibrated`. `hdb_model_outcomes` holds one row per recorded fact, keyed `<decision id>/truth` or `<decision id>/action` (with `/<field>` appended for object schemas): `decisionId`, `fact`, `field`, `state`, `at`, and `expiresAt`. The decision's `state` and `instructions` are not stored.
+
+Rows expire 365 days after the decision was made; a recorded outcome carries the same instant and never extends it. Expired rows stop being returned immediately and are removed by a daily scan, so physical removal lags expiry. Both tables can be queried like any other, for example to list the decisions whose truth has been recorded:
+
+```json
+{
+	"operation": "search_by_conditions",
+	"database": "system",
+	"table": "hdb_model_outcomes",
+	"conditions": [{ "search_attribute": "fact", "search_type": "equals", "search_value": "truth" }]
 }
 ```
 
