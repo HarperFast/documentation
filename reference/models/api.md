@@ -106,9 +106,12 @@ Errors detected before the call starts (unknown model name, missing capability) 
 <VersionBadge version="v5.3.0" />
 
 ```typescript
+models.decide<T>(state: DecideInput, schema: DecisionSchema, options: UnrecordedDecideOpts): Promise<UnrecordedDecision<T>>
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
-models.decide<T>(state: DecideInput, schema: DecisionSchema, options: { persist: false } & DecideOpts): Promise<UnrecordedDecision<T>>
+models.decide<T>(state: DecideInput, schema: DecisionSchema, options: PersistChoiceDecideOpts): Promise<Decision<T> | UnrecordedDecision<T>>
 ```
+
+`UnrecordedDecideOpts` is `DecideOpts` with `persist: false`, and `PersistChoiceDecideOpts` is `DecideOpts` with a `persist` known only at run time; `DecideOpts` itself allows only `persist: true`, so an options object that skips the record never reaches the signature that promises an `id`.
 
 Chooses from a closed set of allowed values and returns the chosen value together with a probability distribution over the whole set. Where `generate()` returns open-ended text, `decide()` answers a classification, routing, scoring, moderation, or guardrail question with numbers an application can threshold on. It is served by [decision backends](./backends#decision-backends): a classifier or hosted decision model registered as a custom backend, or the built-in [generative adapter](./backends#generative-decision-adapter), which scores the allowed values from any configured generative model's log-probabilities where the model exposes them and votes over structured completions otherwise.
 
@@ -220,7 +223,7 @@ For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'va
 
 Each fact is stored on its own, so recording the truth never touches a previously recorded action, and reports that set different facts never overwrite each other; concurrent reports of the same fact from two nodes converge to one of them. Repeating a report whose state equals what is stored writes nothing. Reporting a different state for the same fact replaces it, so a correction is one more call; `{ kind: 'unknown' }` retracts a fact. Reports are validated against the stored schema: a `value` must be one of its allowed values, an object schema takes `{ fields }` naming its properties and a leaf schema takes `{ truth, action }`, and a report with no fact is rejected. All of these reject with a `400`.
 
-The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any model call, because a decision that cannot be recorded would return an id that could never be scored.
+The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any model call, because a decision that cannot be recorded would return an id that could never be scored; a call with `persist: false` records nothing and is not affected.
 
 ## registerBackend()
 

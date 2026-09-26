@@ -420,17 +420,15 @@ type Ticket @table {
 ```javascript
 import { models, tables } from 'harper';
 
-export class TicketOutcome extends tables.Ticket {
-	async post(target, data) {
-		// Read through the caller's own permissions: a caller who cannot see the ticket cannot report on it.
-		const ticket = await this.get(target);
-		return models.recordOutcome(ticket.routeDecision, { truth: { kind: 'value', value: data.route } });
-	}
+async function recordRoute(ticketId, route) {
+	const ticket = await tables.Ticket.get(ticketId);
+	if (!ticket?.routeDecision) return undefined;
+	return models.recordOutcome(ticket.routeDecision, { truth: { kind: 'value', value: route } });
 }
 ```
 
 - The `decision` field is written by the directive only. A write that carries it is rejected with a `400` unless the same write carries the source, whose new decision then replaces it; a replicated write or an audit-log replay stores the id it carries. An `x-replicate-from: none` request is not exempt.
-- The id is provenance, not authorization. `recordOutcome` checks only the request's tenant, and a request with no tenant can report on any decision, so the code that records an outcome must authorize the caller for the record and its tenant itself.
+- The id is provenance, not authorization. `recordOutcome` checks only the request's tenant, and a request with no tenant can report on any decision, so the code that records an outcome must authorize the caller for the record and its tenant itself. Code in a resource runs in a trusted context and skips table permissions, so reading the record there authorizes nothing: check that the caller may report on this ticket before calling a function like `recordRoute`.
 - The field holds the latest decision only. A later write that carries the source replaces it, and a `null` source or a delete leaves the previous decision unreferenced; capture the id with the action you take if the outcome arrives later.
 - Association is best effort, not atomic: the decision is committed before the record, so a write that fails after its decision (validation, a conflict, an abort) leaves an unreferenced decision row. Unreferenced rows expire with the 365-day retention, and a record can outlive its decision, in which case `getDecision` returns nothing and `recordOutcome` returns `404`.
 - Decisions replicate separately from records, so on another node a freshly replicated record can name a decision that has not arrived yet; retry on `404`, or record the outcome on the node that made the decision.
