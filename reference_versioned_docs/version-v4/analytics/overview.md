@@ -167,7 +167,7 @@ Harper automatically tracks the following metrics for all services. Applications
 | `bytes-sent`     | node.database | `replication` | `blob`    | bytes | Bytes sent for blob replication                                                      |
 | `bytes-received` | node.database | `replication` | `ingress` | bytes | Bytes received for replication                                                       |
 | `bytes-received` | node.database | `replication` | `blob`    | bytes | Bytes received for blob replication                                                  |
-| `apply-failures` | node.database | `replication` | `ingress` | count | Replicated transactions that failed to apply on this node; their writes were skipped |
+| `apply-failures` | node.database | `replication` | `ingress` | count | Replicated transactions that failed to apply on this node. Their writes are skipped. |
 
 ### Resource Usage Metrics
 
