@@ -162,12 +162,15 @@ else await route(ticket, decision.value);
 
 Only a backend with the `noMatch` capability can serve an opted-in schema, so a call routes past backends that cannot produce the score, and fails with a capability error when none can. A backend that returns no score, or one outside 0 to 1, fails the attempt and the next candidate is tried. The score is a backend estimate, not a calibrated probability, unless the backend also claims `calibratedNoMatch`: an opted-in call reports `calibrated: true` only when both the distribution and the score are calibrated, and `requires: ['calibrated']` on an opted-in schema routes only to such a backend. A schema without the flag is unaffected: it requires nothing new, and no `noMatch` field appears in its result.
 
-| Option         | Type           | Default     | Description                                                                                                                         |
-| -------------- | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `model`        | `string`       | `'default'` | Logical name of a configured [decision model](./overview#configuration)                                                             |
-| `requires`     | `Capability[]` | —           | Capabilities the backend must satisfy, e.g. `['calibrated']`; used by [routing](./routing#capability-routing) to select a candidate |
-| `instructions` | `string`       | —           | Task framing beyond the schema's descriptions, passed to the backend                                                                |
-| `signal`       | `AbortSignal`  | —           | Cancels the call; composed with the backend's configured `requestTimeoutMs`                                                         |
+| Option         | Type           | Default     | Description                                                                                                                                                                          |
+| -------------- | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`        | `string`       | `'default'` | Logical name of a configured [decision model](./overview#configuration)                                                                                                              |
+| `requires`     | `Capability[]` | —           | Capabilities the backend must satisfy, e.g. `['calibrated']`; used by [routing](./routing#capability-routing) to select a candidate                                                  |
+| `instructions` | `string`       | —           | Task framing beyond the schema's descriptions, passed to the backend                                                                                                                 |
+| `signal`       | `AbortSignal`  | —           | Cancels the call; composed with the backend's configured `requestTimeoutMs`                                                                                                          |
+| `persist`      | `boolean`      | `true`      | `false` records nothing: no row is committed to `hdb_model_decisions`, the result has no `id`, and the call works on a read-only node. The call is still logged in `hdb_model_calls` |
+
+With `persist: false` the result is typed `UnrecordedDecision<T>` (a `Decision<T>` without `id`); a `persist` whose value is only known at run time returns either. A non-boolean `persist` is rejected with a `400` before any model is called. The [`@decide` directive](../database/schema#decide) records its decisions only when it names a `decision` field.
 
 ### Decision
 
