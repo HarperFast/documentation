@@ -149,7 +149,7 @@ The set is closed: the distribution is normalized over the allowed values, so an
 
 <VersionBadge version="v5.3.0" />
 
-A leaf with `noMatch: true` gets a second number beside its distribution: `noMatch`, a score from 0 to 1 that the input matches none of the allowed values. The distribution, `value` and `probability` keep their meaning. The closest allowed value is still chosen, so the caller decides what to do with a high score, for example send the input to a person instead of acting on `value`. The two numbers are not a joint distribution: `distribution` is conditional on the input matching one of the values, so multiplying it by `1 - noMatch` does not give a probability unless the backend documents that guarantee.
+A leaf with `noMatch: true` gets a second number beside its distribution: `noMatch`, a score from 0 to 1 that the input matches none of the allowed values. The distribution, `value` and `probability` keep their meaning. The closest allowed value is still chosen, so the caller decides what to do with a high score, for example send the input to a person instead of acting on `value`. The two numbers are not a joint distribution: `distribution` ranks the allowed values as the closest answer whether or not the input matches (the built-in adapter counts every sample's closest value, including samples that said no match), so multiplying it by `1 - noMatch` does not give a probability unless the backend documents that guarantee.
 
 ```javascript
 const decision = await models.decide(ticket.body, {
