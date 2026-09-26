@@ -46,11 +46,11 @@ Query it like any table, for example through the operations API:
 
 <VersionBadge version="v5.4.0" />
 
-Every `decide()` call also commits one row to the `hdb_model_decisions` system table before it returns, and each outcome recorded with [`recordOutcome()`](./api#recordoutcome) adds a row to `hdb_model_outcomes`. Unlike the per-call log, these rows are written through the resource API, replicate to every node, and are never buffered or dropped; `Decision.id` is the decision row's key, and its `callId` links back to the `hdb_model_calls` row.
+Every decision that `decide()` returns has one row in the `hdb_model_decisions` system table, committed before the call returns (a call that rejects writes none), and each fact recorded with [`recordOutcome()`](./api#recordoutcome) has one row in `hdb_model_outcomes`: a repeated identical report writes nothing, and a correction replaces that fact's row. Unlike the per-call log, these rows are written through the resource API, replicate to every node, and are never buffered or dropped; `Decision.id` is the decision row's key, and its `callId` links back to the `hdb_model_calls` row.
 
 `hdb_model_decisions` holds one immutable row per decision: `id`, `callId`, `at`, `expiresAt`, `tenant`, `app`, `backend`, `model`, `signature`, `configHash`, `schema` (the allowed values, without descriptions), `schemaHash` (of the full schema), `value`, `probability`, `distribution`, `fields`, and `calibrated`. `hdb_model_outcomes` holds one row per recorded fact, keyed `<decision id>/truth` or `<decision id>/action` (with `/<field>` appended for object schemas): `decisionId`, `fact`, `field`, `state`, `at`, and `expiresAt`. The decision's `state` and `instructions` are not stored.
 
-Rows expire 365 days after the decision was made; a recorded outcome carries the same instant and never extends it. Expired rows stop being returned immediately and are removed by a daily scan, so physical removal lags expiry. Both tables can be queried like any other, for example to list the decisions whose truth has been recorded:
+Rows expire 365 days after the decision was made; a recorded outcome carries the same instant and never extends it. Expired rows stop being returned immediately and are removed by a daily scan, so physical removal lags expiry. Both tables can be queried like any other, for example to list every recorded truth fact. A retraction is a fact whose `state.kind` is `unknown`, so add a condition on `state` to leave those out:
 
 ```json
 {
