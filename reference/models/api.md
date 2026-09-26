@@ -103,7 +103,7 @@ Errors detected before the call starts (unknown model name, missing capability) 
 
 ## decide()
 
-<VersionBadge version="v5.3.0" />
+<VersionBadge version="v5.3.0" /> <VersionBadge type="changed" version="v5.4.0" />
 
 ```typescript
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
@@ -170,7 +170,7 @@ A malformed schema, or a `state` that is not a string or a JSON-serializable obj
 models.getDecision<T>(id: string): Promise<DecisionRecord<T> | undefined>
 ```
 
-Reads the durable record of a decision: what was asked, what was answered, who answered, and whatever has been recorded about it since. Every `decide()` call commits its record to [`hdb_model_decisions`](./analytics#durable-decisions) before it returns, so a `Decision.id` can be looked up right away on the node that made it, after a restart, and on other nodes once replication has delivered it. Returns `undefined` for an id that does not exist, has expired, or has not reached this node yet.
+Reads the durable record of a decision: the schema it was asked over (the input `state` and `instructions` are not stored), what was answered, who answered, and whatever has been recorded about it since. Every `decide()` call commits its record to [`hdb_model_decisions`](./analytics#durable-decisions) before it returns, so a `Decision.id` can be looked up right away on the node that made it, after a restart, and on other nodes once replication has delivered it. Returns `undefined` for an id that does not exist, has expired, or has not reached this node yet.
 
 | Field                                                          | Description                                                                                                                                                        |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -214,9 +214,9 @@ await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund
 
 For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'value', value: 'refund' } }, urgent: { action: { kind: 'abstained' } } } }`. Each field's facts are recorded and read independently.
 
-Each fact is stored on its own, so recording the truth never touches a previously recorded action, and two reports arriving on two nodes cannot overwrite each other. Repeating a report whose state equals what is stored writes nothing. Reporting a different state for the same fact replaces it, so a correction is one more call; `{ kind: 'unknown' }` retracts a fact. Reports are validated against the stored schema: a `value` must be one of its allowed values, an object schema takes `{ fields }` naming its properties and a leaf schema takes `{ truth, action }`, and a report with no fact is rejected. All of these reject with a `400`.
+Each fact is stored on its own, so recording the truth never touches a previously recorded action, and reports that set different facts never overwrite each other; concurrent reports of the same fact from two nodes converge to one of them. Repeating a report whose state equals what is stored writes nothing. Reporting a different state for the same fact replaces it, so a correction is one more call; `{ kind: 'unknown' }` retracts a fact. Reports are validated against the stored schema: a `value` must be one of its allowed values, an object schema takes `{ fields }` naming its properties and a leaf schema takes `{ truth, action }`, and a report with no fact is rejected. All of these reject with a `400`.
 
-The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node both `decide()` and `recordOutcome()` reject with a `503` before any model call or write, because a decision that cannot be recorded would return an id that could never be scored.
+The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any model call, because a decision that cannot be recorded would return an id that could never be scored.
 
 ## registerBackend()
 
@@ -233,7 +233,7 @@ Registers a custom backend under a logical name, selectable by the `model` optio
 - An unconfigured logical model name throws a not-found error. The error names the missing logical name only — it does not enumerate configured names.
 - A capability mismatch (embedding call to a generation-only backend, tool declarations against a backend without tool support, `requires: ['calibrated']` against an uncalibrated decision backend) throws before any request is made. A decision backend that reports a single call as uncalibrated when `calibrated` was required fails that attempt after the request, and the next candidate is tried.
 - A malformed decision schema or state rejects with a `400` error before any request is made, and is not recorded.
-- On a read-only node, `decide()` and `recordOutcome()` reject with a `503` before any request or write is made, because a decision that cannot be recorded would return an id that could never be scored. A `decide()` whose record cannot be committed after the backend answered rejects with a `500` without trying another candidate.
+- On a read-only node, `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any request is made, because a decision that cannot be recorded would return an id that could never be scored. A `decide()` whose record cannot be committed after the backend answered rejects with a `500` without trying another candidate.
 - `recordOutcome()` rejects with a `404` for an id that does not exist, has expired, or has not replicated to this node yet, and with a `400` for a report that does not fit the stored schema.
 - Each backend supports a `requestTimeoutMs` configuration field; when set, it is composed with any caller-provided `signal` so whichever fires first cancels the request.
 - Backend/network failures throw backend-specific errors with sanitized messages.

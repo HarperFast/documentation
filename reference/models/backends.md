@@ -169,7 +169,7 @@ Each sample flows through `models.generate()`, so it is routed, recorded, and bi
 
 ## Decision backends
 
-<VersionBadge version="v5.3.0" />
+<VersionBadge version="v5.3.0" /> <VersionBadge type="changed" version="v5.4.0" />
 
 A `decision` backend implements `decide(state, schema, opts)` and returns the distribution over the schema's allowed values. Fine-tuned classifiers, zero-shot NLI models, cross-encoders, and hosted decision models fit this shape without pretending to be a `generative` backend. Register one programmatically with [`defineBackend()`](#definebackend) and [`registerBackend('decision', …)`](#registerbackend), or select it from `models.decision` config as a [config-selectable backend](#config-selectable-backends):
 
