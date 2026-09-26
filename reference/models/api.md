@@ -148,19 +148,75 @@ The set is closed: the distribution is normalized over the allowed values, so an
 
 ### Decision
 
-| Field          | Type                                                   | Description                                                                                                                                                                                    |
-| -------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`           | `string`                                               | Id of this call's row in [`hdb_model_calls`](./analytics). Rows are buffered before they are written, so treat it as a best-effort correlation key, not a durable reference                    |
-| `value`        | `T`                                                    | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                                            |
-| `probability`  | `number`                                               | Probability of `value` (leaf schemas only)                                                                                                                                                     |
-| `distribution` | `{ value, probability }[]`                             | One entry per allowed value, sorted by descending probability; ties keep the schema's order unless the backend chose one of the tied values, which then leads (leaf schemas only)              |
-| `fields`       | `Record<string, { value, probability, distribution }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                                     |
-| `calibrated`   | `boolean`                                              | Whether the backend reports its probabilities as calibrated. The generative adapter's are not (`false`), whether scored from log-probabilities or counted from votes                           |
-| `usage`        | `TokenUsage`                                           | Usage reported by the backend, when available. The generative adapter reports none, because each of its scoring calls or vote samples is recorded as its own `scoreChoices` or `generate` call |
+| Field          | Type                                                   | Description                                                                                                                                                                                             |
+| -------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | `string`                                               | Cluster-unique id of the decision's durable record in [`hdb_model_decisions`](./analytics#durable-decisions), committed before the decision is returned; pass it to [`recordOutcome()`](#recordoutcome) |
+| `value`        | `T`                                                    | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                                                     |
+| `probability`  | `number`                                               | Probability of `value` (leaf schemas only)                                                                                                                                                              |
+| `distribution` | `{ value, probability }[]`                             | One entry per allowed value, sorted by descending probability; ties keep the schema's order unless the backend chose one of the tied values, which then leads (leaf schemas only)                       |
+| `fields`       | `Record<string, { value, probability, distribution }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                                              |
+| `calibrated`   | `boolean`                                              | Whether the backend reports its probabilities as calibrated. The generative adapter's are not (`false`), whether scored from log-probabilities or counted from votes                                    |
+| `usage`        | `TokenUsage`                                           | Usage reported by the backend, when available. The generative adapter reports none, because each of its scoring calls or vote samples is recorded as its own `scoreChoices` or `generate` call          |
 
 Harper validates every backend's output against the schema before returning it: `value` and every distribution entry must be allowed values, the distribution must be complete and sum to one, and `value` must be a most-probable outcome. A backend that violates this is treated like a failed backend — the attempt is recorded and the next candidate in the [fallback group](./routing#fallback-groups) is tried.
 
 A malformed schema, or a `state` that is not a string or a JSON-serializable object, rejects with a `400` error before any backend is chosen, and writes no analytics row.
+
+## getDecision()
+
+<VersionBadge version="v5.4.0" />
+
+```typescript
+models.getDecision<T>(id: string): Promise<DecisionRecord<T> | undefined>
+```
+
+Reads the durable record of a decision: what was asked, what was answered, who answered, and whatever has been recorded about it since. Every `decide()` call commits its record to [`hdb_model_decisions`](./analytics#durable-decisions) before it returns, so a `Decision.id` can be looked up right away on the node that made it, after a restart, and on other nodes once replication has delivered it. Returns `undefined` for an id that does not exist, has expired, or has not reached this node yet.
+
+| Field                                                          | Description                                                                                                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`, `at`, `expiresAt`                                        | The decision's id, when it was made, and when its record and facts expire (365 days after `at`; a recorded outcome never extends it)                               |
+| `callId`                                                       | The [`hdb_model_calls`](./analytics#per-call-log-hdb_model_calls) row of the call that produced it, for correlation                                                |
+| `tenant`, `app`                                                | The tenant and calling resource, when the call carried them                                                                                                        |
+| `backend`, `model`, `signature`, `configHash`                  | Who answered: the backend, the logical model name, the backend's scoring configuration when it reports one, and the identity of the `models` config block in force |
+| `schema`, `schemaHash`                                         | The allowed values the decision was made over (descriptions removed), and the hash of the full schema including descriptions                                       |
+| `value`, `probability`, `distribution`, `fields`, `calibrated` | The [`Decision`](#decision) as it was returned                                                                                                                     |
+| `outcome`                                                      | What has been recorded since: `{ truth?, action?, truthAt?, actionAt? }` for a leaf schema, or `{ fields: { <name>: { … } } }` for an object schema                |
+
+`getDecision()` and `recordOutcome()` are administrative, in-process methods with one built-in guard: when the calling request carries a tenant and the record carries a different one, both behave as if the record did not exist. Beyond that they perform no permission check, like every other `models` method; an application that exposes them to its users authorizes the caller first.
+
+## recordOutcome()
+
+<VersionBadge version="v5.4.0" />
+
+```typescript
+models.recordOutcome<T>(id: string, outcome: OutcomeReport): Promise<DecisionRecord<T>>
+```
+
+Records what actually happened for a decision, so later calibration can score predictions against observed truth. A report carries one or two facts, each a tagged state rather than a bare value, so a label that happens to be called `'unknown'` is never mistaken for missing information:
+
+| Fact     | States                                                                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `truth`  | `{ kind: 'value', value }` (an allowed value of the schema), `{ kind: 'noMatch' }` (the input matched none of them), `{ kind: 'unknown' }`                              |
+| `action` | `{ kind: 'value', value }` (the value acted on), `{ kind: 'noMatch' }` (routed as no match), `{ kind: 'abstained' }` (sent to a human by policy), `{ kind: 'unknown' }` |
+
+```javascript
+const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] });
+if (decision.probability >= 0.7) {
+	await route(ticket, decision.value);
+	await models.recordOutcome(decision.id, { action: { kind: 'value', value: decision.value } });
+} else {
+	await sendToHuman(ticket);
+	await models.recordOutcome(decision.id, { action: { kind: 'abstained' } });
+}
+// Later, when the human's answer is known:
+await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
+```
+
+For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'value', value: 'refund' } }, urgent: { action: { kind: 'abstained' } } } }`. Each field's facts are recorded and read independently.
+
+Each fact is stored on its own, so recording the truth never touches a previously recorded action, and two reports arriving on two nodes cannot overwrite each other. Repeating a report whose state equals what is stored writes nothing. Reporting a different state for the same fact replaces it, so a correction is one more call; `{ kind: 'unknown' }` retracts a fact. Reports are validated against the stored schema: a `value` must be one of its allowed values, an object schema takes `{ fields }` naming its properties and a leaf schema takes `{ truth, action }`, and a report with no fact is rejected. All of these reject with a `400`.
+
+The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node both `decide()` and `recordOutcome()` reject with a `503` before any model call or write, because a decision that cannot be recorded would return an id that could never be scored.
 
 ## registerBackend()
 
@@ -177,6 +233,8 @@ Registers a custom backend under a logical name, selectable by the `model` optio
 - An unconfigured logical model name throws a not-found error. The error names the missing logical name only — it does not enumerate configured names.
 - A capability mismatch (embedding call to a generation-only backend, tool declarations against a backend without tool support, `requires: ['calibrated']` against an uncalibrated decision backend) throws before any request is made. A decision backend that reports a single call as uncalibrated when `calibrated` was required fails that attempt after the request, and the next candidate is tried.
 - A malformed decision schema or state rejects with a `400` error before any request is made, and is not recorded.
+- On a read-only node, `decide()` and `recordOutcome()` reject with a `503` before any request or write is made, because a decision that cannot be recorded would return an id that could never be scored. A `decide()` whose record cannot be committed after the backend answered rejects with a `500` without trying another candidate.
+- `recordOutcome()` rejects with a `404` for an id that does not exist, has expired, or has not replicated to this node yet, and with a `400` for a report that does not fit the stored schema.
 - Each backend supports a `requestTimeoutMs` configuration field; when set, it is composed with any caller-provided `signal` so whichever fires first cancels the request.
 - Backend/network failures throw backend-specific errors with sanitized messages.
 
