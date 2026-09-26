@@ -182,7 +182,7 @@ Reads the durable record of a decision: the schema it was asked over (the input 
 | `value`, `probability`, `distribution`, `fields`, `calibrated`    | The [`Decision`](#decision) as it was returned                                                                                                                                                                                                                                                                                                                  |
 | `outcome`                                                         | What has been recorded since: `{ truth?, action?, truthAt?, actionAt? }` for a leaf schema, or `{ fields: { <name>: { … } } }` for an object schema                                                                                                                                                                                                             |
 
-`getDecision()` and `recordOutcome()` are administrative, in-process methods with one built-in guard: when the calling request carries a tenant and the record carries a different one, both behave as if the record did not exist. Beyond that they perform no permission check, like every other `models` method; an application that exposes them to its users authorizes the caller first.
+`getDecision()` and `recordOutcome()` are administrative, in-process methods with one built-in guard: when the calling request carries a tenant and the record carries a different one, both behave as if the record did not exist. Beyond that they perform no permission check, like every other `models` method. An application that exposes them to its users must authorize the caller first.
 
 ## recordOutcome()
 

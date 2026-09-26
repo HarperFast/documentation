@@ -67,7 +67,7 @@ Rows expire 365 days after the decision was made; a recorded outcome carries the
 
 Each call also increments Harper's aggregate analytics (visible in `hdb_raw_analytics` alongside the other [analytics metrics](../analytics/overview)):
 
-- `model-embed`, `model-generate`, `model-generateStream`, `model-decide`, `model-scoreChoices` — call counts
-- `model-embed-tokens`, `model-generate-tokens`, `model-generateStream-tokens`, `model-decide-tokens`, `model-scoreChoices-tokens` — token totals
+- `model-embed`, `model-generate`, `model-generateStream`, `model-decide`, `model-scoreChoices`: call counts
+- `model-embed-tokens`, `model-generate-tokens`, `model-generateStream-tokens`, `model-decide-tokens`, `model-scoreChoices-tokens`: token totals
 
 Metrics are broken down by backend name, so usage can be charted per provider. Call counts count successful calls; token totals also include the tokens a failed attempt reported, such as a scoring call the backend declined after the completion was billed.

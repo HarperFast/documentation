@@ -35,7 +35,7 @@ A call to the `default` model tries `openai` first; if it fails, the call falls 
 
 A call can require capabilities of the backend it lands on. The router keeps only the candidates whose `capabilities()` satisfy the requirement, in group order.
 
-- **`opts.requires`** — an explicit list of capabilities (`embed`, `generate`, `stream`, `tools`, `adapters`, `decide`, `calibrated`, `scoreChoices`, `structuredOutput`). For example, `models.decide(state, schema, { requires: ['calibrated'] })` routes to a decision backend that reports calibrated probabilities, and the [generative decision adapter](./backends#generative-decision-adapter) routes its scoring calls on `scoreChoices`.
+- **`opts.requires`**: an explicit list of capabilities (`embed`, `generate`, `stream`, `tools`, `adapters`, `decide`, `calibrated`, `scoreChoices`, `structuredOutput`). For example, `models.decide(state, schema, { requires: ['calibrated'] })` routes to a decision backend that reports calibrated probabilities, and the [generative decision adapter](./backends#generative-decision-adapter) routes its scoring calls on `scoreChoices`.
 - **Tools auto-require `tools`** — a `generate()` call whose input carries a `tools` array routes to a tools-capable candidate in the group instead of erroring on a backend that can't do tools.
 
 ```javascript

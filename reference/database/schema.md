@@ -348,8 +348,8 @@ type Document @table {
 }
 ```
 
-- `source` — the name of the field to embed. Must be a declared field on the same type, passed as a string literal.
-- `model` — the logical name of a configured embedding model, passed as a string literal.
+- `source`: the name of the field to embed. Must be a declared field on the same type, passed as a string literal.
+- `model`: the logical name of a configured embedding model, passed as a string literal.
 
 The attribute type must be `[Float]`. The attribute is automatically indexed with an [HNSW vector index](#vector-indexing), so it is immediately searchable by similarity; an explicit `@indexed` on the same attribute is allowed only if it is also HNSW.
 
@@ -379,12 +379,12 @@ type Ticket @table {
 }
 ```
 
-- `source` — the name of the field to decide about. Must be a declared field on the same type, passed as a string literal. A string is passed to the model as text; an object is passed as program state.
-- `values` — the allowed strings, for a `String` attribute: 2 to 255 distinct values, passed as a list of string literals.
-- `minimum`, `maximum` — the inclusive range, for an `Int` attribute: at most 255 values, passed as integer literals.
-- `model` — the logical name of a configured decision model, passed as a string literal. Defaults to `"default"`.
-- `confidence` — the name of a nullable `Float` field on the same type that receives the probability of the chosen value. Optional.
-- `instructions` — task framing sent to the model with every decision, passed as a string literal. Optional.
+- `source`: the name of the field to decide about. Must be a declared field on the same type, passed as a string literal. A string is passed to the model as text; an object is passed as program state.
+- `values`: the allowed strings, for a `String` attribute: 2 to 255 distinct values, passed as a list of string literals.
+- `minimum`, `maximum`: the inclusive range, for an `Int` attribute: at most 255 values, passed as integer literals.
+- `model`: the logical name of a configured decision model, passed as a string literal. Defaults to `"default"`.
+- `confidence`: the name of a nullable `Float` field on the same type that receives the probability of the chosen value. Optional.
+- `instructions`: task framing sent to the model with every decision, passed as a string literal. Optional.
 
 The attribute type selects the [decision schema](../models/api#decision-schemas): `String` with `values` is an enum, `Boolean` takes no further arguments, and `Int` with `minimum` and `maximum` is a bounded integer. Other attribute types are rejected. The attribute and the confidence field must be nullable, because a `null` source clears them, and neither can be the primary key or `@computed`. The closed set is validated when the schema loads, so a bad `values` list fails deployment rather than the first write. The attribute is not indexed implicitly: add `@indexed` to query by the value, and index the confidence field to query by probability, as above.
 
