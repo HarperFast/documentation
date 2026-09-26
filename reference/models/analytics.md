@@ -50,7 +50,7 @@ Every decision that `decide()` returns has one row in the `hdb_model_decisions` 
 
 `hdb_model_decisions` holds one immutable row per decision: `id`, `callId`, `at`, `expiresAt`, `tenant`, `app`, `backend`, `model`, `signature`, `configHash`, `schema` (the allowed values, without descriptions), `schemaHash` (of the full schema), `value`, `probability`, `distribution`, `fields`, and `calibrated`. `hdb_model_outcomes` holds one row per recorded fact, keyed `<decision id>/truth` or `<decision id>/action` (with `/<field>` appended for object schemas): `decisionId`, `fact`, `field`, `state`, `at`, and `expiresAt`. The decision's `state` and `instructions` are not stored.
 
-Rows expire 365 days after the decision was made; a recorded outcome carries the same instant and never extends it. Expired rows stop being returned immediately and are removed by a daily scan, so physical removal lags expiry. Both tables can be queried like any other. This example lists every recorded truth fact, retractions included (a retraction is a truth fact whose `state.kind` is `unknown`):
+Rows expire 365 days after the decision was made; a recorded outcome carries the same instant and never extends it. Expired rows stop being returned immediately and are removed by the table's expiry pruner shortly afterwards. Both tables can be queried like any other. This example lists every recorded truth fact, retractions included (a retraction is a truth fact whose `state.kind` is `unknown`):
 
 ```json
 {
