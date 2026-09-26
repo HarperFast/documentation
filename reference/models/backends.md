@@ -151,21 +151,27 @@ models:
   decision:
     default:
       backend: generative
-      generative: default # the generative logical name to sample
+      generative: default # the generative logical name to score or sample
+      scoring: auto # score from log-probabilities when the backend can, vote otherwise
       samples: 5
 ```
 
-| Field              | Default     | Description                                                                                                                                     |
-| ------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `generative`       | `'default'` | Logical name of the generative model to sample, resolved at call time — a reload of that entry is picked up without touching the decision entry |
-| `samples`          | `5`         | Completions per decision, 1 to 25, validated at startup. The distribution is the vote frequency, so `samples` sets its granularity              |
-| `concurrency`      | `5`         | Completions in flight at once, 1 to 25, never more than `samples`                                                                               |
-| `temperature`      | backend     | Sampling temperature passed to every sample; higher values spread the votes                                                                     |
-| `requestTimeoutMs` | —           | Budget for the whole decision, composed with the caller's `AbortSignal`                                                                         |
+| Field              | Default     | Description                                                                                                                                                                                   |
+| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generative`       | `'default'` | Logical name of the generative model to score or sample, resolved at call time — a reload of that entry is picked up without touching the decision entry                                      |
+| `scoring`          | `'auto'`    | `auto` scores from the generative backend's log-probabilities when it implements [`scoreChoices`](#scoring-generative-backends) and votes otherwise; `score` never votes; `vote` never scores |
+| `samples`          | `5`         | Completions per voted decision, 1 to 25, validated at startup. A voted distribution is the vote frequency, so `samples` sets its granularity                                                  |
+| `concurrency`      | `5`         | Completions or scoring calls in flight at once, 1 to 25                                                                                                                                       |
+| `temperature`      | backend     | Sampling temperature passed to every vote sample; higher values spread the votes. Not sent when scoring                                                                                       |
+| `requestTimeoutMs` | —           | Budget for the whole decision, composed with the caller's `AbortSignal`                                                                                                                       |
 
-For each call the adapter translates the decision schema into a JSON Schema, asks the generative model for `samples` completions with `responseFormat: { schema }`, parses each one, and reports each allowed value's share of the votes as its probability — including zero for values that received none. The state is part of every sample's prompt, so a decision costs `samples` times its tokens. `calibrated` is always `false`: vote frequencies are a sampling estimate, not a calibrated probability. The adapter works best on a backend that enforces `responseFormat: { schema }` ([OpenAI](#openai) and [Ollama](#ollama) do). [Anthropic](#anthropic) and [Amazon Bedrock](#amazon-bedrock) ignore `responseFormat`, so their samples rely on the prompt alone. The adapter tolerates a code fence or brace-free prose around the JSON object, and ignores extra properties. A sample whose required values are missing or outside the allowed set fails the whole decision rather than being dropped from the vote. Any samples still in flight are cancelled first.
+With `scoring: auto`, the adapter first asks whether the `generative` logical name routes to a backend that implements `scoreChoices`: [OpenAI](#openai) does, from chat `logprobs`; [Ollama](#ollama), [Anthropic](#anthropic), and [Amazon Bedrock](#amazon-bedrock) do not, and a [custom backend](#scoring-generative-backends) may. If it does, each leaf of the schema — each field of an object schema — is scored in one call: the backend returns a log-likelihood for every allowed value and the adapter normalizes them into the distribution, so the probabilities are finer than vote counts and a decision costs one call per leaf rather than `samples` completions. If the backend declines a call — OpenAI does for more than 20 allowed values in a leaf, for a model that rejects `logprobs`, and when the model's answer is not one of the labels — the adapter discards any leaf it had already scored and votes the whole decision under the same budget; a decision is never part scored, part voted, and the [analytics](./analytics) rows show which path ran. `scoring: score` fails the decision instead of voting, and `scoring: vote` never scores, which restores the earlier behavior for a configuration that now scores. `calibrated` is always `false` on either path: scores and vote frequencies are estimates, not calibrated probabilities.
 
-Each sample flows through `models.generate()`, so it is routed, recorded, and billed as a `generate` call of its own; the `decide` row in [analytics](./analytics) carries the decision's latency but no token counts, so tokens are never counted twice.
+The OpenAI backend lists the allowed values under the labels `A` to `T`, asks for one token with `top_logprobs: 20`, and scores each label from the alternatives returned for that token, combining spellings of the same letter. A label absent from the alternatives is scored at the smallest log-probability the provider reported — an upper bound, not a measurement. A 400 that names `logprobs` switches scoring off for that model until the configuration reloads, so a reasoning model that rejects log-probabilities does not pay a refused request before every vote.
+
+When voting, the adapter translates the decision schema into a JSON Schema, asks the generative model for `samples` completions with `responseFormat: { schema }`, parses each one, and reports each allowed value's share of the votes as its probability — including zero for values that received none. The state is part of every sample's prompt, so a decision costs `samples` times its tokens. The adapter works best on a backend that enforces `responseFormat: { schema }` ([OpenAI](#openai) and [Ollama](#ollama) do). [Anthropic](#anthropic) and [Amazon Bedrock](#amazon-bedrock) ignore `responseFormat`, so their samples rely on the prompt alone. The adapter tolerates a code fence or brace-free prose around the JSON object, and ignores extra properties. A sample whose required values are missing or outside the allowed set fails the whole decision rather than being dropped from the vote. Any samples still in flight are cancelled first.
+
+Each vote sample flows through `models.generate()` and each scoring call through the same routing as a `generate` call, so each is routed, recorded, and billed as a call of its own — a `generate` or a `scoreChoices` row in [analytics](./analytics); the `decide` row carries the decision's latency but no token counts, so tokens are never counted twice.
 
 ## Decision backends
 
@@ -191,6 +197,12 @@ The backend returns `{ status: 'completed', output, usage? }` where `output` is:
 
 Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too; it must be a most-probable outcome, and on a tie it leads the distribution. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call, for object schemas too. When the caller passed `requires: ['calibrated']` and the output reports `calibrated: false`, that attempt is recorded as a failure after the request and the next candidate is tried.
 
+## Scoring generative backends
+
+<VersionBadge version="v5.3.0" />
+
+A `generative` backend may also implement `scoreChoices(input, choices, opts)`, which the [generative decision adapter](#generative-decision-adapter) uses to score a decision from the model's own likelihoods instead of voting. `input` is the decision prompt in the shape `generate` takes, `choices` is a leaf's allowed values as strings in schema order, and `opts` carries the caller's `signal` and accounting context. It returns `{ status: 'completed', output: { logLikelihoods }, usage? }` with one finite, unnormalized log-likelihood per choice in the same order; Harper normalizes them. For a call the backend cannot score, throw an error whose `name` is `'ChoiceScoringUnsupportedError'`, with a `usage` property when the attempt consumed tokens: the adapter votes instead under `scoring: auto`, and the attempt is recorded as `scoring_unsupported` with those tokens. Any other error is a failure, and the next candidate in the [fallback group](./routing#fallback-groups) is tried. A backend built with [`defineBackend()`](#definebackend) derives the `scoreChoices` capability from the method's presence; a hand-written backend declares it in `capabilities()`.
+
 ## Custom backends
 
 <VersionBadge version="v5.1.15" />
@@ -207,18 +219,19 @@ Custom backends can be added two ways: **registered programmatically** (below), 
 models.defineBackend(spec: DefineBackendSpec): ModelBackend
 ```
 
-A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` / `decide` are supplied; `tools`, `adapters`, and `calibrated` cannot be inferred from method presence, so declare them explicitly.
+A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.defineBackend(...)`). Builds a `ModelBackend` from the methods it implements. `capabilities()` is derived from which of `embed` / `generate` / `generateStream` / `decide` / `scoreChoices` are supplied; `tools`, `adapters`, and `calibrated` cannot be inferred from method presence, so declare them explicitly.
 
-| Field            | Type       | Default | Description                                                                                                        |
-| ---------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| `name`           | `string`   | —       | Backend name, used in analytics and error messages (required)                                                      |
-| `embed`          | `function` | —       | `embed(input, opts)` implementation, if the backend embeds                                                         |
-| `generate`       | `function` | —       | `generate(input, opts)` implementation, if the backend generates                                                   |
-| `generateStream` | `function` | —       | `generateStream(input, opts)` implementation, if the backend streams                                               |
-| `decide`         | `function` | —       | `decide(state, schema, opts)` implementation, if the backend decides — see [Decision backends](#decision-backends) |
-| `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                                                                             |
-| `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection                                                            |
-| `calibrated`     | `boolean`  | `false` | Whether the probabilities `decide` returns are calibrated; selectable with `requires: ['calibrated']`              |
+| Field            | Type       | Default | Description                                                                                                                                                          |
+| ---------------- | ---------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`           | `string`   | —       | Backend name, used in analytics and error messages (required)                                                                                                        |
+| `embed`          | `function` | —       | `embed(input, opts)` implementation, if the backend embeds                                                                                                           |
+| `generate`       | `function` | —       | `generate(input, opts)` implementation, if the backend generates                                                                                                     |
+| `generateStream` | `function` | —       | `generateStream(input, opts)` implementation, if the backend streams                                                                                                 |
+| `decide`         | `function` | —       | `decide(state, schema, opts)` implementation, if the backend decides — see [Decision backends](#decision-backends)                                                   |
+| `scoreChoices`   | `function` | —       | `scoreChoices(input, choices, opts)` implementation, if the backend scores closed-set alternatives — see [Scoring generative backends](#scoring-generative-backends) |
+| `tools`          | `boolean`  | `false` | Whether `generate` supports tool calls                                                                                                                               |
+| `adapters`       | `boolean`  | `false` | Whether the backend supports per-call adapter selection                                                                                                              |
+| `calibrated`     | `boolean`  | `false` | Whether the probabilities `decide` returns are calibrated; selectable with `requires: ['calibrated']`                                                                |
 
 `embed`, `generate`, and `decide` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed`, `{ content, finishReason }` for `generate`, and a distribution (or per-field distributions) for `decide`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied. A backend that supplies only `generateStream` still satisfies `generate()`: Harper drains the stream into a single result.
 
