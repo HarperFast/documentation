@@ -151,7 +151,7 @@ models:
   decision:
     default:
       backend: generative
-      generative: default # the generative logical name to score or sample
+      generative: default
       scoring: auto
       samples: 5
 ```
