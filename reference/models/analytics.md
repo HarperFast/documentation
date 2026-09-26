@@ -11,7 +11,9 @@ Every model call is recorded for observability and usage accounting, at two leve
 
 ## Per-call log: `hdb_model_calls`
 
-Each `embed()`, `generate()`, `generateStream()`, and `decide()` call writes one row to the `hdb_model_calls` system table — on success and on failure. With `toolMode: 'auto'`, each backend round inside the loop records its own row (the outer loop itself does not add one). With the [generative decision adapter](./backends#generative-decision-adapter), each vote sample is a `generate` row of its own, and the `decide` row carries the decision's latency but no token counts. A `decide()` call rejected for a malformed schema or state writes no row.
+<VersionBadge type="changed" version="v5.3.0" />
+
+Each `embed()`, `generate()`, `generateStream()`, and `decide()` call writes a row to the `hdb_model_calls` system table for every attempt — on success, on failure, and for each fallback candidate it tries. With `toolMode: 'auto'`, each backend round inside the loop records its own row (the outer loop itself does not add one). With the [generative decision adapter](./backends#generative-decision-adapter), each vote sample is a `generate` row of its own, and the `decide` row carries the decision's latency but no token counts. A `decide()` call rejected for a malformed schema or state writes no row.
 
 | Field               | Description                                                                                                     |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -41,6 +43,8 @@ Query it like any table, for example through the operations API:
 ```
 
 ## Aggregate metrics
+
+<VersionBadge type="changed" version="v5.3.0" />
 
 Each call also increments Harper's aggregate analytics (visible in `hdb_raw_analytics` alongside the other [analytics metrics](../analytics/overview)):
 

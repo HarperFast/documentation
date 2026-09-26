@@ -128,14 +128,14 @@ if (decision.probability < 0.7) await sendToHuman(ticket, decision);
 
 A schema is one **leaf**, or a one-level **object** of named leaves. Every leaf is a small closed set, so that every backend family — classifiers, cross-encoders, hosted decision models, and language models — can score it:
 
-| Leaf            | Shape                                                            | Allowed values                                                                                          |
+| Kind            | Shape                                                            | Allowed values                                                                                          |
 | --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Enum            | `{ enum: [...], description? }`                                  | 2 to 255 distinct values of one type (all strings, all numbers, or all booleans), in the declared order |
 | Boolean         | `{ type: 'boolean', description? }`                              | `false`, `true`                                                                                         |
 | Bounded integer | `{ type: 'integer', minimum, maximum, description? }`            | Every integer from `minimum` to `maximum`, at most 255 values                                           |
 | Object          | `{ type: 'object', properties: { [name]: leaf }, description? }` | One decision per property; at most 32 properties and 500 allowed values across all of them              |
 
-Deeper nesting, arrays, and free-text extraction are deliberately unsupported: they would split backends into those that can and those that cannot. Descriptions are passed to the backend as task framing; `options.instructions` adds framing beyond the schema itself.
+Deeper nesting, arrays, and free-text extraction are deliberately unsupported: they would split backends into those that can and those that cannot. Object properties are leaves only, and an empty property name or one of `__proto__`, `constructor` and `prototype` is rejected. Descriptions are passed to the backend as task framing; `options.instructions` adds framing beyond the schema itself.
 
 The set is closed: the distribution is normalized over the allowed values, so an input that matches none of them still produces a confident-looking answer. When "none of these" is a real outcome, make it an explicit value (`'other'`, `'unknown'`) and threshold on `probability`.
 
@@ -148,15 +148,15 @@ The set is closed: the distribution is normalized over the allowed values, so an
 
 ### Decision
 
-| Field          | Type                                                   | Description                                                                                                                                                                 |
-| -------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`           | `string`                                               | Id of this call's row in [`hdb_model_calls`](./analytics). Rows are buffered before they are written, so treat it as a best-effort correlation key, not a durable reference |
-| `value`        | `T`                                                    | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                         |
-| `probability`  | `number`                                               | Probability of `value` (leaf schemas only)                                                                                                                                  |
-| `distribution` | `{ value, probability }[]`                             | One entry per allowed value, sorted by descending probability; ties keep the schema's order (leaf schemas only)                                                             |
-| `fields`       | `Record<string, { value, probability, distribution }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                  |
-| `calibrated`   | `boolean`                                              | Whether the backend reports its probabilities as calibrated. Vote frequencies from the generative adapter are not (`false`)                                                 |
-| `usage`        | `TokenUsage`                                           | Usage reported by the backend, when available. The generative adapter reports none, because each of its samples is recorded as its own `generate()` call                    |
+| Field          | Type                                                   | Description                                                                                                                                                                       |
+| -------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | `string`                                               | Id of this call's row in [`hdb_model_calls`](./analytics). Rows are buffered before they are written, so treat it as a best-effort correlation key, not a durable reference       |
+| `value`        | `T`                                                    | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                               |
+| `probability`  | `number`                                               | Probability of `value` (leaf schemas only)                                                                                                                                        |
+| `distribution` | `{ value, probability }[]`                             | One entry per allowed value, sorted by descending probability; ties keep the schema's order unless the backend chose one of the tied values, which then leads (leaf schemas only) |
+| `fields`       | `Record<string, { value, probability, distribution }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                        |
+| `calibrated`   | `boolean`                                              | Whether the backend reports its probabilities as calibrated. Vote frequencies from the generative adapter are not (`false`)                                                       |
+| `usage`        | `TokenUsage`                                           | Usage reported by the backend, when available. The generative adapter reports none, because each of its samples is recorded as its own `generate()` call                          |
 
 Harper validates every backend's output against the schema before returning it: `value` and every distribution entry must be allowed values, the distribution must be complete and sum to one, and `value` must be a most-probable outcome. A backend that violates this is treated like a failed backend — the attempt is recorded and the next candidate in the [fallback group](./routing#fallback-groups) is tried.
 
@@ -164,7 +164,7 @@ A malformed schema, or a `state` that is not a string or a JSON-serializable obj
 
 ## registerBackend()
 
-<VersionBadge version="v5.1.15" />
+<VersionBadge version="v5.1.15" /> <VersionBadge type="changed" version="v5.3.0" />
 
 ```typescript
 models.registerBackend(kind: 'embedding' | 'generative' | 'decision', id: string, backend: ModelBackend): void
@@ -175,7 +175,7 @@ Registers a custom backend under a logical name, selectable by the `model` optio
 ## Errors and timeouts
 
 - An unconfigured logical model name throws a not-found error. The error names the missing logical name only — it does not enumerate configured names.
-- A capability mismatch (embedding call to a generation-only backend, tool declarations against a backend without tool support, `requires: ['calibrated']` against an uncalibrated decision backend) throws before any request is made.
+- A capability mismatch (embedding call to a generation-only backend, tool declarations against a backend without tool support, `requires: ['calibrated']` against an uncalibrated decision backend) throws before any request is made. A decision backend that reports a single call as uncalibrated when `calibrated` was required fails that attempt after the request, and the next candidate is tried.
 - A malformed decision schema or state rejects with a `400` error before any request is made, and is not recorded.
 - Each backend supports a `requestTimeoutMs` configuration field; when set, it is composed with any caller-provided `signal` so whichever fires first cancels the request.
 - Backend/network failures throw backend-specific errors with sanitized messages.

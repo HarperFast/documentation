@@ -158,12 +158,12 @@ models:
 | Field              | Default     | Description                                                                                                                                     |
 | ------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `generative`       | `'default'` | Logical name of the generative model to sample, resolved at call time — a reload of that entry is picked up without touching the decision entry |
-| `samples`          | `5`         | Completions per decision, 1 to 25. The distribution is the vote frequency, so `samples` sets its granularity                                    |
+| `samples`          | `5`         | Completions per decision, 1 to 25, validated at startup. The distribution is the vote frequency, so `samples` sets its granularity              |
 | `concurrency`      | `5`         | Completions in flight at once, 1 to 25, never more than `samples`                                                                               |
 | `temperature`      | backend     | Sampling temperature passed to every sample; higher values spread the votes                                                                     |
 | `requestTimeoutMs` | —           | Budget for the whole decision, composed with the caller's `AbortSignal`                                                                         |
 
-For each call the adapter translates the decision schema into a JSON Schema, asks the generative model for `samples` completions with `responseFormat: { schema }`, parses each one, and reports each allowed value's share of the votes as its probability — including zero for values that received none. The state is part of every sample's prompt, so a decision costs `samples` times its tokens. `calibrated` is always `false`: vote frequencies are a sampling estimate, not a calibrated probability. The generative backend must honor `responseFormat: { schema }` ([OpenAI](#openai) and [Ollama](#ollama) do; [Anthropic](#anthropic) ignores it): a sample that is not valid JSON inside the schema fails the whole decision rather than being dropped from the vote, and any samples still in flight are cancelled first.
+For each call the adapter translates the decision schema into a JSON Schema, asks the generative model for `samples` completions with `responseFormat: { schema }`, parses each one, and reports each allowed value's share of the votes as its probability — including zero for values that received none. The state is part of every sample's prompt, so a decision costs `samples` times its tokens. `calibrated` is always `false`: vote frequencies are a sampling estimate, not a calibrated probability. The adapter works best on a backend that enforces `responseFormat: { schema }` ([OpenAI](#openai) and [Ollama](#ollama) do). [Anthropic](#anthropic) and [Amazon Bedrock](#amazon-bedrock) ignore `responseFormat`, so their samples rely on the prompt alone: the adapter tolerates a code fence or surrounding prose around the JSON object, but a sample whose required values are missing or outside the allowed set fails the whole decision rather than being dropped from the vote (extra properties are ignored), and any samples still in flight are cancelled first.
 
 Each sample flows through `models.generate()`, so it is routed, recorded, and billed as a `generate` call of its own; the `decide` row in [analytics](./analytics) carries the decision's latency but no token counts, so tokens are never counted twice.
 
@@ -177,7 +177,7 @@ A `decision` backend implements `decide(state, schema, opts)` and returns the di
 models:
   decision:
     default:
-      backend: '@acme/harper-decision' # a module that registers a decision backend
+      backend: '@acme/harper-decision'
       apiKey: ${ACME_API_KEY}
       fallback: [llm]
     llm:
@@ -189,7 +189,7 @@ The backend returns `{ status: 'completed', output, usage? }` where `output` is:
 - for a leaf schema, `{ distribution: [{ value, probability }, …], calibrated? }` — one entry for every allowed value, with probabilities that sum to one;
 - for an object schema, `{ fields: { [property]: { distribution } } }` — one such distribution per property.
 
-Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too, but it must be a most-probable outcome. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call.
+Harper derives `value` and `probability` from the distribution, sorts it, and validates it against the schema before returning a `Decision`; a backend may supply `value` too; it must be a most-probable outcome, and on a tie it leads the distribution. An output that is incomplete, out of set, or does not sum to one is treated as a backend failure, so the next candidate in the [fallback group](./routing#fallback-groups) is tried. `calibrated` on the output overrides the backend's declared `calibrated` capability for that call, for object schemas too. When the caller passed `requires: ['calibrated']` and the output reports `calibrated: false`, that attempt is recorded as a failure after the request and the next candidate is tried.
 
 ## Custom backends
 
@@ -200,6 +200,8 @@ Beyond the four built-ins, a component or application can register its own backe
 Custom backends can be added two ways: **registered programmatically** (below), or **selected in config** by pointing the `backend` field at a module — see [Config-selectable backends](#config-selectable-backends).
 
 ### defineBackend()
+
+<VersionBadge type="changed" version="v5.3.0" />
 
 ```typescript
 models.defineBackend(spec: DefineBackendSpec): ModelBackend
@@ -221,6 +223,8 @@ A method on `models` (reachable as `models.defineBackend(...)` / `scope.models.d
 `embed`, `generate`, and `decide` return the shape the built-in backends return: `{ status: 'completed', output, usage? }`, where `output` is `Float32Array[]` for `embed`, `{ content, finishReason }` for `generate`, and a distribution (or per-field distributions) for `decide`. `generateStream` is an async generator yielding incremental `{ deltaContent?, deltaToolCalls?, finishReason? }` chunks — the same [`generateStream()`](./api#generatestream) shape, not a wrapped result. At least one method must be supplied. A backend that supplies only `generateStream` still satisfies `generate()`: Harper drains the stream into a single result.
 
 ### registerBackend()
+
+<VersionBadge type="changed" version="v5.3.0" />
 
 ```typescript
 models.registerBackend(kind: 'embedding' | 'generative' | 'decision', id: string, backend: ModelBackend): void

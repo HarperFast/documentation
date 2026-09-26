@@ -31,6 +31,8 @@ A call to the `default` model tries `openai` first; if it fails, the call falls 
 
 ## Capability routing
 
+<VersionBadge type="changed" version="v5.3.0" />
+
 A call can require capabilities of the backend it lands on. The router keeps only the candidates whose `capabilities()` satisfy the requirement, in group order.
 
 - **`opts.requires`** — an explicit list of capabilities (`embed`, `generate`, `stream`, `tools`, `adapters`, `decide`, `calibrated`). For example, `models.decide(state, schema, { requires: ['calibrated'] })` routes to a decision backend that reports calibrated probabilities.
@@ -60,6 +62,8 @@ When a candidate fails, `embed` / `generate` / `decide` record the attempt and t
 `generateStream` resolves to the **first** candidate only. There is no mid-stream fallback: once chunks have been yielded, switching backends would mean replaying already-delivered output.
 
 ## Custom routers
+
+<VersionBadge type="changed" version="v5.3.0" />
 
 Replace the default policy with `models.registerRouter()`. A router is a single **synchronous** `route()` method that returns the ordered candidate backends for a request; an empty array means "no candidate."
 
