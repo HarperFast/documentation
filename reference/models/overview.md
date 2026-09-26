@@ -30,7 +30,7 @@ The API surface is four methods:
 | [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced                             |
 | [`models.decide(state, schema, options?)`](./api#decide)         | Choose from a closed set, with a probability distribution over it |
 
-Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that votes over structured completions from any configured generative model. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing). Every model call is recorded for [observability and usage accounting](./analytics).
+Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that votes over structured completions from any configured generative model. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing); the [`@decide` schema directive](../database/schema#decide) likewise stores a typed decision and its probability whenever a source field is written. Every model call is recorded for [observability and usage accounting](./analytics).
 
 ## Configuration
 

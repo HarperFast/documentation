@@ -362,6 +362,46 @@ Write semantics:
 
 Multiple `@embed` attributes on one type are computed concurrently.
 
+### `@decide`
+
+<VersionBadge version="v5.3.0" />
+
+Automatically makes a typed decision about the source field whenever it is written, using a configured [decision model](../models/overview#configuration), and stores the chosen value on the attribute and, optionally, its probability on a second attribute:
+
+```graphql
+type Ticket @table {
+	id: Long @primaryKey
+	body: String
+	route: String @decide(source: "body", values: ["billing", "refund", "bug", "other"], confidence: "routeConfidence")
+	routeConfidence: Float @indexed
+	urgent: Boolean @decide(source: "body")
+	severity: Int @decide(source: "body", minimum: 1, maximum: 5)
+}
+```
+
+- `source` — the name of the field to decide about. Must be a declared field on the same type, passed as a string literal. A string is passed to the model as text; an object is passed as program state.
+- `values` — the allowed strings, for a `String` attribute: 2 to 255 distinct values, passed as a list of string literals.
+- `minimum`, `maximum` — the inclusive range, for an `Int` attribute: at most 255 values, passed as integer literals.
+- `model` — the logical name of a configured decision model, passed as a string literal. Defaults to `"default"`.
+- `confidence` — the name of a nullable `Float` field on the same type that receives the probability of the chosen value. Optional.
+- `instructions` — task framing sent to the model with every decision, passed as a string literal. Optional.
+
+The attribute type selects the [decision schema](../models/api#decision-schemas): `String` with `values` is an enum, `Boolean` takes no further arguments, and `Int` with `minimum` and `maximum` is a bounded integer. Other attribute types are rejected. The attribute and the confidence field must be nullable, because a `null` source clears them, and neither can be the primary key or `@computed`. The closed set is validated when the schema loads, so a bad `values` list fails deployment rather than the first write. The attribute is not indexed implicitly: add `@indexed` to query by the value, and index the confidence field to query by probability, as above.
+
+Write semantics match `@embed`:
+
+- Creating a record with the source field, or updating the source field, calls `models.decide` before the write commits and stores the value and the probability from that one decision. A failure to decide fails the write, so the two are never written separately.
+- An update that does not touch the source field leaves both unchanged. The decision and confidence attributes are ordinary attributes: a write that carries them without the source stores them as given, so a stored probability records a model call rather than proving one.
+- Setting the source field to `null` sets both to `null`.
+- Replicated writes and audit-log replays do not decide again — the value and probability travel with the record, and only the node that accepted the original write calls the model. Upgrade every node that accepts writes before adding `@decide` to a schema: a node that does not know the directive commits the source without the pair, and the other nodes store what it sent.
+- Changing `values`, the model or the instructions applies to writes from then on. Existing rows keep their values, and no index is rebuilt.
+
+Every `@decide` attribute on a type is decided concurrently, alongside any `@embed` attributes. A derived field has exactly one writer: two directives cannot name the same attribute or confidence field, and a directive cannot use another directive's output as its source.
+
+The probability is whatever the configured backend reports. With the built-in [generative adapter](../models/backends#generative-decision-adapter) it is the vote fraction over `samples` completions, not a calibrated probability, so a threshold such as `routeConfidence < 0.7` is a review-queue rule rather than a guarantee. That adapter also spends `samples` completions on every write that carries the source; for a high write rate, configure a single-call decision backend under the directive's model name or lower `samples`.
+
+A component can replace the default decider for an attribute with `Table.setDecideAttribute(name, decider)`. The decider receives the write payload and returns `{ value, probability }`, or `null` to clear both; the value must be one the directive allows, and the override survives a schema reload.
+
 ### `@createdTime`
 
 Automatically assigns a creation timestamp (Unix epoch milliseconds) to the attribute when a record is created.
