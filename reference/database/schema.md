@@ -392,7 +392,7 @@ The attribute type selects the [decision schema](../models/api#decision-schemas)
 Write semantics match `@embed`:
 
 - Creating a record with the source field, or updating the source field, calls `models.decide` before the write commits and stores the value and the probability from that one decision. A failure to decide fails the write, so the two are never written separately. The hook sees the write payload before table validation, so a write that is later rejected has already paid for its decisions.
-- An update that does not touch the source field leaves both unchanged. The decision and confidence attributes are ordinary attributes: a write that carries them without the source stores them as given, so a stored probability records a model call rather than proving one. Two writes change the source without deciding again, as with `@embed`: a tracked-instance edit that assigns the source after `update()` and saves, and a CRDT operation payload on the source. Both keep the previous pair beside the new source.
+- An update that does not touch the source field leaves both unchanged. The decided attribute and its confidence field are ordinary attributes: a write that carries them without the source stores them as given, so a stored probability records a model call rather than proving one. The `decision` field is not: see [Recording outcomes for a decided attribute](#recording-outcomes-for-a-decided-attribute). Two writes change the source without deciding again, as with `@embed`: a tracked-instance edit that assigns the source after `update()` and saves, and a CRDT operation payload on the source. Both keep the previous pair, and the previous decision id, beside the new source.
 - Setting the source field to `null` sets both to `null`, and the `decision` field too when the directive names one.
 - Replicated writes and audit-log replays do not decide again — the value and probability travel with the record, and only the node that accepted the original write calls the model. Upgrade every node that accepts writes before adding `@decide` to a schema: a node that does not know the directive commits the source without the pair, and the other nodes store what it sent.
 - Changing `values`, the model or the instructions applies to writes from then on. Existing rows keep their values, and no index is rebuilt.
@@ -406,8 +406,6 @@ A component can replace the default decider for an attribute with `Table.setDeci
 
 #### Recording outcomes for a decided attribute
 
-<VersionBadge version="v5.3.0" />
-
 A directive records its decision in `hdb_model_decisions` only when it names a `decision` field. Without one, the directive calls `models.decide` with `persist: false`: nothing is committed, and the model call is still logged in `hdb_model_calls`. With one, the field holds the decision's id, which [`models.getDecision()`](../models/api#getdecision) reads and [`models.recordOutcome()`](../models/api#recordoutcome) records what actually happened for:
 
 ```graphql
@@ -420,10 +418,15 @@ type Ticket @table {
 ```
 
 ```javascript
-import { models } from 'harper';
+import { models, tables } from 'harper';
 
-const ticket = await tables.Ticket.get(ticketId);
-await models.recordOutcome(ticket.routeDecision, { truth: { kind: 'value', value: 'bug' } });
+export class TicketOutcome extends tables.Ticket {
+	async post(target, data) {
+		// Read through the caller's own permissions: a caller who cannot see the ticket cannot report on it.
+		const ticket = await this.get(target);
+		return models.recordOutcome(ticket.routeDecision, { truth: { kind: 'value', value: data.route } });
+	}
+}
 ```
 
 - The `decision` field is written by the directive only. A write that carries it is rejected with a `400` unless the same write carries the source, whose new decision then replaces it; a replicated write or an audit-log replay stores the id it carries. An `x-replicate-from: none` request is not exempt.
