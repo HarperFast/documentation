@@ -7,7 +7,7 @@ title: API
 
 <VersionBadge version="v5.1.0" />
 
-The `models` object exposes eight methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate decisions recorded with `persist: true`, and [`calibrate()` and `getCalibrations()`](./calibration#api) fit and report calibrations from them; none of the four takes model options. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
+The `models` object exposes eight methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate decisions recorded with `persist: true`, and [`calibrate()` and `getCalibrations()`](./calibration#api) fit and report calibrations from them. None of these four takes the routing options above; `getCalibrations()` takes an optional `{ model }` filter. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
 
 ## embed()
 

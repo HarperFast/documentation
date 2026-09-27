@@ -60,9 +60,17 @@ Removing the block turns calibration off at the next configuration reload: decis
 
 ```javascript
 const [route] = await models.getCalibrations({ model: 'default' });
-route.report.calibrated.conditional;
-// [ { threshold: 0.8, count: 412, coverage: 0.61, risk: 0.018, riskUpper: 0.034 },
-//   { threshold: 0.9, count: 305, coverage: 0.45, risk: 0.007, riskUpper: 0.02 }, … ]
+const report = route.report.calibrated ?? route.report.raw;
+const table = report.operational;
+```
+
+Before a correction qualifies, a report has only `raw`, so read `calibrated` when it is there and `raw` otherwise. Each table looks like this:
+
+```json
+[
+	{ "threshold": 0.8, "count": 412, "coverage": 0.61, "risk": 0.018, "riskUpper": 0.034 },
+	{ "threshold": 0.9, "count": 305, "coverage": 0.45, "risk": 0.007, "riskUpper": 0.02 }
+]
 ```
 
 At each threshold:
@@ -121,7 +129,7 @@ models:
 
 ## When a correction applies
 
-- **Right after a start, or after a new fit, decisions come back uncorrected for a moment.** Each node loads a population's correction in the background after its first decision, and rechecks it about once a minute. A new fit or a revocation reaches every node within that minute.
+- **Right after a start, or after a new fit, decisions come back uncorrected for a moment.** Each node loads a population's correction in the background after its first decision, and rechecks it about once a minute. Corrections replicate like other system tables, so a new fit or a revocation takes effect on a node within about a minute of reaching it; a node behind on replication keeps its previous correction until it catches up.
 - **Only an eligible, current correction applies.** It must have beaten the raw probabilities on the held-out decisions, be younger than `maxAgeMs` (30 days by default), and have been fitted under the current settings. A newer run whose evidence no longer supports it, for example after truths were corrected, revokes it everywhere.
 - **All fields or none.** An object schema is corrected only when every field has a correction.
 - **A schema with a `noMatch: true` leaf is not corrected yet**, because its [no-match score](./api#no-match-scores) would stay uncorrected under `calibrated: true`. It still gets reliability reports.

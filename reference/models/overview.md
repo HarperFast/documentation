@@ -103,10 +103,10 @@ if (decision.probability >= 0.8) await route(ticket, decision.value, decision.id
 else await sendToReview(ticket, decision);
 ```
 
-When a person later confirms the right queue, report it against that id:
+If `route` saved the id on the ticket as `decisionId`, report the queue a person later confirms against it:
 
 ```javascript
-await models.recordOutcome(decisionId, { truth: { kind: 'value', value: confirmedQueue } });
+await models.recordOutcome(ticket.decisionId, { truth: { kind: 'value', value: ticket.confirmedQueue } });
 ```
 
 For a table, add a `decision` field to the directive; it receives the id. [Recording decisions](./api#recording-decisions) compares the two modes, and [Analytics](./analytics#durable-decisions) shows how to query what was recorded. Record the truth for a random sample of decisions as well as the ones people happened to review, so the record reflects all of your traffic.
