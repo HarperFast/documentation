@@ -1,0 +1,124 @@
+---
+title: Add Full-Text Search to a Product Catalog
+description: Configure and query a BM25-ranked product search in Harper.
+---
+
+# Add Full-Text Search to a Product Catalog
+
+This guide adds relevance-ranked text search to a product catalog, then exposes it through Harper's JavaScript and REST APIs.
+
+## 1. Declare the index
+
+Add `audit: true` to the RocksDB-backed table and declare an `@fullText` index over the fields customers search.
+
+```graphql title="schema.graphql"
+type Product
+	@table(database: "catalog", audit: true)
+	@export
+	@fullText(
+		name: "catalogSearch"
+		fields: [
+			{ name: "name", weight: 3, highlight: true }
+			{ name: "description", weight: 1, highlight: true }
+			{ name: "tags" }
+		]
+		highlighting: { maxFragments: 2, fragmentLength: 120 }
+	) {
+	id: ID @primaryKey
+	name: String
+	description: String
+	tags: [String]
+	category: String @indexed
+	price: Float @indexed
+}
+```
+
+`weight: 3` makes a match in `name` contribute more to BM25 relevance than the same match in `description` or `tags`. Highlighting is enabled only for the fields shown to customers.
+
+## 2. Add records
+
+Use the generated REST endpoint:
+
+```http
+POST /Product/
+Content-Type: application/json
+
+{
+	"id": "shoe-1",
+	"name": "Waterproof trail running shoe",
+	"description": "Lightweight shoe for wet mountain trails",
+	"tags": ["outdoor", "trail"],
+	"category": "footwear",
+	"price": 129
+}
+```
+
+Harper commits the record first, then applies the committed change to the local derived full-text index. Every replica performs the same derivation from the transaction it receives.
+
+## 3. Search from a Harper application
+
+```javascript
+export class SearchProducts extends tables.Product {
+	static async get(target) {
+		const text = target.searchParams.get('q') ?? '';
+		return tables.Product.search({
+			conditions: [
+				{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true },
+				{ attribute: 'category', comparator: 'equals', value: 'footwear' },
+			],
+			select: ['id', 'name', 'price', '$score', '$highlights'],
+			limit: 20,
+		});
+	}
+}
+```
+
+The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
+
+## 4. Search through REST
+
+The exported table supports the same match comparator:
+
+```http
+GET /Product/?catalogSearch=matches=waterproof%20trail&category=footwear&select(id,name,price,$score,$highlights)&limit(20)
+```
+
+For a phrase:
+
+```http
+GET /Product/?catalogSearch=matches_phrase=trail%20running&limit(20)
+```
+
+For record autocomplete:
+
+```http
+GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&select(id,name)&limit(10)
+```
+
+Prefix search returns matching products. It does not return a dictionary of suggested terms.
+
+## 5. Choose consistency behavior
+
+Most searches can use the default three-second lag tolerance. When the next request must find a record that was just written, use the JavaScript API and wait for current index coverage:
+
+```javascript
+const results = await tables.Product.search({
+	conditions: [
+		{
+			attribute: 'catalogSearch',
+			comparator: 'matches',
+			value: 'new seasonal product',
+			maxIndexLagMilliseconds: 0,
+			waitForIndexMilliseconds: 10000,
+		},
+	],
+});
+```
+
+Do not apply this wait to every catalog request without measuring it. The normal bounded-staleness path keeps search traffic independent of short indexing bursts.
+
+## 6. Operate the index
+
+Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests return a retryable `503` until the rebuild is ready.
+
+See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.

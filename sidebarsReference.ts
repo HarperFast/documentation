@@ -91,6 +91,29 @@ const sidebars: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'Full-Text Search',
+			collapsible: false,
+			className: 'reference-category-header',
+			items: [
+				{
+					type: 'doc',
+					id: 'full-text-search/overview',
+					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'full-text-search/configuration',
+					label: 'Configuration',
+				},
+				{
+					type: 'doc',
+					id: 'full-text-search/querying',
+					label: 'Querying',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'AI & Models',
 			collapsible: false,
 			className: 'reference-category-header',
