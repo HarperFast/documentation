@@ -62,12 +62,14 @@ With OpenAI, each field with up to 20 allowed values costs one scoring call. A f
 ```javascript
 import { models } from 'harper';
 
-const decision = await models.decide(ticket.body, {
+const queues = {
 	enum: ['billing', 'refund', 'bug', 'other'],
 	description: 'Which queue should handle this support ticket?',
-});
-// decision.value is the chosen queue, and decision.probability is how likely it is
+};
+const decision = await models.decide(ticket.body, queues);
 ```
+
+`decision.value` is the chosen queue, and `decision.probability` is how likely it is.
 
 Or have a table decide whenever a record is written, with the [`@decide` directive](../database/schema#decide):
 
@@ -91,12 +93,18 @@ else await sendToReview(ticket, decision);
 
 `decision.calibrated` is `false` for the built-in adapter. Its probability ranks the choices well, but it is not a measured frequency: 0.8 does not mean the decision is right 80% of the time. Start with a cautious threshold and adjust it once you know how often decisions above it turn out right, which is what step 4 is for.
 
-**4. Record outcomes only when you will use them.** By default nothing is stored beyond the per-call log, and the result has no `id`. When you want to check decisions against what really happened, pass `persist: true` and report the truth later:
+**4. Record outcomes only when you will use them.** By default nothing is stored beyond the per-call log, and the result has no `id`. When you want to check decisions against what really happened, add `persist: true` to the step 2 call and keep the decision's `id` with what you did:
 
 ```javascript
 const decision = await models.decide(ticket.body, queues, { persist: true });
-// Later, when a person confirms the right queue:
-await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
+if (decision.probability >= 0.8) await route(ticket, decision.value, decision.id);
+else await sendToReview(ticket, decision);
+```
+
+When a person later confirms the right queue, report it against that id:
+
+```javascript
+await models.recordOutcome(decisionId, { truth: { kind: 'value', value: confirmedQueue } });
 ```
 
 For a table, add a `decision` field to the directive; it receives the id. [Recording decisions](./api#recording-decisions) compares the two modes, and [Analytics](./analytics#durable-decisions) shows how to query what was recorded. Record the truth for a random sample of decisions as well as the ones people happened to review, so the record reflects all of your traffic.
