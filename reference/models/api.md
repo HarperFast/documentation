@@ -7,7 +7,7 @@ title: API
 
 <VersionBadge version="v5.1.0" />
 
-The `models` object exposes six methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate stored decisions and take no model options. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
+The `models` object exposes six methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate decisions recorded with `persist: true`, and take no model options. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
 
 ## embed()
 
@@ -106,12 +106,9 @@ Errors detected before the call starts (unknown model name, missing capability) 
 <VersionBadge version="v5.3.0" />
 
 ```typescript
-models.decide<T>(state: DecideInput, schema: DecisionSchema, options: UnrecordedDecideOpts): Promise<UnrecordedDecision<T>>
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
-models.decide<T>(state: DecideInput, schema: DecisionSchema, options: PersistChoiceDecideOpts): Promise<Decision<T> | UnrecordedDecision<T>>
+models.decide<T>(state: DecideInput, schema: DecisionSchema, options: DecideOpts & { persist: true }): Promise<RecordedDecision<T>>
 ```
-
-`UnrecordedDecideOpts` is `DecideOpts` with `persist: false`, and `PersistChoiceDecideOpts` is `DecideOpts` with a `persist` known only at run time; `DecideOpts` itself allows only `persist: true`, so an options object that skips the record never reaches the signature that promises an `id`.
 
 Chooses from a closed set of allowed values and returns the chosen value together with a probability distribution over the whole set. Where `generate()` returns open-ended text, `decide()` answers a classification, routing, scoring, moderation, or guardrail question with numbers an application can threshold on. It is served by [decision backends](./backends#decision-backends): a classifier or hosted decision model registered as a custom backend, or the built-in [generative adapter](./backends#generative-decision-adapter), which scores the allowed values from any configured generative model's log-probabilities where the model exposes them and votes over structured completions otherwise.
 
@@ -166,28 +163,50 @@ else await route(ticket, decision.value);
 
 Only a backend with the `noMatch` capability can serve an opted-in schema, so a call routes past backends that cannot produce the score, and fails with a capability error when none can. A backend that returns no score, or one outside 0 to 1, fails the attempt and the next candidate is tried. The score is a backend estimate, not a calibrated probability, unless the backend also claims `calibratedNoMatch`: an opted-in call reports `calibrated: true` only when both the distribution and the score are calibrated, and `requires: ['calibrated']` on an opted-in schema routes only to such a backend. A schema without the flag is unaffected: it requires nothing new, and no `noMatch` field appears in its result.
 
-| Option         | Type           | Default     | Description                                                                                                                                                                          |
-| -------------- | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `model`        | `string`       | `'default'` | Logical name of a configured [decision model](./overview#configuration)                                                                                                              |
-| `requires`     | `Capability[]` | —           | Capabilities the backend must satisfy, e.g. `['calibrated']`; used by [routing](./routing#capability-routing) to select a candidate                                                  |
-| `instructions` | `string`       | —           | Task framing beyond the schema's descriptions, passed to the backend                                                                                                                 |
-| `signal`       | `AbortSignal`  | —           | Cancels the call; composed with the backend's configured `requestTimeoutMs`                                                                                                          |
-| `persist`      | `boolean`      | `true`      | `false` records nothing: no row is committed to `hdb_model_decisions`, the result has no `id`, and the call works on a read-only node. The call is still logged in `hdb_model_calls` |
+| Option         | Type           | Default     | Description                                                                                                                         |
+| -------------- | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `model`        | `string`       | `'default'` | Logical name of a configured [decision model](./overview#configuration)                                                             |
+| `requires`     | `Capability[]` | —           | Capabilities the backend must satisfy, e.g. `['calibrated']`; used by [routing](./routing#capability-routing) to select a candidate |
+| `instructions` | `string`       | —           | Task framing beyond the schema's descriptions, passed to the backend                                                                |
+| `signal`       | `AbortSignal`  | —           | Cancels the call; composed with the backend's configured `requestTimeoutMs`                                                         |
+| `persist`      | `boolean`      | `false`     | `true` records the decision so its outcome can be reported later; see [Recording decisions](#recording-decisions)                   |
 
-With `persist: false` the result is typed `UnrecordedDecision<T>` (a `Decision<T>` without `id`); a `persist` whose value is only known at run time returns either. A non-boolean `persist` is rejected with a `400` before any model is called. The [`@decide` directive](../database/schema#decide) records its decisions only when it names a `decision` field.
+### Recording decisions
+
+By default, `decide()` keeps nothing but its log entry. Like `embed()` and `generate()`, each call writes one row to the [per-call log](./analytics#per-call-log-hdb_model_calls) for observability and usage accounting, and the `Decision` it returns has no `id`. That fits most decisions: a route, a moderation verdict, or any threshold an application acts on and moves past.
+
+Pass `persist: true` when you will want to know later whether the decision was right. The decision is then committed to the [`hdb_model_decisions`](./analytics#durable-decisions) system table before the call returns, and the result carries its `id`. Keep that id with whatever you did: [`getDecision()`](#getdecision) reads the decision back, and [`recordOutcome()`](#recordoutcome) records what actually happened.
+
+```javascript
+const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] }, { persist: true });
+await route(ticket, decision.value);
+// Later, once a person has confirmed the right queue:
+await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
+```
+
+|                                   | Default                                                     | `persist: true`                                                                                                    |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| What is stored                    | One row in `hdb_model_calls`, buffered and kept for 90 days | That row, plus a row in `hdb_model_decisions` that is committed before the call returns and kept for 365 days      |
+| What the call returns             | `Decision<T>`, with no `id`                                 | `RecordedDecision<T>`: a `Decision<T>` whose `id` is always present                                                |
+| Recording outcomes                | Not possible                                                | `getDecision(id)` and `recordOutcome(id, …)`                                                                       |
+| Cost beyond the model call        | None                                                        | One small local commit before the call returns; the row replicates to other nodes in the background                |
+| On a read-only node               | Works as usual                                              | Rejects with a `503` before any model call, so no provider tokens are spent on a decision that could not be stored |
+| If storing fails after the answer | Does not apply                                              | Rejects with a `500` without trying another backend, so a storage fault never costs a second model call            |
+
+Choose when you call. A decision made without `persist: true` is not stored anywhere an outcome can be attached to, so it cannot be scored later. The [`@decide` directive](../database/schema#decide) follows the same rule: it records its decisions only when it names a `decision` field. A `persist` that is not a boolean is rejected with a `400` before any model is called.
 
 ### Decision
 
-| Field          | Type                                                             | Description                                                                                                                                                                                                                                           |
-| -------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`           | `string`                                                         | Cluster-unique id of the decision's durable record in [`hdb_model_decisions`](./analytics#durable-decisions), committed before the decision is returned; absent when the call passed `persist: false`; pass it to [`recordOutcome()`](#recordoutcome) |
-| `value`        | `T`                                                              | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                                                                                                   |
-| `probability`  | `number`                                                         | Probability of `value` (leaf schemas only)                                                                                                                                                                                                            |
-| `noMatch`      | `number`                                                         | The no-match score, for a leaf schema that set `noMatch: true`; see [no-match scores](#no-match-scores)                                                                                                                                               |
-| `distribution` | `{ value, probability }[]`                                       | One entry per allowed value, sorted by descending probability; ties keep the schema's order unless the backend chose one of the tied values, which then leads (leaf schemas only)                                                                     |
-| `fields`       | `Record<string, { value, probability, distribution, noMatch? }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                                                                                            |
-| `calibrated`   | `boolean`                                                        | Whether the backend reports its probabilities as calibrated. The generative adapter's are not (`false`), whether scored from log-probabilities or counted from votes                                                                                  |
-| `usage`        | `TokenUsage`                                                     | Usage reported by the backend, when available. The generative adapter reports none, because each of its scoring calls or vote samples is recorded as its own `scoreChoices` or `generate` call                                                        |
+| Field          | Type                                                             | Description                                                                                                                                                                                                                                            |
+| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`           | `string`                                                         | Present only when the call passed `persist: true`: the cluster-unique id of the decision's record in [`hdb_model_decisions`](./analytics#durable-decisions), committed before the decision is returned. Pass it to [`recordOutcome()`](#recordoutcome) |
+| `value`        | `T`                                                              | The chosen value: the most probable outcome for a leaf schema; for an object schema, a map of each property's most probable outcome                                                                                                                    |
+| `probability`  | `number`                                                         | Probability of `value` (leaf schemas only)                                                                                                                                                                                                             |
+| `noMatch`      | `number`                                                         | The no-match score, for a leaf schema that set `noMatch: true`; see [no-match scores](#no-match-scores)                                                                                                                                                |
+| `distribution` | `{ value, probability }[]`                                       | One entry per allowed value, sorted by descending probability; ties keep the schema's order unless the backend chose one of the tied values, which then leads (leaf schemas only)                                                                      |
+| `fields`       | `Record<string, { value, probability, distribution, noMatch? }>` | Per-property marginals (object schemas only). `value` is assembled from these marginals and may be a combination no single sample produced                                                                                                             |
+| `calibrated`   | `boolean`                                                        | Whether the backend reports its probabilities as calibrated. The generative adapter's are not (`false`), whether scored from log-probabilities or counted from votes                                                                                   |
+| `usage`        | `TokenUsage`                                                     | Usage reported by the backend, when available. The generative adapter reports none, because each of its scoring calls or vote samples is recorded as its own `scoreChoices` or `generate` call                                                         |
 
 Harper validates every backend's output against the schema before returning it: `value` and every distribution entry must be allowed values, the distribution must be complete and sum to one, and `value` must be a most-probable outcome. A backend that violates this is treated like a failed backend — the attempt is recorded and the next candidate in the [fallback group](./routing#fallback-groups) is tried.
 
@@ -201,7 +220,7 @@ A malformed schema, or a `state` that is not a string or a JSON-serializable obj
 models.getDecision<T>(id: string): Promise<DecisionRecord<T> | undefined>
 ```
 
-Reads the durable record of a decision: the schema it was asked over (the input `state` and `instructions` are not stored), what was answered, who answered, and whatever has been recorded about it since. Every `decide()` call without `persist: false` commits its record to [`hdb_model_decisions`](./analytics#durable-decisions) before it returns, so a `Decision.id` can be looked up right away on the node that made it, after a restart, and on other nodes once replication has delivered it. Returns `undefined` for an id that does not exist, has expired, or has not reached this node yet.
+Reads the record of a decision made with [`persist: true`](#recording-decisions): the schema it was asked over (the input `state` and `instructions` are not stored), what was answered, who answered, and whatever has been recorded about it since. The record is committed to [`hdb_model_decisions`](./analytics#durable-decisions) before `decide()` returns, so its `id` can be looked up right away on the node that made it, after a restart, and on other nodes once replication has delivered it. Returns `undefined` for an id that does not exist, has expired, or has not reached this node yet. A decision made without `persist: true` was never stored, so there is nothing to read.
 
 | Field                                                                     | Description                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -223,7 +242,7 @@ Reads the durable record of a decision: the schema it was asked over (the input 
 models.recordOutcome<T>(id: string, outcome: OutcomeReport): Promise<DecisionRecord<T>>
 ```
 
-Records what actually happened for a decision, so later calibration can score predictions against observed truth. A report carries one or two facts, each a tagged state rather than a bare value, so a label that happens to be called `'unknown'` is never mistaken for missing information:
+Records what actually happened for a decision made with [`persist: true`](#recording-decisions), so later calibration can score predictions against observed truth. A report carries one or two facts, each a tagged state rather than a bare value, so a label that happens to be called `'unknown'` is never mistaken for missing information:
 
 | Fact     | States                                                                                                                                                                  |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -231,7 +250,7 @@ Records what actually happened for a decision, so later calibration can score pr
 | `action` | `{ kind: 'value', value }` (the value acted on), `{ kind: 'noMatch' }` (routed as no match), `{ kind: 'abstained' }` (sent to a human by policy), `{ kind: 'unknown' }` |
 
 ```javascript
-const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] });
+const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] }, { persist: true });
 if (decision.probability >= 0.7) {
 	await route(ticket, decision.value);
 	await models.recordOutcome(decision.id, { action: { kind: 'value', value: decision.value } });
@@ -247,7 +266,7 @@ For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'va
 
 Each fact is stored on its own, so recording the truth never touches a previously recorded action, and reports that set different facts never overwrite each other; concurrent reports of the same fact from two nodes converge to one of them. Repeating a report whose state equals what is stored writes nothing. Reporting a different state for the same fact replaces it, so a correction is one more call; `{ kind: 'unknown' }` retracts a fact. Reports are validated against the stored schema: a `value` must be one of its allowed values, an object schema takes `{ fields }` naming its properties and a leaf schema takes `{ truth, action }`, and a report with no fact is rejected. All of these reject with a `400`.
 
-The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any model call, because a decision that cannot be recorded would return an id that could never be scored; a call with `persist: false` records nothing and is not affected.
+The id must be visible on the node handling the report: an id that does not exist, has expired, or has not replicated to this node yet rejects with a `404`. Replication is asynchronous, so an outcome sent to another node immediately after the decision can see that error; record through the node that decided, or retry. Recording an outcome is not a model call: it writes no analytics row and emits no metric. On a read-only node `recordOutcome()` rejects with a `503` because it is a write, and so does `decide()` with `persist: true`, before any model call; a `decide()` without it stores nothing and works there.
 
 ## registerBackend()
 
@@ -264,7 +283,7 @@ Registers a custom backend under a logical name, selectable by the `model` optio
 - An unconfigured logical model name throws a not-found error. The error names the missing logical name only — it does not enumerate configured names.
 - A capability mismatch (embedding call to a generation-only backend, tool declarations against a backend without tool support, `requires: ['calibrated']` against an uncalibrated decision backend) throws before any request is made. A decision backend that reports a single call as uncalibrated when `calibrated` was required fails that attempt after the request, and the next candidate is tried.
 - A malformed decision schema or state rejects with a `400` error before any request is made, and is not recorded.
-- On a read-only node, `recordOutcome()` rejects with a `503` because it is a write, and `decide()` rejects with a `503` before any request is made, because a decision that cannot be recorded would return an id that could never be scored; a call with `persist: false` records nothing and works there. A `decide()` whose record cannot be committed after the backend answered rejects with a `500` without trying another candidate.
+- On a read-only node, `recordOutcome()` rejects with a `503` because it is a write, and so does `decide()` with `persist: true`, before any request is made; a `decide()` without it works there. A `decide()` with `persist: true` whose record cannot be committed after the backend answered rejects with a `500` without trying another candidate.
 - `recordOutcome()` rejects with a `404` for an id that does not exist, has expired, or has not replicated to this node yet, and with a `400` for a report that does not fit the stored schema.
 - Each backend supports a `requestTimeoutMs` configuration field; when set, it is composed with any caller-provided `signal` so whichever fires first cancels the request.
 - Backend/network failures throw backend-specific errors with sanitized messages.

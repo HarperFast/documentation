@@ -23,14 +23,14 @@ The same object is available as `scope.models` in component scopes and as the `m
 
 The API surface is six methods:
 
-| Method                                                           | Purpose                                                              |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`models.embed(input, options?)`](./api#embed)                   | Convert text to embedding vectors                                    |
-| [`models.generate(input, options?)`](./api#generate)             | Generate a completion for a prompt or chat                           |
-| [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced                                |
-| [`models.decide(state, schema, options?)`](./api#decide)         | Choose from a closed set, with a probability distribution over it    |
-| [`models.getDecision(id)`](./api#getdecision)                    | Read the durable record of a decision and what was recorded about it |
-| [`models.recordOutcome(id, outcome)`](./api#recordoutcome)       | Record what actually happened for a decision                         |
+| Method                                                           | Purpose                                                                             |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`models.embed(input, options?)`](./api#embed)                   | Convert text to embedding vectors                                                   |
+| [`models.generate(input, options?)`](./api#generate)             | Generate a completion for a prompt or chat                                          |
+| [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced                                               |
+| [`models.decide(state, schema, options?)`](./api#decide)         | Choose from a closed set, with a probability distribution over it                   |
+| [`models.getDecision(id)`](./api#getdecision)                    | Read a decision recorded with `persist: true`, and what was recorded about it since |
+| [`models.recordOutcome(id, outcome)`](./api#recordoutcome)       | Record what actually happened for a decision recorded with `persist: true`          |
 
 Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that scores the allowed values from any configured generative model's log-probabilities where the model exposes them, and votes over structured completions otherwise. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing); the [`@decide` schema directive](../database/schema#decide) likewise stores a typed decision and its probability whenever a source field is written. Every model call is recorded for [observability and usage accounting](./analytics).
 
