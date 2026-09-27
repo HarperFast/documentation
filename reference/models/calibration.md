@@ -162,10 +162,12 @@ A run that reaches a budget stops cleanly and says which one. Populations it did
 ### calibrate()
 
 ```typescript
-models.calibrate(overrides?: CalibrationConfig): Promise<CalibrationRunResult>
+models.calibrate(budgets?: CalibrationBudgets): Promise<CalibrationRunResult>
 ```
 
-Runs a fit now, as the periodic job does, with the configured settings and any `overrides`. Useful in development and tests, or right after recording a batch of outcomes. It resolves with what the run did and never rejects for a storage fault: the fault is reported in the result.
+Runs a fit now, as the periodic job does. Useful in development and tests, or right after recording a batch of outcomes. `budgets` may narrow this run's `maxDecisions`, `maxPopulations`, `maxExamplesPerKey`, `maxBytes` and `maxRunMs`; the settings that decide whether a correction qualifies always come from configuration, so every node judges a version by the same rules. It resolves with what the run did and never rejects for a storage fault: the fault is reported in the result.
+
+A run covers every tenant's decisions, and its result counts all of them. Treat it as a maintenance operation: call it from trusted code, and do not return its result to a tenant.
 
 | Field                                  | Meaning                                                                                            |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
