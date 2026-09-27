@@ -32,7 +32,74 @@ The API surface is six methods:
 | [`models.getDecision(id)`](./api#getdecision)                    | Read a decision recorded with `persist: true`, and what was recorded about it since |
 | [`models.recordOutcome(id, outcome)`](./api#recordoutcome)       | Record what actually happened for a decision recorded with `persist: true`          |
 
-Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that scores the allowed values from any configured generative model's log-probabilities where the model exposes them, and votes over structured completions otherwise. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing); the [`@decide` schema directive](../database/schema#decide) likewise stores a typed decision and its probability whenever a source field is written. Every model call is recorded for [observability and usage accounting](./analytics).
+Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that scores the allowed values from any configured generative model's log-probabilities where the model exposes them, and votes over structured completions otherwise. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing); the [`@decide` schema directive](../database/schema#decide) likewise stores a typed decision and its probability whenever a source field is written. New to decisions? Begin with [Start here: typed decisions](#start-here-typed-decisions). Every model call is recorded for [observability and usage accounting](./analytics).
+
+## Start here: typed decisions
+
+<VersionBadge version="v5.3.0" />
+
+`decide()` answers a question with one value from a list you give it, plus how likely each value is. Use it for routing, moderation, triage, and yes/no checks. Most applications need only the four steps below. The [API reference](./api#decide) covers everything else.
+
+**1. Configure one decision model.** A decision model sits on top of a generative model. This is the smallest working configuration:
+
+```yaml
+models:
+  generative:
+    default:
+      backend: openai
+      apiKey: ${OPENAI_API_KEY}
+      model: gpt-4o
+  decision:
+    default:
+      backend: generative
+      generative: default
+```
+
+With OpenAI, each field with up to 20 allowed values costs one scoring call. A field with more values, or a model that cannot score, is asked `samples` times (default 5) and the answers are counted, which multiplies the token cost. [Generative decision adapter](./backends#generative-decision-adapter) has the details.
+
+**2. Make a decision.** Call `decide()` from code:
+
+```javascript
+import { models } from 'harper';
+
+const decision = await models.decide(ticket.body, {
+	enum: ['billing', 'refund', 'bug', 'other'],
+	description: 'Which queue should handle this support ticket?',
+});
+// decision.value is the chosen queue, and decision.probability is how likely it is
+```
+
+Or have a table decide whenever a record is written, with the [`@decide` directive](../database/schema#decide):
+
+```graphql
+type Ticket @table {
+	id: Long @primaryKey
+	body: String
+	route: String @decide(source: "body", values: ["billing", "refund", "bug", "other"], confidence: "routeConfidence")
+	routeConfidence: Float @indexed
+}
+```
+
+The directive calls the model on every write that carries `body`, so it costs one decision per such write.
+
+**3. Act on the probability, and send the rest to a person.** Pick a threshold, automate above it, and route everything below it to review:
+
+```javascript
+if (decision.probability >= 0.8) await route(ticket, decision.value);
+else await sendToReview(ticket, decision);
+```
+
+`decision.calibrated` is `false` for the built-in adapter. Its probability ranks the choices well, but it is not a measured frequency: 0.8 does not mean the decision is right 80% of the time. Start with a cautious threshold and adjust it once you know how often decisions above it turn out right, which is what step 4 is for.
+
+**4. Record outcomes only when you will use them.** By default nothing is stored beyond the per-call log, and the result has no `id`. When you want to check decisions against what really happened, pass `persist: true` and report the truth later:
+
+```javascript
+const decision = await models.decide(ticket.body, queues, { persist: true });
+// Later, when a person confirms the right queue:
+await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
+```
+
+For a table, add a `decision` field to the directive; it receives the id. [Recording decisions](./api#recording-decisions) compares the two modes, and [Analytics](./analytics#durable-decisions) shows how to query what was recorded. Record the truth for a random sample of decisions as well as the ones people happened to review, so the record reflects all of your traffic.
 
 ## Configuration
 

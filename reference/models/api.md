@@ -110,7 +110,7 @@ models.decide<T>(state: DecideInput, schema: DecisionSchema, options: DecideOpts
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
 ```
 
-Chooses from a closed set of allowed values and returns the chosen value together with a probability distribution over the whole set. Where `generate()` returns open-ended text, `decide()` answers a classification, routing, scoring, moderation, or guardrail question with numbers an application can threshold on. It is served by [decision backends](./backends#decision-backends): a classifier or hosted decision model registered as a custom backend, or the built-in [generative adapter](./backends#generative-decision-adapter), which scores the allowed values from any configured generative model's log-probabilities where the model exposes them and votes over structured completions otherwise.
+Chooses from a closed set of allowed values and returns the chosen value together with a probability distribution over the whole set. For a short, practical introduction, see [Start here: typed decisions](./overview#start-here-typed-decisions). Where `generate()` returns open-ended text, `decide()` answers a classification, routing, scoring, moderation, or guardrail question with numbers an application can threshold on. It is served by [decision backends](./backends#decision-backends): a classifier or hosted decision model registered as a custom backend, or the built-in [generative adapter](./backends#generative-decision-adapter), which scores the allowed values from any configured generative model's log-probabilities where the model exposes them and votes over structured completions otherwise.
 
 ```javascript
 const decision = await models.decide(ticket.body, {

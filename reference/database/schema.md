@@ -367,7 +367,7 @@ Multiple `@embed` attributes on one type are computed concurrently.
 
 <VersionBadge version="v5.3.0" />
 
-Automatically makes a typed decision about the source field whenever a write carries it, using a configured [decision model](../models/overview#configuration), and stores the chosen value on the attribute and, optionally, its probability on a second attribute:
+Automatically makes a typed decision about the source field whenever a write carries it, using a configured [decision model](../models/overview#configuration) ([Start here: typed decisions](../models/overview#start-here-typed-decisions) walks through a first one), and stores the chosen value on the attribute and, optionally, its probability on a second attribute:
 
 ```graphql
 type Ticket @table {
