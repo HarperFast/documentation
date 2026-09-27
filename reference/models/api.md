@@ -106,8 +106,8 @@ Errors detected before the call starts (unknown model name, missing capability) 
 <VersionBadge version="v5.3.0" />
 
 ```typescript
-models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
 models.decide<T>(state: DecideInput, schema: DecisionSchema, options: DecideOpts & { persist: true }): Promise<RecordedDecision<T>>
+models.decide<T>(state: DecideInput, schema: DecisionSchema, options?: DecideOpts): Promise<Decision<T>>
 ```
 
 Chooses from a closed set of allowed values and returns the chosen value together with a probability distribution over the whole set. Where `generate()` returns open-ended text, `decide()` answers a classification, routing, scoring, moderation, or guardrail question with numbers an application can threshold on. It is served by [decision backends](./backends#decision-backends): a classifier or hosted decision model registered as a custom backend, or the built-in [generative adapter](./backends#generative-decision-adapter), which scores the allowed values from any configured generative model's log-probabilities where the model exposes them and votes over structured completions otherwise.
