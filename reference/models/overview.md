@@ -21,16 +21,18 @@ const route = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bu
 
 The same object is available as `scope.models` in component scopes and as the `models` global. All three refer to the same instance.
 
-The API surface is six methods:
+The API surface is eight methods:
 
-| Method                                                           | Purpose                                                                             |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [`models.embed(input, options?)`](./api#embed)                   | Convert text to embedding vectors                                                   |
-| [`models.generate(input, options?)`](./api#generate)             | Generate a completion for a prompt or chat                                          |
-| [`models.generateStream(input, options?)`](./api#generatestream) | Stream a completion as it is produced                                               |
-| [`models.decide(state, schema, options?)`](./api#decide)         | Choose from a closed set, with a probability distribution over it                   |
-| [`models.getDecision(id)`](./api#getdecision)                    | Read a decision recorded with `persist: true`, and what was recorded about it since |
-| [`models.recordOutcome(id, outcome)`](./api#recordoutcome)       | Record what actually happened for a decision recorded with `persist: true`          |
+| Method                                                             | Purpose                                                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [`models.embed(input, options?)`](./api#embed)                     | Convert text to embedding vectors                                                     |
+| [`models.generate(input, options?)`](./api#generate)               | Generate a completion for a prompt or chat                                            |
+| [`models.generateStream(input, options?)`](./api#generatestream)   | Stream a completion as it is produced                                                 |
+| [`models.decide(state, schema, options?)`](./api#decide)           | Choose from a closed set, with a probability distribution over it                     |
+| [`models.getDecision(id)`](./api#getdecision)                      | Read a decision recorded with `persist: true`, and what was recorded about it since   |
+| [`models.recordOutcome(id, outcome)`](./api#recordoutcome)         | Record what actually happened for a decision recorded with `persist: true`            |
+| [`models.calibrate(overrides?)`](./calibration#calibrate)          | Fit calibrations from recorded outcomes now                                           |
+| [`models.getCalibrations(filter?)`](./calibration#getcalibrations) | Read how reliable each population's decisions are, and the correction applied to them |
 
 Generation supports [tool calling](./tool-calling), including a built-in agent loop (`toolMode: 'auto'`) that resolves tool calls in-process. Decisions are served by [decision backends](./backends#decision-backends), including a built-in adapter that scores the allowed values from any configured generative model's log-probabilities where the model exposes them, and votes over structured completions otherwise. Tables can compute embedding vectors automatically at write time with the [`@embed` schema directive](../database/schema#embed), and vectors can be searched with [HNSW vector indexes](../database/schema#vector-indexing); the [`@decide` schema directive](../database/schema#decide) likewise stores a typed decision and its probability whenever a source field is written. New to decisions? Begin with [Start here: typed decisions](#start-here-typed-decisions). Every model call is recorded for [observability and usage accounting](./analytics).
 
@@ -91,7 +93,7 @@ if (decision.probability >= 0.8) await route(ticket, decision.value);
 else await sendToReview(ticket, decision);
 ```
 
-`decision.calibrated` is `false` for the built-in adapter. Its probability ranks the choices well, but it is not a measured frequency: 0.8 does not mean the decision is right 80% of the time. Start with a cautious threshold and adjust it once you know how often decisions above it turn out right, which is what step 4 is for.
+`decision.calibrated` is `false` for the built-in adapter. Its probability ranks the choices well, but it is not a measured frequency: 0.8 does not mean the decision is right 80% of the time. Start with a cautious threshold and adjust it once you know how often decisions above it turn out right, which is what step 4 is for. With [calibration](./calibration) turned on, Harper measures that for you from the outcomes you record, corrects later probabilities, and reports which threshold covers how much traffic at what error rate.
 
 **4. Record outcomes only when you will use them.** By default nothing is stored beyond the per-call log, and the result has no `id`. When you want to check decisions against what really happened, add `persist: true` to the step 2 call and keep the decision's `id` with what you did:
 

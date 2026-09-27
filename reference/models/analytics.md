@@ -61,6 +61,8 @@ Rows expire 365 days after the decision was made; a recorded outcome carries the
 }
 ```
 
+A decision corrected by a [fitted calibration](./calibration) also keeps its uncorrected scores (`rawDistribution`, or `rawFields` for an object schema) and the correction it applied (`calibration`), and a decision recorded while calibration is enabled carries the `population` it belongs to. The corrections themselves are versions in the replicating `hdb_model_calibrations` table; read them with [`models.getCalibrations()`](./calibration#getcalibrations).
+
 ## Aggregate metrics
 
 <VersionBadge type="changed" version="v5.3.0" />
