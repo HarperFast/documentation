@@ -63,13 +63,13 @@ const sidebarsLearn: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
-					id: 'developers/full-text-search-product-catalog',
-					label: 'Full-Text Product Search',
+					id: 'developers/write-through-caching',
+					label: 'Write-Through Caching',
 				},
 				{
 					type: 'doc',
-					id: 'developers/write-through-caching',
-					label: 'Write-Through Caching',
+					id: 'developers/full-text-search-product-catalog',
+					label: 'Full-Text Product Search',
 				},
 				{
 					type: 'doc',

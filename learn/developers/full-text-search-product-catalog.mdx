@@ -5,7 +5,20 @@ description: Configure and query a BM25-ranked product search in Harper.
 
 # Add Full-Text Search to a Product Catalog
 
+<VersionBadge version="v5.3.0" />
+
 This guide adds relevance-ranked text search to a product catalog, then exposes it through Harper's JavaScript and REST APIs.
+
+## What you will build
+
+- A BM25-ranked index over product names, descriptions, and tags
+- A Harper application endpoint with highlights and a structured category filter
+- REST queries for terms, phrases, and record autocomplete
+
+## Prerequisites
+
+- Harper 5.3 or later using RocksDB
+- A component with a GraphQL schema and JavaScript resources
 
 ## 1. Declare the index
 
@@ -57,10 +70,10 @@ Harper commits the record first, then applies the committed change to the local 
 
 ## 3. Search from a Harper application
 
-```javascript
+```javascript title="resources.js"
 export class SearchProducts extends tables.Product {
 	static async get(target) {
-		const text = target.searchParams.get('q') ?? '';
+		const text = target.get('q') ?? '';
 		return tables.Product.search({
 			conditions: [
 				{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true },
@@ -72,6 +85,8 @@ export class SearchProducts extends tables.Product {
 	}
 }
 ```
+
+Call the resource with `GET /SearchProducts?q=trail`.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
 
@@ -122,3 +137,9 @@ Do not apply this wait to every catalog request without measuring it. The normal
 Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests return a retryable `503` until the rebuild is ready.
 
 See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.
+
+## Additional resources
+
+- [Full-text search overview](/reference/v5/full-text-search/overview)
+- [Resource API](/reference/v5/resources/resource-api)
+- [Query optimization](/reference/v5/resources/query-optimization)
