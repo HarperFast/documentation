@@ -80,17 +80,17 @@ Whether the `system` database is in your replication scope is the highest-stakes
 
 ## What moves automatically, and what does not
 
-| Object or change            | Behavior                                                                                                                        | What it means for you                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Data mutations              | Insert, update, upsert, delete, and bulk load replicate for tables in scope                                                     | Monitor connections, latency, and convergence for the databases that serve critical journeys                  |
-| Transactions                | Replicated atomically, and a transaction may span multiple tables                                                               | Tables that need to commit together must live in the same database                                            |
-| A brand new node            | Requests a full copy of each in-scope database from every peer it has no resume cursor for, then enters incremental replication | Budget N transfers, not one. See the note below before sizing a join                                          |
-| A returning node            | Resynchronizes automatically to catch up on the transactions it missed                                                          | This is not a full copy. A routine restart is much cheaper than a node replacement, so budget them separately |
-| Component deployment        | `deploy_component` replicates by default; pass `"replicated": false` to hold it to one node                                     | Cluster-wide is the default, so single-node validation is the case you must ask for                           |
-| Configuration               | `set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />                                             | Never replicate node-local parameters. See the warning below                                                  |
-| Users and roles             | Propagate when the `system` database is in replication scope, which is the default                                              | If you narrow scope to exclude `system`, identity must be provisioned on every node by your own automation    |
-| Node registry (`hdb_nodes`) | Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload                      | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes |
-| Destructive schema changes  | `drop_database` and `drop_table` replicate by default; `drop_attribute` does not                                                | A drop is a cluster-wide event unless you pass `"replicated": false`. Verify the result on every node         |
+| Object or change            | Behavior                                                                                                                                                | What it means for you                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data mutations              | Insert, update, upsert, delete, and bulk load replicate for tables in scope                                                                             | Monitor connections, latency, and convergence for the databases that serve critical journeys                                                                           |
+| Transactions                | Replicated atomically, and a transaction may span multiple tables                                                                                       | Tables that need to commit together must live in the same database                                                                                                     |
+| A brand new node            | Requests a full copy of each in-scope database from every peer it has no resume cursor for, then enters incremental replication                         | Budget N transfers, not one. See the note below before sizing a join                                                                                                   |
+| A returning node            | Resynchronizes automatically to catch up on the transactions it missed                                                                                  | This is not a full copy. A routine restart is much cheaper than a node replacement, so budget them separately                                                          |
+| Component deployment        | `deploy_component` replicates by default; pass `"replicated": false` to hold it to one node                                                             | Cluster-wide is the default, so single-node validation is the case you must ask for                                                                                    |
+| Configuration               | `set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" />                                                                     | Never replicate node-local parameters. See the warning below                                                                                                           |
+| Users and roles             | Propagate when the `system` database is in replication scope, which is the default                                                                      | If you narrow scope to exclude `system`, identity must be provisioned on every node by your own automation                                                             |
+| Node registry (`hdb_nodes`) | Lives in `system`, so it propagates with it. Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes, and see below if you need the registry kept per cluster |
+| Destructive schema changes  | `drop_database` and `drop_table` replicate by default; `drop_attribute` does not                                                                        | A drop is a cluster-wide event unless you pass `"replicated": false`. Verify the result on every node                                                                  |
 
 The three rows most likely to bite you are the returning node, the new node, and the node registry.
 
@@ -101,6 +101,8 @@ On the new node, the cost is larger than "one copy from one peer," because the f
 The practical consequences are worth planning around. Load lands on every existing peer at once rather than on one, so a join during peak traffic is a capacity event for the whole cluster. If you want a single designated source instead, `add_node` accepts `isLeader: true`, which tells the joining node to request its full copy from that peer alone.
 
 On the registry: a node's advertised record is derived from its configuration file, and it replicates. That means a topology constraint you applied imperatively is superseded the next time that node restarts or reloads components, and the node quietly goes back to advertising itself more broadly than you intended.
+
+That propagation is what makes gossip discovery work, and since v5.2 the record each node advertises is directional, derived from its own routes, so replicating `system` no longer collapses a constrained topology into a full mesh. If you need the registry itself kept per cluster rather than shared, that is a deliberate per-route setting: `excludeTables: ['hdb_nodes']` on a route's `sendsTo` or `receivesFrom` entry stops those rows crossing that link while users, roles, and schema still propagate. Its main use is a migration bridge between clusters that should share identity but keep separate topology.
 
 :::danger
 When replicating configuration, only send cluster-appropriate parameters. Replicating a node-local value such as a port, `node.hostname`, a file path, TLS material, or `replication.hostname`, `url`, or `routes` overwrites every peer's own local value. To apply a cluster-wide change safely, use `set_configuration` with `"replicated": true` for the parameter, then `restart_service` with `"replicated": true`, which restarts nodes one at a time.
@@ -117,7 +119,7 @@ A trimmed response, with the fields that matter:
 	"is_enabled": true,
 	"connections": [
 		{
-			"url": "wss://server-2.example.net:9933",
+			"url": "wss://server-2.example.net:<configured-secure-port>",
 			"name": "server-2.example.net",
 			"database_sockets": [
 				{

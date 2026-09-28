@@ -44,7 +44,7 @@ Once these are separate you get options that do not exist otherwise. You can ins
 This is the opposite of what most operators assume, and it is why the single-node validation pattern below has to say `false` explicitly. If you intend to touch one node, you must say so. ([`set_configuration`](/reference/v5/configuration/operations) is the deliberate exception: it replicates only when you ask.)
 :::
 
-`urlPath` mounts a component at an HTTP path. `host` (Added in: v5.2.0) serves it on a virtual hostname. Both are persisted on the component's root config entry, so they are part of the deployed state rather than a runtime toggle. See [HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
+`urlPath` mounts a component at an HTTP path and `host` serves it on a virtual hostname. Routing by either has been available since v5.1.0. What arrived in v5.2.0 is declaring that routing on the application's entry in the root `harper-config.yaml`, and the matching `host` parameter on `deploy_component`. Declared that way, the routing is persisted deployment state rather than a runtime toggle. See [HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
 
 ## The change loop
 
@@ -122,7 +122,7 @@ This is worth reading carefully, because the naming invites a wrong assumption.
 **`"restart": "rolling"`** does not restart inline either, but it is observable. It starts a replicated `restart_service` job and returns a `restartJobId` you can poll with [`get_job`](/reference/v5/operations-api/operations#get_job). That job walks the cluster **one node at a time**, waiting for each node to come back before starting the next, so the cluster keeps serving throughout.
 
 :::warning
-**On a cluster, prefer `"rolling"`.** `"restart": true` is forwarded verbatim to every peer, and peers are dispatched in parallel, so a replicated deploy with `"restart": true` restarts every node in the cluster at roughly the same moment. That is a cluster-wide availability event, not a node-local one. Reserve `"restart": true` for a single-node or development instance, and use `"rolling"` anywhere you care about staying up. See [Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx).
+**On a cluster, prefer `"rolling"`.** `"restart": true` is forwarded verbatim to every peer, so every node restarts independently as it finishes applying the deploy. Nothing sequences them and nothing waits, so the restarts are free to overlap. You get no rolling coordination and no guarantee that any node is still serving, which makes this a cluster-wide availability risk rather than a node-local one. Reserve `"restart": true` for a single-node or development instance, and use `"rolling"` anywhere you care about staying up. See [Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx).
 :::
 
 Two more consequences for your pipeline. Neither restart mode reports completion in the deploy response, so if you need to know the new code is live, poll the rolling restart job or probe the nodes themselves. And a failed restart does not fail the deploy: the component is installed and replicated either way, so your pipeline needs to check both outcomes separately rather than assuming one implies the other.
