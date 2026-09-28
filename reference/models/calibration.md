@@ -132,7 +132,7 @@ models:
 - **Right after a start, or after a new fit, decisions come back uncorrected for a moment.** Each node loads a population's correction in the background after its first decision, and rechecks it about once a minute. Corrections replicate like other system tables, so a new fit or a revocation takes effect on a node within about a minute of reaching it; a node behind on replication keeps its previous correction until it catches up.
 - **Only an eligible, current correction applies.** It must have beaten the raw probabilities on the held-out decisions, be younger than `maxAgeMs` (30 days by default), and have been fitted under the current settings. A newer run whose evidence no longer supports it, for example after truths were corrected, revokes it everywhere.
 - **All fields or none.** An object schema is corrected only when every field has a correction.
-- **A schema with a `noMatch: true` leaf is not corrected yet**, because its [no-match score](./api#no-match-scores) would stay uncorrected under `calibrated: true`. It still gets reliability reports.
+- **A schema with a `noMatch: true` leaf is not corrected yet**, because its [no-match score](./api#no-match-scores) would stay uncorrected under `calibrated: true`. It still gets reliability reports, with the reason `no-match-schema`.
 - **`requires: ['calibrated']` is unchanged.** It still routes only to a backend that calibrates its own probabilities. To automate only corrected decisions, check `decision.calibrated` and send the rest to review, which keeps a decision you have already paid for.
 
 ## Configuration
@@ -155,7 +155,7 @@ Every setting of `models.calibration` is optional.
 | `maxRunMs`          | `60000`                | Time a run may take                                                        |
 | `maxLoads`          | `8`                    | Correction lookups a node runs at once in the background                   |
 
-A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently.
+A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Half of `maxDecisions` looks for new populations among the newest decisions, and the rest continues from where the previous run stopped, so an older, quiet population is reached within a few runs. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
 
 ## API
 
@@ -165,7 +165,7 @@ A run that reaches a budget stops cleanly and says which one. Populations it did
 models.calibrate(budgets?: CalibrationBudgets): Promise<CalibrationRunResult>
 ```
 
-Runs a fit now, as the periodic job does. Useful in development and tests, or right after recording a batch of outcomes. `budgets` may narrow this run's `maxDecisions`, `maxPopulations`, `maxExamplesPerKey`, `maxBytes` and `maxRunMs`; the settings that decide whether a correction qualifies always come from configuration, so every node judges a version by the same rules. It resolves with what the run did and never rejects for a storage fault: the fault is reported in the result.
+Runs a fit now, as the periodic job does. Useful in development and tests, or right after recording a batch of outcomes. `budgets` may lower, never raise, this run's `maxDecisions`, `maxPopulations`, `maxExamplesPerKey`, `maxBytes` and `maxRunMs`; the settings that decide whether a correction qualifies always come from configuration, so every node judges a version by the same rules. It resolves with what the run did and never rejects for a storage fault: the fault is reported in the result.
 
 A run covers every tenant's decisions, and its result counts all of them. Treat it as a maintenance operation: call it from trusted code, and do not return its result to a tenant.
 
@@ -186,16 +186,16 @@ models.getCalibrations(filter?: { model?: string }): Promise<CalibrationSummary[
 
 The newest version for each field of each population whose tenant is the caller's, newest first. The tenant comes from the calling user and cannot be passed in; decisions made without a tenant are visible only to callers without one.
 
-| Field                                         | Meaning                                                                                            |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `model`, `field`                              | The logical model, and the field for an object schema                                              |
-| `signature`, `instructionsHash`, `schemaHash` | What identifies the population                                                                     |
-| `eligible`, `reason`                          | Whether the correction qualified, and if not, `too-few-labels` or `no-improvement`                 |
-| `applied`                                     | Whether it is being applied now: eligible, current, and fitted under the current settings          |
-| `fittedAt`, `applyUntil`                      | When it was fitted, and when it stops applying                                                     |
-| `decisions`, `labelled`                       | Recorded decisions the run read for this population, and how many had a truth                      |
-| `t`                                           | The temperature: above 1 softens overconfident probabilities, below 1 sharpens underconfident ones |
-| `report`                                      | The [reliability report](#choosing-a-threshold), from 20 outcomes                                  |
+| Field                                         | Meaning                                                                                               |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `model`, `field`                              | The logical model, and the field for an object schema                                                 |
+| `signature`, `instructionsHash`, `schemaHash` | What identifies the population                                                                        |
+| `eligible`, `reason`                          | Whether the correction qualified, and if not, `too-few-labels`, `no-improvement` or `no-match-schema` |
+| `applied`                                     | Whether it is being applied now: eligible, current, and fitted under the current settings             |
+| `fittedAt`, `applyUntil`                      | When it was fitted, and when it stops applying                                                        |
+| `decisions`, `labelled`                       | Recorded decisions the run read for this population, and how many had a truth                         |
+| `t`                                           | The temperature: above 1 softens overconfident probabilities, below 1 sharpens underconfident ones    |
+| `report`                                      | The [reliability report](#choosing-a-threshold), from 20 outcomes                                     |
 
 ## Storage
 
