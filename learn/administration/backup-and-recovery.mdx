@@ -49,7 +49,7 @@ A backup is a whole-database copy: all tables, the transaction log, and any file
 Two limitations to check against your own deployment now rather than later:
 
 - **Managed backups require RocksDB.** For LMDB databases your options are `get_backup` or volume snapshots.
-- **One storage root per database.** A database whose tables use per-table `path` storage configs spans multiple root stores and cannot be backed up with these operations at all. Database-level custom storage paths are fine. If someone has configured per-table paths, your backup strategy for that database does not exist yet and you need to know that before launch.
+- **One storage root per database.** Backup is rejected when a database's tables resolve to more than one storage root. A database-level custom `storage.path` is fine, and so is a per-table `path` that still lands on the same root. It is a database whose tables are split across roots that cannot be backed up with these operations at all, and if you have one, your backup strategy for it does not exist yet.
 
 :::
 
@@ -152,7 +152,7 @@ RocksDB is single-writer, so an in-place restore requires the database to be ful
 Because the restore runs as a background job, a component holding the database open does not fail your request. It fails inside the job, so you find out from `get_job` rather than from the response. Harper does not track which component uses which database, so it cannot selectively stop one.
 
 :::tip
-That last constraint has an escape hatch worth knowing before you need it. Setting `HARPER_SAFE_MODE` to any value starts Harper without loading any applications or components, while the database, Operations API, and HTTP server come up normally:
+That last constraint has an escape hatch worth knowing before you need it. Setting `HARPER_SAFE_MODE` to any value starts Harper without loading your applications and components, while the database, Operations API, and HTTP server come up normally. Harper's own built-in root component still loads; what is skipped is everything you deployed:
 
 ```bash
 HARPER_SAFE_MODE=1 harper run
@@ -218,7 +218,7 @@ Both measured numbers feed [Engineering RPO, RTO, and Uptime](./engineering-rpo-
 - [ ] Failure classes enumerated, with the mechanism that addresses each
 - [ ] Recovery point and recovery time stated per database, not per cluster
 - [ ] Storage engine confirmed per database, and the mechanism chosen accordingly
-- [ ] No database in scope uses per-table storage paths, or its exclusion is known and accepted
+- [ ] No database in scope has tables spanning more than one storage root, or the exclusion is known and accepted
 - [ ] Backup cadence matches the stated recovery point per database
 - [ ] Backup volume sized against the non-incremental transaction-log snapshot, and against full blob copies if the backup and blob paths are on different filesystems
 - [ ] An off-host copy exists in a destination that does not share a failure domain

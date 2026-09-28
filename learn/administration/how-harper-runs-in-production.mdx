@@ -35,7 +35,9 @@ There are three main default ports:
 | `9925` | The [Operations API](/reference/v5/operations-api/overview)                 | Operators and your pipeline only  |
 | `9933` | Secure peer [replication](/reference/v5/replication/overview)               | Other nodes in the cluster only   |
 
-These are the default values. Confirm the live values using the [`get_configuration`](TODO) operation. The replication port in particular can be inherited from other configurations.
+These are the default values. Confirm the live values using the [`get_configuration`](/reference/v5/operations-api/operations#get_configuration) operation.
+
+Resolve the replication port rather than assuming it. `9933` is the default a fresh Harper Pro install writes into `harper-config.yaml`, but it is a configured value, not a constant. When no `replication` block is present at all, the secure replication port falls back to the Operations API secure port instead, so it lands on `9925`. That is not a hypothetical: an in-place upgrade carries the previous configuration forward and does not backfill a `replication` block, so an upgraded node with no such block replicates on a different port than a freshly installed one.
 
 Read back `http.port`, `operationsApi.network.port`, and the `replication` block. Record what you find. Later guides in this track assume you know these numbers for your own deployment.
 
