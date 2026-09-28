@@ -73,12 +73,17 @@ Harper commits the record first, then applies the committed change to the local 
 ```javascript title="resources.js"
 export class SearchProducts extends databases.catalog.Product {
 	static async get(target) {
-		const text = target.get('q') ?? '';
+		const text = target.get('q')?.trim();
+		if (!text) {
+			const error = new Error('q is required');
+			error.statusCode = 400;
+			throw error;
+		}
+		const conditions = [{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true }];
+		const category = target.get('category');
+		if (category) conditions.push({ attribute: 'category', comparator: 'equals', value: category });
 		return super.search({
-			conditions: [
-				{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true },
-				{ attribute: 'category', comparator: 'equals', value: 'footwear' },
-			],
+			conditions,
 			select: ['id', 'name', 'price', '$score', '$highlights'],
 			limit: 20,
 		});
@@ -86,7 +91,7 @@ export class SearchProducts extends databases.catalog.Product {
 }
 ```
 
-Call the resource with `GET /SearchProducts?q=trail`.
+Call the resource with `GET /SearchProducts?q=trail&category=footwear`. The category filter is optional; `q` is required.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
 
