@@ -71,10 +71,10 @@ Harper commits the record first, then applies the committed change to the local 
 ## 3. Search from a Harper application
 
 ```javascript title="resources.js"
-export class SearchProducts extends tables.Product {
+export class SearchProducts extends databases.catalog.Product {
 	static async get(target) {
 		const text = target.get('q') ?? '';
-		return tables.Product.search({
+		return super.search({
 			conditions: [
 				{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true },
 				{ attribute: 'category', comparator: 'equals', value: 'footwear' },
@@ -89,6 +89,8 @@ export class SearchProducts extends tables.Product {
 Call the resource with `GET /SearchProducts?q=trail`.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
+
+Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). This example is appropriate when the selected catalog fields are public. If access depends on the caller, authorize the request in `get()` before returning results; the underlying table's role and attribute permissions are not reapplied automatically.
 
 ## 4. Search through REST
 
@@ -117,7 +119,7 @@ Prefix search returns matching products. It does not return a dictionary of sugg
 Most searches can use the default three-second lag tolerance. When the next request must find a record that was just written, use the JavaScript API and wait for current index coverage:
 
 ```javascript
-const results = await tables.Product.search({
+const results = await databases.catalog.Product.search({
 	conditions: [
 		{
 			attribute: 'catalogSearch',
@@ -134,7 +136,7 @@ Do not apply this wait to every catalog request without measuring it. The normal
 
 ## 6. Operate the index
 
-Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests return a retryable `503` until the rebuild is ready.
+Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests return `503` with `code: "INDEX_REBUILDING"` and `retryable: true` until the rebuild is ready. Retry this code with backoff; do not treat every `503` as an index rebuild.
 
 See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.
 
