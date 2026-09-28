@@ -97,10 +97,10 @@ A correction learned for one model never applies to another. Decisions share a p
 | Instructions     | The `instructions` option                                                                                                          |
 | Schema and field | The decision schema, and for an object schema each field separately                                                                |
 
-A fingerprint covers an entry's settings except its credentials and its `fallback` list. So:
+A fingerprint covers every setting of an entry except its `fallback` list and fields named as credentials: `apiKey`, `apiSecret`, `accessKeyId`, `secretAccessKey`, `sessionToken`, `authorization`, `password`, `token`, `bearerToken` and `credentials`. A secret stored under any other name is part of the fingerprint, so rotating it starts calibration over. So:
 
 - Changing a model, endpoint, sample count or other setting starts a new population, and the old correction stops applying at once. A new model has a different confidence profile, so learning it again is correct.
-- Rotating an API key, reordering fallbacks, or adding an unrelated entry keeps every correction.
+- Rotating a credential in one of those fields, reordering fallbacks, or adding an unrelated entry keeps every correction.
 - The route or resource that made the call is not part of the population, so the same question asked from two endpoints shares one correction.
 
 Some decisions are never corrected and never learned from:
