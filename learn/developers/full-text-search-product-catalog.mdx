@@ -18,7 +18,7 @@ This guide adds relevance-ranked text search to a product catalog, then exposes 
 ## Prerequisites
 
 - Harper 5.3 or later using RocksDB
-- A component with a GraphQL schema and JavaScript resources
+- A component with a GraphQL schema, JavaScript resources, and `rest: true` in its `config.yaml`
 
 ## 1. Declare the index
 
@@ -79,7 +79,15 @@ export class SearchProducts extends databases.catalog.Product {
 			error.statusCode = 400;
 			throw error;
 		}
-		const conditions = [{ attribute: 'catalogSearch', comparator: 'matches', value: text, includeHighlights: true }];
+		const conditions = [
+			{
+				attribute: 'catalogSearch',
+				comparator: 'matches',
+				value: text,
+				fields: ['name', 'description', 'tags'],
+				includeHighlights: true,
+			},
+		];
 		const category = target.get('category');
 		if (category) conditions.push({ attribute: 'category', comparator: 'equals', value: category });
 		return super.search({
@@ -91,11 +99,11 @@ export class SearchProducts extends databases.catalog.Product {
 }
 ```
 
-Call the resource with `GET /SearchProducts?q=trail&category=footwear`. The category filter is optional; `q` is required.
+Call the resource with `GET /SearchProducts/?q=trail&category=footwear`. The category filter is optional; `q` is required.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
 
-Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). This example is appropriate when the selected catalog fields are public. If access depends on the caller, authorize the request in `get()` before returning results; the underlying table's role and attribute permissions are not reapplied automatically.
+Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). This example is appropriate because every field in `fields` is public. If access depends on the caller, authorize the request in `get()` and restrict `fields` before searching; the underlying table's role and attribute permissions are not reapplied automatically, and highlights can reveal searched fields even when those fields are absent from `select`.
 
 ## 4. Search through REST
 
@@ -138,6 +146,8 @@ const results = await databases.catalog.Product.search({
 ```
 
 Do not apply this wait to every catalog request without measuring it. The normal bounded-staleness path keeps search traffic independent of short indexing bursts.
+
+If the index does not reach current coverage within ten seconds, consuming the search returns retryable `503` code `DERIVED_INDEX_LAGGING`. See [freshness controls](/reference/v5/full-text-search/querying#freshness-controls).
 
 ## 6. Operate the index
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './EngineBadge.module.css';
+import styles from './VersionBadge.module.css';
 
 const CANONICAL_NAMES: Record<string, string> = {
 	rocksdb: 'RocksDB',
