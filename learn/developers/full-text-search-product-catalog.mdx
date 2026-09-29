@@ -66,6 +66,8 @@ Content-Type: application/json
 
 Harper commits the record first, then applies the committed change to the local derived full-text index. Every replica performs the same derivation from the transaction it receives.
 
+If the index remains behind for more than 30 seconds, a local write can return retryable `503` code `DERIVED_INDEX_LAGGING`. Retry writes with backoff while the index catches up; freshness options apply only to searches. See [write backpressure](/reference/v5/full-text-search/overview#write-backpressure).
+
 ## 3. Search from a Harper application
 
 ```javascript title="resources.js"
