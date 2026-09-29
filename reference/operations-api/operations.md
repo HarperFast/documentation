@@ -1098,6 +1098,8 @@ Two kinds of deploy set it:
 - A component that had no directory before this deploy. It has never been loaded, so its routes cannot be live until Harper restarts.
 - A redeploy whose package metadata changed (v5.2.1) — a dependency or module-entry change invalidates loaded code, and package metadata sits outside most plugin file globs, so the component's own watcher does not see it.
 
+A third source is not a deploy at all: a component install still running when [`deployment.startupInstallTimeout`](../configuration/options.md#deployment) expires at startup sets the flag if it later succeeds (v5.3.0).
+
 An ordinary redeploy sets nothing: the component's watched files are handled by its file watcher, which requests a restart only when the update needs one.
 
 The flag is evaluated per node. A peer applying the replicated deploy checks its own directory state, since whether the component was already active can differ from node to node.
