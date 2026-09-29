@@ -116,7 +116,7 @@ Type: `number`
 
 Default: `0` (compression disabled)
 
-The threshold is also the on/off switch: `0` disables compression rather than compressing every response, and any non-zero byte count enables it. For clients that send `Accept-Encoding: br`, responses larger than this threshold are Brotli-compressed; Brotli is the only encoding Harper applies, so a client that accepts only `gzip` or `deflate` receives an uncompressed body. Streaming responses (query results and other iterable bodies) are compressed for those clients whenever the threshold is non-zero, regardless of size, since their size is unknown upfront. Server-Sent Events are never compressed. `1200` bytes, about one TCP packet, is a reasonable starting value.
+The threshold is also the on/off switch: `0` disables compression rather than compressing every response, and any non-zero byte count enables it. For clients that send `Accept-Encoding: br`, responses larger than this threshold are Brotli-compressed; Brotli is the only encoding Harper applies, so a client that accepts only `gzip` or `deflate` receives an uncompressed body. A response the content type serializes as a stream (query results, for example) is compressed for those clients whenever the threshold is non-zero, regardless of size, since its size is unknown upfront; an iterable body that the content type serializes to a single buffer, such as a plain array sent as MessagePack, is compressed only above the threshold. Server-Sent Events are never compressed. `1200` bytes, about one TCP packet, is a reasonable starting value.
 
 ```yaml
 http:

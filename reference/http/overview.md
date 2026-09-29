@@ -111,7 +111,7 @@ HTTP/2 can be enabled with the `http2: true` option in `harper-config.yaml`. Whe
 
 ## Compression
 
-Response compression is off by default. Setting [`http.compressionThreshold`](./configuration#httpcompressionthreshold) to a non-zero byte count enables it: Harper then Brotli-compresses responses larger than the threshold for clients that advertise `Accept-Encoding: br`, and compresses streaming responses regardless of size (since their size is not known upfront).
+Response compression is off by default. Setting [`http.compressionThreshold`](./configuration#httpcompressionthreshold) to a non-zero byte count enables it: Harper then Brotli-compresses responses larger than the threshold for clients that advertise `Accept-Encoding: br`, and compresses streamed responses regardless of size (since their size is not known upfront). Server-Sent Events are never compressed.
 
 ## Logging
 
