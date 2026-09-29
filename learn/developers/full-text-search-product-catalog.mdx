@@ -70,14 +70,14 @@ Harper commits the record first, then applies the committed change to the local 
 
 ```javascript title="resources.js"
 export class SearchProducts extends Resource {
-	static loadAsInstance = false;
-
-	allowCreate(user) {
-		return Boolean(user);
-	}
-
-	async post(_target, body) {
-		const text = body.q?.trim();
+	static async post(_target, data, context) {
+		if (!context?.user) {
+			const error = new Error('Authentication required');
+			error.statusCode = 401;
+			throw error;
+		}
+		const body = (await data) ?? {};
+		const text = typeof body.q === 'string' ? body.q.trim() : '';
 		if (!text) {
 			const error = new Error('q is required');
 			error.statusCode = 400;
@@ -89,24 +89,19 @@ export class SearchProducts extends Resource {
 				comparator: 'matches',
 				value: text,
 				fields: ['name', 'description', 'tags'],
-				includeHighlights: true,
 			},
 		];
 		const category = body.category;
 		if (category) conditions.push({ attribute: 'category', comparator: 'equals', value: category });
-		const records = [];
-		for await (const record of databases.catalog.Product.search(
+		return databases.catalog.Product.search(
 			{
 				conditions,
 				select: ['id', 'name', 'price', '$score', '$highlights'],
 				limit: 20,
 				checkPermission: true,
 			},
-			this.getContext()
-		)) {
-			records.push(record);
-		}
-		return records;
+			context
+		);
 	}
 }
 ```
@@ -124,7 +119,9 @@ The category filter is optional; `q` is required.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
 
-Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). Passing `this.getContext()` preserves the authenticated caller, and `checkPermission: true` asks the table to enforce that caller's table and source-field permissions. The custom resource must do both. Highlights can expose searched source text even when those fields are absent from `select`.
+Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). Forwarding the resource's `context` preserves the authenticated caller, and `checkPermission: true` asks the table to enforce that caller's table and source-field permissions. The custom resource must do both. Highlights can expose searched source text even when those fields are absent from `select`.
+
+The search includes `tags`, but that source does not set `highlight: true`. A tag match can rank a product, while `$highlights` omits `tags`.
 
 ## 4. Search through REST
 
@@ -148,12 +145,14 @@ GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&select(id,name)&limi
 
 Prefix search returns matching products. It does not return a dictionary of suggested terms.
 
+REST searches every source field in the index, so the caller must be allowed to read `name`, `description`, and `tags` for these requests. Use `Table.search()` or `search_by_conditions` when a role should search only a subset of sources. See [REST full-text operators](/reference/v5/rest/querying#full-text-operators).
+
 ## 5. Choose consistency behavior
 
 Most searches can use the default three-second lag tolerance. When the next request must find a record that was just written, use the JavaScript API and wait for current index coverage:
 
 ```javascript
-const results = await databases.catalog.Product.search({
+for await (const product of databases.catalog.Product.search({
 	conditions: [
 		{
 			attribute: 'catalogSearch',
@@ -163,7 +162,9 @@ const results = await databases.catalog.Product.search({
 			waitForIndexMilliseconds: 10000,
 		},
 	],
-});
+})) {
+	console.log(product);
+}
 ```
 
 Do not apply this wait to every catalog request without measuring it. The normal bounded-staleness path keeps search traffic independent of short indexing bursts.
@@ -172,7 +173,7 @@ If the index does not reach current coverage within ten seconds, consuming the s
 
 ## 6. Operate the index
 
-Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests return `503` with `code: "INDEX_REBUILDING"` and `retryable: true` until the rebuild is ready. Retry this code with backoff; do not treat every `503` as an index rebuild.
+Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests in `unknown`, `needs-rebuild`, or `rebuilding` state return `503` with `code: "INDEX_REBUILDING"` and `retryable: true`. Retry this code with backoff; do not treat every `503` as an index rebuild.
 
 See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.
 
