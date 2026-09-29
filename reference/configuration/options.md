@@ -255,7 +255,7 @@ replication:
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
 - `enableRootCAs` — Verify against Node.js Mozilla CA store; _Default_: `true`
 - `blobTimeout` — Blob transfer timeout (ms); _Default_: `120000`
-- `maxPayload` — Largest replication message, in bytes, a node sends. <VersionBadge version="v5.3.0" /> Also bounds a build a replicated deploy sends inside the operation when the `system` database does not replicate: its size times the number of peers; _Default_: `100000000`
+- `maxPayload` <VersionBadge version="v5.3.0" /> — Largest replication message, in bytes, a node sends. Also bounds a build a replicated deploy sends inside the operation when the `system` database does not replicate: its size times the number of peers; _Default_: `100000000`
 - `blobGapReconnectMs` — Interval (ms) for the blob-gap watchdog: when a transient blob save failure pins a replication resume cursor, the connection is forced to reconnect on this cadence so the gapped blob is re-streamed and, during a bulk copy, the copy resumes from the last banked cursor. Lower values heal gaps faster at the cost of more reconnects on a link whose faults never heal; _Default_: the `blobTimeout` value
 - `copyCursorFlushBytes` — Bytes of applied bulk-copy data between durable flushes of the copy resume cursor (RocksDB); _Default_: `67108864`
 - `copyCursorFlushIntervalMs` — Maximum time (ms) between durable flushes of the bulk-copy resume cursor (RocksDB); _Default_: `5000`
@@ -417,7 +417,7 @@ deployment:
     maxCount: 5
 ```
 
-- `payloadRetention.maxSize` <VersionBadge version="v5.1.15" /> — Bytes. After a successful deploy, a payload larger than this has its stored tarball (`payload_blob`) dropped from the `hdb_deployment` row; the row and its metadata stay. <VersionBadge type="changed" version="v5.3.0" /> The build a replicated deploy ships to its peers (`artifact_blob`) is dropped by the same threshold, separately. Set it very high to retain every payload; _Default_: `10485760` (10 MiB)
+- `payloadRetention.maxSize` <VersionBadge version="v5.1.15" /> <VersionBadge type="changed" version="v5.3.0" /> — Bytes. After a successful deploy, a payload larger than this has its stored tarball (`payload_blob`) dropped from the `hdb_deployment` row; the row and its metadata stay. The build a replicated deploy ships to its peers (`artifact_blob`) is dropped by the same threshold, separately. Set it very high to retain every payload; _Default_: `10485760` (10 MiB)
 - `stagingRetention.maxCount` <VersionBadge version="v5.3.0" /> — How many complete builds that are not live may remain per component under `<componentsRoot>/.deploy-staging`: builds staged with `activate: false`, and [releases replaced by a later deploy](../operations-api/operations.md#going-back-to-a-previous-release), which `deployment_id` can make live again. The newest survive; older ones are removed when that component next deploys and at startup. `drop_component` removes all of them. Each is a full installed copy of the component, `node_modules` included. `0` keeps none, and no replaced release is kept. This bounds dormant builds only, not a disk quota: staging directories that belong to an in-flight or unsettled deploy are never touched; _Default_: `5`
 
 ---

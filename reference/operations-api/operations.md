@@ -961,7 +961,7 @@ Nothing about the running component changes: the live directory, the root config
 }
 ```
 
-That request takes no `package`, `payload`, `credentials`, install options, or `urlPath`/`host` — they are rejected rather than ignored, because the staged build already decided them and re-supplying one here would have no effect. It resolves and installs nothing; it swaps in the exact bytes that were verified at staging time, including across a full Harper restart in between. <VersionBadge type="changed" version="v5.3.0" /> Before the swap, each node checks that its staged tree is still the one it verified, and that it is the build the requesting node names. It refuses with `409` otherwise, and also when the node can no longer run the build, for example after a Node.js upgrade to an ABI a native addon does not support.
+That request takes no `package`, `payload`, `credentials`, install options, or `urlPath`/`host` — they are rejected rather than ignored, because the staged build already decided them and re-supplying one here would have no effect. It resolves and installs nothing; it swaps in the exact bytes that were verified at staging time, including across a full Harper restart in between. Before the swap, each node checks that its staged tree is still the one it verified, and that it is the build the requesting node names. It refuses with `409` otherwise, and also when the node can no longer run the build, for example after a Node.js upgrade to an ABI a native addon does not support.
 
 A few things worth knowing before you rely on it:
 
@@ -1200,7 +1200,8 @@ Unlike most other `super_user` operations, this check is enforced directly in th
 
 Removes the tarball blob from a deployment record. The deployment record itself is retained; only the binary payload is deleted. Use this to reclaim storage after confirming a deployment is stable. The deletion replicates, so one call frees the payload's storage on every node in the cluster.
 
-<VersionBadge version="v5.3.0" /> Pass `artifact: true` to also delete the build the origin packed for its peers. `freed_bytes` then counts both. Without it, the build is kept, so the operation deletes exactly what it did before. A staged build is already on every node's disk, so deleting its stored copy does not stop its id from activating.
+- `deployment_id` — the deployment whose stored payload to delete.
+- `artifact` <VersionBadge version="v5.3.0" /> — set to `true` to also delete the build the origin packed for its peers; `freed_bytes` then counts both. Without it, the build is kept, so the operation deletes exactly what it did before. A staged build is already on every node's disk, so deleting its stored copy does not stop its id from activating.
 
 ```json
 {
