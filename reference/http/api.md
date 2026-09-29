@@ -449,7 +449,7 @@ A `Readable` is the usual return, but the non-stream forms are not theoretical. 
 
 Harper's own `ContentTypeHandler` TypeScript interface is currently narrower than this runtime contract, so a typed handler returning a `Readable` or an iterable may need a cast.
 
-<VersionBadge type="changed" version="v5.3.0" /> Every return form above is also compressed when response compression is enabled (`http.compressionThreshold` set to a non-zero value) and the client sends `Accept-Encoding: br`: a `Buffer` or string is compressed as a whole body when it exceeds the threshold, and a `Readable` or iterable is compressed as a stream. Before v5.3.0, a `Buffer`, string, or generator return failed with `TypeError: stream.pipe is not a function` under compression, so a handler targeting older releases should return a `Readable` — `Readable.from([value])` wraps an already-serialized value.
+<VersionBadge type="changed" version="v5.3.0" /> Every return form above is also compressed when response compression is enabled (`http.compressionThreshold` set to a non-zero value) and the client sends `Accept-Encoding: br`: a returned `Buffer` or string is compressed as a whole body when it exceeds the threshold, and a returned `Readable` or iterable is compressed as a stream. Before v5.3.0, a `Buffer`, string, or generator return failed with `TypeError: stream.pipe is not a function` under compression, so a handler targeting older releases should return a `Readable` — `Readable.from([value])` wraps an already-serialized value.
 
 ---
 
