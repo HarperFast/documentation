@@ -139,23 +139,23 @@ models:
 
 Every setting of `models.calibration` is optional.
 
-| Setting             | Default                | Meaning                                                                                        |
-| ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `interval`          | `86400000` (1 day)     | Milliseconds between runs; at least one hour                                                   |
-| `minReport`         | `20`                   | Recorded outcomes a field needs before it gets a report                                        |
-| `minTrain`          | `100`                  | Outcomes on the older, training side a correction needs                                        |
-| `minHeldOut`        | `100`                  | Outcomes on the newest, held-out side a correction needs                                       |
-| `heldOutShare`      | `0.3`                  | Share of each population's newest outcomes held out for testing                                |
-| `eceMargin`         | `0.01`                 | How much a correction must lower the held-out calibration error to qualify                     |
-| `maxAgeMs`          | `2592000000` (30 days) | How long a correction applies before a newer run must replace it                               |
-| `maxDecisions`      | `100000`               | Recorded decisions a run reads in total: at most half to find new populations, the rest to fit |
-| `maxPopulations`    | `1000`                 | Populations a run handles                                                                      |
-| `maxExamplesPerKey` | `5000`                 | Newest recorded decisions a run reads per population                                           |
-| `maxBytes`          | `67108864` (64 MB)     | Estimated memory a run may hold                                                                |
-| `maxRunMs`          | `60000`                | Time a run may take                                                                            |
-| `maxLoads`          | `8`                    | Correction lookups a node runs at once in the background                                       |
+| Setting             | Default                | Meaning                                                                                                                                           |
+| ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interval`          | `86400000` (1 day)     | Milliseconds between runs; at least one hour                                                                                                      |
+| `minReport`         | `20`                   | Recorded outcomes a field needs before it gets a report                                                                                           |
+| `minTrain`          | `100`                  | Outcomes on the older, training side a correction needs                                                                                           |
+| `minHeldOut`        | `100`                  | Outcomes on the newest, held-out side a correction needs                                                                                          |
+| `heldOutShare`      | `0.3`                  | Share of each population's newest outcomes held out for testing                                                                                   |
+| `eceMargin`         | `0.01`                 | How much a correction must lower the held-out calibration error to qualify                                                                        |
+| `maxAgeMs`          | `2592000000` (30 days) | How long a correction applies before a newer run must replace it                                                                                  |
+| `maxDecisions`      | `100000`               | Recorded decisions a run reads in total: at most half to find new populations, the rest to fit. Must be at least twice `maxExamplesPerKey` plus 2 |
+| `maxPopulations`    | `1000`                 | Populations a run handles                                                                                                                         |
+| `maxExamplesPerKey` | `5000`                 | Newest recorded decisions a run reads per population                                                                                              |
+| `maxBytes`          | `67108864` (64 MB)     | Estimated memory a run may hold                                                                                                                   |
+| `maxRunMs`          | `60000`                | Time a run may take                                                                                                                               |
+| `maxLoads`          | `8`                    | Correction lookups a node runs at once in the background                                                                                          |
 
-A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is always reached eventually, after as many runs as it takes to page past the decisions ahead of it; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
+A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is always reached eventually, after as many runs as it takes to page past the decisions ahead of it; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A population too large for what a run has left goes to the back of the queue rather than holding up the others. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
 
 ## API
 
