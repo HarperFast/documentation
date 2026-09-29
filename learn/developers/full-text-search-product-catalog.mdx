@@ -25,28 +25,26 @@ This guide adds relevance-ranked text search to a product catalog, then exposes 
 Add `audit: true` to the RocksDB-backed table and declare an `@fullText` index over the fields customers search.
 
 ```graphql title="schema.graphql"
-type Product
-	@table(database: "catalog", audit: true)
-	@export
-	@fullText(
-		name: "catalogSearch"
-		fields: [
-			{ name: "name", weight: 3, highlight: true }
-			{ name: "description", weight: 1, highlight: true }
-			{ name: "tags" }
-		]
-		highlighting: { maxFragments: 2, fragmentLength: 120 }
-	) {
+type Product @table(database: "catalog", audit: true) @export {
 	id: ID @primaryKey
 	name: String
 	description: String
 	tags: [String]
 	category: String @indexed
 	price: Float @indexed
+	catalogSearch: FullText
+		@fullText(
+			fields: [
+				{ name: "name", weight: 3, highlight: true }
+				{ name: "description", weight: 1, highlight: true }
+				{ name: "tags" }
+			]
+			highlighting: { maxFragments: 2, fragmentLength: 120 }
+		)
 }
 ```
 
-`weight: 3` makes a match in `name` contribute more to BM25 relevance than the same match in `description` or `tags`. Highlighting is enabled only for the fields shown to customers.
+The query-only field name `catalogSearch` identifies the index. It is not stored with each product. `weight: 3` makes a match in `name` contribute more to BM25 relevance than the same match in `description` or `tags`. Highlighting is enabled only for the fields shown to customers.
 
 ## 2. Add records
 
@@ -71,9 +69,15 @@ Harper commits the record first, then applies the committed change to the local 
 ## 3. Search from a Harper application
 
 ```javascript title="resources.js"
-export class SearchProducts extends databases.catalog.Product {
-	static async get(target) {
-		const text = target.get('q')?.trim();
+export class SearchProducts extends Resource {
+	static loadAsInstance = false;
+
+	allowCreate(user) {
+		return Boolean(user);
+	}
+
+	async post(_target, body) {
+		const text = body.q?.trim();
 		if (!text) {
 			const error = new Error('q is required');
 			error.statusCode = 400;
@@ -88,22 +92,39 @@ export class SearchProducts extends databases.catalog.Product {
 				includeHighlights: true,
 			},
 		];
-		const category = target.get('category');
+		const category = body.category;
 		if (category) conditions.push({ attribute: 'category', comparator: 'equals', value: category });
-		return super.search({
-			conditions,
-			select: ['id', 'name', 'price', '$score', '$highlights'],
-			limit: 20,
-		});
+		const records = [];
+		for await (const record of databases.catalog.Product.search(
+			{
+				conditions,
+				select: ['id', 'name', 'price', '$score', '$highlights'],
+				limit: 20,
+				checkPermission: true,
+			},
+			this.getContext()
+		)) {
+			records.push(record);
+		}
+		return records;
 	}
 }
 ```
 
-Call the resource with `GET /SearchProducts/?q=trail&category=footwear`. The category filter is optional; `q` is required.
+Call the resource with an authenticated request:
+
+```http
+POST /SearchProducts/
+Content-Type: application/json
+
+{ "q": "trail", "category": "footwear" }
+```
+
+The category filter is optional; `q` is required.
 
 The full-text index provides ranked candidates. The indexed category condition narrows the result set, and Harper loads the current records before returning them.
 
-Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). This example is appropriate because every field in `fields` is public. If access depends on the caller, authorize the request in `get()` and restrict `fields` before searching; the underlying table's role and attribute permissions are not reapplied automatically, and highlights can reveal searched fields even when those fields are absent from `select`.
+Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). Passing `this.getContext()` preserves the authenticated caller, and `checkPermission: true` asks the table to enforce that caller's table and source-field permissions. The custom resource must do both. Highlights can expose searched source text even when those fields are absent from `select`.
 
 ## 4. Search through REST
 
