@@ -129,12 +129,12 @@ if (decision.probability < 0.7) await sendToHuman(ticket, decision);
 
 A schema is one **leaf**, or a one-level **object** of named leaves. Every leaf is a small closed set, so that every backend family — classifiers, cross-encoders, hosted decision models, and language models — can score it:
 
-| Kind            | Shape                                                            | Allowed values                                                                                          |
-| --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Enum            | `{ enum: [...], description? }`                                  | 2 to 255 distinct values of one type (all strings, all numbers, or all booleans), in the declared order |
-| Boolean         | `{ type: 'boolean', description? }`                              | `false`, `true`                                                                                         |
-| Bounded integer | `{ type: 'integer', minimum, maximum, description? }`            | Every integer from `minimum` to `maximum`, at most 255 values                                           |
-| Object          | `{ type: 'object', properties: { [name]: leaf }, description? }` | One decision per property; at most 32 properties and 500 allowed values across all of them              |
+| Kind            | Shape                                                            | Allowed values                                                                                              |
+| --------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Enum            | `{ enum: [...], description? }`                                  | 2 to 255 distinct values of one type (all strings, all numbers, or all booleans), in the declared order     |
+| Boolean         | `{ type: 'boolean', description? }`                              | `false`, `true`                                                                                             |
+| Bounded integer | `{ type: 'integer', minimum, maximum, description? }`            | Every integer from `minimum` to `maximum`: 2 to 255 values, with safe-integer bounds (32-bit for `@decide`) |
+| Object          | `{ type: 'object', properties: { [name]: leaf }, description? }` | One decision per property; at most 32 properties and 500 allowed values across all of them                  |
 
 Any leaf, including an object property, can add `noMatch: true` to ask for a [no-match score](#no-match-scores) as well; the flag is not allowed on an object schema itself.
 
@@ -173,7 +173,7 @@ Only a backend with the `noMatch` capability can serve an opted-in schema, so a 
 
 ### Recording decisions
 
-By default, `decide()` keeps nothing but its log entry. Like `embed()` and `generate()`, each call writes one row to the [per-call log](./analytics#per-call-log-hdb_model_calls) for observability and usage accounting, and the `Decision` it returns has no `id`. That fits most decisions: a route, a moderation verdict, or any threshold an application acts on and moves past.
+By default, `decide()` keeps nothing but its log entry. Like `embed()` and `generate()`, each attempt writes one row to the [per-call log](./analytics#per-call-log-hdb_model_calls) for observability and usage accounting, and the `Decision` it returns has no `id`. That fits most decisions: a route, a moderation verdict, or any threshold an application acts on and moves past.
 
 Pass `persist: true` when you will want to know later whether the decision was right. The decision is then committed to the [`hdb_model_decisions`](./analytics#durable-decisions) system table before the call returns, and the result carries its `id`. Keep that id with whatever you did: [`getDecision()`](#getdecision) reads the decision back, and [`recordOutcome()`](#recordoutcome) records what actually happened.
 
@@ -184,14 +184,14 @@ await route(ticket, decision.value);
 await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
 ```
 
-|                                   | Default                                                     | `persist: true`                                                                                                    |
-| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| What is stored                    | One row in `hdb_model_calls`, buffered and kept for 90 days | That row, plus a row in `hdb_model_decisions` that is committed before the call returns and kept for 365 days      |
-| What the call returns             | `Decision<T>`, with no `id`                                 | `RecordedDecision<T>`: a `Decision<T>` whose `id` is always present                                                |
-| Recording outcomes                | Not possible                                                | `getDecision(id)` and `recordOutcome(id, …)`                                                                       |
-| Cost beyond the model call        | None                                                        | One small local commit before the call returns; the row replicates to other nodes in the background                |
-| On a read-only node               | Works as usual                                              | Rejects with a `503` before any model call, so no provider tokens are spent on a decision that could not be stored |
-| If storing fails after the answer | Does not apply                                              | Rejects with a `500` without trying another backend, so a storage fault never costs a second model call            |
+|                                   | Default                                                                                             | `persist: true`                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| What is stored                    | A row per attempt in `hdb_model_calls`, buffered and kept for 90 days; a read-only node writes none | That row, plus a row in `hdb_model_decisions` that is committed before the call returns and kept for 365 days      |
+| What the call returns             | `Decision<T>`, with no `id`                                                                         | `RecordedDecision<T>`: a `Decision<T>` whose `id` is always present                                                |
+| Recording outcomes                | Not possible                                                                                        | `getDecision(id)` and `recordOutcome(id, …)`                                                                       |
+| Cost beyond the model call        | None                                                                                                | One small local commit before the call returns; the row replicates to other nodes in the background                |
+| On a read-only node               | Works as usual                                                                                      | Rejects with a `503` before any model call, so no provider tokens are spent on a decision that could not be stored |
+| If storing fails after the answer | Does not apply                                                                                      | Rejects with a `500` without trying another backend, so a storage fault never costs a second model call            |
 
 Choose when you call. A decision made without `persist: true` is not stored anywhere an outcome can be attached to, so it cannot be scored later. The [`@decide` directive](../database/schema#decide) follows the same rule: it records its decisions only when it names a `decision` field. A `persist` that is not a boolean is rejected with a `400` before any model is called.
 

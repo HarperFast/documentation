@@ -57,7 +57,7 @@ models:
       generative: default
 ```
 
-With OpenAI, each field with up to 20 allowed values costs one scoring call. A field with more values, or a model that cannot score, is asked `samples` times (default 5) and the answers are counted, which multiplies the token cost. [Generative decision adapter](./backends#generative-decision-adapter) has the details.
+With OpenAI, a decision whose fields each have at most 20 allowed values costs one scoring call per field. If any field has more, or the model cannot score, the whole decision is asked `samples` times (default 5) and the answers are counted, which multiplies the token cost. [Generative decision adapter](./backends#generative-decision-adapter) has the details.
 
 **2. Make a decision.** Call `decide()` from code:
 
@@ -84,7 +84,7 @@ type Ticket @table {
 }
 ```
 
-The directive calls the model on every write that carries `body`, so it costs one decision per such write.
+The directive calls the model on every write that carries a non-null `body`, so it costs one decision per such write.
 
 **3. Act on the probability, and send the rest to a person.** Pick a threshold, automate above it, and route everything below it to review:
 
@@ -92,6 +92,8 @@ The directive calls the model on every write that carries `body`, so it costs on
 if (decision.probability >= 0.8) await route(ticket, decision.value);
 else await sendToReview(ticket, decision);
 ```
+
+With the directive, apply the same rule to the stored `route` and `routeConfidence`.
 
 `decision.calibrated` is `false` for the built-in adapter. Its probability ranks the choices well, but it is not a measured frequency: 0.8 does not mean the decision is right 80% of the time. Start with a cautious threshold and adjust it once you know how often decisions above it turn out right, which is what step 4 is for. With [calibration](./calibration) turned on, Harper measures that for you from the outcomes you record, corrects later probabilities, and reports which threshold covers how much traffic at what error rate.
 

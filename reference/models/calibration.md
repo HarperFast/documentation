@@ -59,12 +59,12 @@ Removing the block turns calibration off at the next configuration reload: decis
 [`models.getCalibrations()`](#getcalibrations) returns the newest report for each field of each population. The part that answers "where can I automate?" is the selective-risk table, one row per threshold:
 
 ```javascript
-const [route] = await models.getCalibrations({ model: 'default' });
-const report = route.report.calibrated ?? route.report.raw;
-const table = report.operational;
+const summaries = await models.getCalibrations({ model: 'default' });
+const route = summaries.find((summary) => summary.field === undefined && summary.report);
+const table = route?.applied ? route.report.calibrated.operational : route?.report.raw.operational;
 ```
 
-Before a correction qualifies, a report has only `raw`, so read `calibrated` when it is there and `raw` otherwise. Each table looks like this:
+Each summary describes one field of one population, so pick the one you are thresholding: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. A population with fewer than 20 recorded outcomes has no report yet. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
 
 ```json
 [
@@ -82,7 +82,7 @@ At each threshold:
 
 For example, if you can accept 2% errors, pick the lowest threshold whose `operational` `riskUpper` is at most 0.02 and whose `count` is large enough for you to trust. Then automate above it and send the rest to review.
 
-The report also has `ece` (expected calibration error: how far stated probabilities are from observed frequencies, lower is better), `nll` (negative log-likelihood), and ten reliability `bins` of stated confidence against observed accuracy. `raw` describes the uncorrected probabilities and `calibrated` the corrected ones, both on the newest held-out decisions. Before a correction qualifies, only `raw` is present, described over every labelled decision, and `window` is `'all'`.
+The report also has `ece` (expected calibration error: how far stated probabilities are from observed frequencies, lower is better), `nll` (negative log-likelihood), and ten reliability `bins` of stated confidence against observed accuracy. `raw` describes the uncorrected probabilities and `calibrated` the corrected ones, both on the newest held-out decisions (`window: 'heldOut'`). A correction that was fitted but did not qualify keeps both, with `eligible: false`. When there were too few outcomes to fit at all, only `raw` is present, described over every labelled decision, and `window` is `'all'`.
 
 ## What a population is
 
@@ -97,7 +97,7 @@ A correction learned for one model never applies to another. Decisions share a p
 | Instructions     | The `instructions` option                                                                                                          |
 | Schema and field | The decision schema, and for an object schema each field separately                                                                |
 
-A fingerprint covers every setting of an entry except its `fallback` list and fields named as credentials: `apiKey`, `apiSecret`, `accessKeyId`, `secretAccessKey`, `sessionToken`, `authorization`, `password`, `token`, `bearerToken` and `credentials`. A secret stored under any other name is part of the fingerprint, so rotating it starts calibration over. So:
+A fingerprint covers every setting of an entry except its `fallback` list and fields named as credentials: `apiKey`, `apiSecret`, `accessKeyId`, `secretAccessKey`, `sessionToken`, `authorization`, `password`, `token`, `bearerToken`, `credential` and `credentials`, matched without regard to case. A secret stored under any other name is part of the fingerprint, so rotating it starts calibration over. So:
 
 - Changing a model, endpoint, sample count or other setting starts a new population, and the old correction stops applying at once. A new model has a different confidence profile, so learning it again is correct.
 - Rotating a credential in one of those fields, reordering fallbacks, or adding an unrelated entry keeps every correction.
@@ -105,7 +105,7 @@ A fingerprint covers every setting of an entry except its `fallback` list and fi
 
 Some decisions are never corrected and never learned from:
 
-- A vote whose samples were served by more than one entry, for example when a sample fell back to another entry, even one of the same provider. Its probability mixes two models' confidence.
+- A decision whose inner calls were served by entries with different fingerprints, for example a vote in which a sample fell back to another entry, even one of the same provider, or an object schema whose fields were scored by different entries. Its probability mixes two sources' confidence. Two entries with identical settings share a fingerprint, so a fallback between them is still one source.
 - A decision made through the built-in adapter over a generative backend a component registered from code, because Harper cannot identify that backend's model.
 
 A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes.
@@ -129,7 +129,7 @@ models:
 
 ## When a correction applies
 
-- **Right after a start, or after a new fit, decisions come back uncorrected for a moment.** Each node loads a population's correction in the background after its first decision, and rechecks it about once a minute. Corrections replicate like other system tables, so a new fit or a revocation takes effect on a node within about a minute of reaching it; a node behind on replication keeps its previous correction until it catches up.
+- **Right after a start, decisions come back uncorrected for a moment.** Each node loads a population's correction in the background after its first decision, and rechecks it about once a minute while it keeps applying the one it has. Corrections replicate like other system tables, so a new fit or a revocation takes effect on a node within about a minute of reaching it; a node behind on replication keeps its previous correction until it catches up.
 - **Only an eligible, current correction applies.** It must have beaten the raw probabilities on the held-out decisions, be younger than `maxAgeMs` (30 days by default), and have been fitted under the current settings. A newer run whose evidence no longer supports it, for example after truths were corrected, revokes it everywhere.
 - **All fields or none.** An object schema is corrected only when every field has a correction.
 - **A schema with a `noMatch: true` leaf is not corrected yet**, because its [no-match score](./api#no-match-scores) would stay uncorrected under `calibrated: true`. It still gets reliability reports, with the reason `no-match-schema`.
@@ -155,7 +155,7 @@ Every setting of `models.calibration` is optional.
 | `maxRunMs`          | `60000`                | Time a run may take                                                                            |
 | `maxLoads`          | `8`                    | Correction lookups a node runs at once in the background                                       |
 
-A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is reached within a few runs; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
+A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is always reached eventually, after as many runs as it takes to page past the decisions ahead of it; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
 
 ## API
 
@@ -186,16 +186,16 @@ models.getCalibrations(filter?: { model?: string }): Promise<CalibrationSummary[
 
 The newest version for each field of each population whose tenant is the caller's, newest first. The tenant comes from the calling user and cannot be passed in; decisions made without a tenant are visible only to callers without one.
 
-| Field                                         | Meaning                                                                                               |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `model`, `field`                              | The logical model, and the field for an object schema                                                 |
-| `signature`, `instructionsHash`, `schemaHash` | What identifies the population                                                                        |
-| `eligible`, `reason`                          | Whether the correction qualified, and if not, `too-few-labels`, `no-improvement` or `no-match-schema` |
-| `applied`                                     | Whether it is being applied now: eligible, current, and fitted under the current settings             |
-| `fittedAt`, `applyUntil`                      | When it was fitted, and when it stops applying                                                        |
-| `decisions`, `labelled`                       | Recorded decisions the run read for this population, and how many had a truth                         |
-| `t`                                           | The temperature: above 1 softens overconfident probabilities, below 1 sharpens underconfident ones    |
-| `report`                                      | The [reliability report](#choosing-a-threshold), from 20 outcomes                                     |
+| Field                                         | Meaning                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`, `field`                              | The logical model, and the field for an object schema                                                                                                                                                                                                                                          |
+| `signature`, `instructionsHash`, `schemaHash` | What identifies the population                                                                                                                                                                                                                                                                 |
+| `eligible`, `reason`                          | Whether the correction qualified, and if not, `too-few-labels`, `no-improvement` or `no-match-schema`                                                                                                                                                                                          |
+| `applied`                                     | Whether the version qualifies to apply: eligible, current, and fitted under the current settings. A node applies it once its cache has loaded it, and a population that no longer receives decisions, for example after a `revision` change, keeps reporting its last version until it expires |
+| `fittedAt`, `applyUntil`                      | When it was fitted, and when it stops applying                                                                                                                                                                                                                                                 |
+| `decisions`, `labelled`                       | Recorded decisions the run read for this population, and how many had a truth                                                                                                                                                                                                                  |
+| `t`                                           | The temperature: above 1 softens overconfident probabilities, below 1 sharpens underconfident ones                                                                                                                                                                                             |
+| `report`                                      | The [reliability report](#choosing-a-threshold), from 20 outcomes                                                                                                                                                                                                                              |
 
 ## Storage
 
