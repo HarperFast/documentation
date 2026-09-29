@@ -885,7 +885,7 @@ Additional parameters:
 - `host` <VersionBadge version="v5.2.0" /> — the virtual hostname the component is served on (e.g. `"api.example.com"`). Must be a bare hostname or IPv6 literal — no scheme, port, path, or brackets. Persisted alongside `urlPath`.
 - `install_allow_scripts` — set to `true` to allow npm pre/post install scripts (disabled by default)
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
-- `deployment_timeout` <VersionBadge version="v5.1.4" /> — how long, in milliseconds, a peer waits to receive the replicated deployment payload before failing (default: `120000`)
+- `deployment_timeout` <VersionBadge version="v5.1.4" /> — how long, in milliseconds, a peer waits to receive the replicated deployment payload, or the origin's build, before failing (default: `120000`)
 - `ignore_replication_errors` <VersionBadge version="v5.1.4" /> — set to `true` to treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. By default a failed peer causes `deploy_component` to return a non-2xx status; the component is still deployed (and, if requested, restarted) on the origin node.
 - `activate` <VersionBadge version="v5.3.0" /> — set to `false` to build and install the component without making it live. See [Staging a build and activating it later](#staging-a-build-and-activating-it-later).
 - `deployment_id` <VersionBadge version="v5.3.0" /> — make a staged build live, or return to a release a later deploy replaced. Takes no build inputs of its own. See [Going back to a previous release](#going-back-to-a-previous-release).
@@ -895,6 +895,21 @@ Additional parameters:
 :::warning
 Under the default [`applications.lockdown`](../components/module-loading.md#intrinsic-lockdown), a deploy is not test-loaded before it goes live. A release that installs but throws when it loads is deployed, and it reports the failure in the `componentStatus` of [`get_status`](#set_status--get_status--clear_status) once workers load it. The rest of the instance keeps serving.
 :::
+
+#### Every node runs the build the origin made
+
+<VersionBadge version="v5.3.0" />
+
+A replicated deploy is built once, on the node that received it. That origin resolves the package or unpacks the payload, installs its dependencies, and packs the resulting tree — `node_modules` included — for the other nodes. Each peer takes that tree as it is: it resolves nothing, installs nothing, and needs neither registry access nor the deploy's credentials. Every node therefore runs the same bytes, even when the package reference moves (`latest`, a semver range, a git branch), a dependency range resolves differently, or an install script or `install_command` would produce different output on each node.
+
+A peer verifies what it received twice: the archive against the origin's digest, then the extracted tree against the tree the origin built. Each peer's answer names the tree it admitted, and `get_deployment` records it as `artifact_build`.
+
+- **A node that cannot run the build refuses it.** The build records what it depends on. That covers native addons (`.node` files), native executables, packages built for one platform (a `package.json` with `os`, `cpu`, or `libc`), and the output of an `install_command` or install scripts. A peer whose OS, CPU architecture, libc, or Node ABI does not match what the build depends on answers `409`, naming the file that requires it, and `deploy_component` reports it as a failed peer. A build with no native code runs on any node. A Node-API addon does not tie the build to a Node version.
+- **The origin publishes only what the other nodes can receive.** In a replicated deploy, a `file:` directory package is refused (`400`), because it is linked rather than copied. So is a component tree that links outside itself. Deploy either one with `replicated: false` on each node, or deploy a packed tarball.
+- **A restart keeps the deployed release.** At startup, and in the reload a `restart` performs, Harper keeps the release a deploy made live, as long as the root config still names the same `package` and `install`. It no longer resolves the package again after each deploy. Change the `package` spec or redeploy to pick up a newer release.
+- **Nodes on an earlier version are reported, not prevented.** A peer running a version before v5.3.0 builds the release itself and answers without naming the origin's tree. `deploy_component` records it as a failed peer, so the operation fails with that node's name, and the stored build is kept. Pass `ignore_replication_errors: true` only if you accept that difference.
+- **The build travels in the deployment record.** It is stored in `system.hdb_deployment` beside the uploaded payload, which stays exactly what you uploaded. After a fully successful deploy it is dropped past [`deployment.payloadRetention.maxSize`](../configuration/options.md#deployment), as the payload is. If the cluster does not replicate the `system` database, the build is sent inside the operation to each peer instead. It is refused before anything changes once its size times the number of peers passes [`replication.maxPayload`](../configuration/options.md#replication) (default 100 MB).
+- **A deploy that reaches no other node packs nothing.** That covers a single node and `replicated: false`.
 
 #### How a deploy updates the root config
 
@@ -946,7 +961,7 @@ Nothing about the running component changes: the live directory, the root config
 }
 ```
 
-That request takes no `package`, `payload`, `credentials`, install options, or `urlPath`/`host` — they are rejected rather than ignored, because the staged build already decided them and re-supplying one here would have no effect. It resolves and installs nothing; it swaps in the exact bytes that were verified at staging time, including across a full Harper restart in between.
+That request takes no `package`, `payload`, `credentials`, install options, or `urlPath`/`host` — they are rejected rather than ignored, because the staged build already decided them and re-supplying one here would have no effect. It resolves and installs nothing; it swaps in the exact bytes that were verified at staging time, including across a full Harper restart in between. <VersionBadge type="changed" version="v5.3.0" /> Before the swap, each node checks that its staged tree is still the one it verified, and that it is the build the requesting node names. It refuses with `409` otherwise, and also when the node can no longer run the build, for example after a Node.js upgrade to an ABI a native addon does not support.
 
 A few things worth knowing before you rely on it:
 
@@ -985,7 +1000,7 @@ When a deploy replaces the release that is live, Harper keeps the replaced one u
 
 - **Kept releases count against [`deployment.stagingRetention.maxCount`](../configuration/options.md#deployment)**, with staged builds. The most recently replaced ones are kept.
 - **Each kept release is a full installed copy of the component, `node_modules` included.** At the default of `5`, budget disk for up to five extra copies per component. `0` keeps no replaced release.
-- **A release is kept as it was when it was replaced**, including anything it wrote into its own directory while it was live.
+- **A release is kept as it was when it was replaced**, including anything it wrote into its own directory while it was live. Unlike a staged build, it is therefore not checked against the tree it was built as when you activate it again.
 - **Not every release can be kept.** A release made live before v5.3.0, or deployed from a `file:` directory, is not kept. A release whose dependency links use absolute paths is kept but refused (`409`) when you try to activate it; on Windows, npm writes such links for `file:` and workspace dependencies.
 - **Each node answers for itself.** A node that never had the release, or no longer keeps it, answers `404`. `deploy_component` reports that as a failed peer.
 
@@ -1130,7 +1145,7 @@ Returns a list of deployment records, newest first. All filter parameters are op
 }
 ```
 
-Response includes a `deployments` array and a `total` count. The `payload_blob` field is stripped from list responses for size; use `get_deployment_payload` to retrieve the tarball.
+Response includes a `deployments` array and a `total` count. The `payload_blob` and `artifact_blob` fields are stripped from list responses for size, and `payload_blob_present` and `artifact_blob_present` say whether each is stored; use `get_deployment_payload` to retrieve the uploaded tarball.
 
 ### `get_deployment`
 
@@ -1156,6 +1171,9 @@ The deployment record includes:
 | `peer_results`       | Per-node outcome map for replicated deployments                         |
 | `payload_hash`       | SHA-256 hash of the deployment tarball                                  |
 | `payload_size`       | Byte size of the deployment tarball                                     |
+| `artifact_hash`      | (v5.3.0) SHA-256 hash of the build the origin packed for its peers      |
+| `artifact_size`      | (v5.3.0) Byte size of that build                                        |
+| `artifact_build`     | (v5.3.0) The build's tree digest and the platform it depends on         |
 | `started_at`         | Timestamp when deployment began                                         |
 | `completed_at`       | Timestamp when deployment finished                                      |
 | `user`               | User who initiated the deployment                                       |
@@ -1182,6 +1200,8 @@ Unlike most other `super_user` operations, this check is enforced directly in th
 
 Removes the tarball blob from a deployment record. The deployment record itself is retained; only the binary payload is deleted. Use this to reclaim storage after confirming a deployment is stable. The deletion replicates, so one call frees the payload's storage on every node in the cluster.
 
+<VersionBadge version="v5.3.0" /> Pass `artifact: true` to also delete the build the origin packed for its peers. `freed_bytes` then counts both. Without it, the build is kept, so the operation deletes exactly what it did before. A staged build is already on every node's disk, so deleting its stored copy does not stop its id from activating.
+
 ```json
 {
 	"operation": "delete_deployment_payload",
@@ -1199,7 +1219,7 @@ Response:
 }
 ```
 
-The deployment must be in a terminal status (`success`, `failed`, or `rolled_back`); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). A `payload_dropped` entry recording the deleting user is appended to the deployment's `event_log`.
+The deployment must be in a terminal status (`success`, `failed`, or `rolled_back`); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). A `payload_dropped` entry recording the deleting user is appended to the deployment's `event_log`, and an `artifact_dropped` entry for the build.
 
 ### `add_ssh_key`
 
