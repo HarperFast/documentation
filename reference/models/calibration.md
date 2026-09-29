@@ -99,13 +99,13 @@ A correction learned for one model never applies to another. Decisions share a p
 
 A fingerprint covers every setting of an entry except its `fallback` list and fields named as credentials: `apiKey`, `apiSecret`, `accessKeyId`, `secretAccessKey`, `sessionToken`, `authorization`, `password`, `token`, `bearerToken`, `credential` and `credentials`, matched without regard to case. A secret stored under any other name is part of the fingerprint, so rotating it starts calibration over. So:
 
-- Changing a model, endpoint, sample count or other setting starts a new population, and the old correction stops applying at once. A new model has a different confidence profile, so learning it again is correct.
+- Renaming an entry, or changing its model, endpoint, sample count or other setting, starts a new population, and the old correction stops applying at once. A new model has a different confidence profile, so learning it again is correct.
 - Rotating a credential in one of those fields, reordering fallbacks, or adding an unrelated entry keeps every correction.
 - The route or resource that made the call is not part of the population, so the same question asked from two endpoints shares one correction.
 
 Some decisions are never corrected and never learned from:
 
-- A decision whose inner calls were served by entries with different fingerprints, for example a vote in which a sample fell back to another entry, even one of the same provider, or an object schema whose fields were scored by different entries. Its probability mixes two sources' confidence. Two entries with identical settings share a fingerprint, so a fallback between them is still one source.
+- A decision whose inner calls were served by entries with different fingerprints, for example a vote in which a sample fell back to another entry, even one of the same provider, or an object schema whose fields were scored by different entries. Its probability mixes two sources' confidence. An entry's name is part of its fingerprint, so a fallback between two entries is never one source, even when their settings are identical.
 - A decision made through the built-in adapter over a generative backend a component registered from code, because Harper cannot identify that backend's model.
 
 A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes.
@@ -155,7 +155,7 @@ Every setting of `models.calibration` is optional.
 | `maxRunMs`          | `60000`                | Time a run may take                                                                                                                               |
 | `maxLoads`          | `8`                    | Correction lookups a node runs at once in the background                                                                                          |
 
-A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is always reached eventually, after as many runs as it takes to page past the decisions ahead of it; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A population too large for what a run has left goes to the back of the queue rather than holding up the others. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
+A run that reaches a budget stops cleanly and says which one. Populations it did not reach go first next time, because each run starts with the populations that were fitted least recently. Up to half of `maxDecisions` looks for new populations, split between the newest decisions and a continuation of where the previous run stopped, so an older, quiet population is always reached eventually, after as many runs as it takes to page past the decisions ahead of it; the rest of the budget reads decisions for fitting. A population found but not fitted is remembered, and a later run fits it. A population a run cannot finish, because it is too large for what the run has left or runs into the byte or time budget, goes to the back of the queue rather than holding up the others. A run that fails, for example because recorded outcomes could not be read, fails its scheduled job, so the scheduler's job status shows it.
 
 ## API
 
