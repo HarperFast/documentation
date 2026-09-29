@@ -114,9 +114,9 @@ The maximum estimated request queue time in milliseconds. When the queue exceeds
 
 Type: `number`
 
-Default: `1200` (bytes)
+Default: `0` (compression disabled)
 
-For clients that support Brotli encoding (`Accept-Encoding: br`), responses larger than this threshold are compressed. Streaming query responses are always compressed for supporting clients, regardless of this setting (since their size is unknown upfront).
+Set a non-zero byte count to enable response compression. For clients that send `Accept-Encoding: br`, responses larger than this threshold are Brotli-compressed; Brotli is the only encoding Harper applies, so a client that accepts only `gzip` or `deflate` receives an uncompressed body. Streaming responses (query results and other iterable bodies) are compressed for those clients whenever the threshold is non-zero, regardless of size, since their size is unknown upfront. Server-Sent Events are never compressed. `1200` bytes, about one TCP packet, is a reasonable starting value.
 
 ```yaml
 http:
