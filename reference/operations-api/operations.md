@@ -1160,26 +1160,28 @@ Returns a single deployment record by `deployment_id`. When called on an in-prog
 
 The deployment record includes:
 
-| Field                | Description                                                             |
-| -------------------- | ----------------------------------------------------------------------- |
-| `deployment_id`      | Unique identifier (content hash)                                        |
-| `project`            | Component project name                                                  |
-| `package_identifier` | Package reference or `payload` for tar uploads                          |
-| `status`             | `pending`, `success`, `failed`, `staged` (v5.3.0), or `rolled_back`     |
-| `phase`              | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`      |
-| `event_log`          | Bounded log of install output and phase transitions (up to 200 entries) |
-| `peer_results`       | Per-node outcome map for replicated deployments                         |
-| `payload_hash`       | SHA-256 hash of the deployment tarball                                  |
-| `payload_size`       | Byte size of the deployment tarball                                     |
-| `artifact_hash`      | (v5.3.0) SHA-256 hash of the build the origin packed for its peers      |
-| `artifact_size`      | (v5.3.0) Byte size of that build                                        |
-| `artifact_build`     | (v5.3.0) The build's tree digest and the platform it depends on         |
-| `started_at`         | Timestamp when deployment began                                         |
-| `completed_at`       | Timestamp when deployment finished                                      |
-| `user`               | User who initiated the deployment                                       |
-| `activated_from`     | (v5.3.0) On an activation, the id of the staged deployment it made live |
-| `rollback_of`        | `deployment_id` of the deployment this rolls back, if applicable        |
-| `error`              | Error message for failed deployments                                    |
+| Field                   | Description                                                                                                                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deployment_id`         | Unique identifier (content hash)                                                                                                                                                                            |
+| `project`               | Component project name                                                                                                                                                                                      |
+| `package_identifier`    | Package reference or `payload` for tar uploads                                                                                                                                                              |
+| `status`                | `pending`, `success`, `failed`, `staged` (v5.3.0), or `rolled_back`                                                                                                                                         |
+| `phase`                 | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`                                                                                                                                          |
+| `event_log`             | Bounded log of install output and phase transitions (up to 200 entries)                                                                                                                                     |
+| `peer_results`          | Per-node outcome map for replicated deployments                                                                                                                                                             |
+| `payload_hash`          | SHA-256 hash of the deployment tarball                                                                                                                                                                      |
+| `payload_size`          | Byte size of the deployment tarball                                                                                                                                                                         |
+| `payload_blob_present`  | Whether the uploaded tarball is still stored: `false` for a package deploy, and once retention or `delete_deployment_payload` drops it                                                                      |
+| `artifact_hash`         | (v5.3.0) SHA-256 hash of the build the origin packed for its peers                                                                                                                                          |
+| `artifact_size`         | (v5.3.0) Byte size of that build                                                                                                                                                                            |
+| `artifact_build`        | (v5.3.0) The build's tree digest and the platform it depends on                                                                                                                                             |
+| `artifact_blob_present` | (v5.3.0) Whether the build the origin packed for its peers is still stored: `false` when the deploy reached no other node, and once retention or `delete_deployment_payload` with `artifact: true` drops it |
+| `started_at`            | Timestamp when deployment began                                                                                                                                                                             |
+| `completed_at`          | Timestamp when deployment finished                                                                                                                                                                          |
+| `user`                  | User who initiated the deployment                                                                                                                                                                           |
+| `activated_from`        | (v5.3.0) On an activation, the id of the staged deployment it made live                                                                                                                                     |
+| `rollback_of`           | `deployment_id` of the deployment this rolls back, if applicable                                                                                                                                            |
+| `error`                 | Error message for failed deployments                                                                                                                                                                        |
 
 ### `get_deployment_payload`
 
@@ -1220,7 +1222,7 @@ Response:
 }
 ```
 
-The deployment must be in a terminal status (`success`, `failed`, or `rolled_back`); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). A `payload_dropped` entry recording the deleting user is appended to the deployment's `event_log`, and an `artifact_dropped` entry for the build.
+The deployment must be in a terminal status (`success`, `failed`, `rolled_back`, or `staged` (v5.3.0)); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). Each blob it deletes appends an entry recording the deleting user to the deployment's `event_log`: `payload_dropped` for the payload, and `artifact_dropped` for the build, which is deleted only with `artifact: true`.
 
 ### `add_ssh_key`
 
