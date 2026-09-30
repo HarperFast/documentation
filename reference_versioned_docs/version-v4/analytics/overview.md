@@ -161,13 +161,13 @@ Harper automatically tracks the following metrics for all services. Applications
 
 ### Replication Metrics
 
-| `metric`         | `path`              | `method`      | `type`   | Unit  | Description                                                                          |
-| ---------------- | ------------------- | ------------- | -------- | ----- | ------------------------------------------------------------------------------------ |
-| `bytes-sent`     | node.database       | `replication` | `egress` | bytes | Bytes sent for replication                                                           |
-| `bytes-sent`     | node.database       | `replication` | `blob`   | bytes | Bytes sent for blob replication                                                      |
-| `bytes-received` | node.database.table | `replication` | `ingest` | bytes | Bytes received for replication                                                       |
-| `bytes-received` | node.database       | `replication` | `blob`   | bytes | Bytes received for blob replication                                                  |
-| `apply-failures` | node.database       | `replication` | `ingest` | count | Replicated transactions that failed to apply on this node. Their writes are skipped. |
+| `metric`         | `path`              | `method`      | `type`   | Unit  | Description                                                                                            |
+| ---------------- | ------------------- | ------------- | -------- | ----- | ------------------------------------------------------------------------------------------------------ |
+| `bytes-sent`     | node.database       | `replication` | `egress` | bytes | Bytes sent for replication                                                                             |
+| `bytes-sent`     | node.database       | `replication` | `blob`   | bytes | Bytes sent for blob replication                                                                        |
+| `bytes-received` | node.database.table | `replication` | `ingest` | bytes | Bytes received for replication                                                                         |
+| `bytes-received` | node.database       | `replication` | `blob`   | bytes | Bytes received for blob replication                                                                    |
+| `apply-failures` | node.database       | `replication` | `ingest` | count | Replicated transactions that failed to apply on this node. Their writes are skipped. Added in v4.7.39. |
 
 ### Resource Usage Metrics
 
