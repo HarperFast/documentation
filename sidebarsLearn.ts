@@ -68,6 +68,11 @@ const sidebarsLearn: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'developers/full-text-search-product-catalog',
+					label: 'Full-Text Product Search',
+				},
+				{
+					type: 'doc',
 					id: 'developers/deploying-from-ci',
 					label: 'Deploying from a CI/CD Pipeline',
 				},

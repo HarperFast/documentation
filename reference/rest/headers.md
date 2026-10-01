@@ -20,7 +20,20 @@ These headers are included in all Harper REST API responses:
 | `etag`          | `"abc123"`         | Encoded version/last-modification time of the returned record. Used for conditional requests.                                                                                                             |
 | `location`      | `/MyTable/new-id`  | Returned on `POST` responses. Contains the path to the newly created record.                                                                                                                              |
 
-Collection responses to a [count request](./querying.md#pagination-and-total-count) additionally include `Content-Range`, `Range-Unit`, and `Preference-Applied` (<VersionBadge version="v5.3.0" />).
+Collection responses to a [count request](./querying.md#pagination-and-total-count) additionally include `Content-Range`, `Range-Unit`, and `Preference-Applied` (Added in: v5.3.0).
+
+### `Harper-Index-Coverage`
+
+<VersionBadge version="v5.3.0" />
+
+A non-waiting request that uses a native derived index can include `Harper-Index-Coverage`. Its value is one of:
+
+- `current; lag=0; tolerance=<requested-ms>`: the index covered current committed data at admission.
+- `bounded; lag=<upper-bound-ms>; tolerance=<requested-ms>`: the admitted lag upper bound was within the requested tolerance.
+
+Multiple native searches append one value each. The header certifies coverage when the search is admitted; it does not certify a later traversal. See [Full-text freshness controls](../full-text-search/querying.md#freshness-controls).
+
+When CORS is enabled, Harper adds this header to `Access-Control-Expose-Headers` so browser clients can read it.
 
 ## Cache-Control
 
