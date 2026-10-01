@@ -3,9 +3,9 @@ id: calibration
 title: Calibration
 ---
 
-<!-- Source: harper resources/models/calibration.ts, resources/models/calibrationStore.ts, resources/models/generativeDecision.ts, resources/models/Models.ts (v5.3.0) -->
+<!-- Source: harper resources/models/calibration.ts, resources/models/calibrationStore.ts, resources/models/generativeDecision.ts, resources/models/Models.ts (v5.3.1) -->
 
-<VersionBadge version="v5.3.0" />
+<VersionBadge version="v5.3.1" />
 
 A decision's `probability` ranks its choices well, but it is not a measured chance of being right. A model can say 0.9 and be right only 70% of the time. Calibration learns that gap from the outcomes you record and answers two questions from Harper itself:
 
@@ -51,6 +51,7 @@ Removing the block turns calibration off at the next configuration reload: decis
 ## Recording outcomes calibration can use
 
 - Record with `persist: true`, or give the [`@decide` directive](../database/schema#decide) a `decision` field. Unrecorded decisions have nothing to attach an outcome to.
+- Report against a record's decision id only while the record still holds the input that decision saw. A tracked-instance edit after `update()`, a CRDT operation, or a write sent with `x-replicate-from: none` [changes the source without deciding again](../database/schema#decide) and keeps the old id, and a truth reported through it would label a decision made on different input.
 - Report the truth with `{ truth: { kind: 'value', value } }`. A `noMatch` truth, meaning none of the allowed values was right, is left out of the fit but counts as an error in the [operational risk](#choosing-a-threshold). An `unknown` truth is ignored. Correcting a truth later is fine: the next run notices and refits.
 - **Record the truth for a random sample of decisions, not only the ones people happened to review.** Reviewed cases are usually the hard ones, and a calibration learned only from them describes them, not your traffic. Each report shows how many decisions it read and how many had a truth.
 
@@ -59,12 +60,19 @@ Removing the block turns calibration off at the next configuration reload: decis
 [`models.getCalibrations()`](#getcalibrations) returns the newest report for each field of each population. The part that answers "where can I automate?" is the selective-risk table, one row per threshold:
 
 ```javascript
+const recent = await models.getDecision(ticket.decisionId);
 const summaries = await models.getCalibrations({ model: 'default' });
-const route = summaries.find((summary) => summary.field === undefined && summary.report);
-const table = route?.applied ? route.report.calibrated.operational : route?.report.raw.operational;
+const route = summaries.find(
+	(summary) =>
+		summary.field === undefined &&
+		summary.signature === recent.signature &&
+		summary.instructionsHash === recent.instructionsHash &&
+		summary.schemaHash === recent.schemaHash
+);
+const table = route?.applied ? route.report.calibrated.operational : route?.report?.raw.operational;
 ```
 
-Each summary describes one field of one population, so pick the one you are thresholding: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. A population with fewer than 20 recorded outcomes has no report yet. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
+Each summary describes one field of one population: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. Match the summary to a recent decision of the kind you are thresholding, here the one saved on a routed ticket as in [Start here](./overview#start-here-typed-decisions), so that another schema on the same model, or a population retired by a model change, is never read by mistake. A population with fewer than 20 recorded outcomes has no report yet, and `table` is then undefined: keep your cautious threshold. Summaries come newest first, but a backend whose `signature` does not name its source gives the old and new populations the same `signature` after a [`revision` change](#when-the-deployment-changes-but-the-configuration-does-not), so until a summary with a `fittedAt` after the change appears, treat the match as the old deployment's. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
 
 ```json
 [

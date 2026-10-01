@@ -7,7 +7,7 @@ title: API
 
 <VersionBadge version="v5.1.0" />
 
-The `models` object exposes eight methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate decisions recorded with `persist: true`, and [`calibrate()` and `getCalibrations()`](./calibration#api) fit and report calibrations from them. None of these four takes the routing options above; `getCalibrations()` takes an optional `{ model }` filter. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
+The `models` object exposes eight methods. The four that call a model (`embed`, `generate`, `generateStream` and `decide`) accept an optional `model` option naming the configured logical model to use; when omitted, the logical name `default` is used. `getDecision()` and `recordOutcome()` read and annotate decisions recorded with `persist: true`, and, from v5.3.1, [`calibrate()` and `getCalibrations()`](./calibration#api) fit and report calibrations from them. None of these four takes the routing options above; `getCalibrations()` takes an optional `{ model }` filter. Calling a logical name with no configured backend, or asking a backend for a capability it does not support (for example, embeddings from a generation-only backend), throws an error: capability checks run before a backend is called, except the `calibrated` check on a decision, which a backend can only answer after it returns.
 
 ## embed()
 
@@ -117,11 +117,10 @@ const decision = await models.decide(ticket.body, {
 	enum: ['billing', 'refund', 'bug', 'other'],
 	description: 'Which queue should handle this support ticket?',
 });
-// decision.value → 'refund'
-// decision.probability → 0.8
-// decision.distribution → [{ value: 'refund', probability: 0.8 }, { value: 'billing', probability: 0.2 }, …]
 if (decision.probability < 0.7) await sendToHuman(ticket, decision);
 ```
+
+Here `decision.value` might be `'refund'` with a `probability` of 0.8, and `decision.distribution` lists every allowed value with its probability, highest first.
 
 `state` is the input to decide about: a string, or any JSON-serializable object (program state, a record, a message). `schema` defines the closed set; it is a required argument rather than an option because the schema is what makes the call a decision instead of a generation.
 
@@ -180,9 +179,10 @@ Pass `persist: true` when you will want to know later whether the decision was r
 ```javascript
 const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] }, { persist: true });
 await route(ticket, decision.value);
-// Later, once a person has confirmed the right queue:
 await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
 ```
+
+The `recordOutcome` call runs later, once a person has confirmed the right queue.
 
 |                                   | Default                                                                                             | `persist: true`                                                                                                    |
 | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -258,9 +258,10 @@ if (decision.probability >= 0.7) {
 	await sendToHuman(ticket);
 	await models.recordOutcome(decision.id, { action: { kind: 'abstained' } });
 }
-// Later, when the human's answer is known:
 await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
 ```
+
+The last call runs later, when the person's answer is known.
 
 For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'value', value: 'refund' } }, urgent: { action: { kind: 'abstained' } } } }`. Each field's facts are recorded and read independently.
 

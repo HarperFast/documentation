@@ -20,12 +20,12 @@ Four provider backends ship with Harper, serving `embedding` and `generative` en
 
 All backends support these common fields:
 
-| Field              | Description                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `backend`          | Which backend to use (required)                                                                                                                                                                               |
-| `model`            | Provider-side model identifier (e.g. `gpt-4o`) used when a call does not pass its own `model` option                                                                                                          |
-| `requestTimeoutMs` | Per-request timeout in milliseconds; composed with any caller-provided `AbortSignal`                                                                                                                          |
-| `revision`         | A non-secret label for the deployment behind the entry, for [calibration](./calibration#when-the-deployment-changes-but-the-configuration-does-not); change it when the same settings reach a different model |
+| Field              | Description                                                                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend`          | Which backend to use (required)                                                                                                                                                                                            |
+| `model`            | Provider-side model identifier (e.g. `gpt-4o`) used when a call does not pass its own `model` option                                                                                                                       |
+| `requestTimeoutMs` | Per-request timeout in milliseconds; composed with any caller-provided `AbortSignal`                                                                                                                                       |
+| `revision`         | A non-secret label for the deployment behind the entry, for [calibration](./calibration#when-the-deployment-changes-but-the-configuration-does-not); change it when the same settings reach a different model. From v5.3.1 |
 
 ## Ollama
 
