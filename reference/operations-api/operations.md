@@ -1052,12 +1052,14 @@ Three operations edit a component's `.env` file without ever returning a value. 
 
 All three take a `project` (the component directory name) and an optional `file`, which defaults to `.env`. `file` must name an env file — `.env` or `.env.<suffix>` such as `.env.local` — and is rejected otherwise. Key names must match `[A-Za-z0-9_.-]+`, the character set the `.env` parser accepts.
 
-`set_env_value` and `delete_env_value` replicate, so an edit reaches every node in the cluster.
+`set_env_value` and `delete_env_value` replicate, so an edit reaches the file on every node in the cluster.
+
+An edit changes the file, not the running components. [`loadEnv`](../environment-variables/overview.md) reads a `.env` file into `process.env` when the component loads, and reads only the files its `files` option names. When a file it has already loaded changes, it does not reload the values. It flags the node as needing a restart instead, so `get_status` reports `restartRequired: true`. Until the node's worker threads restart, running code still sees the old value of a changed key, and still sees a deleted key. To apply an edit, restart the workers on every node, for example with [`restart_service`](#restart_service) using `"service": "http_workers"` and `"replicated": true`, which restarts the nodes one at a time. `harper dev` restarts its workers on its own when the flag is set.
 
 :::note
 `get_component_file` on a `.env` file returns a **masked** body: `protected: true`, the `keys` array, and a `message` of one `KEY=********` line per key. `get_components` likewise flags such files with `protected: true`. Template files — `.env.example`, `.env.sample`, `.env.template` — hold placeholders rather than secrets, so they are returned verbatim and are not masked.
 
-`set_component_file` is **not** blocked on a `.env` file; it overwrites the file verbatim with whatever payload you send. Use `set_env_value` when you want to change one key and keep the others.
+`set_component_file` is **not** blocked on a `.env` file. It overwrites the file verbatim with whatever payload you send. Use `set_env_value` when you want to change one key and keep the others.
 
 This is disclosure protection for the editor surface, not a security boundary — component code can still read the real values from `process.env`.
 :::
@@ -1581,12 +1583,12 @@ With an `id`, it returns that one status record:
 { "operation": "get_status" }
 ```
 
-| Field              | Description                                                                                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `systemStatus`     | Every status record set with `set_status`                                                                                                                                 |
-| `componentStatus`  | Per-component health, aggregated across threads: `name` plus a `status` of `healthy`, `warning`, `error`, `loading`, or `unknown`                                         |
-| `restartRequired`  | Whether a restart is pending on this node — set by a deploy that did not restart (see [Deploying without a restart](#deploying-without-a-restart)) and cleared on restart |
-| `middlewareChains` | The resolved HTTP, upgrade, and WebSocket middleware order (v5.2.0). Present only when the request passes `middleware: true`                                              |
+| Field              | Description                                                                                                                                                                                                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `systemStatus`     | Every status record set with `set_status`                                                                                                                                                                                                                                                                                       |
+| `componentStatus`  | Per-component health, aggregated across threads: `name` plus a `status` of `healthy`, `warning`, `error`, `loading`, or `unknown`                                                                                                                                                                                               |
+| `restartRequired`  | Whether a restart is pending on this node — set by a change that needs one to take effect, such as a deploy that did not restart (see [Deploying without a restart](#deploying-without-a-restart)) or an edit to a loaded `.env` file (see [Environment File Operations](#environment-file-operations)), and cleared on restart |
+| `middlewareChains` | The resolved HTTP, upgrade, and WebSocket middleware order (v5.2.0). Present only when the request passes `middleware: true`                                                                                                                                                                                                    |
 
 `restartRequired` is per node: it reports the node that served the request, not the cluster.
 

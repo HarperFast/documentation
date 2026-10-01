@@ -64,7 +64,7 @@ To change Harper's configuration, set it in the [configuration file](../configur
 
 <VersionBadge version="v5.2.0" />
 
-A component's `.env` file can be edited through the Operations API without exposing the values already in it. `get_env_keys` lists key names only, `set_env_value` writes one or many keys while preserving every other line, and `delete_env_value` removes keys. `get_component_file` returns a `.env` file **masked** — key names and one `KEY=********` line per key, never a value. See [Environment File Operations](../operations-api/operations.md#environment-file-operations).
+A component's `.env` file can be edited through the Operations API without exposing the values already in it. `get_env_keys` lists key names only, `set_env_value` writes one or many keys while preserving every other line, and `delete_env_value` removes keys. `get_component_file` returns a `.env` file **masked** — key names and one `KEY=********` line per key, never a value. An edit to a file `loadEnv` has already loaded reaches running code only after the node's worker threads restart. See [Environment File Operations](../operations-api/operations.md#environment-file-operations).
 
 Individual values can also be stored encrypted, so the plaintext never reaches the API, the logs, the replication payload, or the file on disk. See [Encrypted Environment Values](./encrypted-values.md).
 

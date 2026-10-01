@@ -27,14 +27,18 @@ Decryption requires **secret custody** — the cluster's secrets private key —
 
 | Node                             | Behavior at load                                                                     |
 | -------------------------------- | ------------------------------------------------------------------------------------ |
-| Custody registered (Harper Pro)  | The value is decrypted and written to `process.env` under its key.                   |
+| Custody registered (Harper Pro)  | The value is decrypted, then loaded like a plaintext value.                          |
 | No custody (core, or key absent) | The value is **skipped** with an error logged, and queued for a decryptor.           |
-| Custody registers later          | Queued values are decrypted into `process.env` as soon as it registers.              |
+| Custody registers later          | Queued values are decrypted and loaded as soon as it registers.                      |
 | Value cannot be decrypted        | Skipped with an error logged — a wrong key, a tampered envelope, or a malformed one. |
 
-A skipped value means the variable is **absent** from `process.env`, not set to the ciphertext — your component fails on a missing variable rather than silently receiving an unusable string. Skipping is never fatal to the node: it still boots, so a bad value can be corrected with `set_env_value` and a node without Pro is not crashed by a replicated encrypted value.
+A decrypted value is loaded under the same [override rule](./overview.md#override-behavior) as a plaintext one, so by default it does not replace a variable that is already set.
 
-Because a decryptor that comes up after component `.env` loading replays the values it missed, custody startup order is not something you have to arrange.
+A skipped value is never written to `process.env`, so the ciphertext never becomes the value. If nothing else set that variable, it is **absent**, and your component fails on a missing variable rather than silently receiving an unusable string. If the variable was already set, by the shell or container environment or by an earlier `.env` file, it keeps that value.
+
+Skipping is never fatal to the node. It still boots, so you can correct a bad value with `set_env_value` and restart the workers, and a node without Pro is not crashed by a replicated encrypted value.
+
+A decryptor that comes up after component `.env` loading replays the values it missed into `process.env`. Replaying sets the variable but does not rerun code that has already read it. A component that reads the value while it initializes, before custody registers, finds it missing and keeps whatever it did with that result. For such a component, read the variable when you use it rather than at startup, or restart the workers once custody is available. Each deferred value is logged as an error that ends in `deferring`.
 
 ## Encrypting a value
 
@@ -93,6 +97,8 @@ Send the envelope as an ordinary value. Harper stores the string verbatim:
 	"value": "enc:v1:<base64url-envelope>"
 }
 ```
+
+Like any edit to a `.env` file a component has already loaded, the new value reaches running code when the node's worker threads restart. See [Environment File Operations](../operations-api/operations.md#environment-file-operations).
 
 :::note
 Unlike `set_secret`, `set_env_value` does **not** validate the envelope — it is just a string to the `.env` writer, and there is no server-side check of its structure or `kid`. A malformed or wrongly-keyed envelope is only discovered when the file is loaded, as a decrypt error in the log. `set_secret` performs those checks on ingest, which is one more reason to prefer the [secrets store](../security/secrets.md) for credentials.
