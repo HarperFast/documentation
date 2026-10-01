@@ -1052,9 +1052,9 @@ Three operations edit a component's `.env` file without ever returning a value. 
 
 All three take a `project` (the component directory name) and an optional `file`, which defaults to `.env`. `file` must name an env file — `.env` or `.env.<suffix>` such as `.env.local` — and is rejected otherwise. Key names must match `[A-Za-z0-9_.-]+`, the character set the `.env` parser accepts.
 
-`set_env_value` and `delete_env_value` replicate, so an edit reaches the file on every node in the cluster.
+`set_env_value` and `delete_env_value` replicate. The node that receives the request edits its own file, then sends the edit once to each peer. The response's `replicated` array has one entry per peer, naming it in `node`. A peer that could not be reached is listed with `"status": "failed"` and a `reason`. Harper does not retry it, so that node keeps its old file until the edit is sent again.
 
-An edit changes the file, not the running components. [`loadEnv`](../environment-variables/overview.md) reads a `.env` file into `process.env` when the component loads, and reads only the files its `files` option names. When a file it has already loaded changes, it does not reload the values. It flags the node as needing a restart instead, so `get_status` reports `restartRequired: true`. Until the node's worker threads restart, running code still sees the old value of a changed key, and still sees a deleted key. To apply an edit, restart the workers on every node, for example with [`restart_service`](#restart_service) using `"service": "http_workers"` and `"replicated": true`, which restarts the nodes one at a time. `harper dev` restarts its workers on its own when the flag is set.
+An edit changes the file, not the running components. [`loadEnv`](../environment-variables/overview.md) reads a `.env` file into `process.env` when the component loads, and reads only the files its `files` option names. When a file it has already loaded changes, it does not reload the values. It flags the node as needing a restart instead, so `get_status` reports `restartRequired: true`. Until the node's worker threads restart, running code still sees the old value of a changed key, and still sees a deleted key. To apply an edit, restart the workers on every node, for example with [`restart_service`](#restart_service) using `"service": "http_workers"` and `"replicated": true`, which restarts the nodes one at a time. When `harper dev` runs an application directory, it restarts the workers on its own when the flag is set.
 
 :::note
 `get_component_file` on a `.env` file returns a **masked** body: `protected: true`, the `keys` array, and a `message` of one `KEY=********` line per key. `get_components` likewise flags such files with `protected: true`. Template files — `.env.example`, `.env.sample`, `.env.template` — hold placeholders rather than secrets, so they are returned verbatim and are not masked.
@@ -1119,7 +1119,7 @@ Response:
 
 `keys` is the file's key list after the write — the request value is never echoed back.
 
-Harper quotes the value as needed so the `.env` parser reads back exactly what you sent, including spaces, `#`, quotes, backslashes, and newlines. One combination cannot be represented: a value containing a single quote (`'`) together with a double quote, a backslash, or a carriage return is rejected with a `400`.
+Harper quotes the value as needed so the `.env` parser reads back exactly what you sent, including spaces, `#`, quotes, backslashes, and newlines. A carriage return is the exception: the parser reads `\r\n` and a lone `\r` back as `\n`. One combination cannot be represented: a value containing a single quote (`'`) together with a double quote, a backslash, or a carriage return is rejected with a `400`.
 
 A value may also be an `enc:v1:` ciphertext envelope rather than plaintext — see [Encrypted Environment Values](../environment-variables/encrypted-values.md).
 
