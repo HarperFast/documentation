@@ -255,10 +255,10 @@ Records what actually happened for a decision made with [`persist: true`](#recor
 ```javascript
 const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] }, { persist: true });
 if (decision.probability >= 0.7) {
-	await route(ticket, decision.value);
+	await route(ticket, decision.value, decision.id);
 	await models.recordOutcome(decision.id, { action: { kind: 'value', value: decision.value } });
 } else {
-	await sendToHuman(ticket);
+	await sendToHuman(ticket, decision.id);
 	await models.recordOutcome(decision.id, { action: { kind: 'abstained' } });
 }
 ```

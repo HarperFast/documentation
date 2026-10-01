@@ -116,7 +116,7 @@ Some decisions are never corrected and never learned from:
 - A decision whose inner calls were served by entries with different fingerprints, for example a vote in which a sample fell back to another entry, even one of the same provider, or an object schema whose fields were scored by different entries. Its probability mixes two sources' confidence. An entry's name is part of its fingerprint, so a fallback between two entries is never one source, even when their settings are identical.
 - A decision made through the built-in adapter over a generative backend a component registered from code, because Harper cannot identify that backend's model.
 
-A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes.
+A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes. When that can happen without Harper seeing it, for example new weights behind the same endpoint, fold the entry's `revision` (on the `config` its [factory](./backends#config-selectable-backends) receives) into the signature, so a `revision` bump also gives its decisions a new signature and the threshold lookup above can tell the old population from the new one.
 
 ### When the deployment changes but the configuration does not
 
