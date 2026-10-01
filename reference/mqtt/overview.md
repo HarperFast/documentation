@@ -53,7 +53,7 @@ Harper supports multi-level topics for both publishing and subscribing:
 
 ### Durable Sessions
 
-A durable session retains a client's subscription list and any unacknowledged messages across disconnects. When the client reconnects with the same client ID, it picks up from where it left off — including any messages published while it was offline.
+A durable session retains a client's subscription list and any unacknowledged messages across disconnects. When the client reconnects with the same client ID, Harper catches up subscribed topics from retained audit history.
 
 Durable sessions in Harper are persisted as records in the `hdb_durable_session` system table, indexed by client ID. The session record holds the list of subscriptions (topic + QoS) and the timestamp of the last delivered message per topic. Because durable sessions are records rather than in-memory state, an abandoned session sits idle with no runtime cost until the client reconnects or the record is deleted.
 
@@ -71,7 +71,11 @@ mqtt.connect('mqtts://harper.example.com:8883', {
 });
 ```
 
-**Catch-up on reconnect** — When the client reconnects, Harper replays missed messages on subscribed topics by reading the audit log. For this to work, audit logging must be enabled on the tables backing the subscribed topics. See [Transaction Logging](../database/transaction.md) and [`logging.auditLog`](../logging/configuration.md#loggingauditlog).
+**Catch-up on reconnect** — When the client reconnects, Harper reads retained audit history for subscribed topics. For this to work, audit logging must be enabled on the tables backing the subscribed topics. See [Transaction Logging](../database/transaction.md) and [`logging.auditLog`](../logging/configuration.md#loggingauditlog).
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+Durable subscriptions with QoS 1 or 2 explicitly include superseded record versions during both live delivery and reconnect catch-up. This preserves delivery of intermediate retained publications (`retain: true`), even though ordinary table subscriptions now default to current-state delivery. Non-retained publications remain independent messages. Catch-up is limited by audit-log retention. See [Superseded record updates](../resources/resource-api.md#superseded-record-updates).
 
 **Session expiry** — In MQTT v5, the `sessionExpiryInterval` property on `CONNECT` controls how long the session is retained after the client disconnects. With `sessionExpiryInterval: 0` (or a clean session connect), Harper deletes the session record at disconnect. Connecting with the same client ID and `clean: true` also explicitly deletes any existing durable session.
 
@@ -93,7 +97,7 @@ Harper is designed for distributed, low-latency message delivery. Messages are d
 
 In a distributed cluster, messages may arrive out of order due to network topology. The behavior depends on whether the message is retained or non-retained:
 
-- **Retained messages** (published with `retain: true`, or written via PUT/upsert) maintain eventual consistency across the cluster. Harper keeps the message with the latest timestamp as the winning record state. An out-of-order earlier message will not be re-delivered to clients; the cluster converges to the most recent state.
+- **Retained messages** (published with `retain: true`, or written via PUT/upsert) maintain eventual consistency across the cluster. Harper keeps the message with the latest timestamp as the winning record state. Ordinary subscriptions skip superseded updates. Durable QoS 1/2 subscriptions include superseded versions, so their delivered history can include older updates even though the stored record converges to the most recent state.
 - **Non-retained messages** are always delivered to local subscribers when received, even if they arrive out of order. Every message is delivered, prioritizing completeness over strict ordering.
 
 **Non-retained messages** are suited for applications like chat where every message must be delivered. **Retained messages** are suited for sensor readings or state updates where only the latest value matters.
