@@ -62,17 +62,11 @@ Removing the block turns calibration off at the next configuration reload: decis
 ```javascript
 const recent = await models.getDecision(ticket.decisionId);
 const summaries = recent ? await models.getCalibrations({ model: recent.model }) : [];
-const route = summaries.find(
-	(summary) =>
-		summary.field === undefined &&
-		summary.signature === recent.signature &&
-		summary.instructionsHash === recent.instructionsHash &&
-		summary.schemaHash === recent.schemaHash
-);
+const route = summaries.find((summary) => summary.field === undefined && summary.population === recent.population);
 const table = route?.applied ? route.report.calibrated.operational : route?.report?.raw.operational;
 ```
 
-Each summary describes one field of one population: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. Match the summary to a recent decision of the kind you are thresholding, here the one saved on a routed ticket as in [Start here](./overview#start-here-typed-decisions), so that another schema or set of instructions on the same model is never read by mistake. While calibration is on, the built-in adapter's `signature` names the entry that produced the scores, so after a model or [`revision` change](#when-the-deployment-changes-but-the-configuration-does-not) new decisions carry a new signature and the retired population no longer matches; a [custom decision backend](#what-a-population-is) gets the same only if it changes its `signature` when its scores change. `table` stays undefined when the decision has expired or has not replicated to this node yet, and while its population has fewer than 20 recorded outcomes and so no report: keep your cautious threshold then. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
+Each summary describes one field of one population: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. Match the summary to a recent decision of the kind you are thresholding, here the one saved on a routed ticket as in [Start here](./overview#start-here-typed-decisions), by the `population` both carry. It is the [whole identity](#what-a-population-is), the decision entry's settings included, so another schema on the same model, or a population retired by a model, setting or [`revision` change](#when-the-deployment-changes-but-the-configuration-does-not), is never read by mistake; the signature and hashes a summary also shows are not enough on their own. `table` stays undefined when the decision has expired or has not replicated to this node yet, when it was recorded while calibration was off and so has no `population`, and while its population has fewer than 20 recorded outcomes and so no report: keep your cautious threshold then. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
 
 ```json
 [
@@ -116,7 +110,7 @@ Some decisions are never corrected and never learned from:
 - A decision whose inner calls were served by entries with different fingerprints, for example a vote in which a sample fell back to another entry, even one of the same provider, or an object schema whose fields were scored by different entries. Its probability mixes two sources' confidence. An entry's name is part of its fingerprint, so a fallback between two entries is never one source, even when their settings are identical.
 - A decision made through the built-in adapter over a generative backend a component registered from code, because Harper cannot identify that backend's model.
 
-A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes. When that can happen without Harper seeing it, for example new weights behind the same endpoint, fold the entry's `revision` (on the `config` its [factory](./backends#config-selectable-backends) receives) into the signature, so a `revision` bump also gives its decisions a new signature and the threshold lookup above can tell the old population from the new one.
+A [custom decision backend](./backends#decision-backends) identifies its own score source through the `signature` it returns. It must change that signature whenever what produces its scores changes.
 
 ### When the deployment changes but the configuration does not
 
@@ -197,6 +191,7 @@ The newest version for each field of each population whose tenant is the caller'
 | Field                                         | Meaning                                                                                                                                                                                                                                                                                        |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`, `field`                              | The logical model, and the field for an object schema                                                                                                                                                                                                                                          |
+| `population`                                  | The population's key, the same one each of its recorded decisions carries; match a decision to its summary on this                                                                                                                                                                             |
 | `signature`, `instructionsHash`, `schemaHash` | What identifies the population                                                                                                                                                                                                                                                                 |
 | `eligible`, `reason`                          | Whether the correction qualified, and if not, `too-few-labels`, `no-improvement` or `no-match-schema`                                                                                                                                                                                          |
 | `applied`                                     | Whether the version qualifies to apply: eligible, current, and fitted under the current settings. A node applies it once its cache has loaded it, and a population that no longer receives decisions, for example after a `revision` change, keeps reporting its last version until it expires |
