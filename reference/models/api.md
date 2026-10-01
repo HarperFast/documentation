@@ -178,11 +178,14 @@ Pass `persist: true` when you will want to know later whether the decision was r
 
 ```javascript
 const decision = await models.decide(ticket.body, { enum: ['billing', 'refund', 'bug', 'other'] }, { persist: true });
-await route(ticket, decision.value);
-await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
+await route(ticket, decision.value, decision.id);
 ```
 
-The `recordOutcome` call runs later, once a person has confirmed the right queue.
+Later, once a person has confirmed the right queue, report it against the id `route` saved on the ticket:
+
+```javascript
+await models.recordOutcome(ticket.decisionId, { truth: { kind: 'value', value: ticket.confirmedQueue } });
+```
 
 |                                   | Default                                                                                             | `persist: true`                                                                                                    |
 | --------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -258,10 +261,13 @@ if (decision.probability >= 0.7) {
 	await sendToHuman(ticket);
 	await models.recordOutcome(decision.id, { action: { kind: 'abstained' } });
 }
-await models.recordOutcome(decision.id, { truth: { kind: 'value', value: 'refund' } });
 ```
 
-The last call runs later, when the person's answer is known.
+When the person's answer is known, record it as the truth, against the id kept with the ticket:
+
+```javascript
+await models.recordOutcome(ticket.decisionId, { truth: { kind: 'value', value: ticket.confirmedQueue } });
+```
 
 For an object schema, report per field: `{ fields: { queue: { truth: { kind: 'value', value: 'refund' } }, urgent: { action: { kind: 'abstained' } } } }`. Each field's facts are recorded and read independently.
 

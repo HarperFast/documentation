@@ -61,7 +61,7 @@ Removing the block turns calibration off at the next configuration reload: decis
 
 ```javascript
 const recent = await models.getDecision(ticket.decisionId);
-const summaries = await models.getCalibrations({ model: 'default' });
+const summaries = recent ? await models.getCalibrations({ model: recent.model }) : [];
 const route = summaries.find(
 	(summary) =>
 		summary.field === undefined &&
@@ -72,7 +72,7 @@ const route = summaries.find(
 const table = route?.applied ? route.report.calibrated.operational : route?.report?.raw.operational;
 ```
 
-Each summary describes one field of one population: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. Match the summary to a recent decision of the kind you are thresholding, here the one saved on a routed ticket as in [Start here](./overview#start-here-typed-decisions), so that another schema on the same model, or a population retired by a model change, is never read by mistake. A population with fewer than 20 recorded outcomes has no report yet, and `table` is then undefined: keep your cautious threshold. Summaries come newest first, but a backend whose `signature` does not name its source gives the old and new populations the same `signature` after a [`revision` change](#when-the-deployment-changes-but-the-configuration-does-not), so until a summary with a `fittedAt` after the change appears, treat the match as the old deployment's. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
+Each summary describes one field of one population: a model can have several, one per schema, instructions and configuration, and an object schema has one per field. Match the summary to a recent decision of the kind you are thresholding, here the one saved on a routed ticket as in [Start here](./overview#start-here-typed-decisions), so that another schema or set of instructions on the same model is never read by mistake. While calibration is on, the built-in adapter's `signature` names the entry that produced the scores, so after a model or [`revision` change](#when-the-deployment-changes-but-the-configuration-does-not) new decisions carry a new signature and the retired population no longer matches; a [custom decision backend](#what-a-population-is) gets the same only if it changes its `signature` when its scores change. `table` stays undefined when the decision has expired or has not replicated to this node yet, and while its population has fewer than 20 recorded outcomes and so no report: keep your cautious threshold then. Read the `calibrated` table only when `applied` is true: a correction that was fitted but did not qualify still has a `calibrated` table, but no decision uses it. Otherwise read `raw`, which describes the probabilities your decisions actually carry. Each table looks like this:
 
 ```json
 [
