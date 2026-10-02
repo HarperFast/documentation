@@ -110,7 +110,7 @@ A few details worth noting:
 
 - **`#semver:v1.2.3`** resolves the reference through your repo's semver tags. You can also pin an exact commit (`#<sha>`) — useful if you want deploys keyed to commits rather than tags.
 - **`replicated: true`** runs the deploy across the cluster; each node fetches and installs the package itself, resolving the credential from the (replicated) secrets store.
-- **`restart: "rolling"`** restarts nodes sequentially so the cluster keeps serving throughout. Use `restart: true` for a single-node or dev instance.
+- **`restart: "rolling"`** restarts nodes sequentially so the cluster keeps serving throughout. Use `restart: true` for a single-node or dev instance. Either one loads the release in one [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before rolling it out there, so a release that fails to load is rejected and the previous one keeps serving.
 - The token is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
 
 If this repository needs a build step to be runnable, stop — don't reach for `install_allow_scripts`. Use Path B.
