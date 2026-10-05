@@ -86,11 +86,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy tag to Harper
+        shell: bash
         run: |
           curl --fail-with-body -s "$HARPER_OPS_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: $HARPER_OPS_AUTH" \
-            -d @- <<EOF
+            -d @- <<EOF | tee deploy-response.json
           {
             "operation": "deploy_component",
             "project": "my-app",
@@ -110,7 +111,8 @@ A few details worth noting:
 
 - **`#semver:v1.2.3`** resolves the reference through your repo's semver tags. You can also pin an exact commit (`#<sha>`) — useful if you want deploys keyed to commits rather than tags.
 - **`replicated: true`** runs the deploy across the cluster; each node fetches and installs the package itself, resolving the credential from the (replicated) secrets store.
-- **`restart: "rolling"`** restarts nodes sequentially so the cluster keeps serving throughout. Use `restart: true` for a single-node or dev instance. Either one loads the release in one [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before rolling it out there, so a release that fails to load is rejected and the previous one keeps serving.
+- **`restart: "rolling"`** restarts nodes sequentially so the cluster keeps serving throughout. Use `restart: true` for a single-node or dev instance. Either one loads the release in a [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before that node serves it, except in the cases that section lists, so a release that fails to load there is rejected. With `"rolling"`, the response only covers the node you called: the other nodes take the release one at a time in a job that keeps running after the deploy responds, and a node that rejects it fails that job, not this step. [Wait for the job](#verify-the-deployment) before you count the deploy as done.
+- **`shell: bash`** turns on `pipefail`, so the step still fails when `curl` does even though its output goes through `tee`, which saves the response for the next step.
 - The token is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
 
 If this repository needs a build step to be runnable, stop — don't reach for `install_allow_scripts`. Use Path B.
@@ -159,12 +161,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy to Harper
+        shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           curl --fail-with-body -s "$HARPER_OPS_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: $HARPER_OPS_AUTH" \
-            -d @- <<EOF
+            -d @- <<EOF | tee deploy-response.json
           {
             "operation": "deploy_component",
             "project": "my-app",
@@ -191,7 +194,34 @@ The `scope` field maps the `@my-org` scope to GitHub Packages on the installing 
 
 ## Verify the deployment
 
-`deploy_component` responds with a `deployment_id`. Harper records the full lifecycle of every deployment — phase transitions, per-node outcomes, and install output — in a deployment record you can query:
+With `"restart": "rolling"`, a passing deploy step only means the node you called took the release. The response's `restartJobId` names the job that then activates it on each other node, each certifying it in a canary worker of its own, and a node that rejects it fails that job after the deploy step has passed. Add a step after either deploy step that waits for the job, so a rejected release fails the pipeline rather than being discovered later:
+
+```yaml
+- name: Wait for every node to take the release
+  run: |
+    JOB_ID=$(jq -r '.restartJobId // empty' deploy-response.json)
+    [ -n "$JOB_ID" ] || exit 0
+    for attempt in $(seq 60); do
+      JOB=$(curl --fail-with-body -s "$HARPER_OPS_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: $HARPER_OPS_AUTH" \
+        -d "{\"operation\": \"get_job\", \"id\": \"$JOB_ID\"}")
+      case $(echo "$JOB" | jq -r '.[0].status') in
+        COMPLETE) exit 0 ;;
+        ERROR) echo "$JOB" | jq '.[0].message'; exit 1 ;;
+      esac
+      sleep 10
+    done
+    echo "Job $JOB_ID was still running after 10 minutes"
+    exit 1
+  env:
+    HARPER_OPS_URL: ${{ secrets.HARPER_OPS_URL }}
+    HARPER_OPS_AUTH: ${{ secrets.HARPER_OPS_AUTH }}
+```
+
+A failed job's `message` lists each node's outcome under `activated`, so the log names the node that rejected the release and why. With `restart: true` there is no job to wait for: unless you pass `ignore_replication_errors: true`, the deploy step itself fails when a node rejects the release.
+
+`deploy_component` also responds with a `deployment_id`. Harper records the full lifecycle of every deployment — phase transitions, per-node outcomes, and install output — in a deployment record you can query:
 
 ```json
 {
@@ -200,7 +230,7 @@ The `scope` field maps the `@my-org` scope to GitHub Packages on the installing 
 }
 ```
 
-A useful pattern is to have the workflow poll [`get_deployment`](/reference/v5/operations-api/operations#get_deployment) until the deployment reaches `success` (or fail the job if it reports `failed`), so a broken deploy fails the pipeline rather than being discovered later. [`list_deployments`](/reference/v5/operations-api/operations#list_deployments) gives you the history — handy for answering "what exactly is deployed right now, and when did it change?"
+The node you called writes that record, so with `"restart": "rolling"` it reports `success` before the job has visited the other nodes. Wait on the job, not the record, to learn whether they took the release. [`list_deployments`](/reference/v5/operations-api/operations#list_deployments) gives you the history — handy for answering "what exactly is deployed right now, and when did it change?"
 
 ## Operational notes
 
