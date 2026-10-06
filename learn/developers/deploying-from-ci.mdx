@@ -109,13 +109,15 @@ That has one practical consequence: **use a durable token, not your workflow's e
 - **For a private repository (git-tag deploys):** a GitHub [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with **Contents: read-only** permission, scoped to just the application repository. An organization can attach these to a machine account so they aren't tied to an individual.
 - **For GitHub Packages (registry deploys):** a token with the **`read:packages`** scope.
 
-Store it in Harper once, from your machine, with [`harper deploy setup=true`](/reference/v5/cli/commands#private-deploy-sources). It prompts for the token, encrypts it locally with the cluster's public key, grants it to the component, and prints the `credentials` reference to use — the secret's name, never the token:
+Store it in Harper once, from your machine, with [`harper deploy setup=true`](/reference/v5/cli/commands#private-deploy-sources). It prompts for the token, encrypts it locally with the cluster's public key, grants it to the component, and prints the `credentials` reference to use — the secret's name, never the token. For a private repository:
 
 ```bash
-# A private repository
 harper deploy setup=true provider=github project=my-app
+```
 
-# GitHub Packages
+For GitHub Packages:
+
+```bash
 harper deploy setup=true provider=npm project=my-app registry=https://npm.pkg.github.com scope=@my-org
 ```
 
