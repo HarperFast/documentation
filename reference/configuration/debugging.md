@@ -106,6 +106,20 @@ threads:
 
 Snapshots can be large (often a sizable fraction of the heap limit) and writing them blocks the thread briefly — leave disabled for normal operation and enable only when investigating an out-of-memory pattern.
 
+## Source Maps in Stack Traces
+
+<VersionBadge version="v5.4.0" />
+
+Harper ships its compiled JavaScript with source maps, but does not enable them by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces from Harper's core point at the compiled files under `dist/`.
+
+To get stack traces that point at the TypeScript sources, enable source maps with the Node.js flag, either on the command line or through `NODE_OPTIONS`. Harper passes the setting on to every worker thread:
+
+```bash
+NODE_OPTIONS=--enable-source-maps harper
+```
+
+Before v5.4.0, source maps were always enabled.
+
 ## Related
 
 - [Configuration Options — `threads`](./options.md#threads) — full thread configuration reference
