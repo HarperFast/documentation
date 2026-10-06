@@ -163,7 +163,7 @@ jobs:
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
             esac
           done
-          echo "Job $JOB_ID did not finish within 10 minutes"
+          echo "Job $JOB_ID did not finish after 60 polls"
           exit 1
 ```
 
@@ -249,7 +249,7 @@ jobs:
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
             esac
           done
-          echo "Job $JOB_ID did not finish within 10 minutes"
+          echo "Job $JOB_ID did not finish after 60 polls"
           exit 1
 ```
 
@@ -276,7 +276,7 @@ Only the node you called writes that record, so with `restart=rolling` on v5.4.0
 
 The Harper CLI detects GitHub Actions' identity token only. On another CI system it falls through to its other credential sources, so give the pipeline a stored credential for the `ci-deploy` user instead — a refresh token from [`harper login --for-ci`](/reference/v5/cli/authentication#token-credentials-for-cicd), or that user's password — and keep it in the CI system's secret store. The deploy-only role still applies: name private-source credentials with `secret` references, since a literal `token` needs `super_user`.
 
-Without the CLI, call the Operations API with `curl`. `HARPER_OPS_URL` is the Operations API endpoint (`https://my-cluster.example.com:9925`), and `HARPER_OPS_AUTH` is the full `Authorization` header value for the `ci-deploy` user (`Basic <base64 user:password>`):
+Without the CLI, call the Operations API with `curl`. `HARPER_OPS_URL` is one node's Operations API endpoint (`https://my-cluster.example.com:9925`), because only the node that receives the deploy knows its job. `HARPER_OPS_AUTH` is the full `Authorization` header value for the `ci-deploy` user (`Basic <base64 user:password>`), and `RELEASE_TAG` is the tag being released, such as `v1.2.3`:
 
 ```bash
 set -euo pipefail
@@ -313,7 +313,7 @@ for attempt in $(seq 60); do
     ERROR) echo "$JOB" | jq -r '.[0].message'; exit 1 ;;
   esac
 done
-echo "Job $JOB_ID did not finish within 10 minutes"
+echo "Job $JOB_ID did not finish after 60 polls"
 exit 1
 ```
 

@@ -195,7 +195,7 @@ harper deploy_component \
   replicated=true
 ```
 
-`target` points to a node's operations endpoint. `replicated=true` sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
+`target` points to a node's operations endpoint, and that node sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
 
 :::note
 Restart afterward to apply the changes—for example, `harper restart target=https://cluster-node-1.example.com:9925 replicated=true`.
