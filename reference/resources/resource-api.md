@@ -289,10 +289,10 @@ As of v5.4.0, a subscription on a RocksDB database can resume from a position th
 
 Harper refuses a position it cannot replay completely:
 
-| Error                            | Status | Code                          | When                                                                                                      |
-| -------------------------------- | ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `DatabaseGenerationChangedError` | 409    | `DATABASE_GENERATION_CHANGED` | The database was replaced by a restored or copied state after the position was recorded, or it is LMDB.   |
-| `ResumeHistoryUnavailableError`  | 410    | `RESUME_HISTORY_UNAVAILABLE`  | Audit retention pruned history after the position, or one record has more than 10,000 versions after it.  |
+| Error                            | Status | Code                          | When                                                                                                     |
+| -------------------------------- | ------ | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DatabaseGenerationChangedError` | 409    | `DATABASE_GENERATION_CHANGED` | The database was replaced by a restored or copied state after the position was recorded, or it is LMDB.  |
+| `ResumeHistoryUnavailableError`  | 410    | `RESUME_HISTORY_UNAVAILABLE`  | Audit retention pruned history after the position, or one record has more than 10,000 versions after it. |
 
 A subscription to one record is checked against that record's own history: it resumes as long as the record's retained version history still reaches back to the position, even when retention has pruned other history past it. A record first written after the position is checked against retention like a table subscription.
 
