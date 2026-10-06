@@ -71,7 +71,7 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 - Known issue: `npm run serve` (post-build preview) 404s on paths like `/docs/4.X` locally due to an upstream `serve-handler` bug. This is not a real breakage — see CONTRIBUTING.md for details.
 - **Run the commands a page documents** before shipping them, against a throwaway Harper of the version the page targets. In a scratch directory, `npm install harper@<version>`, then run `harper install` and `harper start` with `HOME`, `ROOTPATH`, `TC_AGREEMENT=yes`, `HDB_ADMIN_USERNAME`, `HDB_ADMIN_PASSWORD`, `OPERATIONSAPI_NETWORK_PORT` and `HTTP_PORT` set to scratch values, and point the CLI at it with `HARPER_CLI_TARGET`.
   - Set `HOME` to a scratch directory on every command. Without it, `harper install` finds the contributor's own `~/.harperdb/hdb_boot_properties.file` and inspects that install, and `harper login` writes their `~/.harperdb/credentials.json`.
-  - Harper core alone has no replication, so anything that replicates fails with `Replication not implemented`, including `replicated=true` and the job `restart=rolling` starts. Those paths need Harper Pro.
+  - Harper core alone has no replication, so anything that replicates fails with `Replication not implemented`, including `replicated=true`, and the job a `restart=rolling` deploy starts when it only restarts (before v5.4.0, or when the deploy's `certification` is `unavailable`). Those paths need Harper Pro.
 
 ## CI
 
