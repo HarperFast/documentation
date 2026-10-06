@@ -90,7 +90,9 @@ replication:
 With dedicated replication threads:
 
 - Only the replication threads listen on the replication port, and they own every subscription to other nodes, so both sending and receiving replication data happen off the application threads.
-- The replication threads load no application code. Anything your application installs on a table at runtime (for example `setResidencyById`) is not present there, so applications that rely on it should keep `threads: 0`.
+- The replication threads load no application code. Anything your application installs on a table at runtime is not present there, so applications that rely on it should keep `threads: 0`:
+  - `setResidencyById`: records are sent to nodes outside their residency as invalidated, partial records.
+  - `setComputedAttribute` on an `@indexed` computed attribute: a replication thread cannot maintain that index, so it refuses to replicate the table and logs which attributes caused it. Computed attributes defined with `@computed(from: "...")` are not affected.
 - Reads that fetch a missing record from another node still run on the thread serving the request.
 - A dedicated replication port is required: set `replication.securePort` (default `9933`) or `replication.port`, different from the HTTP and operations API ports. Harper refuses to start otherwise.
 - `threads.count: 0` (no worker threads) ignores the setting.
