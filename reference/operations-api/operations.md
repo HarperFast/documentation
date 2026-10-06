@@ -1693,7 +1693,7 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 
 Each conversation is a session, persisted to `system.hdb_agent_session` so transcripts survive a restart. Runs are asynchronous: `agent_prompt` returns as soon as the run is started, and you poll `get_agent_session` for progress and results.
 
-Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — and each tool call is recorded with its arguments as well as its output, so a bearer token in an `http_fetch` header or a secret in a `set_configuration` call is stored verbatim. Treat a prompt and everything a run passes to a tool as durably recorded, and keep credentials out of both.
+Transcripts are retained indefinitely — the table is audited and none of these operations delete a session — and each tool call is recorded with its arguments as well as its output (cut to [`agent.maxToolResultBytes`](../configuration/options.md#agent)), so a bearer token in an `http_fetch` header or a secret in a `set_configuration` call is stored verbatim. Treat a prompt and everything a run passes to a tool as durably recorded, and keep credentials out of both.
 
 The table also carries no replication opt-out: it is not on core's list of non-replicating system tables, so on a cluster that replicates the `system` database, expect transcripts to reach peer nodes with it, and a backup of `system` to carry them as well. Treat a run's prompts and tool output as cluster-wide rather than local to the node that served the request.
 
@@ -1711,6 +1711,17 @@ A session's `status` is one of:
 | `error`             | The run failed; `lastError` carries the message                                               |
 
 `completed` also covers hitting the `agent.maxTurns` ceiling — in that case `lastError` reads `Reached maxTurns=<n> without a final answer.`, so check it before treating a completed session as finished.
+
+### When a conversation outgrows the model's context window
+
+<VersionBadge version="v5.4.0" />
+
+Every model request replays the session's whole conversation, so a single large tool result can fill the model's context window, and then every later request is rejected. Two rules keep a session usable:
+
+- **Tool results are capped where they are stored.** A result larger than [`agent.maxToolResultBytes`](../configuration/options.md#agent) (default 64 KiB) is cut to that size before it is added to `messages`, and ends with `…[truncated; full result is <n> bytes. Ask for less: …]`. Only the cut form is kept, so `get_agent_session` shows what the model saw. The file-reading tools page instead of being cut: `read_file` returns whole lines from `startLine` and gives `nextLine` while the file continues, so the agent can work through a log of any size one page at a time.
+- **A rejected request is retried once.** When the provider rejects a request because it does not fit the model's context window (detected for the OpenAI, Anthropic and Bedrock backends), the agent cuts every result over 2 KiB in the most recent group of tool results that has one down to its first 2 KiB, records the cut in `messages`, and sends the request again. If nothing is left to cut, or the retry is rejected as well, the run ends `error` with a `lastError` that starts `The conversation no longer fits the model's context window`. Shorten the prompt, or start a new session.
+
+Earlier versions added every tool result in full, so one large result left the session unusable. Prompting such a session again usually recovers it, because its oversized result is cut on the first rejection.
 
 ### `agent_prompt`
 
@@ -1809,7 +1820,7 @@ One gap is worth knowing: changing `allowDestructive` with [`set_agent_config`](
 
 ### `set_agent_config`
 
-Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent). A request that includes `httpFetch` is rejected with a 400 and nothing in it is applied: the [`http_fetch` policy](../configuration/options.md#restricting-http_fetch) is read at startup only.
+Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxToolResultBytes`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent). A request that includes `httpFetch` is rejected with a 400 and nothing in it is applied: the [`http_fetch` policy](../configuration/options.md#restricting-http_fetch) is read at startup only. A `maxToolResultBytes` that is not an integer from `1024` to `1048576` is rejected the same way.
 
 ```json
 { "operation": "set_agent_config", "autoApprove": false, "maxTurns": 20 }
@@ -1818,7 +1829,7 @@ Updates agent settings and returns the resulting configuration. Accepts any of `
 Three limits are worth knowing:
 
 - **The change is in-memory and not persisted.** It applies for the life of the process and is lost on restart; edit `harper-config.yaml` for a durable change.
-- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
+- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, `maxToolResultBytes`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
 - **`enabled` is not a kill switch.** It cannot turn the agent on — if it was off at startup, this operation does not exist. Setting it to `false` only makes subsequent `agent_prompt` calls return 409; a run already in flight continues, and `approve_agent_action` still resumes a paused one. Use `cancel_agent_run` to stop a run.
 
 ### MCP access
