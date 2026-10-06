@@ -110,9 +110,9 @@ Snapshots can be large (often a sizable fraction of the heap limit) and writing 
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Harper no longer enables source maps by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces point at the JavaScript that actually ran, which for Harper's core is the compiled code under `dist/`, and for a component built with a bundler or `tsc` is its build output rather than its original sources.
+Harper no longer enables source maps by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces from Harper's core point at the compiled code under `dist/` rather than its TypeScript sources.
 
-To get stack traces that point at the original sources, for Harper's core and for components that ship source maps alike, set the Node.js `--enable-source-maps` flag through `NODE_OPTIONS`. Harper passes the setting on to every worker thread:
+To get stack traces that point at the original sources, set the Node.js `--enable-source-maps` flag through `NODE_OPTIONS`. Harper passes the setting on to every worker thread. It applies to modules Node.js loads itself: Harper's core, and application code loaded natively (for example with `applications.moduleLoader: native`). Modules run by the default VM-based loader are not mapped either way.
 
 ```bash
 NODE_OPTIONS=--enable-source-maps harper
