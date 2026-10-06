@@ -156,14 +156,14 @@ jobs:
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
           [ -n "$JOB_ID" ] || exit 0
           for attempt in $(seq 60); do
-            harper get_job id="$JOB_ID" json=true > job.json
+            sleep 10
+            harper get_job id="$JOB_ID" json=true > job.json || continue
             case $(jq -r '.[0].status' job.json) in
               COMPLETE) exit 0 ;;
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
             esac
-            sleep 10
           done
-          echo "Job $JOB_ID was still running after 10 minutes"
+          echo "Job $JOB_ID did not finish within 10 minutes"
           exit 1
 ```
 
@@ -176,7 +176,8 @@ A few details worth noting:
 - **`replicated` isn't needed.** On Harper Fabric and Harper Pro, a deploy goes to every node in the cluster unless you pass `replicated=false`. Each node fetches and installs the package itself, resolving the credential from the replicated secrets store. Harper core on its own does not replicate.
 - **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
 - **`json=true`** prints the deploy's result as JSON on stdout. Progress and authentication messages go to stderr, so `deploy.json` holds only the result. A deploy that fails exits non-zero, which fails the step.
-- **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`. Each `harper get_job` authenticates through the trust policy the same way. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
+- **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
+- **Poll the node you deployed to.** Harper does not replicate jobs, so only the node that received the deploy knows the job; any other node answers `get_job` with an empty list. If `HARPER_CLI_TARGET` is an address that can route each request to a different node, such as a load balancer, the wait step only sees the job on the polls that reach that node, and times out if none do. Point it at one node.
 - **Canary certification** <VersionBadge version="v5.4.0" />. On v5.4.0 and later, `restart=true` and `restart=rolling` load the release in a [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before that node serves it, except in the cases that section lists, so a release that fails to load is rejected. With `restart=rolling`, the node you called certifies it before the deploy responds, and each other node certifies it as the job reaches it.
 - The token for a private repository is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
 
@@ -241,14 +242,14 @@ jobs:
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
           [ -n "$JOB_ID" ] || exit 0
           for attempt in $(seq 60); do
-            harper get_job id="$JOB_ID" json=true > job.json
+            sleep 10
+            harper get_job id="$JOB_ID" json=true > job.json || continue
             case $(jq -r '.[0].status' job.json) in
               COMPLETE) exit 0 ;;
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
             esac
-            sleep 10
           done
-          echo "Job $JOB_ID was still running after 10 minutes"
+          echo "Job $JOB_ID did not finish within 10 minutes"
           exit 1
 ```
 
@@ -256,6 +257,8 @@ Note the two credentials play different roles, matching their lifetimes:
 
 - **Publishing** uses the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`). Publishing happens entirely inside the job, so an ephemeral token is exactly right.
 - **Installing** uses the durable `read:packages` token you stored in Harper as `deploy.my-app.npm.pkg.github.com` — because installs can happen long after this workflow ends.
+
+The deploy step installs the version the tag names, while `npm publish` publishes the version in `package.json`, so the two must agree: `npm version 1.2.3` sets one and creates the other as `v1.2.3`.
 
 `scope: '@my-org'` on `setup-node` sends only `@my-org` packages to GitHub Packages, so `npm install -g harper` still installs from the public registry. The `scope` in `credentials` does the same on each Harper node, so scoped dependencies from the same registry resolve too.
 
@@ -300,17 +303,17 @@ set -euo pipefail
 JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
 [ -n "$JOB_ID" ] || exit 0
 for attempt in $(seq 60); do
+  sleep 10
   JOB=$(curl --fail-with-body -s "$HARPER_OPS_URL" \
     -H "Content-Type: application/json" \
     -H "Authorization: $HARPER_OPS_AUTH" \
-    -d "{\"operation\": \"get_job\", \"id\": \"$JOB_ID\"}")
+    -d "{\"operation\": \"get_job\", \"id\": \"$JOB_ID\"}") || continue
   case $(echo "$JOB" | jq -r '.[0].status') in
     COMPLETE) exit 0 ;;
     ERROR) echo "$JOB" | jq -r '.[0].message'; exit 1 ;;
   esac
-  sleep 10
 done
-echo "Job $JOB_ID was still running after 10 minutes"
+echo "Job $JOB_ID did not finish within 10 minutes"
 exit 1
 ```
 
