@@ -185,9 +185,7 @@ For local iteration, `harper dev .` runs the application and watches for file ch
 
 ## Deploying across the cluster
 
-The preceding sections deploy an application to a single instance. To deploy it across every node in the cluster, include the `replicated=true` parameter.
-
-When deploying in a clustered environment, set `replicated=true` to spread the deployment to all nodes:
+On Harper Pro and Fabric, a deploy goes to every node in the cluster unless you pass `replicated=false`. Harper core on its own deploys only to the node you call. Passing `replicated=true` makes the cluster-wide deploy explicit:
 
 ```bash
 harper deploy_component \
