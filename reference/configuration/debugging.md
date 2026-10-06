@@ -108,15 +108,17 @@ Snapshots can be large (often a sizable fraction of the heap limit) and writing 
 
 ## Source Maps in Stack Traces
 
-<VersionBadge version="v5.4.0" />
+<VersionBadge type="changed" version="v5.4.0" />
 
-Harper ships its compiled JavaScript with source maps, but does not enable them by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces from Harper's core point at the compiled files under `dist/`.
+Harper no longer enables source maps by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces point at the JavaScript that actually ran, which for Harper's core is the compiled code under `dist/`, and for a component built with a bundler or `tsc` is its build output rather than its original sources.
 
-To get stack traces that point at the TypeScript sources, enable source maps with the Node.js flag, either on the command line or through `NODE_OPTIONS`. Harper passes the setting on to every worker thread:
+To get stack traces that point at the original sources, for Harper's core and for components that ship source maps alike, set the Node.js `--enable-source-maps` flag through `NODE_OPTIONS`. Harper passes the setting on to every worker thread:
 
 ```bash
 NODE_OPTIONS=--enable-source-maps harper
 ```
+
+Passing the flag to `node` directly works too when you launch Harper's entry script with `node`.
 
 Before v5.4.0, source maps were always enabled.
 
@@ -125,3 +127,4 @@ Before v5.4.0, source maps were always enabled.
 - [Configuration Options — `threads`](./options.md#threads) — full thread configuration reference
 - [Architecture Overview](../database/overview.md#architecture-overview) — how worker threads fit into Harper
 - [Node.js Inspector documentation](https://nodejs.org/en/learn/getting-started/debugging) — debugger protocol details
+- [Node.js `--enable-source-maps`](https://nodejs.org/api/cli.html#--enable-source-maps) — how Node.js applies source maps to stack traces
