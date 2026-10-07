@@ -36,6 +36,28 @@ To edit an existing cluster:
    - Adding or removing additional regions.
 5. Click the "Save Changes" or "Confirm Payment Details" button to summarize and apply your modifications.
 
+## Preview Hosts
+
+Preview hosts let a cluster serve short-lived copies of an application, such as one per pull request, under the cluster's own Fabric hostname. With preview hosts on, a name one label below `preview.` and the cluster's hostname reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
+
+```
+pr-42.preview.<cluster name>.<organization subdomain>.harperfabric.com
+```
+
+Fabric creates the DNS record and adds `*.preview.<cluster hostname>` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind.
+
+- Only isolated applications answer on preview hosts. A preview host that no running isolated application lists gets no response; it never reaches the cluster's other applications.
+- A preview host is exactly one label below `preview.`: `pr-42.preview.…` works, and `a.pr-42.preview.…` does not.
+- Preview hosts are available on Colocated and Dedicated clusters whose hostname has the default form, `<cluster name>.<organization subdomain>.harperfabric.com`.
+
+Studio does not have a setting for preview hosts yet. The Fabric API turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster:
+
+```json
+{ "previews": true }
+```
+
+`{ "previews": false }` turns them off. Either request must not include other changes to the cluster. After turning preview hosts on, allow a few minutes for each instance to obtain a certificate that covers them.
+
 ## Harper Deployment Types:
 
 ### Colocated:
