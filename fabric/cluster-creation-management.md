@@ -50,7 +50,7 @@ Fabric creates the DNS record and adds `*.preview.<cluster hostname>` to each in
 - A preview host is exactly one label below `preview.`: `pr-42.preview.…` works, and `a.pr-42.preview.…` does not.
 - Preview hosts are available on Colocated and Dedicated clusters whose hostname has the default form, `<cluster name>.<organization subdomain>.harperfabric.com`.
 
-Studio does not have a setting for preview hosts yet. The Fabric API turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster:
+Studio does not have a setting for preview hosts yet. The Fabric API at `https://fabric.harper.fast` turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster. The cluster ID is the part of Studio's address after the organization ID on any of the cluster's pages.
 
 ```json
 { "previews": true }
