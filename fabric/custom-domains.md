@@ -6,7 +6,7 @@ title: Custom Domains
 
 ## What are Custom Domains?
 
-Custom domains allow you to serve your Harper Fabric cluster from your own domain (e.g., `api.yourcompany.com`) instead of the default `<cluster name>.<org subdomain>.harperfabric.com` URL. Harper Fabric handles domain verification, DNS validation, and TLS certificate provisioning — all from within the Fabric Studio UI.
+Custom domains allow you to serve your Harper Fabric cluster from your own domain (e.g., `api.yourcompany.com`) instead of the default `<cluster name>.<org subdomain>.harperfabric.com` URL. Harper Fabric handles domain verification, DNS validation, and TLS certificate provisioning — all from within the Fabric Studio UI. (A wildcard domain is the exception: it needs a certificate you provide; see [Wildcard Domains](#wildcard-domains).)
 
 ## Prerequisites
 
@@ -90,6 +90,8 @@ You can verify DNS propagation yourself using tools like [dnschecker.org](https:
 dig _fabric.api.example.com TXT
 ```
 
+For a wildcard such as `*.preview.example.com`, check `_fabric.preview.example.com` instead.
+
 ## Binding the Domain
 
 After successful validation, use the **Bind** column in the domains table to bind the domain to your cluster.
@@ -98,22 +100,21 @@ Once bound, Harper Fabric will automatically begin generating an SSL certificate
 
 - This process typically takes **5-10 minutes**.
 - The interface will show you the progress as it goes.
+- A wildcard domain is the exception: Fabric does not generate its certificate. See [Wildcard Domains](#wildcard-domains) to add your own.
 
 Everything should be working once the SSL certificate is successfully generated! Traffic to your custom domain will then be routed to your Harper Fabric cluster.
-
-Fabric does not generate a certificate for a wildcard domain; see [Wildcard Domains](#wildcard-domains) for how to add your own.
 
 ## Wildcard Domains
 
 A wildcard domain, such as `*.preview.example.com`, routes every host one level below it to your cluster. You register and verify it once, instead of adding a custom domain for each host. This suits per-pull-request previews, where each preview runs at its own host, such as `pr-42.preview.example.com`.
 
 - **Coverage.** A wildcard covers exactly one label in place of the `*`. `*.preview.example.com` covers `pr-42.preview.example.com`, but neither `preview.example.com` itself nor `a.pr-42.preview.example.com`. The `*` must be the whole leftmost label.
-- **Verification.** The TXT record goes on the name after the `*.`: `_fabric.preview.example.com`. A wildcard and that name share the record name; each registration has its own verification string, and a TXT record can hold several.
+- **Verification.** The TXT record goes on the name after the `*.`: `_fabric.preview.example.com`. A wildcard and that name share the record name, and each registration has its own verification string, so add each one as its own TXT record at that name.
 - **DNS.** Point the wildcard at your cluster with a wildcard CNAME record (`*.preview`, targeting your cluster's Fabric hostname).
 - **Certificate.** Fabric's automatic certificates use Let's Encrypt's HTTP-01 challenge, and Let's Encrypt [issues wildcard certificates only through the DNS-01 challenge](https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates). So you provide your own wildcard certificate, for example one you obtain from Let's Encrypt with a DNS-01 challenge at your DNS provider, and you replace it before it expires. Fabric keeps generating certificates for the cluster's other domains.
 - **More specific domains win.** If a host under the wildcard also has its own custom domain, in your organization or another, traffic for that host follows that domain rather than the wildcard.
 
-To add your wildcard certificate, send the [`add_certificate`](/reference/v5/operations-api/operations#add_certificate) operation to your cluster's Operations API: your cluster's Fabric hostname on port `9925`. Include the certificate's private key. The certificate is copied to every node in the cluster, and Fabric serves it for every host the wildcard covers.
+To add your wildcard certificate, send the [`add_certificate`](/reference/v5/operations-api/operations#add_certificate) operation, as a `super_user`, to your cluster's Operations API: in Fabric Studio, click the cluster's three dots, select `Copy API Url`, and add `:9925` if it is not already there. Include the certificate's private key. The operation, private key included, is applied on every node in the cluster, and Fabric serves the certificate for every host the wildcard covers.
 
 ```json
 {
