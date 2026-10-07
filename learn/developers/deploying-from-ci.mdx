@@ -178,7 +178,7 @@ A few details worth noting:
 - **No secrets.** `HARPER_CLI_TARGET` is the only thing the workflow is given. `id-token: write` lets the CLI request an identity token, and `environment: production` puts the `environment` claim the trust policy requires into it. The CLI prints which policy authenticated it, and as whom, to stderr.
 - **`by_ref=true`** deploys `git+https://github.com/<owner>/<repo>.git#<sha>`, where the SHA is the commit the tag points to (`GITHUB_SHA`). Every node clones that exact commit, even if the tag is moved later. Pass `ref=<tag or sha>` to deploy a different commit.
 - **`replicated` isn't needed.** On Harper Fabric and Harper Pro, a deploy goes to every node in the cluster unless you pass `replicated=false`. Each node fetches and installs the package itself, resolving the credential from the replicated secrets store. Harper core on its own does not replicate.
-- **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
+- **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. The [preview recipe](#per-pr-previews-with-shared-databases) also uses inline restarts on clusters, with an explicit allowance for concurrent initial restarts. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
 - **`json=true`** prints the deploy's result as JSON on stdout. Progress and authentication messages go to stderr, so `deploy.json` holds only the result. A deploy that fails exits non-zero, which fails the step.
 - **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
 - **The job lives on one node.** Everything else about a deploy is visible from any node, but Harper does not replicate jobs, so only the node that received the deploy knows the rolling job. Any other node answers `get_job` with an empty list, which the wait step treats as not finished and polls again. So through a load-balanced cluster URL, at least one poll has to reach the node that received the deploy. Routing that keeps the runner on one node sends its polls where the deploy went, and routing that spreads requests across nodes reaches it within a few polls. Routing that sends the polls to a different node than the deploy never does: the step fails, saying the job was not on the node that answered and its outcome is unknown, even when the rollout succeeded. If your load balancer routes that way, use one node's own URL for both the deploy and the wait, and as the trust policy's `audience`. [harper#3060](https://github.com/HarperFast/harper/issues/3060) tracks recording each node's outcome on the deployment record, which replicates and would remove this requirement.
@@ -306,7 +306,7 @@ Creating an isolated application, or turning isolation on or off, also restarts 
 
 <VersionBadge version="v5.3.0" />
 
-A preview can run each PR's code at its own hostname while sharing the cluster's databases. PR `42`, for example, deploys as `my-app-pr-42` at `pr-42.preview.example.com`; new commits replace that copy, and closing or merging the PR removes it.
+A preview can run each PR's code at its own hostname while sharing the cluster's databases. PR `42`, for example, deploys as `my-app-pr-42` at `pr-42.preview.example.com`; new commits replace that copy, and closing or merging the PR triggers cleanup.
 
 **The preview shares data with every application using those databases, including production if it runs on the same cluster.** Its writes, schema changes, and application startup work affect that shared data. Instance-wide roles declared by the PR also apply, and background work can run once per preview. Isolation separates worker state and exported routes; it does not sandbox code or isolate database access. This recipe is for trusted PRs from branches in the same repository.
 
@@ -317,7 +317,11 @@ Choose a hostname suffix such as `preview.example.com`. For each preview, provis
 - **Fabric:** add, verify, and bind each hostname as a custom domain. The workflow below deploys the application; it does not register domains. Wildcard-domain automation is still tracked under [PR preview deployments](https://github.com/HarperFast/harper/issues/3042), so a wildcard DNS record alone is not sufficient.
 - **Self-managed:** configure your proxy to route each hostname to the corresponding application's socket. For `my-app-pr-42` and secure port `9927`, the HTTP socket is `<rootPath>/sockets/app-my%2Dapp%2Dpr%2D42-9927.sock`. That socket serves plain HTTP; the proxy terminates TLS.
 
-Create a separate `preview` GitHub environment and OIDC policy instead of reusing the production policy. This workflow uses `pull_request_target`, runs from the trusted default branch, and does not check out or execute PR code on the runner. In **Settings > Environments > preview**, allow `main` under **Deployment branches and tags**, and, when sharing a production cluster, require deployment reviewers if your repository's GitHub plan supports them. Without that approval gate, every same-repository writer and automation that opens a PR can run code with access to production data. Replace `main` throughout this example if your default branch has another name. See [GitHub environment rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments) and [the `pull_request_target` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
+On GitHub.com, create a separate `preview` GitHub environment and OIDC policy instead of reusing the production policy. This workflow uses `pull_request_target`, runs from the trusted default branch, and does not check out or execute PR code on the runner. In **Settings > Environments > preview**, allow `main` under **Deployment branches and tags**, and, when sharing a production cluster, require deployment reviewers if your repository's GitHub plan supports them. Without that approval gate, every same-repository writer and automation that opens a PR can run code with access to production data. Required reviewers also gate closure and retargeting cleanup: approve those runs, or the preview remains running. Before closing a previewed PR, finish or cancel any older run waiting for approval so per-PR concurrency can admit cleanup. Replace `main` throughout this example if your default branch has another name. See [GitHub environment rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments) and [the `pull_request_target` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
+
+Ensure your Actions execution policy allows `pull_request_target` for `.github/workflows/preview.yml`. GitHub's default protection will block that event for affected public repositories starting November 2, 2026; private and internal repositories are unaffected. See [GitHub's execution-protection rollout](https://github.blog/changelog/2026-09-17-workflow-execution-protections-in-github-actions-generally-available/).
+
+Cleanup needs a **direct Operations API URL for every node**, rather than a balanced cluster URL. Put these URLs in the `HARPER_PREVIEW_NODE_TARGETS` repository variable as a JSON array, including the port and trailing slash. On a single-node instance, the array contains its one URL. On Fabric, arrange direct instance access with your administrator or support before enabling this recipe; a cluster URL alone cannot safely check each node. Keep the list current when cluster membership changes.
 
 From your machine, logged in as a `super_user`, create a role that can deploy and clean up previews:
 
@@ -331,9 +335,11 @@ harper add_oidc_trust \
   user=ci-preview \
   claims='{"repository_id":"67890","workflow_ref":"my-org/my-app/.github/workflows/preview.yml@refs/heads/main","environment":"preview","event_name":"pull_request_target"}'
 gh variable set HARPER_PREVIEW_DOMAIN --repo my-org/my-app --body preview.example.com
+gh variable set HARPER_PREVIEW_NODE_TARGETS --repo my-org/my-app \
+  --body '["https://node-a.example.com:9925/","https://node-b.example.com:9925/"]'
 ```
 
-Use your repository id, workflow path, and cluster URL, as in the [release policy](#add-a-trust-policy). The workflow uses the existing `HARPER_CLI_TARGET` variable. The preview role's operations apply to the whole cluster, not just projects whose names begin `my-app-pr-`; trust the people allowed to run this workflow accordingly. `get_components` can expose component configuration and files, so keep its response out of logs and artifacts.
+Use your repository id, workflow path, and cluster URL, as in the [release policy](#add-a-trust-policy). Add a trust policy for each node URL as well: authenticate as a `super_user` at that node and repeat `add_oidc_trust` with `target=<node URL>`, a unique `id`, that exact URL as `audience`, and the same user and claims. Ensure each node has the preview user, role, and matching policy. The CLI requests a token for the target it calls, so a policy with only the cluster URL as its audience does not authorize node URLs. The workflow uses the existing `HARPER_CLI_TARGET` variable. The preview role's operations apply to the whole cluster, not just projects whose names begin `my-app-pr-`; trust the people allowed to run this workflow accordingly. `get_components` can expose component configuration and files, so keep its response out of logs and artifacts.
 
 ### Deploy on PR updates and remove on closure
 
@@ -365,6 +371,7 @@ jobs:
     env:
       HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
       PREVIEW_DOMAIN: ${{ vars.HARPER_PREVIEW_DOMAIN }}
+      PREVIEW_NODE_TARGETS: ${{ vars.HARPER_PREVIEW_NODE_TARGETS }}
       PR_NUMBER: ${{ github.event.number }}
     steps:
       - uses: actions/setup-node@v4
@@ -379,22 +386,34 @@ jobs:
           [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
           PROJECT="my-app-pr-$PR_NUMBER"
           PR=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and test("^https?://"))' <<< "$PREVIEW_NODE_TARGETS" > /dev/null
           if [ "$(jq -r .state <<< "$PR")" = closed ] ||
              [ "$(jq -r .base.ref <<< "$PR")" != main ]; then
-            harper get_components json=true > components.json
-            harper system_information attributes='["threads"]' json=true > system.json
-            jq -e '.error == null and (.entries | type == "array")' components.json > /dev/null
-            jq -e '.threads | type == "array"' system.json > /dev/null
-            if jq -e --arg project "$PROJECT" 'any(.entries[]; .name == $project)' components.json > /dev/null ||
-               jq -e --arg project "$PROJECT" 'any(.threads[]; .application == $project)' system.json > /dev/null; then
-              harper drop_component project="$PROJECT" restart=true json=true > drop.json
-              if ! jq -e 'type == "object" and .error == null and all(.replicated[]?; .status != "failed" and .status != "error" and .error == null)' drop.json > /dev/null; then
-                echo 'Preview cleanup failed; check these nodes:' >> "$GITHUB_STEP_SUMMARY"
-                jq -r '.replicated[]? | select(.status == "failed" or .status == "error" or .error != null) | "- \( .node ): \( .reason // .error // .status )"' drop.json >> "$GITHUB_STEP_SUMMARY"
-                exit 1
+            cleanup_node() {
+              export HARPER_CLI_TARGET="$1"
+              harper get_components json=true > components.json || return 1
+              harper system_information attributes='["threads"]' json=true > system.json || return 1
+              jq -e '.error == null and (.entries | type == "array")' components.json > /dev/null || return 1
+              jq -e '.threads | type == "array"' system.json > /dev/null || return 1
+              SHOULD_RESTART=$(jq -r --arg project "$PROJECT" 'any(.threads[]; .application == $project)' system.json) || return 1
+              if jq -e --arg project "$PROJECT" 'any(.entries[]; .name == $project)' components.json > /dev/null ||
+                 [ "$SHOULD_RESTART" = true ]; then
+                harper drop_component project="$PROJECT" restart="$SHOULD_RESTART" replicated=false json=true > drop.json || return 1
+                jq -e 'type == "object" and .error == null' drop.json > /dev/null || return 1
+                harper get_components json=true > after-components.json || return 1
+                harper system_information attributes='["threads"]' json=true > after-system.json || return 1
+                jq -e --arg project "$PROJECT" '.error == null and (.entries | type == "array") and (any(.entries[]; .name == $project) | not)' after-components.json > /dev/null || return 1
+                jq -e --arg project "$PROJECT" '(.threads | type == "array") and (any(.threads[]; .application == $project) | not)' after-system.json > /dev/null || return 1
               fi
-            fi
-            exit 0
+            }
+            FAILED=0
+            while IFS= read -r NODE_TARGET; do
+              if ! cleanup_node "$NODE_TARGET"; then
+                echo "Preview cleanup failed: $NODE_TARGET" >> "$GITHUB_STEP_SUMMARY"
+                FAILED=1
+              fi
+            done < <(jq -r '.[]' <<< "$PREVIEW_NODE_TARGETS")
+            exit "$FAILED"
           fi
           SHA=$(jq -r .head.sha <<< "$PR")
           HOST="pr-$PR_NUMBER.$PREVIEW_DOMAIN"
@@ -405,7 +424,9 @@ jobs:
 
 The workflow reads the PR's current state, base branch, and head SHA from GitHub, rather than deploying the default-branch commit in `GITHUB_SHA`. Its concurrency group serializes updates and cleanup for that PR without canceling a deploy midway. A delayed run sees a closed or retargeted PR and cleans up instead of recreating the preview. The job filter ignores title/body edits and unrelated updates on other base branches, while admitting closures and base-branch edits. The fresh API read remains authoritative.
 
-The cleanup guard checks both component files and running workers on the node that answers, so it also handles a worker left running after files were removed. It skips an absent preview because dropping one with `restart=true` can restart shared workers. On Fabric and Pro, deploy and drop propagate to peers by default. The JSON check fails the job when a peer reports a failed deletion. After a partial cluster failure, an administrator must check each node and retry `drop_component` with `restart=true replicated=false` directly on nodes still holding the component or worker; rerunning against a cluster endpoint can reach an already-clean node and skip the remaining peers. Use each node's Operations API endpoint on a self-managed cluster; on Fabric, arrange access to the affected instance with your administrator or support.
+Cleanup checks component files and running workers separately on **each listed node**, so it also handles a worker left running after files were removed. An absent node is skipped: dropping an absent preview with `restart=true` can restart its shared workers. Each necessary drop uses `replicated=false`, and requests a restart only when that node has the preview worker. Files without a worker are dropped with `restart=false`; the node's shared workers stay running. It then verifies the component and worker are both absent; a successful drop response alone is insufficient. The loop attempts the remaining nodes after an error and fails the job with each failed target in the summary. After a failed, timed-out, or interrupted run, rerun cleanup and check those nodes directly with an administrator account; do not reuse the project name until cleanup has completed on every node. An omitted node cannot be checked or cleaned by this workflow.
+
+The deploy still propagates to peers by default on Fabric and Pro, and a failed peer install fails the CLI unless `ignore_replication_errors` is set. Do not enable that option here. Cleanup uses direct node calls specifically to recover from asymmetric deploy or drop state.
 
 `restart=true` waits for the restart on the answering node, but a successful response does not establish that every peer loaded the application: a peer restart can be slow or fail, and a node can refuse isolation. This workflow prints the URL but does not probe preview health. Check [application status](/reference/v5/operations-api/operations#set_status--get_status--clear_status) on each node with an administrator account and verify the routed preview endpoint. This recipe uses inline restarts instead of the production workflows' rolling job. **The first deploy of each preview can restart shared workers on all nodes concurrently**, disrupting existing connections. Use a dedicated preview cluster if that interruption is unacceptable; adapting the [rolling workflow](#path-a-deploy-a-tagged-release-from-your-repository) also requires granting `get_job` to the preview role and retaining its wait step.
 
@@ -425,7 +446,7 @@ For applications that need a build, build and publish an immutable package versi
 
 ### Adding private database forks later
 
-The recipe deliberately omits `branchedDatabases`. On v5.3.0 and v5.3.1, a package deployment ignores that key when loading the application ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). Follow [Branched databases](/reference/v5/components/applications#branched-databases) for current behavior and limitations; database forks can be added to the recipe once that deployment path is fixed.
+The recipe deliberately omits `branchedDatabases`. On v5.3.0 and v5.3.1, a package deployment ignores that key when loading the application ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). Follow [Branched databases](/reference/v5/components/applications#branched-databases) for current behavior and limitations; database forks can be added to the recipe once that deployment path is fixed. Revisit cleanup then as well: a drop with `restart=false` leaves fork storage in place.
 
 ## Other CI systems
 
