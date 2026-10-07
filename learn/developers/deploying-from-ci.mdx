@@ -19,6 +19,7 @@ Both work with private sources: `deploy_component` accepts a [`credentials`](/re
 - A GitHub Actions workflow that deploys a tagged release straight from a repository
 - A GitHub Actions workflow that builds, publishes to GitHub Packages, and deploys the published artifact
 - How to wait until every node has taken the release, and how to go back to a previous one
+- How to deploy isolated applications and keep one preview per PR, with shared databases and cleanup on closure
 
 ## Prerequisites
 
@@ -269,6 +270,127 @@ Note the two credentials play different roles, matching their lifetimes:
 The deploy step installs the version the tag names, while `npm publish` publishes the version in `package.json`, so the two must agree: `npm version 1.2.3` sets one and creates the other as `v1.2.3`.
 
 `scope: '@my-org'` on `setup-node` sends only `@my-org` packages to GitHub Packages, so `npm install -g harper` still installs from the public registry. The `scope` in `credentials` does the same on each Harper node, so scoped dependencies from the same registry resolve too.
+
+## Run CI deployments in an isolated worker
+
+<VersionBadge version="v5.3.0" />
+
+An [isolated application](/reference/v5/components/applications#isolated-applications) runs in a dedicated worker thread. You can use it for your main application or for additional copies deployed by CI. Add `isolated=true` and a unique `host` to the package deploy in Path A or Path B; for example, Path A becomes:
+
+```bash
+harper deploy project=my-app by_ref=true \
+  isolated=true host=app.example.com restart=rolling json=true > deploy.json
+```
+
+Keep the workflow's wait step when using `restart=rolling`. For a single-node instance, use `restart=true` instead.
+
+Before deploying, check the instance's [isolation requirements](/reference/v5/components/applications#requirements-and-refusals): a nonzero `threads.count`, `http.securePort`, `tls.unixDomainSockets: true`, and a platform that supports Unix sockets. Each isolated application adds a worker on top of the shared pool and consumes one slot in [`threads.maxIsolated`](/reference/v5/configuration/options#threads), which defaults to `8`. Budget memory and disk on every node as well: dedicated workers count when Harper divides its default heap limit, and each preview can keep replaced releases under [staging retention](/reference/v5/operations-api/operations#staging-a-build-and-activating-it-later).
+
+Requests need a route to the dedicated worker's Unix socket. On Fabric, add, verify, and bind the application's hostname as a [custom domain](/fabric/custom-domains), with a hostname used by no other application. On a self-managed instance, configure a proxy that terminates TLS and forwards to that application's socket. Sending the preview's `Host` header to Harper's shared HTTP port does not reach it. See [Reaching an isolated application](/reference/v5/components/applications#reaching-an-isolated-application).
+
+Creating an isolated application, or turning isolation on or off, also restarts the shared workers. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
+
+## Per-PR previews with shared databases
+
+A preview can run each PR's code at its own hostname while sharing the cluster's databases. PR `42`, for example, deploys as `my-app-pr-42` at `pr-42.preview.example.com`; new commits replace that copy, and closing or merging the PR removes it.
+
+**The preview shares data with every application using those databases, including production if it runs on the same cluster.** Its writes, schema changes, and application startup work affect that shared data. Instance-wide roles declared by the PR also apply, and background work can run once per preview. Isolation separates worker state and exported routes; it does not sandbox code or isolate database access. This recipe is for trusted PRs from branches in the same repository.
+
+### Prepare routing and preview authentication
+
+Choose a hostname suffix such as `preview.example.com`. For each preview, provision DNS, TLS, and routing for `pr-<number>.<suffix>`:
+
+- **Fabric:** add, verify, and bind each hostname as a custom domain. The workflow below deploys the application; it does not register domains. Wildcard-domain automation is still tracked under [PR preview deployments](https://github.com/HarperFast/harper/issues/3042), so a wildcard DNS record alone is not sufficient.
+- **Self-managed:** configure your proxy to route each hostname to the corresponding application's socket. For `my-app-pr-42` and secure port `9927`, the HTTP socket is `<rootPath>/sockets/app-my%2Dapp%2Dpr%2D42-9927.sock`. That socket serves plain HTTP; the proxy terminates TLS.
+
+Create a separate `preview` GitHub environment and OIDC policy instead of reusing the production policy. This workflow uses `pull_request_target`, runs from the trusted default branch, and does not check out or execute PR code on the runner. In **Settings > Environments > preview**, allow `main` under **Deployment branches and tags**, and add required reviewers if your repository's GitHub plan supports them and previews need approval. Replace `main` throughout this example if your default branch has another name. See [GitHub environment rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments) and [the `pull_request_target` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
+
+From your machine, logged in as a `super_user`, create a role that can deploy and clean up previews:
+
+```bash
+harper add_role role=ci_preview permission='{"operations":["deploy_component","drop_component"]}'
+harper add_user username=ci-preview role=ci_preview active=true password="$(openssl rand -base64 32)"
+harper add_oidc_trust \
+  id=my-app-preview \
+  issuer=https://token.actions.githubusercontent.com \
+  audience=https://my-cluster.example.com:9925/ \
+  user=ci-preview \
+  claims='{"repository_id":"67890","workflow_ref":"my-org/my-app/.github/workflows/preview.yml@refs/heads/main","environment":"preview","event_name":"pull_request_target"}'
+gh variable set HARPER_PREVIEW_DOMAIN --repo my-org/my-app --body preview.example.com
+```
+
+Use your repository id, workflow path, and cluster URL, as in the [release policy](#add-a-trust-policy). The workflow uses the existing `HARPER_CLI_TARGET` variable. The preview role's operations apply to the whole cluster, not just projects whose names begin `my-app-pr-`; trust the people allowed to run this workflow accordingly.
+
+### Deploy on PR updates and remove on closure
+
+This example is Path A for an application that runs from source. Add `.github/workflows/preview.yml` to your repository:
+
+```yaml
+name: Preview on Harper
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, closed]
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    concurrency:
+      group: harper-preview-${{ github.repository }}-${{ github.event.number }}
+      cancel-in-progress: false
+    env:
+      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
+      PREVIEW_DOMAIN: ${{ vars.HARPER_PREVIEW_DOMAIN }}
+      PR_NUMBER: ${{ github.event.number }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g harper
+      - name: Update or remove the preview
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          PROJECT="my-app-pr-$PR_NUMBER"
+          PR=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          if [ "$(jq -r .state <<< "$PR")" = closed ]; then
+            harper drop_component project="$PROJECT" restart=true
+            exit 0
+          fi
+          SHA=$(jq -r .head.sha <<< "$PR")
+          HOST="pr-$PR_NUMBER.$PREVIEW_DOMAIN"
+          harper deploy project="$PROJECT" by_ref=true ref="$SHA" \
+            isolated=true host="$HOST" restart=true json=true > deploy.json
+          echo "Preview: https://$HOST" >> "$GITHUB_STEP_SUMMARY"
+```
+
+The workflow reads the PR's current state and head SHA from GitHub, rather than deploying the default-branch commit in `GITHUB_SHA`. The concurrency group serializes updates and cleanup for that PR without canceling a deploy midway. A delayed run sees a closed PR and removes its preview instead of recreating it. If cleanup fails, rerun the workflow or run `harper drop_component project=my-app-pr-42 restart=true` from your machine for that PR. `restart=true` waits for the deploy's restart; on Fabric and Pro the deploy and drop propagate to the cluster by default. It does not request the rolling job used by the production workflows. The initial preview deploy can restart the shared workers, so account for that when previews share a production cluster.
+
+Fork PRs are skipped. The policy pins `workflow_ref` so a PR cannot change the trusted workflow to mint a token with different deploy or drop commands; `event_name` explicitly authorizes `pull_request_target`, which Harper otherwise refuses unless constrained. Provision the hostname before opening the preview URL; successful deployment alone does not make an unconfigured hostname reachable. Close unused previews to release worker slots. Dropping a running isolated preview stops its worker; retrying a drop after it is already absent can restart the shared workers. Removing an application does not undo its writes to shared databases or remove its DNS and Fabric custom-domain registration; clean up that routing separately.
+
+### Private sources and built artifacts
+
+For a private repository, each preview project needs its own grant to a durable source credential. Before its first deployment, run the same setup from your machine for that project's name:
+
+```bash
+harper deploy setup=true provider=github project=my-app-pr-42
+```
+
+Then add `credential=true` to the workflow's deploy command. It derives `deploy.my-app-pr-42.git.github.com` for PR `42`. A secret granted only to `my-app` does not authorize `my-app-pr-42`; the production setup cannot be reused just by changing `project`. Credential provisioning and rotation remain outside this workflow.
+
+For applications that need a build, build and publish an immutable package version for each PR commit using Path B's delivery model, and trigger the trusted deploy only after publication finishes. Keep PR builds in a separate workflow; do not check out or run PR code in this `pull_request_target` job. Replace `by_ref=true ref="$SHA"` with `package="@my-org/my-app@<preview-version>"`, retaining `project`, `host`, `isolated=true`, and cleanup. Set up the registry credential for each preview project and pass its `credentials` reference, as in Path B. A payload upload cannot set `isolated=true`.
+
+### Adding private database forks later
+
+The recipe deliberately omits `branchedDatabases`. On v5.3.0 and v5.3.1, a package deployment ignores that key when loading the application ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). Follow [Branched databases](/reference/v5/components/applications#branched-databases) for current behavior and limitations; database forks can be added to the recipe once that deployment path is fixed.
 
 ## Check the deployment record
 
