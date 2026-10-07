@@ -13,7 +13,7 @@ Custom domains allow you to serve your Harper Fabric cluster from your own domai
 Before adding a custom domain, make sure you have:
 
 - An existing Harper Fabric cluster (see [Cluster Creation & Management](/fabric/cluster-creation-management) if you need to create one)
-- A domain or subdomain that you own (e.g., `api.example.com`, `data.mycompany.io`)
+- A domain or subdomain that you own (e.g., `api.example.com`, `data.mycompany.io`), or a wildcard covering many subdomains (e.g., `*.preview.example.com`; see [Wildcard Domains](#wildcard-domains))
 - Access to your DNS registrar or DNS management provider (e.g., Cloudflare, Route 53, GoDaddy, Namecheap)
 
 ## Accessing Domain Configuration
@@ -33,10 +33,12 @@ Domain configuration is accessible through two primary paths:
 ## Adding a Custom Domain
 
 1. Access domain configuration using one of the paths above.
-2. Enter your domain in the **New Domain Name** field — for example, `api.example.com` or `example.com`.
+2. Enter your domain in the **New Domain Name** field — for example, `api.example.com`, `example.com`, or a wildcard such as `*.preview.example.com`.
 3. Click the **+ Add** button.
 
 Harper Fabric will register the domain and display the DNS records you need to configure. A confirmation notification will appear: _“Domain added! Please add the TXT record above to your domain registrar.”_
+
+Domain names are not case-sensitive, and Fabric stores them in lowercase. A name must be a valid hostname, optionally starting with `*.` for a wildcard. Once an organization has verified a domain, no other organization can register it.
 
 ## Configuring DNS Records
 
@@ -47,7 +49,7 @@ After adding your domain, Fabric displays two DNS records in the **Next Steps** 
 This record proves that you own the domain. Add the following to your DNS registrar:
 
 - **Type**: `TXT`
-- **Name**: `_fabric.<your domain>` (e.g., `_fabric.api.example.com`)
+- **Name**: `_fabric.<your domain>` (e.g., `_fabric.api.example.com`). For a wildcard such as `*.preview.example.com`, the record goes on the name after the `*.`: `_fabric.preview.example.com`.
 - **TTL**: Auto
 - **Content**: The unique verification string displayed in the Fabric UI
 
@@ -58,7 +60,7 @@ This record proves that you own the domain. Add the following to your DNS regist
 After ownership is verified, you will be instructed to add a CNAME record to your domain registrar pointing to the Harper Fabric load balancer.
 
 - **Type**: `CNAME`
-- **Name**: Your subdomain prefix (e.g., `api` for `api.example.com`)
+- **Name**: Your subdomain prefix (e.g., `api` for `api.example.com`, or `*.preview` for `*.preview.example.com`)
 - **TTL**: Auto
 - **Target**: Your cluster’s Fabric hostname (e.g., `my-cluster.my-org.harperfabric.com`)
 
@@ -99,6 +101,30 @@ Once bound, Harper Fabric will automatically begin generating an SSL certificate
 
 Everything should be working once the SSL certificate is successfully generated! Traffic to your custom domain will then be routed to your Harper Fabric cluster.
 
+Fabric does not generate a certificate for a wildcard domain; see [Wildcard Domains](#wildcard-domains) for how to add your own.
+
+## Wildcard Domains
+
+A wildcard domain, such as `*.preview.example.com`, routes every host one level below it to your cluster. You register and verify it once, instead of adding a custom domain for each host. This suits per-pull-request previews, where each preview runs at its own host, such as `pr-42.preview.example.com`.
+
+- **Coverage.** A wildcard covers exactly one label in place of the `*`. `*.preview.example.com` covers `pr-42.preview.example.com`, but neither `preview.example.com` itself nor `a.pr-42.preview.example.com`. The `*` must be the whole leftmost label.
+- **Verification.** The TXT record goes on the name after the `*.`: `_fabric.preview.example.com`. A wildcard and that name share the record name; each registration has its own verification string, and a TXT record can hold several.
+- **DNS.** Point the wildcard at your cluster with a wildcard CNAME record (`*.preview`, targeting your cluster's Fabric hostname).
+- **Certificate.** Fabric's automatic certificates use Let's Encrypt's HTTP-01 challenge, and Let's Encrypt [issues wildcard certificates only through the DNS-01 challenge](https://letsencrypt.org/docs/faq/#does-let-s-encrypt-issue-wildcard-certificates). So you provide your own wildcard certificate, for example one you obtain from Let's Encrypt with a DNS-01 challenge at your DNS provider, and you replace it before it expires. Fabric keeps generating certificates for the cluster's other domains.
+- **More specific domains win.** If a host under the wildcard also has its own custom domain, in your organization or another, traffic for that host follows that domain rather than the wildcard.
+
+To add your wildcard certificate, send the [`add_certificate`](/reference/v5/operations-api/operations#add_certificate) operation to your cluster's Operations API: your cluster's Fabric hostname on port `9925`. Include the certificate's private key. The certificate is copied to every node in the cluster, and Fabric serves it for every host the wildcard covers.
+
+```json
+{
+	"operation": "add_certificate",
+	"name": "preview-wildcard",
+	"certificate": "-----BEGIN CERTIFICATE-----...",
+	"private_key": "-----BEGIN PRIVATE KEY-----...",
+	"is_authority": false
+}
+```
+
 ## Managing Domains
 
 From the **Config** → **Domains** page, you can manage all custom domains associated with your cluster:
@@ -111,7 +137,7 @@ Each domain entry also displays a unique **Domain ID** (e.g., `dom-xxxxxxxxxxxx`
 
 ## Additional Information
 
-- TLS certificates are managed automatically by Harper Fabric once a domain is validated and bound. You can also manage custom certificates under the **Certificates** section in Config.
+- TLS certificates are managed automatically by Harper Fabric once a domain is validated and bound, except for wildcard domains ([Wildcard Domains](#wildcard-domains)). You can also manage custom certificates under the **Certificates** section in Config.
 - You can add multiple custom domains to the same cluster.
 - Your cluster’s default Fabric hostname can be found on the **Config** → **Overview** page under **Application URL**.
 - DNS propagation can take up to 24–48 hours in rare cases, though it typically completes within minutes.
