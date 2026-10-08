@@ -1712,6 +1712,17 @@ A session's `status` is one of:
 
 `completed` also covers hitting the `agent.maxTurns` ceiling — in that case `lastError` reads `Reached maxTurns=<n> without a final answer.`, so check it before treating a completed session as finished.
 
+### When a conversation outgrows the model's context window
+
+<VersionBadge version="v5.4.0" />
+
+Every model request replays the session's whole conversation, so a single large tool result can fill the model's context window, and then every later request is rejected. Two rules keep a session usable:
+
+- **Tool results are capped where they are stored.** A result larger than [`agent.maxToolResultBytes`](../configuration/options.md#agent) (default 64 KiB) is cut to that size before it is added to `messages`, ending with a note that gives its original size and tells the model how to ask for less. Only the cut form is kept, so `get_agent_session` shows what the model saw. The file-reading tools return pages sized to fit under the cap, measured as JSON: `read_file` returns up to `lineCount` whole lines from `startLine`, and while the file continues it gives `nextLine` and `nextOffset`, which the agent passes back as `startLine` and `offset` to read the next page without rescanning the file. So it can work through a log of any size one page at a time. A line longer than a page comes back in parts, continued the same way, with every part but the last flagged `lineTruncated`.
+- **A rejected request is retried once.** When the provider rejects a request because it does not fit the model's context window (detected for the OpenAI, Anthropic and Bedrock backends), the agent cuts every result over 2 KiB to 2 KiB, in the most recent group of tool results that has one, keeping its beginning plus a note saying it was cut, records the cut in `messages`, and sends the request again. If nothing is left to cut, or the retry is rejected as well, the run ends `error` with a `lastError` that starts `The conversation no longer fits the model's context window`. Shorten the prompt, or start a new session. With fallback models configured, a context-window rejection from a fallback that follows an unrelated failure of the first model is reported as that first failure, and is not retried.
+
+Earlier versions added every tool result in full, so one large result left the session unusable. Prompting such a session again usually recovers it, because its oversized result is cut on the first rejection; if it still ends `error`, start a new session.
+
 ### `agent_prompt`
 
 Sends a prompt to the agent. Omit `session_id` to start a new session; supply one to continue an existing conversation. Returns immediately with the session id and `"status": "running"`.
@@ -1809,7 +1820,9 @@ One gap is worth knowing: changing `allowDestructive` with [`set_agent_config`](
 
 ### `set_agent_config`
 
-Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent). A request that includes `httpFetch` is rejected with a 400 and nothing in it is applied: the [`http_fetch` policy](../configuration/options.md#restricting-http_fetch) is read at startup only.
+<VersionBadge type="changed" version="v5.4.0" />
+
+Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxToolResultBytes`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent). A request that includes `httpFetch` is rejected with a 400 and nothing in it is applied: the [`http_fetch` policy](../configuration/options.md#restricting-http_fetch) is read at startup only. A `maxToolResultBytes` that is not an integer from `1024` to `1048576` is rejected the same way.
 
 ```json
 { "operation": "set_agent_config", "autoApprove": false, "maxTurns": 20 }
@@ -1818,7 +1831,7 @@ Updates agent settings and returns the resulting configuration. Accepts any of `
 Three limits are worth knowing:
 
 - **The change is in-memory and not persisted.** It applies for the life of the process and is lost on restart; edit `harper-config.yaml` for a durable change.
-- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
+- **A run already in flight keeps the settings it started with** — its toolset, `autoApprove`, `model`, `maxToolResultBytes`, and `systemPromptAppend` are all captured at start. Changes take effect on the next run. To stop a run immediately, use `cancel_agent_run`.
 - **`enabled` is not a kill switch.** It cannot turn the agent on — if it was off at startup, this operation does not exist. Setting it to `false` only makes subsequent `agent_prompt` calls return 409; a run already in flight continues, and `approve_agent_action` still resumes a paused one. Use `cancel_agent_run` to stop a run.
 
 ### MCP access
