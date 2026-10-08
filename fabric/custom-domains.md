@@ -38,7 +38,7 @@ Domain configuration is accessible through two primary paths:
 
 Harper Fabric will register the domain and display the DNS records you need to configure. A confirmation notification will appear: _“Domain added! Please add the TXT record above to your domain registrar.”_
 
-Domain names are not case-sensitive, and Fabric stores them in lowercase. A name must be a valid hostname. Once an organization has verified a domain, no other organization can register it.
+Domain names are not case-sensitive, and Fabric stores them in lowercase. A name must be a valid hostname, and cannot be a cluster's own host name or a name under it, which Fabric already serves as [preview hosts](/fabric/cluster-creation-management#preview-hosts). Once an organization has verified a domain, no other organization can register it.
 
 ## Configuring DNS Records
 
