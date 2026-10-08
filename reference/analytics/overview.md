@@ -226,16 +226,18 @@ signal when the guard trips. Tune the threshold against a baseline for your work
 
 ### Resource Usage Metrics
 
-| `metric`                        | Key attributes                                                                                   | Other               | Unit    | Description                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `database-size`                 | `size`, `used`, `free`, `audit`                                                                  | `database`          | bytes   | Database file size breakdown                                                                                      |
-| `main-thread-utilization`       | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers` | `time`              | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown                                 |
-| `read-transaction-queue-depth`  | `depth`, `maxDepth`                                                                              |                     | count   | Open tracked transactions holding a read handle (see [transaction queue depth](#transaction-queue-depth-metrics)) |
-| `resource-usage`                | (see below)                                                                                      |                     | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))                                     |
-| `storage-volume`                | `available`, `free`, `size`                                                                      | `database`          | bytes   | Storage volume size breakdown                                                                                     |
-| `table-size`                    | `size`                                                                                           | `database`, `table` | bytes   | Table file size                                                                                                   |
-| `utilization`                   |                                                                                                  |                     | %       | Percentage of time the worker thread was processing requests                                                      |
-| `write-transaction-queue-depth` | `depth`, `maxDepth`                                                                              |                     | count   | In-flight write transaction commits (see [transaction queue depth](#transaction-queue-depth-metrics))             |
+| `metric`                        | Key attributes                                                                                   | Other               | Unit    | Description                                                                                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cpu-usage`                     | `mean`, `count`                                                                                  | `path`, `method`    | seconds | CPU time the Harper Pro profiler attributes to Harper code (`path: harper`), application code (`path: user`), a hot function (`path: <file>:<line>`), or child processes (`method: child-processes`, Linux only) |
+| `database-size`                 | `size`, `used`, `free`, `audit`                                                                  | `database`          | bytes   | Database file size breakdown                                                                                                                                                                                     |
+| `main-thread-utilization`       | `idle`, `active`, `taskQueueLatency`, `rss`, `heapTotal`, `heapUsed`, `external`, `arrayBuffers` | `time`              | various | Main thread resource usage: idle/active time, queue latency, and memory breakdown                                                                                                                                |
+| `profiler-sampling`             | `total`                                                                                          |                     | ms      | Time the Harper Pro CPU profiler sampled the worker since its previous entry; that entry's `utilization` is inflated (see [`utilization` and the CPU profiler](#utilization-and-the-cpu-profiler))               |
+| `read-transaction-queue-depth`  | `depth`, `maxDepth`                                                                              |                     | count   | Open tracked transactions holding a read handle (see [transaction queue depth](#transaction-queue-depth-metrics))                                                                                                |
+| `resource-usage`                | (see below)                                                                                      |                     | various | Node.js process resource usage (see [resource-usage](#resource-usage-metric))                                                                                                                                    |
+| `storage-volume`                | `available`, `free`, `size`                                                                      | `database`          | bytes   | Storage volume size breakdown                                                                                                                                                                                    |
+| `table-size`                    | `size`                                                                                           | `database`, `table` | bytes   | Table file size                                                                                                                                                                                                  |
+| `utilization`                   |                                                                                                  |                     | %       | Percentage of time the worker thread was processing requests; inflated while the Harper Pro CPU profiler samples the thread (see [`utilization` and the CPU profiler](#utilization-and-the-cpu-profiler))        |
+| `write-transaction-queue-depth` | `depth`, `maxDepth`                                                                              |                     | count   | In-flight write transaction commits (see [transaction queue depth](#transaction-queue-depth-metrics))                                                                                                            |
 
 #### Transaction Queue Depth Metrics
 
@@ -304,6 +306,12 @@ Includes everything returned by Node.js [`process.resourceUsage()`](https://node
 | `period`         | ms   | Duration of the measurement period          |
 | `cpuUtilization` | %    | CPU utilization (user + system combined)    |
 
+#### `utilization` and the CPU profiler
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+Harper Pro's CPU profiler (see [`analytics.profiling`](#analyticsprofiling)) samples a worker's stack with a timer signal, and while it runs the worker's event-loop idle time is under-counted, so `utilization` reads high: an idle worker can report 70%. The profiler now samples only for one `aggregatePeriod` before each capture: from application load until the second capture, two periods later, and then for one period before each later capture. A `hdb_raw_analytics` entry whose `metrics` include `profiler-sampling` is one whose `utilization` sample overlapped sampling; its `total` is the milliseconds sampled since that worker's previous entry. Set those samples aside when using `utilization` as a load signal, or set `analytics.profiling: false`.
+
 ## Custom Metrics
 
 Applications can record custom metrics using the `server.recordAnalytics()` API. See [HTTP API](../http/api.md) for details.
@@ -317,6 +325,7 @@ analytics:
   aggregatePeriod: 60
   storageInterval: 10
   replicate: false
+  profiling: true
   logging:
     level: info
 ```
@@ -344,6 +353,16 @@ Type: `boolean`
 Default: `false`
 
 When enabled, aggregate analytics entries are replicated across the cluster so a single peer can answer aggregate queries for the whole topology. Raw per-thread entries (`hdb_raw_analytics`) are always node-local. Enable when running a centralized analytics consumer; leave disabled in large clusters to avoid replication overhead for high-cardinality metrics.
+
+### `analytics.profiling`
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+Type: `boolean`
+
+Default: `true`
+
+Harper Pro only. Runs the CPU profiler that records the `cpu-usage` metric, attributing CPU time to Harper code, application code, hot functions, and child processes. The profiler samples only in a window of one `aggregatePeriod` before each capture and marks the `utilization` samples it affects with `profiler-sampling`; see [`utilization` and the CPU profiler](#utilization-and-the-cpu-profiler). Set to `false` to never start it.
 
 ### `analytics.logging`
 
