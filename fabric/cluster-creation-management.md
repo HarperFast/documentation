@@ -38,25 +38,22 @@ To edit an existing cluster:
 
 ## Preview Hosts
 
-Preview hosts let a cluster serve short-lived copies of an application, such as one per pull request, under a Fabric hostname of its own. With preview hosts on, a name one label below the cluster's preview namespace reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
+Every cluster can serve short-lived copies of an application, such as one per pull request, under its own host name. A name one label below the cluster's full host name reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
 
 ```
-pr-42.<cluster id>.preview.<organization subdomain>.harperfabric.com
+pr-42.<cluster name>.<organization subdomain>.harperfabric.com
 ```
 
-Fabric creates the DNS record and adds `*.<cluster id>.preview.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind. The cluster ID is the part of Studio's address after the organization ID on any of the cluster's pages.
+Fabric points every name under the cluster's host name at the cluster and adds `*.<cluster name>.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind, and no setting to turn on.
 
 - Only isolated applications answer on preview hosts. A preview host that no running isolated application lists gets no response; it never reaches the cluster's other applications.
-- A preview host is exactly one label below the namespace: `pr-42.<cluster id>.preview.…` works, and `a.pr-42.<cluster id>.preview.…` does not.
+- A preview host is exactly one label below the cluster's host name: `pr-42.<cluster name>.…` works, and `a.pr-42.<cluster name>.…` does not. The cluster's instance host names, such as `<region>-1.<cluster name>.…`, keep reaching the cluster itself.
 - Preview hosts are available on Colocated and Dedicated clusters.
+- New clusters serve preview hosts from the start. A cluster created earlier serves them from each instance once that instance's certificate renews, which happens automatically within about seven weeks.
 
-Studio does not have a setting for preview hosts yet. The Fabric API at `https://fabric.harper.fast` turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster:
+### Cookies on preview hosts
 
-```json
-{ "previews": true }
-```
-
-`{ "previews": false }` turns them off. Either request must not include other changes to the cluster. After turning preview hosts on, allow a few minutes for each instance to obtain a certificate that covers them.
+A preview runs under the cluster's own host name, so browsers treat it as part of the same site. A response from a preview can set a cookie with `Domain=<cluster name>.<organization subdomain>.harperfabric.com`, which browsers then send to every application on the cluster, alongside any cookie of the same name the cluster set itself. For any cookie your production application relies on, such as a session cookie, use a name that starts with `__Host-`: browsers accept a `__Host-` cookie only from the host that sets it and without a `Domain`, so a preview cannot set, replace, or receive it.
 
 ## Harper Deployment Types:
 
