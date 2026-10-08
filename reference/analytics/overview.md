@@ -308,7 +308,9 @@ Includes everything returned by Node.js [`process.resourceUsage()`](https://node
 
 #### `utilization` and the CPU profiler
 
-Harper Pro's CPU profiler (see [`analytics.profiling`](#analyticsprofiling)) samples a worker's stack with a timer signal, and while it runs the worker's event-loop idle time is under-counted, so `utilization` reads high: an idle worker can report 70%. <VersionBadge type="changed" version="v5.4.0" /> The profiler now samples only for one `aggregatePeriod` before each capture: from application load until the second capture, two periods later, and then for one period before each later capture. A `hdb_raw_analytics` entry whose `metrics` include `profiler-sampling` is one whose `utilization` sample overlapped sampling; its `total` is the milliseconds sampled since that worker's previous entry. Set those samples aside when using `utilization` as a load signal, or set `analytics.profiling: false`.
+<VersionBadge type="changed" version="v5.4.0" />
+
+Harper Pro's CPU profiler (see [`analytics.profiling`](#analyticsprofiling)) samples a worker's stack with a timer signal, and while it runs the worker's event-loop idle time is under-counted, so `utilization` reads high: an idle worker can report 70%. The profiler now samples only for one `aggregatePeriod` before each capture: from application load until the second capture, two periods later, and then for one period before each later capture. A `hdb_raw_analytics` entry whose `metrics` include `profiler-sampling` is one whose `utilization` sample overlapped sampling; its `total` is the milliseconds sampled since that worker's previous entry. Set those samples aside when using `utilization` as a load signal, or set `analytics.profiling: false`.
 
 ## Custom Metrics
 
@@ -354,11 +356,13 @@ When enabled, aggregate analytics entries are replicated across the cluster so a
 
 ### `analytics.profiling`
 
+<VersionBadge type="changed" version="v5.4.0" />
+
 Type: `boolean`
 
 Default: `true`
 
-Harper Pro only. Runs the CPU profiler that records the `cpu-usage` metric, attributing CPU time to Harper code, application code, hot functions, and child processes. <VersionBadge type="changed" version="v5.4.0" /> The profiler samples only in a window of one `aggregatePeriod` before each capture and marks the `utilization` samples it affects with `profiler-sampling`; see [`utilization` and the CPU profiler](#utilization-and-the-cpu-profiler). Set to `false` to never start it.
+Harper Pro only. Runs the CPU profiler that records the `cpu-usage` metric, attributing CPU time to Harper code, application code, hot functions, and child processes. The profiler samples only in a window of one `aggregatePeriod` before each capture and marks the `utilization` samples it affects with `profiler-sampling`; see [`utilization` and the CPU profiler](#utilization-and-the-cpu-profiler). Set to `false` to never start it.
 
 ### `analytics.logging`
 
