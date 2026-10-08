@@ -68,7 +68,7 @@ harper add_user username=ci-deploy role=ci_deploy active=true password="$(openss
 - **`get_job`** is what the wait step polls. The jobs table lists `get_job` as open to any role, but an `operations` allowlist refuses every operation it doesn't list, so without it the wait step fails with `403`.
 - **`get_deployment`** reads the deployment record.
 
-`restart_service` is not needed: the rolling restart's job is started by Harper itself, not by the caller. The password is required to create the user, but a GitHub Actions pipeline never uses it, since it authenticates through the trust policy. Keep it only if you deploy from [another CI system](#other-ci-systems).
+`restart_service` is not needed: the rolling restart's job is started by Harper itself, not by the caller. The password is required to create the user, but a GitHub Actions pipeline never uses it, since it authenticates through the trust policy, so this command discards it. [Other CI systems](#other-ci-systems) shows how to set one you keep.
 
 Deploying is still administrative authority, because the deployed component runs inside the Harper process. And a deploy that passes a literal registry or git `token` in `credentials` needs `super_user`, because Harper seals that token into the secrets store. So this role deploys private sources through a `secret` reference, which the next section sets up.
 
@@ -154,7 +154,7 @@ jobs:
       - name: Wait for every node to take the release
         run: |
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
-          [ -n "$JOB_ID" ] || exit 0
+          [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
           LAST="could not be read"
           for attempt in $(seq 60); do
             sleep 10
@@ -162,11 +162,11 @@ jobs:
             case $(jq -r '.[0].status // "MISSING"' job.json) in
               COMPLETE) exit 0 ;;
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
-              MISSING) LAST="was not on the node that answered" ;;
+              MISSING) LAST="was not on the node that answered; its outcome is unknown" ;;
               *) LAST="was still running" ;;
             esac
           done
-          echo "Job $JOB_ID $LAST after 60 polls"
+          echo "After 60 polls, job $JOB_ID $LAST"
           exit 1
 ```
 
@@ -180,7 +180,7 @@ A few details worth noting:
 - **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
 - **`json=true`** prints the deploy's result as JSON on stdout. Progress and authentication messages go to stderr, so `deploy.json` holds only the result. A deploy that fails exits non-zero, which fails the step.
 - **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
-- **The job lives on one node.** Everything else about a deploy is visible from any node, but Harper does not replicate jobs, so only the node that received the deploy knows the rolling job. Any other node answers `get_job` with an empty list, which the wait step treats as not finished and polls again. Through a load-balanced cluster URL, the polls that reach the node that received the deploy see the job; if none do, the step says the job was not on the node that answered. [harper#3060](https://github.com/HarperFast/harper/issues/3060) tracks recording each node's outcome on the deployment record, which replicates.
+- **The job lives on one node.** Everything else about a deploy is visible from any node, but Harper does not replicate jobs, so only the node that received the deploy knows the rolling job. Any other node answers `get_job` with an empty list, which the wait step treats as not finished and polls again. So through a load-balanced cluster URL, at least one poll has to reach the node that received the deploy. Routing that keeps the runner on one node sends its polls where the deploy went, and routing that spreads requests across nodes reaches it within a few polls. Routing that sends the polls to a different node than the deploy never does: the step fails, saying the job was not on the node that answered and its outcome is unknown, even when the rollout succeeded. If your load balancer routes that way, use one node's own URL for both the deploy and the wait, and as the trust policy's `audience`. [harper#3060](https://github.com/HarperFast/harper/issues/3060) tracks recording each node's outcome on the deployment record, which replicates and would remove this requirement.
 - **Canary certification** <VersionBadge version="v5.4.0" />. On v5.4.0 and later, `restart=true` and `restart=rolling` load the release in a [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before that node serves it, except in the cases that section lists, so a release that fails to load is rejected. With `restart=rolling`, the node you called certifies it before the deploy responds, and each other node certifies it as the job reaches it.
 - The token for a private repository is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
 
@@ -229,6 +229,8 @@ jobs:
           scope: '@my-org'
       - run: npm install -g harper
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run build
       - run: npm test
       - name: Publish to GitHub Packages
@@ -243,7 +245,7 @@ jobs:
       - name: Wait for every node to take the release
         run: |
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
-          [ -n "$JOB_ID" ] || exit 0
+          [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
           LAST="could not be read"
           for attempt in $(seq 60); do
             sleep 10
@@ -251,17 +253,17 @@ jobs:
             case $(jq -r '.[0].status // "MISSING"' job.json) in
               COMPLETE) exit 0 ;;
               ERROR) jq -r '.[0].message' job.json; exit 1 ;;
-              MISSING) LAST="was not on the node that answered" ;;
+              MISSING) LAST="was not on the node that answered; its outcome is unknown" ;;
               *) LAST="was still running" ;;
             esac
           done
-          echo "Job $JOB_ID $LAST after 60 polls"
+          echo "After 60 polls, job $JOB_ID $LAST"
           exit 1
 ```
 
 Note the two credentials play different roles, matching their lifetimes:
 
-- **Publishing** uses the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`). Publishing happens entirely inside the job, so an ephemeral token is exactly right.
+- **Publishing**, and installing private `@my-org` dependencies with `npm ci`, use the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`, which includes read). Both happen entirely inside the job, so an ephemeral token is exactly right. A dependency published from another repository has to grant this one access first, under that package's **Manage Actions access** settings.
 - **Installing** uses the durable `read:packages` token you stored in Harper as `deploy.my-app.npm.pkg.github.com` — because installs can happen long after this workflow ends.
 
 The deploy step installs the version the tag names, while `npm publish` publishes the version in `package.json`, so the two must agree: `npm version 1.2.3` sets one and creates the other as `v1.2.3`.
@@ -280,7 +282,14 @@ Only the node you called writes that record, so with `restart=rolling` on v5.4.0
 
 ## Other CI systems
 
-The Harper CLI detects GitHub Actions' identity token only. On another CI system it falls through to its other credential sources, so give the pipeline a stored credential for the `ci-deploy` user instead — a refresh token from [`harper login --for-ci`](/reference/v5/cli/authentication#token-credentials-for-cicd), or that user's password — and keep it in the CI system's secret store. The deploy-only role still applies: name private-source credentials with `secret` references, since a literal `token` needs `super_user`.
+The Harper CLI detects GitHub Actions' identity token only. On another CI system it falls through to its other credential sources, so give the pipeline a stored credential for the `ci-deploy` user instead. The setup above discarded that user's password, so first set one you keep: generate it in your password manager, then, logged in as a `super_user`, run:
+
+```bash
+read -rs CI_DEPLOY_PASSWORD
+harper alter_user username=ci-deploy password="$CI_DEPLOY_PASSWORD"
+```
+
+Keep that password in the CI system's secret store. To store a 30-day refresh token instead, run [`harper login --for-ci`](/reference/v5/cli/authentication#token-credentials-for-cicd) as `ci-deploy` with it. That also replaces your own saved login for the target, so run `harper login` as yourself afterward. The deploy-only role still applies: name private-source credentials with `secret` references, since a literal `token` needs `super_user`.
 
 Without the CLI, call the Operations API with `curl`. `HARPER_OPS_URL` is the cluster's Operations API endpoint (`https://my-cluster.example.com:9925`), `HARPER_OPS_AUTH` is the full `Authorization` header value for the `ci-deploy` user (`Basic <base64 user:password>`), and `RELEASE_TAG` is the tag being released, such as `v1.2.3`:
 
@@ -307,7 +316,7 @@ Then wait for the job the same way, polling `get_job` with the same header:
 ```bash
 set -euo pipefail
 JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
-[ -n "$JOB_ID" ] || exit 0
+[ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
 LAST="could not be read"
 for attempt in $(seq 60); do
   sleep 10
@@ -318,11 +327,11 @@ for attempt in $(seq 60); do
   case $(echo "$JOB" | jq -r '.[0].status // "MISSING"') in
     COMPLETE) exit 0 ;;
     ERROR) echo "$JOB" | jq -r '.[0].message'; exit 1 ;;
-    MISSING) LAST="was not on the node that answered" ;;
+    MISSING) LAST="was not on the node that answered; its outcome is unknown" ;;
     *) LAST="was still running" ;;
   esac
 done
-echo "Job $JOB_ID $LAST after 60 polls"
+echo "After 60 polls, job $JOB_ID $LAST"
 exit 1
 ```
 
