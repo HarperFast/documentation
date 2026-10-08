@@ -106,8 +106,23 @@ threads:
 
 Snapshots can be large (often a sizable fraction of the heap limit) and writing them blocks the thread briefly — leave disabled for normal operation and enable only when investigating an out-of-memory pattern.
 
+## Source Maps in Stack Traces
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+Harper no longer enables source maps by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces from Harper's core point at the compiled code under `dist/` rather than its TypeScript sources.
+
+To get stack traces that point at the original sources, set the Node.js `--enable-source-maps` flag through `NODE_OPTIONS`. Harper passes the setting on to every worker thread. It applies to modules Node.js loads itself: Harper's core, and application code loaded natively (for example with `applications.moduleLoader: native`). Modules run by Harper's VM-based loaders (`vm-current-context`, the default, as well as `vm` and `compartment`) are not mapped either way.
+
+```bash
+NODE_OPTIONS=--enable-source-maps harper
+```
+
+Before v5.4.0, source maps were always enabled.
+
 ## Related
 
 - [Configuration Options — `threads`](./options.md#threads) — full thread configuration reference
 - [Architecture Overview](../database/overview.md#architecture-overview) — how worker threads fit into Harper
 - [Node.js Inspector documentation](https://nodejs.org/en/learn/getting-started/debugging) — debugger protocol details
+- [Node.js `--enable-source-maps`](https://nodejs.org/api/cli.html#--enable-source-maps) — how Node.js applies source maps to stack traces
