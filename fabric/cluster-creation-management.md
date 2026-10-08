@@ -38,19 +38,19 @@ To edit an existing cluster:
 
 ## Preview Hosts
 
-Preview hosts let a cluster serve short-lived copies of an application, such as one per pull request, under the cluster's own Fabric hostname. With preview hosts on, a name one label below `preview.` and the cluster's hostname reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
+Preview hosts let a cluster serve short-lived copies of an application, such as one per pull request, under a Fabric hostname of its own. With preview hosts on, a name one label below the cluster's preview namespace reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
 
 ```
-pr-42.preview.<cluster name>.<organization subdomain>.harperfabric.com
+pr-42.<cluster id>.preview.<organization subdomain>.harperfabric.com
 ```
 
-Fabric creates the DNS record and adds `*.preview.<cluster hostname>` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind.
+Fabric creates the DNS record and adds `*.<cluster id>.preview.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind. The cluster ID is the part of Studio's address after the organization ID on any of the cluster's pages.
 
 - Only isolated applications answer on preview hosts. A preview host that no running isolated application lists gets no response; it never reaches the cluster's other applications.
-- A preview host is exactly one label below `preview.`: `pr-42.preview.…` works, and `a.pr-42.preview.…` does not.
-- Preview hosts are available on Colocated and Dedicated clusters whose hostname has the default form, `<cluster name>.<organization subdomain>.harperfabric.com`.
+- A preview host is exactly one label below the namespace: `pr-42.<cluster id>.preview.…` works, and `a.pr-42.<cluster id>.preview.…` does not.
+- Preview hosts are available on Colocated and Dedicated clusters.
 
-Studio does not have a setting for preview hosts yet. The Fabric API at `https://fabric.harper.fast` turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster. The cluster ID is the part of Studio's address after the organization ID on any of the cluster's pages.
+Studio does not have a setting for preview hosts yet. The Fabric API at `https://fabric.harper.fast` turns them on with `PUT /Cluster/<cluster id>` and this body, sent by a user who can edit the cluster:
 
 ```json
 { "previews": true }
