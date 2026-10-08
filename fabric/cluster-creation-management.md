@@ -53,7 +53,7 @@ Fabric points every name under the cluster's host name at the cluster and adds `
 
 ### Previews share a site with production
 
-A preview runs under the cluster's own host name, so browsers treat it as the same site as the cluster's other applications. Deploy as a preview only code you would trust in production.
+A preview runs under the cluster's own host name, so browsers treat it as the same site as your production application. Deploy as a preview only code you would trust in production.
 
 - A preview can set a cookie with `Domain=<cluster name>.<organization subdomain>.harperfabric.com`, which browsers then send to every application on the cluster, alongside any cookie of the same name the cluster set itself. For a cookie your production application relies on, such as a session cookie, use a name that starts with `__Host-` and set it with `Secure`, `Path=/` and no `Domain`, as browsers require of that prefix: a preview can then neither set nor replace it, and browsers never send it to a preview, as they do any cookie production sets with a `Domain`. Harper's own session cookie keeps its name, so it cannot take this protection.
 - `SameSite` does not separate a preview from production: a page served from a preview can send requests to your production application with production's cookies attached. Protect requests that change state with a CSRF token or an `Origin` check, not `SameSite` alone.
