@@ -47,13 +47,16 @@ pr-42.<cluster name>.<organization subdomain>.harperfabric.com
 Fabric points every name under the cluster's host name at the cluster and adds `*.<cluster name>.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind, and no setting to turn on.
 
 - Only isolated applications answer on preview hosts. A preview host that no running isolated application lists gets no response; it never reaches the cluster's other applications.
-- A preview host is exactly one label below the cluster's host name: `pr-42.<cluster name>.…` works, and `a.pr-42.<cluster name>.…` does not. The cluster's instance host names, such as `<region>-1.<cluster name>.…`, keep reaching the cluster itself.
+- A preview host is exactly one label below the cluster's host name: `pr-42.<cluster name>.…` works, and `a.pr-42.<cluster name>.…` does not. The cluster's instance host names, such as `<region>-1.<cluster name>.…`, keep reaching the cluster itself, so don't name a preview after one.
 - Preview hosts are available on Colocated and Dedicated clusters.
-- New clusters serve preview hosts from the start. A cluster created earlier serves them from each instance once that instance's certificate renews, which happens automatically within about seven weeks.
+- New clusters serve preview hosts from the start. A cluster created earlier gains them one instance at a time, as each instance's certificate renews, which happens automatically within about seven weeks. Until every instance has renewed, a request for a preview host that reaches an instance without the new certificate fails with a certificate error, so on a cluster with several instances previews work only intermittently.
 
-### Cookies on preview hosts
+### Previews share a site with production
 
-A preview runs under the cluster's own host name, so browsers treat it as part of the same site. A response from a preview can set a cookie with `Domain=<cluster name>.<organization subdomain>.harperfabric.com`, which browsers then send to every application on the cluster, alongside any cookie of the same name the cluster set itself. For any cookie your production application relies on, such as a session cookie, use a name that starts with `__Host-`: browsers accept a `__Host-` cookie only from the host that sets it and without a `Domain`, so a preview cannot set, replace, or receive it.
+A preview runs under the cluster's own host name, so browsers treat it as the same site as the cluster's other applications. Deploy as a preview only code you would trust in production.
+
+- A preview can set a cookie with `Domain=<cluster name>.<organization subdomain>.harperfabric.com`, which browsers then send to every application on the cluster, alongside any cookie of the same name the cluster set itself. For a cookie your production application relies on, such as a session cookie, use a name that starts with `__Host-` and set it with `Secure`, `Path=/` and no `Domain`, as browsers require of that prefix: a preview can then neither set nor replace it, and browsers never send it to a preview, as they do any cookie production sets with a `Domain`. Harper's own session cookie keeps its name, so it cannot take this protection.
+- `SameSite` does not separate a preview from production: a page served from a preview can send requests to your production application with production's cookies attached. Protect requests that change state with a CSRF token or an `Origin` check, not `SameSite` alone.
 
 ## Harper Deployment Types:
 
