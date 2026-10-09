@@ -55,7 +55,7 @@ X-Replicate-To: 2;confirm=1
 
 `X-Replicate-To`/`replicateTo` controls where the record is stored — whether given as a count or an explicit node list — but only under the default residency. A table's `setResidency` or `setResidencyById` function (see Custom Sharding below) takes precedence over it, and placement is independent of what the confirmation count counts either way.
 
-This version has no timeout on an unmet confirmation count — a request can block indefinitely if a peer never catches up — and only rejects, after the write has already committed locally, a count larger than the total number of other nodes it knows about, not specifically the peers this node replicates the database to.
+This version has no timeout on an unmet confirmation count — a request can block indefinitely if a peer never catches up — and only rejects, after the write (or delete) has already committed locally, a count larger than the total number of other nodes it knows about, not specifically the peers this node replicates the database to.
 
 Specify exact destination nodes by hostname:
 
