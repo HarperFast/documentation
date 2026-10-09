@@ -261,7 +261,7 @@ There is no operation that revokes a refresh token directly. To invalidate one, 
 
 On a runner that can prove its own identity, the CLI needs **no stored credential at all**. It asks the runtime for an identity token addressed to your instance and trades it for a one-hour operation token. Nothing durable is stored in your CI provider, and there is no 30-day token to rotate.
 
-Configure the instance to trust the workflow once with [`add_oidc_trust`](../operations-api/operations.md#add_oidc_trust). For a GitHub Actions workflow that deploys from a branch, [`harper deploy setup=true provider=github-actions`](./commands.md#github-actions-deploys-oidc) <VersionBadge version="v5.4.0" /> does it in one command: a deploy-only role and user, the policy, and the repository's `HARPER_CLI_TARGET` variable.
+Configure the instance to trust the workflow once with [`add_oidc_trust`](../operations-api/operations.md#add_oidc_trust). For a GitHub Actions workflow that deploys from a branch, [`harper deploy setup=true provider=github-actions`](./commands.md#github-actions-deploys-oidc) (v5.4.0) does it in one command: a deploy-only role and user, the policy, and the repository's `HARPER_CLI_TARGET` variable.
 
 ###### Using it in a workflow
 

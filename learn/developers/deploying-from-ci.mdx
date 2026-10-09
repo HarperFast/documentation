@@ -54,7 +54,7 @@ A GitHub Actions job that declares `id-token: write` can ask GitHub for an ident
 
 :::tip
 
-<VersionBadge version="v5.4.0" /> For a workflow that deploys when changes merge to a branch, [`harper deploy setup=true
+From v5.4.0, for a workflow that deploys when changes merge to a branch, [`harper deploy setup=true
 provider=github-actions`](/reference/v5/cli/commands#github-actions-deploys-oidc) creates a role, a user and a policy
 pinned to that branch, and sets the `HARPER_CLI_TARGET` variable, in one command. Its role allows `deploy_component` and
 `get_job` only, not the `get_deployment` the role below adds. This guide's workflows deploy on version tags, which a
