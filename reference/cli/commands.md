@@ -166,7 +166,7 @@ All parameters are passed as `key=value` arguments. Every parameter is optional.
 - `by_ref=true` - Deploy the current project from its GitHub `origin` remote as a pinned commit (`git+https`) instead of uploading a packaged tarball. (Added in: v5.2.3)
 - `ref=<committish>` - The branch, tag, or commit to deploy. Resolved to an immutable commit SHA so every cluster node deploys the same commit. Defaults to the current `HEAD`; implies `by_ref`. (Added in: v5.2.3)
 - `credential=true` - Attach the sealed credential reference so the cluster can clone a private repository. Provision it first with `harper deploy setup=true`. (Added in: v5.2.3)
-- `setup=true` - Provision (seal) a durable encrypted credential for a private deploy source instead of deploying. Interactive. (Added in: v5.2.3) With `provider=github-actions`, set up [GitHub Actions deploys](#github-actions-deploys-oidc) instead. (Added in: v5.4.0)
+- `setup=true` - Provision (seal) a durable encrypted credential for a private deploy source instead of deploying; interactive. (Added in: v5.2.3) With `provider=github-actions`, set up [GitHub Actions deploys](#github-actions-deploys-oidc) instead. (Added in: v5.4.0)
 
 #### Waiting for a rolling deploy
 
@@ -257,12 +257,14 @@ harper deploy setup=true provider=github-actions project=my-app
 It needs no secret custody, and it does this:
 
 1. Takes the GitHub repository from the checkout's `origin` remote, or `repo=<owner>/<name>`, and looks it up with the `gh` CLI or GitHub's public API, for its numeric id and for the spelling of its name GitHub uses in the token. When neither answers, such as for a private repository without `gh`, pass the id as `repository_id=<id>` and spell `repo=` as GitHub does; setup says the spelling was not verified.
-2. Checks the workflow file, `.github/workflows/deploy.yaml` by default (`workflow=`, a `.yml` or `.yaml` file in `.github/workflows/`): it must be able to run on `main` (`branch=`) and run a job in the `production` environment (`environment=`). A workflow that could never match, such as one whose push filter names only other branches and has no other trigger, or in which no job sets an environment, stops setup before it writes anything. What it can't decide, such as a branch pattern, a scheduled or manual trigger, or a reusable workflow, is reported as not verified.
+2. Checks the workflow file, `.github/workflows/deploy.yaml` by default (`workflow=`, a `.yml` or `.yaml` file in `.github/workflows/`): it must be able to run on `main` (`branch=`) and run a job in the `production` environment (`environment=`). A workflow that could never match, such as one whose push filter names only other branches and has no other trigger, or in which no job sets an environment, stops setup before it writes anything. What it can't decide, such as a branch pattern, a scheduled or manual trigger, or a reusable workflow, is reported as not verified. So is the whole check when the workflow file isn't in the checkout: run setup from the repository with the workflow committed, or the policy it writes uses the defaults whether or not they match.
 3. Creates a role and a user named `<project>-ci-deploy`, allowed only `deploy_component` and `get_job` (to wait for a rolling deploy), and the trust policy `github-actions-<project>`. The policy's `audience` is the target exactly as the CLI requests its token, and its claims are the repository id, the workflow and branch (`workflow_ref`), and the environment.
 4. Reads the policy back and compares it, claim by claim, with what it meant to write.
 5. Sets the repository's `HARPER_CLI_TARGET` variable with `gh`. Without `gh`, or if the write fails, it prints the command to run and exits non-zero.
 
-It only creates. Running it again changes nothing, and a role, user or policy that already exists but differs, or that someone deactivated or disabled, stops it before it writes, naming what differs. To replace a policy, drop it with `harper drop_oidc_trust id=github-actions-<project>` and run setup again.
+It only creates. Running it again leaves the cluster unchanged, and a role, user or policy that already exists but differs, or that someone deactivated or disabled, stops it before it writes, naming what differs. To replace a policy, drop it with `harper drop_oidc_trust id=github-actions-<project>` and run setup again. Because `add_oidc_trust` replaces a policy, setup checks again just before writing it, but a policy another super user creates or disables in that moment would still be overwritten.
+
+If setting the variable fails, the cluster part is already done: run the printed `gh variable set` command, or run setup again, which leaves the cluster as it is and retries the variable.
 
 The deploy user can deploy any component on the cluster, not only this project, so who can deploy comes down to who can merge to the branch. To revoke, `harper drop_oidc_trust id=github-actions-<project>` stops new runs, and `harper alter_user username=<project>-ci-deploy active=false` also stops a token already issued, which lasts an hour.
 

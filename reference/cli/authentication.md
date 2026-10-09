@@ -261,16 +261,16 @@ There is no operation that revokes a refresh token directly. To invalidate one, 
 
 On a runner that can prove its own identity, the CLI needs **no stored credential at all**. It asks the runtime for an identity token addressed to your instance and trades it for a one-hour operation token. Nothing durable is stored in your CI provider, and there is no 30-day token to rotate.
 
-Configure the instance to trust the workflow once with [`add_oidc_trust`](../operations-api/operations.md#add_oidc_trust). For a GitHub Actions workflow that deploys from a branch, [`harper deploy setup=true provider=github-actions`](./commands.md#github-actions-deploys-oidc) <VersionBadge version="v5.4.0" /> does it in one command: the policy, a deploy-only user for it, and the repository's `HARPER_CLI_TARGET` variable.
+Configure the instance to trust the workflow once with [`add_oidc_trust`](../operations-api/operations.md#add_oidc_trust). For a GitHub Actions workflow that deploys from a branch, [`harper deploy setup=true provider=github-actions`](./commands.md#github-actions-deploys-oidc) <VersionBadge version="v5.4.0" /> does it in one command: a deploy-only role and user, the policy, and the repository's `HARPER_CLI_TARGET` variable.
 
 ###### Using it in a workflow
 
-**Nothing in the workflow names the policy, and no `harper` command takes an option for it.** Once the policy exists, every `harper` command in a job authenticates through it by itself — `harper deploy`, `harper get_job`, or any other operation — when all four of these hold:
+**Nothing in the workflow names the policy, and no `harper` command takes an option for it.** Once the policy exists, every `harper` command in a job authenticates through it by itself — `harper deploy`, `harper get_job`, or any other operation — when all four of these hold. What each command may then do is up to the role of the user the policy names: one that lists only `deploy_component` and `get_job` refuses anything else with a `403`.
 
 1. **The job may request an identity token.** On GitHub Actions that is `permissions: id-token: write` on the job.
 2. **`HARPER_CLI_TARGET` is the policy's `audience`.** The CLI requests its token for the target it connects to, so the target must be the URL the policy names, with its port and trailing slash (`https://my-instance.harperdb.io:9925/`). It is not sensitive, so a repository variable (`vars`) rather than a secret.
 3. **The run matches the policy's claims**: its repository, its workflow file and branch, and its environment.
-4. **Nothing else is configured to authenticate.** A password, a `HARPER_CLI_REFRESH_TOKEN`, a saved `harper login`, or `auth_username=` outranks the exchange — see below.
+4. **Nothing else is configured to authenticate.** `auth_username=`/`auth_password=`, credentials in the target URL, `HARPER_CLI_USERNAME`/`HARPER_CLI_PASSWORD`, `HARPER_CLI_REFRESH_TOKEN` or `HARPER_CLI_OPERATION_TOKEN` (or their `CLI_TARGET_` forms), and a saved `harper login` all outrank the exchange — see [Authentication Precedence](#authentication-precedence).
 
 For example, this job deploys with nothing but the target:
 
