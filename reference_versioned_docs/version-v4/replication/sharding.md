@@ -51,7 +51,7 @@ X-Replicate-To: 2;confirm=1
 - `2` — replicate to two additional nodes
 - `confirm=1` — wait for confirmation from one additional node before responding
 
-`confirm=N` waits until any N peers acknowledge the commit — not N specific peers — so it cannot guarantee that a particular node has the write, only that N replicas exist somewhere in the cluster. To target specific nodes, use an explicit node list with `X-Replicate-To` instead of (or in addition to) a count.
+`confirm=N` waits until any N distinct peers acknowledge the commit — not N specific peers, and a peer outside the record's residency counts too (it receives an invalidation entry, not the record). So `confirm` cannot guarantee that N full copies exist, or that any particular node — even one named in `X-Replicate-To` — has the write. `X-Replicate-To` with an explicit node list controls where the record is stored; it does not change which peers' acknowledgements `confirm` counts. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
 
 Specify exact destination nodes by hostname:
 
@@ -80,7 +80,7 @@ Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 }
 ```
 
-`replicatedConfirmation: N` waits until any N peers acknowledge the commit — not N specific peers — so it cannot guarantee that a particular node has the write. Use `replicateTo` with an explicit node list to target specific nodes.
+`replicatedConfirmation: N` waits until any N peers acknowledge the commit — not N specific peers, including peers outside the record's residency (they only receive an invalidation entry, not the record). It does not guarantee that a particular node, even one listed in `replicateTo`, has the write; `replicateTo` controls where the record is stored, independently of what `replicatedConfirmation` counts.
 
 Or specify explicit nodes:
 
@@ -107,7 +107,7 @@ class MyTable extends tables.MyTable {
 }
 ```
 
-As above, `replicatedConfirmation` waits for any N peers to acknowledge, not N specific ones — set `replicateTo` to an explicit array of node names to target specific nodes.
+As above, `replicatedConfirmation` waits for any N peers to acknowledge — not N specific ones, and not necessarily N peers holding the full record. `replicateTo` controls where the record is stored, independently of which peers' acknowledgements count toward `replicatedConfirmation`.
 
 ## Static Sharding
 
