@@ -38,16 +38,16 @@ To edit an existing cluster:
 
 ## Preview Hosts
 
-Every cluster can serve short-lived copies of an application, such as one per pull request, under its own host name. A name one label below the cluster's full host name reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
+Every cluster can serve short-lived copies of an application, such as one per pull request, under its own host name. A name one label below `app.` and the cluster's full host name reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
 
 ```
-pr-42.<cluster name>.<organization subdomain>.harperfabric.com
+pr-42.app.<cluster name>.<organization subdomain>.harperfabric.com
 ```
 
-Fabric points every name under the cluster's host name at the cluster and adds `*.<cluster name>.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind, and no setting to turn on.
+Fabric points every name under `app.<cluster name>.<organization subdomain>.harperfabric.com` at the cluster and adds `*.app.<cluster name>.<organization subdomain>.harperfabric.com` to each instance's certificate, so a new preview needs a deploy and nothing else: no custom domain to add, verify, or bind, and no setting to turn on.
 
 - Only isolated applications answer on preview hosts. A preview host that no running isolated application lists gets no response; it never reaches the cluster's other applications.
-- A preview host is exactly one label below the cluster's host name: `pr-42.<cluster name>.…` works, and `a.pr-42.<cluster name>.…` does not. The cluster's instance host names, such as `<region>-1.<cluster name>.…`, keep reaching the cluster itself, so don't name a preview after one.
+- A preview host is exactly one label below `app.` and the cluster's host name: `pr-42.app.<cluster name>.…` works, and neither `a.pr-42.app.<cluster name>.…` nor `pr-42.<cluster name>.…` does.
 - Preview hosts are available on Colocated and Dedicated clusters.
 - New clusters serve preview hosts from the start. A cluster created earlier gains them one instance at a time, as each instance's certificate renews, which happens automatically within about seven weeks. Until every instance has renewed, a request for a preview host that reaches an instance without the new certificate fails with a certificate error, so on a cluster with several instances previews work only intermittently.
 
