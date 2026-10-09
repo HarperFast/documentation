@@ -51,6 +51,8 @@ X-Replicate-To: 2;confirm=1
 - `2` — replicate to two additional nodes
 - `confirm=1` — wait for confirmation from one additional node before responding
 
+`confirm=N` waits until any N peers acknowledge the commit — not N specific peers — so it cannot guarantee that a particular node has the write, only that N replicas exist somewhere in the cluster. To target specific nodes, use an explicit node list with `X-Replicate-To` instead of (or in addition to) a count.
+
 Specify exact destination nodes by hostname:
 
 ```http
@@ -78,6 +80,8 @@ Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 }
 ```
 
+`replicatedConfirmation: N` waits until any N peers acknowledge the commit — not N specific peers — so it cannot guarantee that a particular node has the write. Use `replicateTo` with an explicit node list to target specific nodes.
+
 Or specify explicit nodes:
 
 ```jsonc
@@ -102,6 +106,8 @@ class MyTable extends tables.MyTable {
 	}
 }
 ```
+
+As above, `replicatedConfirmation` waits for any N peers to acknowledge, not N specific ones — set `replicateTo` to an explicit array of node names to target specific nodes.
 
 ## Static Sharding
 
