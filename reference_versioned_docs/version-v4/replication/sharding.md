@@ -55,7 +55,7 @@ X-Replicate-To: 2;confirm=1
 
 `X-Replicate-To`/`replicateTo` controls where the record is stored — whether given as a count or an explicit node list — but only under the default residency. A table's `setResidency` or `setResidencyById` function (see Custom Sharding below) takes precedence over it, and placement is independent of what the confirmation count counts either way.
 
-This version has no timeout on an unmet confirmation count — a request can block indefinitely if a peer never catches up — and only rejects a count larger than the total number of nodes in the cluster, not the peers this node actually replicates the database to.
+This version has no timeout on an unmet confirmation count — a request can block indefinitely if a peer never catches up — and only rejects, after the write has already committed locally, a count larger than the total number of other nodes it knows about, not specifically the peers this node replicates the database to.
 
 Specify exact destination nodes by hostname:
 
@@ -64,7 +64,7 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists, but as above it still only counts acknowledgements from any N peers, not specifically the listed ones. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
+The `confirm` parameter can be combined with explicit node lists, but as above it still only counts whichever peer acknowledgements come in, not specifically from the listed nodes. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
 
 ### Replication Control via Operations API
 
