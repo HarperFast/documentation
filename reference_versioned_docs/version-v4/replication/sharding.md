@@ -49,9 +49,9 @@ X-Replicate-To: 2;confirm=1
 ```
 
 - `2` — replicate to two additional nodes
-- `confirm=1` — wait for confirmation from one additional node before responding
+- `confirm=1` — wait for confirmation from one additional peer before responding (see below for exactly what this confirms)
 
-`confirm=N` waits until any N distinct peers acknowledge the commit — not N specific peers, and a peer outside the record's residency counts too once its replication position passes the write, even though it may hold only an invalidation entry (or nothing at all for that record). So `confirm` cannot guarantee that N full copies exist, or that any particular node — even one named in `X-Replicate-To` — has the write. `X-Replicate-To` with an explicit node list controls where the record is stored; it does not change which peers' acknowledgements `confirm` counts. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
+`confirm=N` waits until any N distinct peers acknowledge the commit — not N specific peers, and a peer outside the record's residency counts too once its replication position passes the write, even though it may hold only an invalidation entry (or nothing at all for that record). So `confirm` cannot guarantee that N full copies exist, or that any particular node — even one named in `X-Replicate-To` — has the write. `X-Replicate-To` with an explicit node list controls where the record is stored under the default residency — a table's `setResidency` or `setResidencyById` function (see Custom Sharding below) takes precedence over it — but it does not change which peers' acknowledgements `confirm` counts. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
 
 Specify exact destination nodes by hostname:
 
@@ -60,7 +60,7 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists.
+The `confirm` parameter can be combined with explicit node lists, but as above it still only counts acknowledgements from any N peers, not specifically the listed ones.
 
 ### Replication Control via Operations API
 
@@ -80,7 +80,7 @@ Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 }
 ```
 
-`replicatedConfirmation: N` waits until any N peers acknowledge the commit — not N specific peers, including peers outside the record's residency (they count once their replication position passes the write, even holding only an invalidation entry or nothing at all for that record). It does not guarantee that a particular node, even one listed in `replicateTo`, has the write; `replicateTo` controls where the record is stored, independently of what `replicatedConfirmation` counts.
+`replicatedConfirmation: N` waits until any N peers acknowledge the commit — not N specific peers, including peers outside the record's residency (they count once their replication position passes the write, even holding only an invalidation entry or nothing at all for that record). It does not guarantee that a particular node, even one listed in `replicateTo`, has the write; `replicateTo` controls where the record is stored (subject to any `setResidency`/`setResidencyById` function — see Custom Sharding below), independently of what `replicatedConfirmation` counts.
 
 Or specify explicit nodes:
 
@@ -107,7 +107,7 @@ class MyTable extends tables.MyTable {
 }
 ```
 
-As above, `replicatedConfirmation` waits for any N peers to acknowledge — not N specific ones, and not necessarily N peers holding the full record. `replicateTo` controls where the record is stored, independently of which peers' acknowledgements count toward `replicatedConfirmation`.
+As above, `replicatedConfirmation` waits for any N peers to acknowledge — not N specific ones, and not necessarily N peers holding the full record. `replicateTo` controls where the record is stored (subject to any `setResidency`/`setResidencyById` function), independently of which peers' acknowledgements count toward `replicatedConfirmation`.
 
 ## Static Sharding
 
