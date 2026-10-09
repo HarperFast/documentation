@@ -262,7 +262,7 @@ It needs no secret custody, and it does this:
 4. Reads the policy back and compares it, claim by claim, with what it meant to write.
 5. Sets the repository's `HARPER_CLI_TARGET` variable with `gh`. Without `gh`, or if the write fails, it prints the command to run and exits non-zero.
 
-It only creates. Running it again leaves the cluster unchanged, and a role, user or policy that already exists but differs, or that someone deactivated or disabled, stops it before it writes, naming what differs. To replace a policy, drop it with `harper drop_oidc_trust id=github-actions-<project>` and run setup again. Because `add_oidc_trust` replaces a policy, setup checks again just before writing it, but a policy another super user creates or disables in that moment would still be overwritten.
+It only creates. Running it again leaves the cluster unchanged and sets `HARPER_CLI_TARGET` again to this target, and a role, user or policy that already exists but differs, or that someone deactivated or disabled, stops it before it writes, naming what differs. To replace a policy, drop it with `harper drop_oidc_trust id=github-actions-<project>` and run setup again. Because `add_oidc_trust` replaces a policy, setup checks again just before writing it, but a policy another super user creates or disables in that moment would still be overwritten.
 
 If setting the variable fails, the cluster part is already done: run the printed `gh variable set` command, or run setup again, which leaves the cluster as it is and retries the variable.
 
