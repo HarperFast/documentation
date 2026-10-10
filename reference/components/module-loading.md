@@ -162,7 +162,7 @@ An addon loads when any of these holds:
 - node-gyp compiled it under this Node.js, for example with `npm rebuild <package> --build-from-source`, and it is loaded from that package's `build/` directory. That build's `config.gypi` must record `"v8_enable_pointer_compression": 1`, and the binary must be newer than it. Two cases need the marker below instead:
   - a binary copied elsewhere after building, as node-pre-gyp does;
   - a build whose files all share one modification time, such as a reproducible build with clamped timestamps.
-- Its package directory contains a `.pointer-compression-build` file. The marker admits every native binary in the package without inspecting it, so add it only when all of them were built for pointer compression.
+- Its package directory contains a `.pointer-compression-build` file. The marker admits every native binary in the package without inspecting it. Add this marker only when all of them were built for pointer compression.
 
 A refused addon fails to load with an `IncompatibleNativeAddonError`. The error names the file and its package, and lists the fixes:
 
@@ -175,8 +175,8 @@ The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addo
 
 The check has three limits:
 
-- It inspects Linux (ELF) binaries only; addons in other formats are left to Node.js.
-- Modules preloaded through `NODE_OPTIONS` run before Harper starts, so their addons are not checked. Load such modules with `threads.preload` or `threads.preloadRequire` instead.
+- It inspects Linux (ELF) binaries only. Addons in other formats are left to Node.js and are not checked.
+- Modules preloaded through `NODE_OPTIONS` run before Harper starts. Their addons are not checked. Load such modules with `threads.preload` or `threads.preloadRequire` instead.
 - On a standard Node.js build, nothing changes.
 
 ## Choosing a Mode
