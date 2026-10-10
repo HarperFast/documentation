@@ -154,11 +154,15 @@ Allowlisting `child_process` still yields Harper's constrained substitute under 
 
 Harper can run on a Node.js build with V8 pointer compression enabled (built with `--experimental-enable-pointer-compression`, so that `process.config.variables.v8_enable_pointer_compression` is `1`), which uses less JavaScript heap per thread. Pointer compression changes V8's C++ ABI without changing Node.js's module version. A native addon (`.node` file) that calls V8's C++ API directly, rather than Node-API, and was built for a standard Node.js therefore loads and then crashes the whole process the first time it is used.
 
-On a pointer-compression runtime, Harper checks every native addon before it loads, in every thread, including addons that applications and their dependencies load. It refuses one that uses V8's C++ API unless the addon was built for pointer compression. An addon loads when any of these holds:
+On a pointer-compression runtime, Harper checks native addons before they load, in every thread. That covers addons loaded by applications, by their dependencies, and by [`threads.preload` and `threads.preloadRequire`](../configuration/options.md#threads) modules. Harper refuses an addon that links V8's C++ API unless it was built for pointer compression. A 64-bit ELF addon whose symbol table cannot be read is refused too, unless one of the last two rules below admits it.
 
-- It uses only [Node-API](https://nodejs.org/api/n-api.html), which is ABI-stable across the flag. Most current addons are Node-API.
-- node-gyp compiled it under this Node.js, for example with `npm rebuild <package> --build-from-source`, and it is loaded from that package's `build/` directory. A binary that is copied elsewhere after building, as node-pre-gyp does, needs the marker below instead.
-- Its package directory contains a `.pointer-compression-build` file. This marks binaries that were built for pointer compression by other means.
+An addon loads when any of these holds:
+
+- It uses only [Node-API](https://nodejs.org/api/n-api.html), which is ABI-stable across the flag: it imports no V8 C++ symbols. Most current addons are Node-API.
+- node-gyp compiled it under this Node.js, for example with `npm rebuild <package> --build-from-source`, and it is loaded from that package's `build/` directory. That build's `config.gypi` must record `"v8_enable_pointer_compression": 1`, and the binary must be newer than it. Two cases need the marker below instead:
+  - a binary copied elsewhere after building, as node-pre-gyp does;
+  - a build whose files all share one modification time, such as a reproducible build with clamped timestamps.
+- Its package directory contains a `.pointer-compression-build` file. The marker admits every native binary in the package without inspecting it, so add it only when all of them were built for pointer compression.
 
 A refused addon fails to load with an `IncompatibleNativeAddonError`. The error names the file and its package, and lists the fixes:
 
@@ -167,7 +171,13 @@ A refused addon fails to load with an `IncompatibleNativeAddonError`. The error 
 - a rebuild from source under the running Node.js;
 - a standard Node.js runtime.
 
-The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addon it cannot load. So packages that treat their native accelerator as optional, such as `cbor-x` and `msgpackr`, fall back to their JavaScript implementation. The check inspects Linux (ELF) binaries; addons in other formats are left to Node.js. On a standard Node.js build nothing changes.
+The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addon it cannot load. So packages that treat their native accelerator as optional, such as `cbor-x` and `msgpackr`, fall back to their JavaScript implementation.
+
+The check has three limits:
+
+- It inspects Linux (ELF) binaries only; addons in other formats are left to Node.js.
+- Modules preloaded through `NODE_OPTIONS` run before Harper starts, so their addons are not checked. Load such modules with `threads.preload` or `threads.preloadRequire` instead.
+- On a standard Node.js build, nothing changes.
 
 ## Choosing a Mode
 
