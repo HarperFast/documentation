@@ -108,7 +108,7 @@ The dd-trace behavior described here was observed on 6.x. Check your agent's cur
 
 ### Applying V8 flags
 
-Some V8 flags, such as `--optimize-for-size`, cannot be passed through `NODE_OPTIONS` (Node refuses them there) or to a worker thread. `v8Flags` applies them inside Harper instead: the main thread calls Node's [`v8.setFlagsFromString()`](https://nodejs.org/api/v8.html#v8setflagsfromstringflags) for each entry before the first worker thread starts, so every worker thread runs with them. V8 flags are process-wide, so they also affect the main thread from that point on. The main thread's isolate already exists, though, so flags V8 reads only when an isolate is created (such as heap sizing) do not change it. With `count: 0`, where the main thread serves requests, those flags have no effect.
+Some V8 flags, such as `--optimize-for-size`, cannot be passed through `NODE_OPTIONS` (Node refuses them there) or to a worker thread. `v8Flags` applies them inside Harper instead: the main thread calls Node's [`v8.setFlagsFromString()`](https://nodejs.org/api/v8.html#v8setflagsfromstringflags) for each entry before the first worker thread starts, so every worker thread runs with them. V8 flags are process-wide, so they also affect the main thread from that point on. The main thread's isolate already exists, though, so flags V8 reads only when an isolate is created (such as heap sizing) do not change it. With `count: 0`, the main thread serves requests, so those creation-time flags do not affect request handling; flags V8 reads while running still apply.
 
 ```yaml
 threads:
@@ -117,11 +117,11 @@ threads:
     - --max-semi-space-size=1
 ```
 
-The value can also be set from the environment, for example `HARPER_SET_CONFIG='{"threads":{"v8Flags":["--optimize-for-size"]}}'`.
+The value can also be set from the environment, for example `HARPER_SET_CONFIG='{"threads":{"v8Flags":["--optimize-for-size","--max-semi-space-size=1"]}}'`.
 
 - **Validation.** Surrounding whitespace is trimmed, and an empty entry is ignored. An entry that does not start with `--` is refused by `set_configuration`, and stops Harper at startup with an error naming `threads.v8Flags`. V8 skips a flag it does not recognize and only prints `Error: unrecognized flag` to standard error, so check the spelling against your Node version (`node --v8-options`).
 - **Implied flags are not applied.** On the command line, some flags turn on others; `--optimize-for-size` also caps the young-generation semi-space at 1 MB. Applied at runtime, a flag does not do that, so list the implied flags explicitly, as the example does with `--max-semi-space-size=1`.
-- **When it takes effect.** Flags are read once per process. A changed value takes effect on the next full restart (`harper restart` or a process restart), not on a worker thread restart. Removing the setting and restarting is how to roll it back.
+- **When it takes effect.** Flags are read once per process. A changed value takes effect when the whole process restarts: the [`restart`](../operations-api/operations.md#restart) operation, `harper restart`, or a container restart. [`restart_service`](../operations-api/operations.md#restart_service) restarts only worker threads, which keep the process's flags, so it does not apply a change, even with `"replicated": true`. To roll back, remove the setting from wherever it was set (the config file, `HARPER_SET_CONFIG`, `HARPER_CONFIG` or the `THREADS_V8FLAGS` environment variable) and restart the process.
 - **Expert setting.** Flags change V8's behavior for the whole process and are not validated beyond the `--` prefix. A conflicting combination can stop the process at startup. Measure memory and throughput with your workload before relying on a flag in production.
 
 ---

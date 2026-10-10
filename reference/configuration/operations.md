@@ -72,7 +72,7 @@ The `replicated` array reports per-node outcomes. A failed peer appears as `{ "s
 }
 ```
 
-To restart the whole cluster afterward, follow with [restart_service](../operations-api/operations.md#restart_service) using `"replicated": true` — it restarts nodes one at a time, so the cluster stays available:
+To restart the whole cluster afterward, follow with [restart_service](../operations-api/operations.md#restart_service) using `"replicated": true` — it restarts nodes one at a time, so the cluster stays available. `restart_service` restarts only worker threads, so a change to [`threads.v8Flags`](./options.md#applying-v8-flags) needs a [restart](../operations-api/operations.md#restart) of each node instead:
 
 ```json
 {
