@@ -148,6 +148,27 @@ Like `allowedDirectory`, this applies to imports the application module loader h
 
 Allowlisting `child_process` still yields Harper's constrained substitute under the VM loaders, not Node's unmodified module.
 
+## Native Addons on Pointer-Compression Runtimes
+
+<VersionBadge version="v5.4.0" />
+
+Harper can run on a Node.js build with V8 pointer compression enabled (built with `--experimental-enable-pointer-compression`, so that `process.config.variables.v8_enable_pointer_compression` is `1`), which uses less JavaScript heap per thread. Pointer compression changes V8's C++ ABI without changing Node.js's module version. A native addon (`.node` file) that calls V8's C++ API directly, rather than Node-API, and was built for a standard Node.js therefore loads and then crashes the whole process the first time it is used.
+
+On a pointer-compression runtime, Harper checks every native addon before it loads, in every thread, including addons that applications and their dependencies load. It refuses one that uses V8's C++ API unless the addon was built for pointer compression. An addon loads when any of these holds:
+
+- It uses only [Node-API](https://nodejs.org/api/n-api.html), which is ABI-stable across the flag. Most current addons are Node-API.
+- node-gyp compiled it under this Node.js, for example with `npm rebuild <package> --build-from-source`, and it is loaded from that package's `build/` directory. A binary that is copied elsewhere after building, as node-pre-gyp does, needs the marker below instead.
+- Its package directory contains a `.pointer-compression-build` file. This marks binaries that were built for pointer compression by other means.
+
+A refused addon fails to load with an `IncompatibleNativeAddonError`. The error names the file and its package, and lists the fixes:
+
+- a Node-API version of the package;
+- a build compiled for pointer compression;
+- a rebuild from source under the running Node.js;
+- a standard Node.js runtime.
+
+The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addon it cannot load. So packages that treat their native accelerator as optional, such as `cbor-x` and `msgpackr`, fall back to their JavaScript implementation. The check inspects Linux (ELF) binaries; addons in other formats are left to Node.js. On a standard Node.js build nothing changes.
+
 ## Choosing a Mode
 
 For most applications the default is the right choice, and the settings on this page are worth changing only in response to a concrete problem.
