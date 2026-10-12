@@ -2165,7 +2165,7 @@ For modern equivalents, see [Components Overview](../components/overview.md).
 | Operation              | Replaced By                                                         |
 | ---------------------- | ------------------------------------------------------------------- |
 | `install_node_modules` | Handled automatically by `deploy_component` and `restart`           |
-| `get_fingerprint`      | Use `registration_info`                                             |
+| `get_fingerprint`      | None: `registration_info` returns only the version                  |
 | `set_license`          | Use `install_usage_license`                                         |
 | `search_by_hash`       | Use `search_by_id`                                                  |
 | `search_attribute`     | Use `attribute` field in `search_by_value` / `search_by_conditions` |
