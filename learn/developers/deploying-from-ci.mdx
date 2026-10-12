@@ -56,9 +56,9 @@ A GitHub Actions job that declares `id-token: write` can ask GitHub for an ident
 
 From v5.4.0, for a workflow that deploys when changes merge to a branch, [`harper deploy setup=true
 provider=github-actions`](/reference/v5/cli/commands#github-actions-deploys-oidc) creates a role, a user and a policy
-pinned to that branch, and sets the `HARPER_CLI_TARGET` variable, in one command. Its role allows `deploy_component` and
-`get_job` only, not the `get_deployment` the role below adds. This guide's workflows deploy on version tags, which a
-branch pin cannot match, so they use the policy below, written by hand.
+pinned to that branch, and sets the `HARPER_CLI_TARGET` variable, in one command. Its role allows `deploy_component`,
+`get_job` and `registration_info` only, not the `get_deployment` the role below adds. This guide's workflows deploy on
+version tags, which a branch pin cannot match, so they use the policy below, written by hand.
 
 :::
 
@@ -73,13 +73,14 @@ harper login https://my-cluster.example.com:9925
 The user a trust policy names is the privilege boundary: a matching run gets that user's role. A pipeline does not need `super_user`. Give it a role that lists only the operations the workflows below call:
 
 ```bash
-harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment"]}'
+harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment","registration_info"]}'
 harper add_user username=ci-deploy role=ci_deploy active=true password="$(openssl rand -base64 32)"
 ```
 
 - **`deploy_component`** is the deploy itself.
 - **`get_job`** is what the wait step polls. The jobs table lists `get_job` as open to any role, but an `operations` allowlist refuses every operation it doesn't list, so without it the wait step fails with `403`.
 - **`get_deployment`** reads the deployment record.
+- **`registration_info`** returns only Harper's version, which `harper deploy` checks before it uploads. Without it the deploy still works, but the cluster logs a refused operation on every run.
 
 `restart_service` is not needed: the rolling restart's job is started by Harper itself, not by the caller. The password is required to create the user, but a GitHub Actions pipeline never uses it, since it authenticates through the trust policy, so this command discards it. [Other CI systems](#other-ci-systems) shows how to set one you keep.
 

@@ -674,7 +674,7 @@ harper add_oidc_trust \
 harper list_oidc_trust
 ```
 
-`claims` is a JSON object, so quote it as a single shell argument — the CLI parses each value as JSON, which is what turns that string into the nested object the operation expects. `operations` works the same way if you scope the policy: `operations='["deploy_component","get_job","get_deployment"]'`.
+`claims` is a JSON object, so quote it as a single shell argument — the CLI parses each value as JSON, which is what turns that string into the nested object the operation expects. `operations` works the same way if you scope the policy: `operations='["deploy_component","get_job","get_deployment","registration_info"]'`.
 
 `harper login` stores a token for that target, so step 2 needs no credentials of its own. If you would rather not store one, pass the target and credentials explicitly instead:
 
@@ -697,7 +697,7 @@ The user the policy names is the privilege boundary: a matching run gets that us
 	"issuer": "https://token.actions.githubusercontent.com",
 	"audience": "https://my-instance.harperdb.io:9925/",
 	"user": "ci-deploy",
-	"operations": ["deploy_component", "get_job", "get_deployment"],
+	"operations": ["deploy_component", "get_job", "get_deployment", "registration_info"],
 	"claims": {
 		"repository_id": "67890",
 		"workflow_ref": "HarperFast/my-app/.github/workflows/deploy.yml@refs/heads/main",
@@ -723,12 +723,12 @@ A deploy user does not need `super_user`. A role that lists the operations the p
 	"operation": "add_role",
 	"role": "ci_deploy",
 	"permission": {
-		"operations": ["deploy_component", "get_job", "get_deployment"]
+		"operations": ["deploy_component", "get_job", "get_deployment", "registration_info"]
 	}
 }
 ```
 
-`get_job` is what a pipeline polls to wait for a `"restart": "rolling"` deploy to reach every node, and `get_deployment` reads the deployment record. Both have to be listed: an `operations` allowlist, and a policy's `operations` scope, refuse every operation they don't name, including ones like `get_job` that any role may otherwise call. `restart_service` is not needed, since Harper starts the rolling restart's job itself.
+`get_job` is what a pipeline polls to wait for a `"restart": "rolling"` deploy to reach every node, `get_deployment` reads the deployment record, and `registration_info` is the version check `harper deploy` makes before it uploads; without that one the deploy still works, but the node logs a refused operation on every run. Each has to be listed: an `operations` allowlist, and a policy's `operations` scope, refuse every operation they don't name, including ones like `get_job` that any role may otherwise call. `restart_service` is not needed, since Harper starts the rolling restart's job itself.
 
 Deploying is still administrative authority, since the deployed component runs inside the Harper process. A deploy that passes a literal registry or git `token` in `credentials` needs `super_user` on a node that holds secret custody, because Harper seals that token into the secrets store. Give a least-privilege role a `secret` reference instead.
 
@@ -2097,7 +2097,7 @@ Operations for license management.
 
 | Operation               | Description                                        | Role Required |
 | ----------------------- | -------------------------------------------------- | ------------- |
-| `registration_info`     | Returns registration and version information       | any           |
+| `registration_info`     | Returns the Harper version                         | any           |
 | `install_usage_license` | Installs a Harper usage license block              | super_user    |
 | `get_usage_licenses`    | Returns all usage licenses with consumption counts | super_user    |
 | `get_fingerprint`       | _(Deprecated)_ Returns the machine fingerprint     | super_user    |
@@ -2105,10 +2105,14 @@ Operations for license management.
 
 ### `registration_info`
 
-Returns the instance registration status, version, RAM allocation, and license expiration.
+Returns the instance's Harper version, and `deprecated: true`. It no longer returns registration details. `harper deploy` calls it to check the target's version before it uploads, so a role with an `operations` allowlist that runs `harper deploy` should list it.
 
 ```json
 { "operation": "registration_info" }
+```
+
+```json
+{ "version": "5.3.2", "deprecated": true }
 ```
 
 ### `install_usage_license`
