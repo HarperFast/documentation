@@ -122,6 +122,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'models/calibration',
+					label: 'Calibration',
+				},
+				{
+					type: 'doc',
 					id: 'models/analytics',
 					label: 'Analytics',
 				},
@@ -582,6 +587,11 @@ const sidebars: SidebarsConfig = {
 					type: 'doc',
 					id: 'environment-variables/overview',
 					label: 'Overview',
+				},
+				{
+					type: 'doc',
+					id: 'environment-variables/encrypted-values',
+					label: 'Encrypted Values',
 				},
 			],
 		},
