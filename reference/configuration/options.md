@@ -446,7 +446,7 @@ Whatever `componentsScope` and `configScope` say, every scope refuses:
 
 - **Harper's key directories**, `<rootPath>/keys` (TLS and JWT keys) and `<rootPath>/ssh` (git deploy keys): nothing in them is read, listed, or written. Paths are compared after resolving symlinks.
 - **Key file names**, `*.pem`, `*.key`, and `.jwtPass`: not read. `list_dir` still shows the names, and `write_file` can still create such a file outside the key directories.
-- **Text holding a PEM private key** (`-----BEGIN ... PRIVATE KEY-----`), such as an inline `tls.privateKey` in the config file: `read_file` refuses a page that holds one or starts partway through one (it looks back 32 KiB for the BEGIN line, more than any PEM key spans), `tail_file` refuses lines that hold one or a file that ends partway through one, and `grep_files` skips the file.
+- **Text holding a PEM private key** (`-----BEGIN ... PRIVATE KEY-----`), such as an inline `tls.privateKey` in the config file: `read_file` refuses a page that holds one or starts partway through one (it looks back 128 KiB for the BEGIN line, more than any PEM key spans, post-quantum ones included), `tail_file` refuses lines that hold one or a file that ends partway through one, and `grep_files` skips the file.
 
 A key with neither a key file name nor PEM armor, such as a `.p12` bundle or raw DER, is not recognized outside the key directories.
 
