@@ -1192,7 +1192,7 @@ Three operations edit a component's `.env` file without ever returning a value. 
 
 All three take a `project` (the component directory name) and an optional `file`, which defaults to `.env`. `file` must name an env file — `.env` or `.env.<suffix>` such as `.env.local` — and is rejected otherwise. Key names must match `[A-Za-z0-9_.-]+`, the character set the `.env` parser accepts.
 
-`set_env_value` and `delete_env_value` replicate. The node that receives the request edits its own file, then sends the edit once to each peer. The response's `replicated` array has one entry per peer, naming it in `node`. A peer that could not be reached, or that answered with an error, is listed with `"status": "failed"` and a `reason`. Harper does not retry it, so that node's file may not have the edit. The request still succeeds, so check `replicated` for a `failed` entry. Sending the same edit again once that peer is back is safe: it sets the same value again, and deleting a key that is not present is not an error.
+`set_env_value` and `delete_env_value` replicate. The node that receives the request edits its own file, then sends the edit once to each peer. The response's `replicated` array has one entry per peer, naming it in `node`. A peer that could not be reached, or that answered with an error, is listed with `"status": "failed"` and a `reason`. Harper does not retry it, so that node's file may not have the edit. The request still succeeds, so check `replicated` for a `failed` entry. Once that peer is back, send the affected keys' current state again: their current values, or a delete for keys that should still be absent. A resend reaches every node, so resending the original request is safe only if no later edit changed those keys. Deleting a key that is not present is not an error.
 
 An edit changes the file, not the running components. [`loadEnv`](../environment-variables/overview.md) reads a `.env` file into `process.env` when the component loads, and reads only the files its `files` option names. When a file it has already loaded changes, it does not reload the values. It flags the node as needing a restart instead, so `get_status` reports `restartRequired: true`. Until the node's worker threads restart, running code still sees the old value of a changed key, and still sees a deleted key. To apply an edit, restart the workers on every node, for example with [`restart_service`](#restart_service) using `"service": "http_workers"` and `"replicated": true`, which restarts the nodes one at a time. When `harper dev` runs an application directory, it restarts the workers on its own when the flag is set.
 
@@ -1257,7 +1257,7 @@ Response:
 }
 ```
 
-`keys` is the file's key list after the write — the request value is never echoed back.
+`keys` is the file's key list after the write — the request value is never echoed back. With Harper Pro, the response of both `set_env_value` and `delete_env_value` also carries the [`replicated` array](#environment-file-operations).
 
 Harper quotes the value as needed so the `.env` parser reads back exactly what you sent, including spaces, `#`, quotes, backslashes, and newlines. A carriage return is the exception: the parser reads `\r\n` and a lone `\r` back as `\n`. One combination cannot be represented: a value containing a single quote (`'`) together with a double quote, a backslash, or a carriage return is rejected with a `400`.
 
