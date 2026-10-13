@@ -34,7 +34,7 @@ http:
 ```
 
 - `sessionAffinity` — Route requests from same client to same worker thread (`ip` or header name)
-- `compressionThreshold` — Response size threshold for Brotli compression; _Default_: `1200` (bytes)
+- `compressionThreshold` — Response size threshold (bytes) for Brotli compression; `0` disables compression; _Default_: `0`
 - `cors` — Enable CORS; _Default_: `true`
 - `corsAccessList` — Allowed domains for CORS requests
 - `corsAccessControlAllowHeaders` — `Access-Control-Allow-Headers` value for OPTIONS preflight
@@ -62,7 +62,8 @@ threads:
 ```
 
 - `count` — Number of worker threads; _Default_: CPU count minus one
-- `maxHeapMemory` — Heap limit per thread (MB)
+- `maxHeapMemory` — Heap limit per thread (MB). When unset, each thread's limit is derived from available memory and the number of HTTP worker threads, including isolated applications' threads
+- `maxIsolated` <VersionBadge version="v5.3.0" /> — How many [isolated applications](../components/applications.md#isolated-applications) may run, each in a dedicated worker thread; _Default_: `8`. An isolated application past this limit is not loaded anywhere, and a `deploy_component` that would exceed it is refused with a `409`. `0` admits none. Dedicated threads are added to `count`, not taken from it, so a node runs up to `count` + `maxIsolated` HTTP worker threads. When `maxHeapMemory` is unset, they all count when Harper divides available memory into each thread's default heap limit. Each one lowers that limit for threads started afterward, until it reaches its 512 MB floor, after which more threads add to the total heap the node may use
 - `heapSnapshotNearLimit` — Write a `.heapsnapshot` file when a thread nears its heap limit (loadable in Chrome DevTools Memory tab); _Default_: `false`. See [Worker Thread Debugging](./debugging.md#heap-snapshots-near-the-limit)
 - `debug` — Enable Node.js inspector; sub-options: `port`, `startingPort`, `host`, `waitForDebugger`. See [Worker Thread Debugging](./debugging.md)
 - `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load via Node's `--import` before any Harper or application module on each worker thread. Intended for instrumentation and APM agents. Worker threads only (not under Bun).
@@ -167,6 +168,17 @@ tls:
 - `certificateAuthority` — Path to CA file; _Default_: `<rootPath>/keys/ca.pem`
 - `privateKey` — Path to private key; _Default_: `<rootPath>/keys/privateKey.pem`
 - `ciphers` — Allowed TLS cipher suites
+- `unixDomainSockets` <VersionBadge version="v5.1.0" /> — `true` makes each HTTP worker thread also listen on a Unix domain socket under `<rootPath>/sockets` for each secure port, for a proxy on the same host to forward to. [Isolated applications](../components/applications.md#isolated-applications) are reachable only this way, so they require it; _Default_: `false`
+
+With `tls` as a single object, put `unixDomainSockets: true` inside it. With an SNI certificate array, put `tls_unixDomainSockets: true` at the root of `harper-config.yaml`, alongside `tls`; placing `unixDomainSockets` inside an array entry does not enable the global setting. On v5.3.0, a standalone `TLS_UNIXDOMAINSOCKETS=true` environment variable does not enable this SNI configuration; use the root YAML setting:
+
+```yaml
+tls_unixDomainSockets: true
+tls:
+  - host: app.example.com
+    certificate: ~/hdb/keys/app-certificate.pem
+    privateKey: ~/hdb/keys/app-private-key.pem
+```
 
 ---
 
@@ -398,9 +410,58 @@ agent:
 - `allowDestructive` — Include the tools marked destructive in the agent's toolset: `write_file`, the inspector's code-evaluation tools, and any operations tool carrying MCP's [`destructiveHint`](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). When `false` they are removed entirely rather than gated. That hint comes from a curated set in core which does not cover every damaging operation, so this is not a complete safety boundary on its own — see [Agent operations](../operations-api/operations.md#agent); _Default_: `false`
 - `user` — Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
 - `componentsScope` — Filesystem write scope for component edits, relative to `rootPath`; _Default_: the full `componentsRoot`
+- `httpFetch` <VersionBadge version="v5.3.2" /> — Whether the agent has its `http_fetch` tool, and which hosts it may reach: `true`, `false`, or `{ allow: [...] }`. Read at startup only. See [Restricting `http_fetch`](#restricting-http_fetch); _Default_: `true`
 - `systemPromptAppend` — Operator text appended to the agent's system prompt
 
 `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only. `enabled` is the exception worth knowing: it cannot switch the agent on, because with the agent disabled at startup no agent operation is registered at all.
+
+### Restricting `http_fetch`
+
+<VersionBadge version="v5.3.2" />
+
+`http_fetch` lets the agent send HTTP requests from the Harper process: to its own REST endpoints while it builds an app, or to pull a reference page. The same agent reads table rows, logs, and component source, and text in any of them can steer it, so an enabled agent has a read path and an egress path in one toolset. `agent.httpFetch` bounds that tool. It is not a bound on every way the agent can reach the network: with `allowDestructive` on, for example, the agent can write component code, and the Harper process runs that code.
+
+Remove the tool when the agent has no reason to reach the network, for example an investigation or operations-assistant role:
+
+```yaml
+agent:
+  enabled: true
+  httpFetch: false
+```
+
+Or keep it and allow only named hosts:
+
+```yaml
+agent:
+  enabled: true
+  httpFetch:
+    allow:
+      - localhost:9926
+      - '*.example.com'
+```
+
+| Value              | Effect                                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `true` (default)   | The tool is available. Cloud-metadata hosts and the IPv4 link-local range are refused.                                                                   |
+| `false`            | The tool is removed from the agent's toolset. The model never sees it, and the system prompt stops suggesting HTTP checks.                               |
+| `{ allow: [...] }` | The tool is available, and a request is refused unless its host matches an entry. Its description lists the entries, so the model knows where it can go. |
+
+Allow-list entries take these forms:
+
+- `api.example.com` — that host, on any port
+- `localhost:9926` — that host on that port only. A URL without a port uses 80 for `http` and 443 for `https`.
+- `*.example.com` — any subdomain, at any depth. It does not match `example.com` itself; list that separately.
+- `[::1]` or `[::1]:9926` — an IPv6 address, in brackets
+
+Entries and request URLs are compared in canonical form, so letter case, internationalized names, and shorthand spellings of an IPv4 address all match the same entry. An IPv4 entry does not admit the IPv4-mapped IPv6 form of its address (`[::ffff:...]`); list that separately if you need it.
+
+Some behavior worth knowing:
+
+- **Every redirect hop is checked.** A redirect to a host the policy refuses fails the request before that host is contacted. This applies in every mode, so with the default `true`, a redirect into the cloud-metadata range fails too.
+- **The metadata block comes first.** Listing a cloud-metadata or link-local address does not make it reachable.
+- **Matching is by host name, not address.** An allowed name whose DNS resolves to an internal address is still reached. List names whose DNS you control.
+- **An empty list removes the tool**, the same as `false`. A value Harper cannot read also removes the tool, and logs an error naming it, while the rest of the agent stays available.
+- **It is read at startup only.** Set it in `harper-config.yaml`, with `set_configuration`, through `HARPER_CONFIG`, or as an [environment variable](./overview.md#2-environment-variables) or [CLI argument](./overview.md#3-cli-arguments) (`AGENT_HTTPFETCH=false`, or `AGENT_HTTPFETCH_ALLOW='["localhost:9926"]'` as a JSON array), then restart. A comma-separated string is not a list: it is rejected, and the tool is removed. [`set_agent_config`](../operations-api/operations.md#set_agent_config) rejects it at runtime. Because `set_configuration` can write it and `restart` applies it, the policy only holds against the agent itself while those two operations stay out of its toolset (they are not in the default operations allow list) or behind [approval](../operations-api/operations.md#approve_agent_action).
 
 ---
 
@@ -417,7 +478,7 @@ deployment:
 ```
 
 - `payloadRetention.maxSize` <VersionBadge version="v5.1.15" /> — Bytes. After a successful deploy, a payload larger than this has its stored tarball (`payload_blob`) dropped from the `hdb_deployment` row; the row and its metadata stay. Set it very high to retain every payload; _Default_: `10485760` (10 MiB)
-- `stagingRetention.maxCount` <VersionBadge version="v5.3.0" /> — How many complete, unactivated staged builds may remain per component under `<componentsRoot>/.deploy-staging`. The newest survive; older ones are removed at the start of that component's next deploy and at startup, and `drop_component` removes all of them. `0` keeps none. This bounds dormant builds only, not a disk quota: staging directories that belong to an in-flight or unsettled deploy are never touched; _Default_: `5`
+- `stagingRetention.maxCount` <VersionBadge version="v5.3.0" /> — How many complete builds that are not live may remain per component under `<componentsRoot>/.deploy-staging`: builds staged with `activate: false`, and [releases replaced by a later deploy](../operations-api/operations.md#going-back-to-a-previous-release), which `deployment_id` can make live again. The newest survive; older ones are removed when that component next deploys and at startup. `drop_component` removes all of them. Each is a full installed copy of the component, `node_modules` included. `0` keeps none, and no replaced release is kept. This bounds dormant builds only, not a disk quota: staging directories that belong to an in-flight or unsettled deploy are never touched; _Default_: `5`
 
 ---
 

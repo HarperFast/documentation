@@ -122,6 +122,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'models/calibration',
+					label: 'Calibration',
+				},
+				{
+					type: 'doc',
 					id: 'models/analytics',
 					label: 'Analytics',
 				},

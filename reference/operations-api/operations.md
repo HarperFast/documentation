@@ -620,18 +620,7 @@ A CI runner can authenticate to Harper with **no stored credential**. It present
 
 The alternative is a `HARPER_CLI_REFRESH_TOKEN` secret: a 30-day credential, one per user, that expires on a schedule nobody tracks. A trust policy replaces it with a rule you configure once, and revoke with `drop_oidc_trust`.
 
-```yaml
-permissions:
-  id-token: write
-  contents: read
-environment: production
-steps:
-  - run: harper deploy by_ref=true
-    env:
-      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }} # a var, not a secret
-```
-
-No secret at all — `HARPER_CLI_TARGET` is not sensitive. See [CLI Authentication](../cli/authentication.md#workload-identity-oidc) for the client half and where the exchange sits in credential precedence.
+The workflow needs `permissions: id-token: write` and the `HARPER_CLI_TARGET` variable, and no secret at all, since the target is not sensitive. [Deploying from a CI/CD Pipeline](/learn/developers/deploying-from-ci#let-the-workflow-authenticate-with-oidc) has a complete workflow, with the trust policy and deploy-only role it needs. See [CLI Authentication](../cli/authentication.md#workload-identity-oidc) for the client half and where the exchange sits in credential precedence.
 
 Policies live in the replicated `system.hdb_oidc_trust` table, so configuring one on any node applies cluster-wide.
 
@@ -685,7 +674,7 @@ harper add_oidc_trust \
 harper list_oidc_trust
 ```
 
-`claims` is a JSON object, so quote it as a single shell argument — the CLI parses each value as JSON, which is what turns that string into the nested object the operation expects. `operations` works the same way if you scope the policy: `operations='["deploy_component","get_deployment"]'`.
+`claims` is a JSON object, so quote it as a single shell argument — the CLI parses each value as JSON, which is what turns that string into the nested object the operation expects. `operations` works the same way if you scope the policy: `operations='["deploy_component","get_job","get_deployment"]'`.
 
 `harper login` stores a token for that target, so step 2 needs no credentials of its own. If you would rather not store one, pass the target and credentials explicitly instead:
 
@@ -708,7 +697,7 @@ The user the policy names is the privilege boundary: a matching run gets that us
 	"issuer": "https://token.actions.githubusercontent.com",
 	"audience": "https://my-instance.harperdb.io:9925/",
 	"user": "ci-deploy",
-	"operations": ["deploy_component", "get_deployment", "restart_service"],
+	"operations": ["deploy_component", "get_job", "get_deployment"],
 	"claims": {
 		"repository_id": "67890",
 		"workflow_ref": "HarperFast/my-app/.github/workflows/deploy.yml@refs/heads/main",
@@ -726,6 +715,22 @@ Names are validated when the policy is written, against the same registry `add_r
 
 So `operations` bounds what a CI credential can _administer_, not what data it can read or write. If that matters, point the policy's `user` at a role that is itself least-privilege for the data the token can reach, rather than relying on the scope alone.
 :::
+
+A deploy user does not need `super_user`. A role that lists the operations the pipeline calls is enough:
+
+```json
+{
+	"operation": "add_role",
+	"role": "ci_deploy",
+	"permission": {
+		"operations": ["deploy_component", "get_job", "get_deployment"]
+	}
+}
+```
+
+`get_job` is what a pipeline polls to wait for a `"restart": "rolling"` deploy to reach every node, and `get_deployment` reads the deployment record. Both have to be listed: an `operations` allowlist, and a policy's `operations` scope, refuse every operation they don't name, including ones like `get_job` that any role may otherwise call. `restart_service` is not needed, since Harper starts the rolling restart's job itself.
+
+Deploying is still administrative authority, since the deployed component runs inside the Harper process. A deploy that passes a literal registry or git `token` in `credentials` needs `super_user` on a node that holds secret custody, because Harper seals that token into the secrets store. Give a least-privilege role a `secret` reference instead.
 
 A scoped token also cannot trade itself for a browser session: `create_authentication_tokens` with `purpose: "login"` is refused, because a session carries no operation scope and would silently restore the user's full role.
 
@@ -864,9 +869,11 @@ Detailed documentation: [Components Overview](../components/overview.md)
 | `get_ssh_known_hosts`       | Returns the contents of the SSH known_hosts file                        | super_user    |
 | `install_node_modules`      | _(Deprecated)_ Run npm install on component projects                    | super_user    |
 
+A role that is not `super_user` can be granted these operations by listing them in its [`operations` allowlist](../users-and-roles/overview.md#operation-permissions), which is how a deploy-only CI role gets `deploy_component` and `get_deployment`. A few cannot be granted that way, such as `get_deployment_payload`; that section lists them.
+
 ### `deploy_component`
 
-Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"replicated": true` and `"restart": true` or `"restart": "rolling"`.
+Deploys a component. The `package` option accepts any valid NPM reference including GitHub repos (`HarperDB/app#semver:v1.0.0`), tarballs, or NPM packages. The `payload` option accepts a base64-encoded tar string from `package_component`. Supports `"restart": true` or `"restart": "rolling"`. On Harper Pro and Fabric, a deploy goes to every node in the cluster unless you pass `"replicated": false`; Harper core on its own does not replicate.
 
 Additional parameters:
 
@@ -876,10 +883,28 @@ Additional parameters:
 - `credentials` — credentials for installing a component from a private npm registry or private git repository (see below)
 - `deployment_timeout` <VersionBadge version="v5.1.4" /> — how long, in milliseconds, a peer waits to receive the replicated deployment payload before failing (default: `120000`)
 - `ignore_replication_errors` <VersionBadge version="v5.1.4" /> — set to `true` to treat a peer that fails to receive the deploy as non-fatal instead of failing the whole operation. By default a failed peer causes `deploy_component` to return a non-2xx status; the component is still deployed (and, if requested, restarted) on the origin node.
-- `activate` <VersionBadge version="v5.3.0" /> — set to `false` to build and verify the component without making it live. See [Staging a build and activating it later](#staging-a-build-and-activating-it-later).
-- `deployment_id` <VersionBadge version="v5.3.0" /> — make a previously staged build live. Takes no build inputs of its own.
+- `activate` <VersionBadge version="v5.3.0" /> — set to `false` to build and install the component without making it live. See [Staging a build and activating it later](#staging-a-build-and-activating-it-later).
+- `deployment_id` <VersionBadge version="v5.3.0" /> — make a staged build live, or return to a release a later deploy replaced. Takes no build inputs of its own. See [Going back to a previous release](#going-back-to-a-previous-release).
 
 `urlPath` and `host` both require `package` and are rejected on a payload-only deploy. To mount a payload-deployed component, add `host`/`urlPath` to its entry in the root `harper-config.yaml` instead.
+
+:::warning
+Only a deploy that restarts workers can be checked before it serves. On a node running v5.4.0 or later, `"restart": true` or `"restart": "rolling"` [certifies the release in a canary worker](#certifying-a-release-in-a-canary-worker) first, unless the response's `certification` is `uncertified` or `unavailable`, which say why it went out unchecked. A release that fails to load is rejected. The release it replaced is put back, or, if there is none, the component is failed closed on that node. A deploy without `restart` is not test-loaded: a release that installs but throws when it loads is deployed, and it reports the failure in the `componentStatus` of [`get_status`](#set_status--get_status--clear_status) once workers load it. The rest of the instance keeps serving.
+:::
+
+#### How a deploy updates the root config
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+A deploy changes the component's entry in the root `harper-config.yaml` only once the new release is live on that node. A deploy that fails to install or validate leaves the entry exactly as it was, so a restart does not install a release that never went live. If Harper stops partway through the swap, startup settles it before it installs anything from the root config: either the previous release stays live with its entry, or the new release goes live with its entry, including whether the component runs isolated.
+
+- **A `package` deploy replaces the entry.** The new entry is built from the request: `package`, `install`, `credentials`, `urlPath`, `host`, `branchedDatabases`, and `isolated`.
+- **A `payload` deploy removes `package`, `install`, and `credentials`.** Everything else in the entry is kept, such as `host`, `urlPath`, `isolated`, and `branchedDatabases`, and an entry left with no keys is removed. A `package` key left in place would make a node installing from the root config resolve the old package instead of the payload release that is live.
+- **`drop_component` removes the entry.**
+
+These writes are serialized with each other and with `set_configuration`, so concurrent deploys, drops, and configuration changes do not overwrite one another.
+
+A deploy that has to change the entry is refused before anything changes if the root config does not parse, or if Harper cannot write to the directory that holds it. A deploy that leaves the entry as it is, such as a `payload` deploy of a component that has no entry, does not need the root config to be writable.
 
 #### Staging a build and activating it later
 
@@ -921,21 +946,58 @@ That request takes no `package`, `payload`, `credentials`, install options, or `
 
 A few things worth knowing before you rely on it:
 
-- **Activation consumes the build.** The swap is a rename, so a deployment id can be activated once. Activating it again returns `404`.
-- **A staged build outlives later deploys, which is how you go back.** Staging a release keeps it available even if you deploy something else afterwards: stage v2, deploy v3, and activating v2's id later returns the component to v2. Only versions you staged can be returned to — an ordinary deploy leaves nothing behind to activate.
-- **Staged builds are bounded.** [`deployment.stagingRetention.maxCount`](../configuration/options.md#deployment) caps how many unactivated builds a component keeps (default `5`); the oldest are removed at the start of that component's next deploy and at startup. A build pruned before you activate it has to be staged again.
-- **A deployment id names one build.** Staging again with the same id is rejected rather than rebuilding over it, and the id stays bound to that build until it is activated or pruned.
+- **Activating the release that is already live succeeds and changes nothing.** A retry is therefore safe: see [Retrying an activation](#retrying-an-activation).
+- **A staged build outlives later deploys.** Stage v2, deploy v3, and activating v2's id later returns the component to v2.
+- **Builds that are not live are bounded.** [`deployment.stagingRetention.maxCount`](../configuration/options.md#deployment) caps how many a component keeps — staged builds and [replaced releases](#going-back-to-a-previous-release) together (default `5`). The oldest are removed at the start of that component's next deploy and at startup. A build pruned before you activate it has to be staged again.
+- **A deployment id names one release on a node for as long as the node holds it** — waiting, live, or kept after a later deploy replaced it. Staging again with the same id is rejected rather than rebuilding over it.
 - **`file:` directory sources cannot be staged.** A local-directory package is linked rather than copied, so the bytes could change between staging and activation. Deploy those normally.
 - **`restart` belongs on the activation, not the stage.** A stage changes nothing that is running, so `restart` is rejected alongside `activate: false`; pass it with `deployment_id` to restart as the new version goes live.
 - **Reclaiming the payload does not disable the artifact.** [`delete_deployment_payload`](#delete_deployment_payload) on a staged deployment frees the stored tarball; the build is already installed on disk, so its id still activates.
 
-A refused activation says which kind of refusal it is: `404` when nothing on that node answers to the id — it never existed, or it has already been activated or pruned — and `409` when the build is there but cannot be activated, such as one belonging to another component or one whose files changed after it was staged.
+A refused activation says which kind of refusal it is: `404` when nothing on that node answers to the id — it never existed there, it was pruned, or its release was replaced and not kept — and `409` when the build is there but cannot be activated, such as one belonging to another component or one whose files changed after it was staged.
 
 :::warning
 **Upgrade every node before staging.** A stage is replicated like any other deploy. A node still running a version before v5.3.0 does not recognize `activate: false`. It performs an ordinary deploy and serves the release immediately.
 
 The origin cannot detect this in advance, so it checks afterward. Any peer that does not confirm staging fails the operation with the node names. Check those nodes before activating. Pass `ignore_replication_errors: true` only if you have accepted that difference.
 :::
+
+#### Going back to a previous release
+
+<VersionBadge version="v5.3.0" />
+
+When a deploy replaces the release that is live, Harper keeps the replaced one under the `deployment_id` that deployed it. Activating that id puts it back, with no rebuild, resolve, or install:
+
+```json
+{
+	"operation": "deploy_component",
+	"project": "my-app",
+	"deployment_id": "<id of the deployment you want back>",
+	"restart": true
+}
+```
+
+[`list_deployments`](#list_deployments) shows each deployment's id. The activation publishes the root config entry published by that deployment, so a `package` release gets its `package` entry back and a `payload` release removes the one a later deploy added. The release it replaces is kept in turn, so you can go forward again the same way.
+
+- **Kept releases count against [`deployment.stagingRetention.maxCount`](../configuration/options.md#deployment)**, with staged builds. The most recently replaced ones are kept.
+- **Each kept release is a full installed copy of the component, `node_modules` included.** At the default of `5`, budget disk for up to five extra copies per component. `0` keeps no replaced release.
+- **A release is kept as it was when it was replaced**, including anything it wrote into its own directory while it was live.
+- **Not every release can be kept.** A release made live before v5.3.0, or deployed from a `file:` directory, is not kept. A release whose dependency links use absolute paths is kept but refused (`409`) when you try to activate it; on Windows, npm writes such links for `file:` and workspace dependencies.
+- **Each node answers for itself.** A node that never had the release, or no longer keeps it, answers `404`. `deploy_component` reports that as a failed peer.
+
+#### Retrying an activation
+
+<VersionBadge version="v5.3.0" />
+
+An activation of the id that is already live on a node succeeds there without a swap. If an activation fails partway — a peer was unreachable, or the component went live on the origin but its root config entry could not be written — retry the same `deployment_id`. During the retry:
+
+- A node that already switched answers success.
+- A node still holding the build switches now.
+- A node that holds neither answers `404`.
+
+The retry also finishes anything the failed attempt left half done on that node, such as writing the root config entry. A node that answers "already live" still restarts if you pass `restart` — every worker, including those of isolated applications, since it cannot tell which ones loaded the previous release. Without `restart`, it marks the component as needing a restart, because it cannot tell whether every worker has loaded that release.
+
+A plain deploy (without `activate: false`) that went live only on the origin leaves the peers nothing to activate. Their retry answers `404`, so deploy the release again instead.
 
 #### Deploy credentials (`credentials`)
 
@@ -977,7 +1039,7 @@ Private git repository (token resolved from an existing secret):
 	"operation": "deploy_component",
 	"project": "my-app",
 	"package": "github:my-org/my-app#semver:v1.2.3",
-	"credentials": [{ "host": "github.com", "secret": "deploy.my-app.git.github_com" }]
+	"credentials": [{ "host": "github.com", "secret": "deploy.my-app.git.github.com" }]
 }
 ```
 
@@ -1003,23 +1065,62 @@ Response:
 {
 	"deployment_id": "a3f8c2d1...",
 	"restartJobId": "b7d41e09...",
-	"message": "Successfully deployed: my-app, restarting Harper"
+	"certification": "certified",
+	"message": "Successfully deployed: my-app, activating it on each other node in turn"
 }
 ```
 
-`restartJobId` is present only for `"restart": "rolling"`, which is the one path that hands the restart to a separate job. An inline `"restart": true` returns the same message without it, and a deploy that does not restart returns `Successfully deployed: my-app`.
+`restartJobId` is present only for `"restart": "rolling"`, which is the one path that hands the restart to a separate job. An inline `"restart": true` returns `Successfully deployed: my-app, restarting Harper` without it, and a deploy that does not restart returns `Successfully deployed: my-app`. `certification` says whether the release was [certified in a canary worker](#certifying-a-release-in-a-canary-worker).
 
 #### Restarting (`restart`)
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-`"restart": true` restarts this node's HTTP worker threads and waits for that restart to finish before responding, so a successful response means every worker thread is serving the newly deployed code. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — before this, a client that treated the immediate response as "the component is live" could be served by a worker that had never loaded it.
+`"restart": true` requests a restart of this node's HTTP workers and waits for it before responding. A redeploy that keeps an application isolated targets only its worker; creating an isolated application or changing isolation also restarts the shared pool. Retrying an activation whose release is already live restarts every worker. After a completed restart, the workers in that scope serve the newly deployed code; a restart failure can still leave a successful deploy response, as described below. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — before this, a client that treated the immediate response as "the component is live" could be served by a worker that had never loaded it.
 
 The wait follows the restart's own progress rather than a fixed timeout, so a wide thread pool, a slow component install, or a worker draining in-flight work does not cut it short. That also means the response can take as long as the install plus the restart — tens of seconds on a slow install with many worker threads — so a caller with a short request timeout should use `"restart": "rolling"` and poll its job instead. If it does give up — the restart stopped reporting progress, ran past the wait's absolute ceiling, or left a worker thread that could not be replaced — the restart continues in the background and the Harper log says which of those happened. A restart that fails does not fail the deploy: the component is already installed and replicated.
 
-`"restart": "rolling"` is unchanged: instead of restarting inline it starts a replicated `restart_service` job and returns its `restartJobId` to poll.
+`"restart": "rolling"` does not restart the other nodes inline: it starts a `restart_service` job and returns its `restartJobId` to poll. Both certify the release in a canary worker before rolling it out; see the next section.
 
-`drop_component` accepts `"restart": true` and waits for the restart the same way (v5.3.0).
+`drop_component` accepts `"restart": true` and waits for the restart the same way (v5.3.0). Dropping a running isolated application stops only that application's worker; dropping an already-absent application can restart the shared workers. On Pro and Fabric it propagates to peers by default unless `replicated` is `false`. Inspect its `replicated` results for peer failures; a successful local response does not establish successful cleanup on every node.
+
+#### Certifying a release in a canary worker
+
+<VersionBadge version="v5.4.0" />
+
+A deploy with `"restart": true` or `"restart": "rolling"` checks its release before rolling it out. The first worker thread started on the new release, the canary, loads every component as any worker does when it starts, but it is held out of traffic until it reports whether the deployed component loaded. It replaces the first worker thread (worker 0), so code a component runs only in that thread is part of what it checks. Until then the workers already running keep serving the release being replaced. The rollout goes on only if the release loaded, and each later replacement is checked the same way before it serves.
+
+A deploy that succeeds, and is not staged, reports how this went as a string in `certification`:
+
+| `certification` | Meaning                                                                                                                                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `certified`     | The canary loaded the release, and the rollout went on.                                                                                                                                                                                                  |
+| `uncertified`   | The rollout went on unchecked: the component ran nothing as it loaded (`loadComponent: dev-only`, an absent `if-installed` component, or safe mode), or no worker was replaced.                                                                          |
+| `unavailable`   | The deploy restarted unchecked: no worker on this node loads the component, its `isolated` setting changed with this deploy, it was already live, or it was deployed from a local directory (`package: file:<dir>`), which is linked rather than copied. |
+| `not-requested` | The deploy did not restart.                                                                                                                                                                                                                              |
+
+A release whose canary throws while loading the component, exits, or does not report within a minute is rejected, and the deploy fails with `400`. The release the deploy replaced, when there is one, is made live again first, as in [going back to a previous release](#going-back-to-a-previous-release), so the workers that never stopped serving it continue to do so. Nothing is replicated to other nodes. The error carries the decision as an object in `certification` instead of a string, with `status` set to `rejected`, or to `interrupted` for a restart that stopped before the canary decided:
+
+```json
+{
+	"error": "my-app was not deployed: release 9b2e... failed to load in its canary worker: my-app.jsResource: ... Deployment a3f8c2d1..., the release it replaced, is live again. No other node received it. Deploy a fix, or activate deployment 9b2e... again once the cause is fixed.",
+	"deployment_id": "9b2e...",
+	"certification": {
+		"status": "rejected",
+		"reason": "my-app.jsResource: ...",
+		"failures": [{ "key": "my-app.jsResource", "name": "ResourceLoadError", "message": "...", "stack": "..." }],
+		"restored": "a3f8c2d1...",
+		"failed_closed": false
+	}
+}
+```
+
+- **A release with nothing to go back to fails closed.** A rejected first deploy, or one whose previous release was not kept, stays on disk, but no worker on that node loads it, including after Harper restarts. `get_status` reports the component as failed and says why. Deploy a fixed release, or once the cause is fixed, activate the same `deployment_id` again with `restart`, which certifies it again.
+- **Nothing else changes the component while its release rolls out.** Another deploy or a `drop_component` of it on that node is refused with `409` until the canary has decided and the rollout that follows has finished.
+- **A restart that stops before the canary decides restores the previous release.** The decision is reported with `status: "interrupted"`. If the process dies first, the next start rejects the undecided release and restores the one it replaced before it loads anything.
+- **It checks what a worker loads when it starts.** The release is on disk before the canary starts. Workers that have not been replaced yet keep running the previous release and do not react to the new files until the rollout ends, but one that first imports one of the component's modules while the canary is held gets the new release's copy of it.
+
+With `"restart": "rolling"`, the node that received the deploy certifies the release itself, the other nodes only stage it, and the job then activates it on each of them in turn with `deployment_id` and `"restart": true`, so every node certifies it with a canary of its own. Each node decides for itself. A node whose canary rejects the release keeps the previous one, or fails closed if it had none. Nothing is rolled back on the others, and the job fails naming each node that did not activate it. The deploy responds once it has started the job, and the record [`get_deployment`](#get_deployment) returns is written only by the node that received the deploy, so it reports `success` while the job is still running and after the job fails. Poll the job's `restartJobId` with [`get_job`](#get_job) to learn whether every node took the release: it ends `COMPLETE`, or `ERROR` with a `message` listing each node's outcome under `activated`. A node running a version before v5.4.0 activates the release without a canary.
 
 #### Deploying without a restart
 
@@ -1037,6 +1138,45 @@ An ordinary redeploy sets nothing: the component's watched files are handled by 
 The flag is evaluated per node. A peer applying the replicated deploy checks its own directory state, since whether the component was already active can differ from node to node.
 
 Until the restart happens, a request to a route of a never-loaded component returns a 404 naming the component and saying a restart may be needed, instead of the generic 404. That fuller message is returned only to an authenticated `super_user`. The difference between the two responses would otherwise report which component directories exist on disk.
+
+#### Checking what each node installed
+
+<VersionBadge version="v5.3.1" />
+
+Each node of a replicated deploy resolves and installs the release itself. So a mutable reference can resolve differently between nodes' installs and leave them running different code: a branch or tag that was updated, a `latest` version published in between, or a dependency range that resolved to a newer version. Harper doesn't prevent this, but it reports it.
+
+A deploy or a stage records an install fingerprint on each node after it installs. An activation by `deployment_id` installs nothing, so it records none: its response has no `install`, its deployment record has no `install_fingerprint`, and its `peer_results` carry no comparison fields. The fingerprint has two parts:
+
+- `source`: what the package resolved to, named the way its resolver already names it. That is `git:<commit>` for a git reference, the commit a branch or tag pointed at; `npm:<name>@<version>` for a registry package, where a tag resolves to one version; or npm's `integrity:<sri>` for a tarball URL, or for a git reference npm packed itself because `install_allow_scripts` is set. A source that can't be identified is `unidentified`. A `payload` deploy has no `source`, because every node extracts the same uploaded bytes. A local `file:` path, a directory or a tarball, is `unidentified`, because each node reads its own copy, so a peer on one compares as unknown rather than matching.
+- `lockfiles`: the SHA-256 of each lockfile at the component's root (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock` or `bun.lockb`), keyed by file name. A lockfile that exists but can't be read is recorded as an object naming the error instead, such as `{"unreadable": "EISDIR"}`, which leaves the comparison unknown unless another field differs.
+
+Every node that recorded a fingerprint returns it as `install` in its `deploy_component` response. The node that received the deploy compares each peer's fingerprint with its own, and when any differ:
+
+- the response's `message` ends with a sentence naming them, such as `Install fingerprints differ from this node's on 1 of 2 peer node(s): node-b (source npm:web@1.5.0, package-lock.json).`;
+- a `warning` event goes to a caller [streaming Server-Sent Events](#streaming-deploy-progress), and the Harper CLI prints it on a directory deploy;
+- each peer's entry in the deployment's `peer_results` carries `install`, the peer's fingerprint; `install_matches`; and `install_differs`, the list of fields that differ. `install_matches` is `false` when anything compared differs. Otherwise it is `null` when a fingerprint is missing or unreadable, or a source could not be identified (as from a peer on an earlier version), and `true` only when everything compared matches.
+
+A difference never fails the deploy or changes the CLI's exit status. A match means the evidence is equal, not that the installed trees are: an `install_command` can install different dependencies and leave the same lockfile, and lockfiles written against different registry mirrors differ even when the code matches. A staged deploy reports at stage time, before you activate it.
+
+#### Streaming deploy progress
+
+<VersionBadge version="v5.1.0" />
+
+A `deploy_component` request that accepts `text/event-stream` gets its progress as Server-Sent Events, ending in the result, instead of one JSON response. Once the stream starts the HTTP status is `200`, so a failure arrives in-band as an `error` event. The Harper CLI requests it for every deploy, except to a target older than v5.1.0.
+
+| Event             | Data                                                                                                                                                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `phase`           | `{ phase, status }`. `phase` is `prepare`, `load`, `replicate`, or `restart`, each sent with `status` `start` and then `done`. A deploy that succeeds ends with `{ "phase": "success", "status": "done" }`, or `"staged"` for `activate: false` |
+| `install`         | `{ manager, stream, line }`: one line of the package manager's output, and whether it came from `stdout` or `stderr`                                                                                                                            |
+| `peer`            | One peer's outcome as it arrives, in the shape of an entry in the record's `peer_results`                                                                                                                                                       |
+| `warning`         | `{ message }`, such as [install fingerprints that differ](#checking-what-each-node-installed)                                                                                                                                                   |
+| `payload_dropped` | `{ payload_size, max_size }`: payload retention dropped the stored tarball, because it is larger than `max_size`                                                                                                                                |
+| `error`           | `{ message, code, phase }`, plus `deployment_id`, and when they apply `install_output`, `failed_peers`, and `certification`. The stream ends after it                                                                                           |
+| `done`            | `{ result }`: the response the deploy would have returned as JSON. The stream ends after it                                                                                                                                                     |
+
+From v5.4.0, the `load` phase brackets the [canary's decision](#certifying-a-release-in-a-canary-worker), so a deploy that does not restart, or whose `certification` is `unavailable`, sends no `load` phase. Before v5.4.0, every deploy sends one.
+
+Every event but `done` is also appended to the deployment's `event_log`, which [`get_deployment`](#get_deployment) replays as a stream. A replayed log can also contain `truncated`, `{ dropped_events }`, where the log reached its 200-entry bound and dropped entries from its middle, keeping the start and the most recent, and a `payload_dropped` carrying `deleted_by` instead of `max_size` when [`delete_deployment_payload`](#delete_deployment_payload) reclaimed the tarball.
 
 ### Environment File Operations
 
@@ -1150,18 +1290,20 @@ Returns an error if the file does not exist. Removing a key that is not present 
 
 Harper records every `deploy_component` call in the `system.hdb_deployment` table, capturing the full lifecycle of a deployment including phase transitions (prepare → load → replicate → restart → success/failed), per-node outcomes, and a bounded event log of install output.
 
+The record is written by the node that received the deploy, and describes that deploy, not what each node is running now. With `"restart": "rolling"` on v5.4.0 and later, it can report `success` once that node has taken the release, before the other nodes have, and keeps reporting it if one of them [rejects the release](#certifying-a-release-in-a-canary-worker). To learn whether every node took it, wait for the deploy's `restartJobId` with [`get_job`](#get_job).
+
 ### `list_deployments`
 
 Returns a list of deployment records, newest first. All filter parameters are optional.
 
-| Parameter | Type   | Description                                                         |
-| --------- | ------ | ------------------------------------------------------------------- |
-| `project` | string | Filter to a specific component project                              |
-| `status`  | string | Filter by status: `pending`, `success`, `failed`, `staged` (v5.3.0) |
-| `since`   | number | Start of time range (Unix timestamp ms)                             |
-| `until`   | number | End of time range (Unix timestamp ms)                               |
-| `limit`   | number | Maximum number of results (default: 100)                            |
-| `offset`  | number | Pagination offset                                                   |
+| Parameter | Type   | Description                                                                  |
+| --------- | ------ | ---------------------------------------------------------------------------- |
+| `project` | string | Filter to a specific component project                                       |
+| `status`  | string | Filter by one status. See `status` under [`get_deployment`](#get_deployment) |
+| `since`   | number | Start of time range (Unix timestamp ms)                                      |
+| `until`   | number | End of time range (Unix timestamp ms)                                        |
+| `limit`   | number | Maximum number of results. Omit to return every matching record              |
+| `offset`  | number | Pagination offset                                                            |
 
 ```json
 {
@@ -1172,11 +1314,17 @@ Returns a list of deployment records, newest first. All filter parameters are op
 }
 ```
 
-Response includes a `deployments` array and a `total` count. The `payload_blob` field is stripped from list responses for size; use `get_deployment_payload` to retrieve the tarball.
+Response includes a `deployments` array and a `total` count. The `payload_blob` field is stripped from list responses for size, and replaced by `payload_blob_present`; use `get_deployment_payload` to retrieve the tarball.
+
+A deploy in progress reads `pending`, or `loading` once its release has started loading, so filtering on `pending` alone misses some deploys in flight. List without `status` and check each record's `completed_at` instead, which is set once the deploy finishes.
+
+The list is the history of deploys as each receiving node recorded them, newest first. It answers what was deployed and when, but the newest `success` for a project is not necessarily the release every node is serving: a rolling deploy's record can say `success` before the other nodes have taken the release, and keeps saying it if one rejects it.
 
 ### `get_deployment`
 
-Returns a single deployment record by `deployment_id`. When called on an in-progress deployment via a request that accepts `text/event-stream`, the response streams live phase events and install output as Server-Sent Events, replaying the buffered event log then tailing until the deployment reaches a terminal status.
+Returns a single deployment record by `deployment_id`. A request that accepts `text/event-stream` gets the record's event log replayed as [Server-Sent Events](#streaming-deploy-progress), followed by a `done` event carrying the record.
+
+The replay is followed by a live tail only when the deploy is still running in the same Harper thread that answers the request. Any other request — one answered by another node, as a load balancer may route it, or by another thread on the same node — replays the log and returns at once, with whatever status the record has then, which may not be terminal. Poll until `completed_at` is set if you need the outcome.
 
 ```json
 {
@@ -1187,23 +1335,27 @@ Returns a single deployment record by `deployment_id`. When called on an in-prog
 
 The deployment record includes:
 
-| Field                | Description                                                             |
-| -------------------- | ----------------------------------------------------------------------- |
-| `deployment_id`      | Unique identifier (content hash)                                        |
-| `project`            | Component project name                                                  |
-| `package_identifier` | Package reference or `payload` for tar uploads                          |
-| `status`             | `pending`, `success`, `failed`, `staged` (v5.3.0), or `rolled_back`     |
-| `phase`              | Current lifecycle phase: `prepare`, `load`, `replicate`, `restart`      |
-| `event_log`          | Bounded log of install output and phase transitions (up to 200 entries) |
-| `peer_results`       | Per-node outcome map for replicated deployments                         |
-| `payload_hash`       | SHA-256 hash of the deployment tarball                                  |
-| `payload_size`       | Byte size of the deployment tarball                                     |
-| `started_at`         | Timestamp when deployment began                                         |
-| `completed_at`       | Timestamp when deployment finished                                      |
-| `user`               | User who initiated the deployment                                       |
-| `activated_from`     | (v5.3.0) On an activation, the id of the staged deployment it made live |
-| `rollback_of`        | `deployment_id` of the deployment this rolls back, if applicable        |
-| `error`              | Error message for failed deployments                                    |
+| Field                  | Description                                                                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deployment_id`        | Unique identifier, a random UUID assigned to each deploy. `payload_hash` is the content hash                                                                                                                                                                                                                      |
+| `project`              | Component project name                                                                                                                                                                                                                                                                                            |
+| `package_identifier`   | Package reference or `payload` for tar uploads                                                                                                                                                                                                                                                                    |
+| `status`               | In progress: `pending`, or `loading` once the release has started loading. The record is not rewritten during the replicate and restart phases, so it keeps that status until the deploy finishes. Finished: `success`, `failed`, or `staged` (v5.3.0). A stage whose peers fail stays `staged`, with `error` set |
+| `phase`                | The last lifecycle phase reached: `pending` before the first, then `prepare`, `load`, `replicate`, `restart`, and finally `success` or `staged`; a failed deploy keeps the phase it failed in                                                                                                                     |
+| `event_log`            | Bounded log of install output and phase transitions (up to 200 entries)                                                                                                                                                                                                                                           |
+| `peer_results`         | Per-node outcomes for replicated deployments, one entry per peer; from v5.3.1, on a deploy or a stage, each peer also carries `install`, `install_matches` and `install_differs` (see [Checking what each node installed](#checking-what-each-node-installed))                                                    |
+| `payload_hash`         | SHA-256 hash of the deployment tarball                                                                                                                                                                                                                                                                            |
+| `payload_size`         | Byte size of the deployment tarball                                                                                                                                                                                                                                                                               |
+| `payload_blob_present` | Whether the tarball is still stored. `false` once payload retention or `delete_deployment_payload` has reclaimed it                                                                                                                                                                                               |
+| `install_fingerprint`  | (v5.3.1) On a deploy or a stage, this node's install fingerprint: its `source` and `lockfiles`                                                                                                                                                                                                                    |
+| `started_at`           | Timestamp when deployment began                                                                                                                                                                                                                                                                                   |
+| `completed_at`         | Timestamp when deployment finished                                                                                                                                                                                                                                                                                |
+| `user`                 | User who initiated the deployment                                                                                                                                                                                                                                                                                 |
+| `origin_node`          | Host name of the node that received the deploy and wrote this record                                                                                                                                                                                                                                              |
+| `restart_mode`         | `immediate` for `"restart": true`, `rolling` for `"restart": "rolling"`, or `null` for a deploy that did not restart                                                                                                                                                                                              |
+| `credentials`          | The deploy's `credentials`, in reference form (`secret` names, never a token), or `null`                                                                                                                                                                                                                          |
+| `activated_from`       | (v5.3.0) On an activation, the id of the deployment it made live: a staged build, or a release a later deploy replaced. [Going back to a previous release](#going-back-to-a-previous-release) writes a new `success` record with this set                                                                         |
+| `error`                | For a deploy that failed, or a stage whose peers failed: an object with `message`, `code`, and `phase`, the phase it failed in                                                                                                                                                                                    |
 
 ### `get_deployment_payload`
 
@@ -1241,11 +1393,11 @@ Response:
 }
 ```
 
-The deployment must be in a terminal status (`success`, `failed`, or `rolled_back`); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). A `payload_dropped` entry recording the deleting user is appended to the deployment's `event_log`.
+The deployment must be in a terminal status (`success`, `failed`, or `staged`); deleting the payload of an in-progress deployment fails with `409`, since its payload may still be replicating to peers. Deleting an already-reclaimed payload succeeds with `freed_bytes: 0` (the operation is idempotent). A `payload_dropped` entry recording the deleting user is appended to the deployment's `event_log`.
 
 ### `add_ssh_key`
 
-Adds an SSH key (must be ed25519) for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
+Adds an SSH key for authenticating deployments from private repositories. Supply the private key with `key`, or omit it and pass `generate: true` to have Harper mint the keypair itself.
 
 `list_ssh_keys` and the logs never return key material.
 
@@ -1268,6 +1420,54 @@ Adding an existing key:
 	"hostname": "github.com"
 }
 ```
+
+#### What `key`, `host` and `hostname` must be
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+A key ssh can't use would otherwise go unnoticed until ssh loads it for a git deploy, where it fails as a generic authentication error. So `add_ssh_key` and `update_ssh_key` check a supplied key first, and refuse one ssh couldn't use with a `400` that names the problem.
+
+`key` must be an unencrypted **Ed25519**, **ECDSA** (P-256, P-384 or P-521) or **RSA** (at least 1024 bits) private key, in one of the formats ssh reads:
+
+- **OpenSSH** (`-----BEGIN OPENSSH PRIVATE KEY-----`, what `ssh-keygen` writes by default), with nothing before the `BEGIN` line
+- **PEM**: PKCS#1 (`RSA PRIVATE KEY`), SEC1 (`EC PRIVATE KEY`) or PKCS#8 (`PRIVATE KEY`)
+
+These are refused:
+
+- a public key — the `.pub` file, or a public key exported as PEM or RFC 4716 — in place of the private one
+- a PuTTY key (`.ppk`); export it from PuTTYgen with **Conversions → Export OpenSSH key**
+- a passphrase-protected key: Harper runs git without a terminal, so ssh has nowhere to ask for the passphrase
+- a DSA key, which OpenSSH 10 no longer supports
+- a FIDO security key (`sk-ssh-ed25519@openssh.com`, `sk-ecdsa-sha2-nistp256@openssh.com`), which signs only with its hardware authenticator attached
+- any other algorithm or curve ssh doesn't support, or an SSH certificate in place of a plain key
+- a key that is cut off, has lines missing or repeated, or is otherwise damaged — including one whose private half doesn't match its public half, which ssh may load but can never authenticate with
+
+Harper stores the key the way ssh needs it: each line trimmed, blank lines dropped, and a final newline added. An indented or CRLF paste therefore works. A value already sealed as `enc:v1:` for this cluster (for example one copied from another node's `get_ssh_key` in the same cluster) is stored as-is, since checking it would mean decrypting it. It must still be a well-formed envelope, and a node with secret custody refuses one sealed for another cluster's key.
+
+`host` and `hostname` are written into the ssh config that every key on the node shares, so a value that would break it is refused: any whitespace or control character, such as a space, tab or line break (`Host my key` matches two aliases, and `HostName my key` stops ssh for every key), a quote, an `=`, or a leading `#`. A leading `-` or any backslash is refused too, since no real host has either, and so is a pattern (`*`, `?`, `!`) in `host`, whose block would also apply to other keys' aliases. In `hostname`, a `%` must be `%h` (replaced by the alias) or `%%` (a literal `%`), the only expansions ssh makes there, so an IPv6 zone needs the doubled form: `fe80::1%%en0`. Surrounding whitespace is trimmed.
+
+#### The key's block in the ssh config
+
+<VersionBadge type="changed" version="v5.3.0" />
+
+Harper writes each key's settings to `<rootPath>/ssh/config`, in a block that starts and ends with lines Harper owns:
+
+```
+#my-key
+# BEGIN harper ssh key my-key
+Host my-key.github.com
+	HostName github.com
+	User git
+	IdentityFile <rootPath>/ssh/my-key.key
+	IdentitiesOnly yes
+# END harper ssh key my-key
+```
+
+`get_ssh_key`, `list_ssh_keys` and `delete_ssh_key` read and change only the lines from `#<name>` through `# END harper ssh key <name>`, so you can add your own sections and settings anywhere outside them. `delete_ssh_key` removes exactly those lines, including anything you put between them, and leaves every other line of the file as it was. ssh_config has no end-of-section marker, so ssh still reads a line placed just after a key's `END` line as part of that key's `Host` section. Put your own settings under a `Host` or `Match` line of your own.
+
+A config written by an earlier version gets these lines when the node starts, without changing what ssh resolves for any host. Only blocks whose `IdentityFile` is exactly `<rootPath>/ssh/<name>.key` get them, so a section of your own under a comment that looks like a key's name stays yours.
+
+If a key's `BEGIN` line has no matching `END` line, where its block ends is unknown. `delete_ssh_key` then refuses that key with a `400` naming the line, until the `END` line is restored or the block is removed by hand. Other keys are unaffected.
 
 #### Server-side key generation (`generate`)
 
@@ -1553,9 +1753,19 @@ Restarts a specific service. `service` must be one of: `http`, `http_workers`, `
 { "operation": "restart_service", "service": "http_workers" }
 ```
 
+#### `scope`
+
+<VersionBadge version="v5.3.0" />
+
+Set `scope` to an [isolated application's name](../components/applications.md#isolated-applications) to restart only its worker. A name that identifies neither an isolated root-config entry nor a running isolated worker is refused with `400`.
+
+```json
+{ "operation": "restart_service", "service": "http", "scope": "shop-preview" }
+```
+
 ### `system_information`
 
-Returns system metrics including CPU, memory, disk, network, and Harper process info. Optionally filter by `attributes` array (e.g., `["cpu", "memory", "replication"]`).
+Returns system metrics including CPU, memory, disk, network, and Harper process info. Optionally filter by `attributes` array (e.g., `["cpu", "memory", "replication"]`). With `attributes: ["threads"]`, the response includes a `threads` array of workers. Each entry has a `threadId`; a dedicated isolated worker also has `application: "<name>"`. These describe the node that answers, not its peers.
 
 ```json
 { "operation": "system_information" }
@@ -1609,7 +1819,7 @@ Anyone who can call `agent_prompt` can direct whatever the agent does. Understan
 
 - `agent.user` (default: a `super_user` bootstrap identity) governs only the **operations** tools. Setting it to a restricted user narrows those, and nothing else.
 - The agent's other tools — scoped filesystem access, outbound `http_fetch`, followup scheduling, and the V8 inspector — run at the Harper process's own privilege, whatever `agent.user` is. (The inspector tools additionally need `threads.debug`, and fail with an explanatory error without it.)
-- `http_fetch` blocks only the known cloud-metadata hostnames and the IPv4 link-local range `169.254.0.0/16`, and it checks the literal hostname you pass — a name that resolves to a blocked address is not caught, and redirects are followed without re-checking. Every other host, including anything private or internal the server can route to, is reachable. Reading is ungated too: `read_file` covers the log and configuration directories as well as the component tree, so an enabled agent puts a read path and an egress path in the same toolset. Treat it as an outbound network client and apply egress policy to the host.
+- By default, `http_fetch` blocks only cloud-metadata hosts and the IPv4 link-local range `169.254.0.0/16`, and it checks host names, not resolved addresses: a name that resolves to a blocked address is not caught. Since v5.3.2, it also checks every redirect hop before following it. Every other host, including anything private or internal the server can route to, is reachable. Reading is ungated too: `read_file` covers the log and configuration directories as well as the component tree, so an enabled agent puts a read path and an egress path in the same toolset. Unless the agent needs the network, set [`agent.httpFetch`](../configuration/options.md#restricting-http_fetch) to `false` to remove the tool, or to an allow-list of the hosts it needs. Otherwise, treat it as an outbound network client and apply egress policy to the host.
 - With the default `agent.allowDestructive: false`, destructive tools (including filesystem writes) are removed from the toolset entirely. Turning it on admits component writes, and component code is executed by the Harper process — a write is effectively code execution at process privilege.
 - Leave `agent.autoApprove` off so any destructive call that is admitted still pauses for [approval](#approve_agent_action). The gate covers only the tools marked destructive — filesystem writes, the inspector's code-evaluation tools, and the operations on MCP's [curated destructive set](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). `http_fetch` and followup scheduling are not gated, so an outbound POST and a self-rescheduling run proceed without an approval prompt.
 - That set is an explicit list in core rather than a prefix match, and it is not a list of every damaging operation, so `allowDestructive` and `autoApprove` are not a boundary by themselves. The component operations are the ones to know about: `drop_component` and `deploy_component` are both off the set, so opting either into [`mcp.operations.allow`](../mcp/configuration.md#mcpoperationsallow) puts it in the agent's toolset where `allowDestructive: false` does not remove it and no approval gates it — and `deploy_component` writes code the Harper process then executes. Vet anything you add to that allow list on its own merits rather than assuming these two settings cover it.
@@ -1744,7 +1954,7 @@ One gap is worth knowing: changing `allowDestructive` with [`set_agent_config`](
 
 ### `set_agent_config`
 
-Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent).
+Updates agent settings and returns the resulting configuration. Accepts any of `enabled`, `provider`, `model`, `maxTurns`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend`; keys not supplied are left unchanged. Each field is described under [`agent`](../configuration/options.md#agent). A request that includes `httpFetch` is rejected with a 400 and nothing in it is applied: the [`http_fetch` policy](../configuration/options.md#restricting-http_fetch) is read at startup only.
 
 ```json
 { "operation": "set_agent_config", "autoApprove": false, "maxTurns": 20 }
@@ -1849,11 +2059,15 @@ Detailed documentation: [Database Jobs](../database/jobs.md)
 
 ### `get_job`
 
-Returns job status (`COMPLETE`, `IN_PROGRESS`, `ERROR`), timing, and result message for the specified job ID. Bulk import/export operations return a job ID on initiation.
+Returns job status (`COMPLETE`, `IN_PROGRESS`, `ERROR`), timing, and result message for the specified job ID. Bulk import/export operations return a job ID on initiation, as does a `deploy_component` with `"restart": "rolling"`, as `restartJobId`.
 
 ```json
 { "operation": "get_job", "id": "4a982782-929a-4507-8794-26dae1132def" }
 ```
+
+A job is recorded only on the node that ran it, because `system.hdb_job` is not replicated, so `get_job` answers only there; any other node returns an empty array. For a `deploy_component` with `"restart": "rolling"`, that is the node that received the deploy.
+
+Any role may call `get_job`, unless the role has an `operations` allowlist, or the caller's token an `operations` scope, that does not list it. Either one refuses every operation it doesn't name, so a deploy-only role that waits for its rolling deploys must list `get_job`.
 
 ### `search_jobs_by_start_date`
 
