@@ -152,7 +152,7 @@ Allowlisting `child_process` still yields Harper's constrained substitute under 
 
 <VersionBadge version="v5.4.0" />
 
-Harper can run on a Node.js build with V8 pointer compression enabled (built with `--experimental-enable-pointer-compression`, so that `process.config.variables.v8_enable_pointer_compression` is `1`), which uses less JavaScript heap per thread. Pointer compression changes V8's C++ ABI without changing Node.js's module version. A native addon (`.node` file) that calls V8's C++ API directly, rather than Node-API, and was built for a standard Node.js therefore loads and then crashes the whole process the first time it is used.
+Harper can run on a Node.js build with V8 pointer compression enabled (built with `--experimental-enable-pointer-compression`, so that `process.config.variables.v8_enable_pointer_compression` is `1`), which uses less JavaScript heap per thread. Free and Hobby tier clusters on Harper Fabric use pointer-compression runtimes by default. Pointer compression changes V8's C++ ABI without changing Node.js's module version. A native addon (`.node` file) that calls V8's C++ API directly, rather than Node-API, and was built for a standard Node.js therefore loads and then crashes the whole process the first time it is used.
 
 On a pointer-compression runtime, Harper checks native addons before they load, in every thread. That covers addons loaded by applications, by their dependencies, and by [`threads.preload` and `threads.preloadRequire`](../configuration/options.md#threads) modules. Harper refuses an addon that links V8's C++ API unless it was built for pointer compression. A 64-bit ELF addon whose symbol table cannot be read is refused too, unless one of the last two rules below admits it.
 
