@@ -254,6 +254,12 @@ See [`deploy_component` credentials](../operations-api/operations.md#deploy-cred
 harper deploy setup=true provider=github-actions project=my-app
 ```
 
+The workflow file defaults to `.github/workflows/deploy.yaml`, the name create-harper projects use. If yours has another name, such as `deploy.yml`, pass it with `workflow=`. Otherwise the policy pins `deploy.yaml`, and the runs of your workflow can't match it:
+
+```bash
+harper deploy setup=true provider=github-actions project=my-app workflow=.github/workflows/deploy.yml
+```
+
 It needs no secret custody, and it does this:
 
 1. Takes the GitHub repository from the checkout's `origin` remote, or `repo=<owner>/<name>`, and looks it up with the `gh` CLI or GitHub's public API, for its numeric id and for the spelling of its name GitHub uses in the token. When neither answers, such as for a private repository without `gh`, pass the id as `repository_id=<id>` and spell `repo=` as GitHub does; setup says the spelling was not verified.
