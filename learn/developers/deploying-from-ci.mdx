@@ -50,6 +50,18 @@ A second constraint pushes the same direction: a git-reference deploy authentica
 
 A GitHub Actions job that declares `id-token: write` can ask GitHub for an identity token that says which repository, workflow, and environment it is running for. The Harper CLI trades that token for a one-hour operation token, if it matches a **trust policy** you stored on the cluster. Nothing durable lives in your CI provider, and there is no 30-day refresh token to rotate. See [Workload identity (OIDC)](/reference/v5/cli/authentication#workload-identity-oidc) for how the CLI does this, and [`add_oidc_trust`](/reference/v5/operations-api/operations#add_oidc_trust) for every rule a policy can carry.
 
+**Nothing in the workflow names the policy.** Once it exists, every `harper` command in the deploy job — `harper deploy`, `harper get_job`, anything else — authenticates through it by itself, and may do what the policy's user's role allows, as long as the job has `id-token: write`, `HARPER_CLI_TARGET` is the policy's `audience`, the run matches the policy's claims, and no other credential is configured. [Using it in a workflow](/reference/v5/cli/authentication#using-it-in-a-workflow) lists those conditions.
+
+:::tip
+
+From v5.4.0, for a workflow that deploys when changes merge to a branch, [`harper deploy setup=true
+provider=github-actions`](/reference/v5/cli/commands#github-actions-deploys-oidc) creates a role, a user and a policy
+pinned to that branch, and sets the `HARPER_CLI_TARGET` variable, in one command. Its role allows `deploy_component`,
+`get_job` and `registration_info` only, not the `get_deployment` the role below adds. This guide's workflows deploy on
+version tags, which a branch pin cannot match, so they use the policy below, written by hand.
+
+:::
+
 You set this up once, from your own machine, logged in as a `super_user`:
 
 ```bash
@@ -61,13 +73,14 @@ harper login https://my-cluster.example.com:9925
 The user a trust policy names is the privilege boundary: a matching run gets that user's role. A pipeline does not need `super_user`. Give it a role that lists only the operations the workflows below call:
 
 ```bash
-harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment"]}'
+harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment","registration_info"]}'
 harper add_user username=ci-deploy role=ci_deploy active=true password="$(openssl rand -base64 32)"
 ```
 
 - **`deploy_component`** is the deploy itself.
 - **`get_job`** is what the wait step polls. The jobs table lists `get_job` as open to any role, but an `operations` allowlist refuses every operation it doesn't list, so without it the wait step fails with `403`.
 - **`get_deployment`** reads the deployment record.
+- **`registration_info`** returns only Harper's version, which `harper deploy` checks before it uploads. Without it the deploy still works, but the cluster logs a refused operation on every run.
 
 `restart_service` is not needed: the rolling restart's job is started by Harper itself, not by the caller. The password is required to create the user, but a GitHub Actions pipeline never uses it, since it authenticates through the trust policy, so this command discards it. [Other CI systems](#other-ci-systems) shows how to set one you keep.
 
