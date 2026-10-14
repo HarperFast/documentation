@@ -6,16 +6,16 @@ sidebar_position: 6
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-[Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx) gets an immutable artifact onto your cluster from a pipeline. This guide is about what happens around that call: how to limit who sees a change, what evidence justifies expanding it, and how to reverse it when the evidence says stop.
+[Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx) covers installing a release from a pipeline. This guide covers limiting its initial traffic, deciding when to expand the rollout, and reversing it if checks fail.
 
-Harper makes reversal unusually cheap, because your application is a component deployed from an immutable reference, so rolling back is deploying the previous reference. There is no image to rebuild and no instance to replace. That only helps if the previous reference is still addressable and someone has done it before under calm conditions, which is what makes rollback a designed capability rather than a hope.
+To roll back component code, redeploy the previous immutable reference. Keep that reference addressable and rehearse the procedure before launch.
 
 ## What You Will Learn
 
 - How to separate build, deploy, activate, and expose into four decisions with four different control points
 - The change loop, and what counts as evidence at each step
 - Five rollout patterns and the Harper operations behind each
-- What `"restart": true` and `"restart": "rolling"` actually do, which is not what most people assume
+- How `"restart": true` and `"restart": "rolling"` differ, and how to verify completion
 - How to classify a change so you reverse the right thing, and why reversing the wrong thing can cause data loss
 
 ## Prerequisites
@@ -27,7 +27,7 @@ Harper makes reversal unusually cheap, because your application is a component d
 
 ## Separate four decisions
 
-Most bad deployments come from collapsing these into one action.
+Decide separately what to build, where to install it, which behavior to enable, and who receives it.
 
 | Decision     | The question                              | Harper control point                                                                            |
 | ------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -36,31 +36,44 @@ Most bad deployments come from collapsing these into one action.
 | **Activate** | Which code path is actually enabled?      | `urlPath` and `host` mounting, component configuration, a feature flag, a header or tenant rule |
 | **Expose**   | Which production traffic reaches it?      | Traffic layer weights, the availability flag, cohort or geography targeting                     |
 
-Once these are separate you get options that do not exist otherwise. You can install an artifact on every node and activate it nowhere. You can activate a route and expose it only to internal traffic. And when something is wrong you can reverse exposure in seconds without touching what is installed, which is the fastest containment action available to you.
+For example, validate a route with internal traffic before exposing it publicly. If errors rise, reduce traffic to the release or disable its feature flag while you investigate.
 
 :::danger
-**`replicated` is opt-out, not opt-in.** A `deploy_component` call with no `replicated` field replicates to every peer. So does `add_component`, `drop_component`, `set_component_file`, `set_env_value`, `delete_env_value`, and the destructive `drop_database` and `drop_table`. Only `"replicated": false` changes anything; `"replicated": true` is the default spelled out.
-
-This is the opposite of what most operators assume, and it is why the single-node validation pattern below has to say `false` explicitly. If you intend to touch one node, you must say so. ([`set_configuration`](/reference/v5/configuration/operations) is the deliberate exception: it replicates only when you ask.)
+**Component deployment replicates by default.** Pass `"replicated": false` when validating on one node. Other management operations also replicate by default; check the operation's reference before using it during an isolated rollout. [`set_configuration`](/reference/v5/configuration/operations) requires an explicit `"replicated": true`.
 :::
 
 `urlPath` mounts a component at an HTTP path and `host` serves it on a virtual hostname. Routing by either has been available since v5.1.0. What arrived in v5.2.0 is declaring that routing on the application's entry in the root `harper-config.yaml`, and the matching `host` parameter on `deploy_component`. Declared that way, the routing is persisted deployment state rather than a runtime toggle. See [HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
 
 ## The change loop
 
-1. **Preflight.** Confirm the target version, the component inventory from `get_components`, `cluster_status` convergence, peer capacity with one node held out, backup posture if data is at risk, and that the previous known-good artifact is still addressable.
+```mermaid
+flowchart TD
+    Preflight --> Limit[Limit initial traffic]
+    Limit --> Observe
+    Observe --> Decide{Decide}
+    Decide -->|Advance| Expand[Expand traffic]
+    Expand -->|More stages| Observe
+    Expand -->|Rollout complete| Close[Verify and close]
+    Decide -->|Hold| Hold[Keep current exposure]
+    Hold --> Observe
+    Decide -->|Reverse| Reverse[Restore prior release or traffic]
+    Reverse --> Verify[Verify recovery]
+    Verify --> Close
+```
 
-2. **Limit.** Choose the smallest cohort that produces useful evidence. One drained node, an internal cohort, a low-risk geography, a tenant set, or a small weighted slice. Smaller is better right up until the sample is too small to distinguish signal from noise.
+1. **Preflight.** Confirm the target version, component inventory, replication convergence, peer capacity with one node held out, and backups if data is at risk. Check that the prior artifact is still addressable. Name the decision owner and set stop thresholds before starting.
 
-3. **Observe.** Compare the new and old versions on the same metrics: request success, latency at your SLO percentile, worker saturation, logs and traces, data correctness, replication behavior, and downstream errors. Comparison against the other cohort is the point. Absolute numbers on the new version tell you much less.
+2. **Limit.** Start with one drained node, an internal group, selected tenants, a region, or a small traffic percentage. Choose enough requests to make the comparison meaningful.
 
-4. **Decide.** Advance, hold, stop, or roll back, against thresholds declared before you started, with a named owner. Missing telemetry is a failed gate, not a pass.
+3. **Observe.** Compare old and new versions on request success, SLO latency, worker saturation, data correctness, replication, and downstream errors. Use logs and traces to investigate differences.
+
+4. **Decide.** Advance, hold, stop, or roll back against the agreed thresholds. Hold if required telemetry is missing.
 
 5. **Expand.** Increase exposure only after minimum sample and hold conditions pass, and keep enough healthy capacity in the old version to reverse.
 
 6. **Close.** Verify uniform artifact and configuration across nodes, restore intended traffic, record the actual outcome, and keep the evidence with the change record.
 
-Declaring thresholds in step 4 before step 2 is the part that gets skipped and the part that matters. A threshold invented while looking at a live graph is not a threshold, it is a negotiation, and it always resolves toward shipping.
+Record each decision and the measurements that supported it.
 
 ## Five rollout patterns
 
@@ -102,7 +115,27 @@ Drain the node first, deploy, run your readiness route and journey synthetic aga
 }
 ```
 
-Same immutable reference, now cluster-wide. The deploy itself is finished when the call returns, so the thing still outstanding is the restart: poll the returned `restartJobId` with [`get_job`](/reference/v5/operations-api/operations#get_job). Read [`get_deployment`](/reference/v5/operations-api/operations#get_deployment) for the per-peer detail the response summarizes away, including which peers received the artifact and which failed.
+On Harper Pro 5.2.15, this returns a `deployment_id` for the deployment record and a separate `restartJobId` for the rolling restart. Read each from the actual response:
+
+```json
+{
+	"operation": "get_job",
+	"id": "<restartJobId from the deploy response>"
+}
+```
+
+Poll the node that received the deployment. `get_job` returns an array; wait for its job's `status` to be `COMPLETE`, and stop on `ERROR`. An empty array means the job was not found on that node. Retry a failed request if the node is restarting.
+
+Use the other identifier to read the deployment details:
+
+```json
+{
+	"operation": "get_deployment",
+	"deployment_id": "<deployment_id from the deploy response>"
+}
+```
+
+On 5.2, check its `status` and `peer_results` for install and replication failures, then confirm the serving version directly on every node. Later releases change how the rolling job applies the release; use the version-specific [CI wait procedure](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository) with your installed version.
 
   </TabItem>
 </Tabs>
@@ -115,17 +148,17 @@ A pinned registry version such as `@my-org/orders-api@2.4.1` is the best-travell
 
 ## What restart actually does
 
-This is worth reading carefully, because the naming invites a wrong assumption.
+On Harper 5.2, the two modes behave as follows:
 
 **`"restart": true`** starts a restart of the HTTP worker threads on the node handling the call and returns immediately, without waiting for it. A `200` means the deploy succeeded and a restart has been requested. It does not mean the new code is serving yet. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections during the changeover.
 
-**`"restart": "rolling"`** does not restart inline either, but it is observable. It starts a replicated `restart_service` job and returns a `restartJobId` you can poll with [`get_job`](/reference/v5/operations-api/operations#get_job). That job walks the cluster **one node at a time**, waiting for each node to come back before starting the next, so the cluster keeps serving throughout.
+**`"restart": "rolling"`** starts a replicated `restart_service` job. Poll its `restartJobId` with [`get_job`](/reference/v5/operations-api/operations#get_job). It sequences node restarts, but your peers still need enough capacity and your traffic-admission checks must pass.
 
 :::warning
-**On a cluster, prefer `"rolling"`.** `"restart": true` is forwarded verbatim to every peer, so every node restarts independently as it finishes applying the deploy. Nothing sequences them and nothing waits, so the restarts are free to overlap. You get no rolling coordination and no guarantee that any node is still serving, which makes this a cluster-wide availability risk rather than a node-local one. Reserve `"restart": true` for a single-node or development instance, and use `"rolling"` anywhere you care about staying up. See [Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx).
+**Use `"rolling"` for cluster rollouts.** With `"restart": true`, each node restarts independently as it applies the replicated deployment. Those restarts can overlap and reduce serving capacity. Use `"restart": true` for the drained single-node validation above, or for a development instance.
 :::
 
-Two more consequences for your pipeline. Neither restart mode reports completion in the deploy response, so if you need to know the new code is live, poll the rolling restart job or probe the nodes themselves. And a failed restart does not fail the deploy: the component is installed and replicated either way, so your pipeline needs to check both outcomes separately rather than assuming one implies the other.
+Wait for the rolling job and verify the serving version on each node. A successful deployment record alone does not establish that every worker is running the release.
 
 ### Waiting for the restart
 
@@ -133,16 +166,16 @@ Two more consequences for your pipeline. Neither restart mode reports completion
 
 From v5.3.0, `"restart": true` waits for the worker restart to finish before responding, rather than returning as soon as it has been requested. The wait follows the restart's own progress rather than a fixed timeout, so the call can take tens of seconds on a slow install with many worker threads, with a hard ceiling of ten minutes.
 
-Two things do not change, and both matter more than the wait itself. A caller that gives up early does not stop the restart, it only loses the result. And the response still does not carry the restart's outcome: a restart that stalls, times out, or leaves workers on the old code is reported in the node's log, not to you. So even on v5.3.0, treat a `200` as "the deploy landed and a restart ran," and confirm the version actually serving through your readiness route or journey synthetic rather than through the deploy response.
+A caller timeout does not stop the restart. On v5.3, the deploy response does not report restart success; check the logs for restart failures and verify the serving version through readiness or a journey test. For later versions, check the [restart and certification behavior](/reference/v5/operations-api/operations#restarting-restart) before choosing pipeline checks.
 
-Two parameters worth setting deliberately on replicated deploys:
+Set these parameters to match your payload size, network, and failure policy:
 
 - `deployment_timeout` (Added in: v5.1.4) is how long a peer waits for the replicated payload before failing, defaulting to 120000 ms. Raise it for large components or slow links.
 - `ignore_replication_errors` (Added in: v5.1.4) treats a peer that fails to receive the deploy as non-fatal. By default a failed peer makes the whole operation return a non-2xx status, while the component is still deployed on the origin node. Decide which behavior you want before you need it, because the default leaves you in a mixed-version state with a failed response, and that is a confusing thing to reason about mid-incident.
 
 ## Configuration changes are deployments too
 
-A configuration change carries the same risk as a code change and gets less ceremony, which is backwards.
+Apply the same review, rollout, and rollback checks to configuration changes.
 
 `set_configuration` supports `"replicated": true` (Added in: v5.2.0) to apply a change across the cluster in one call, with per-node outcomes in the response. To finish the change cluster-wide, follow with `restart_service` using `"replicated": true`, which restarts nodes one at a time.
 
@@ -158,7 +191,7 @@ A configuration change carries the same risk as a code change and gets less cere
 Only replicate cluster-appropriate parameters. Node-local values such as ports, `node.hostname`, file paths, TLS material, and `replication.hostname`, `url`, or `routes` would overwrite every peer's own values. Replicating one of these is a cluster-wide outage delivered in a single API call.
 :::
 
-Two more things to hold onto. A change takes effect only after a restart, so a node that has been reconfigured and not restarted is running the old configuration while reporting the new one. And `get_status` reports a `restartRequired` flag, but it tracks component and code restarts rather than configuration changes, so it will not tell you a configuration change is still pending. Track pending configuration in your change record instead, and read back `get_configuration` after the restart to confirm.
+Configuration changes take effect after restart. `get_status.restartRequired` tracks component and code restarts, so it does not identify pending `set_configuration` changes. Record those changes yourself, restart the affected nodes, and read back `get_configuration` to confirm the intended values.
 
 ## Rollback is a designed capability
 
@@ -193,7 +226,7 @@ Rehearse a stopped rollout end to end on a non-production cluster:
 4. Reverse it, and time from decision to restored traffic. That number is your release RTO, and it belongs in your reliability plan.
 5. Verify uniform state afterwards: `get_components` on every node, and `list_deployments` showing the reversal.
 
-The step people fail is 5. A partially reversed cluster looks fine on a dashboard because the healthy majority dominates the average.
+Check every node after rollback; a cluster average can hide nodes still running the failed release.
 
 ## Operational notes
 

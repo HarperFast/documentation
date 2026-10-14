@@ -6,9 +6,9 @@ sidebar_position: 5
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-A dashboard is useful when it lets an operator place a symptom. Users are seeing errors: is it the edge, the traffic layer, one node, the replication path, a downstream dependency, or the change someone shipped twenty minutes ago? A dashboard that shows CPU across the cluster cannot answer that, which is why it gets ignored during incidents.
+Monitor the parts of the service you can investigate or change: the public route, individual Harper nodes, replication, downstream dependencies, and recent deployments.
 
-This guide builds monitoring around the boundaries you can actually act on, names the specific Harper metrics worth alerting on, and gives you a triage sequence short enough to run under pressure.
+This guide identifies useful signals at each boundary and gives you a procedure for narrowing an incident.
 
 ## What You Will Learn
 
@@ -39,31 +39,30 @@ This guide builds monitoring around the boundaries you can actually act on, name
 | Change             | Component and config version, cohort, operator, start and end, outcome                     | `list_deployments`, `get_deployment`, `get_components`, `get_configuration` read-back     |
 | Recovery           | Backup age, job state, verification result, last restore drill                             | `list_backups`, `verify_backup`, `get_job`                                                |
 
-The Change row is the one teams leave out and the one that resolves incidents fastest. Most production symptoms correlate with something a human did, so being able to overlay deployments onto a latency graph is worth more than another resource metric.
+Show deployments and configuration changes alongside request errors and latency. Their timing helps you identify whether a release affected one node, one version, or the whole cluster.
 
 ## The signals worth an alert
 
 Harper records a large standard metric set automatically. Most of it belongs on a dashboard. This much belongs on a pager:
 
-| Alert on                               | Metric or source                                                   | Why this one                                                                             |
-| -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Journey success rate below SLO         | `success`, by resource path and method                             | The only signal that maps directly to user impact                                        |
-| Journey latency at your SLO percentile | `duration`, by resource path and method                            | Alert on the percentile in your SLO, never on the mean                                   |
-| Worker saturation                      | `utilization`, per worker thread                                   | Percentage of time the worker was processing requests. This is your real headroom signal |
-| Event loop backpressure                | `main-thread-utilization`, the `taskQueueLatency` attribute        | Rises before throughput drops, so it is an early warning rather than a postmortem input  |
-| Replication convergence lag            | `replication-latency`, or the receive-time gap in `cluster_status` | A node serving stale data looks healthy on every other signal                            |
-| Write commit time                      | `transaction-commit-time` <VersionBadge version="v5.2.0" />        | Storage-level degradation shows here before it shows in request latency                  |
-| Write queue depth growing              | `write-transaction-queue-depth` <VersionBadge version="v5.2.0" />  | A growing queue means the node is accepting work faster than it can commit it            |
-| Storage headroom                       | `storage-volume` free, and `database-size`                         | Disk exhaustion is an outage with no graceful degradation                                |
-| Missing peer                           | `cluster_status`                                                   | Covered in [Operating Replication](./operating-replication.mdx)                          |
-| Backup age exceeding RPO               | `list_backups`                                                     | The failure you will not notice until you need it                                        |
+| Alert on                               | Metric or source                                                  | Why this one                                                                             |
+| -------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Journey success rate below SLO         | `success`, by resource path and method                            | The only signal that maps directly to user impact                                        |
+| Journey latency at your SLO percentile | `duration`, by resource path and method                           | Alert on the percentile in your SLO, never on the mean                                   |
+| Worker saturation                      | `utilization`, per worker thread                                  | Percentage of time the worker was processing requests. This is your real headroom signal |
+| Event loop backpressure                | `main-thread-utilization`, the `taskQueueLatency` attribute       | Rises before throughput drops, so it is an early warning rather than a postmortem input  |
+| Replication convergence lag            | `replication-latency`, source timeline, and sentinel checks       | Connection health alone does not establish that a node's data is current                 |
+| Write commit time                      | `transaction-commit-time` <VersionBadge version="v5.2.0" />       | Storage-level degradation shows here before it shows in request latency                  |
+| Write queue depth growing              | `write-transaction-queue-depth` <VersionBadge version="v5.2.0" /> | A growing queue means the node is accepting work faster than it can commit it            |
+| Storage headroom                       | `storage-volume` free, and `database-size`                        | Disk exhaustion is an outage with no graceful degradation                                |
+| Missing peer                           | `cluster_status`                                                  | Covered in [Operating Replication](./operating-replication.mdx)                          |
+| Verified recovery point older than RPO | Backup manifest and destination/restore validation records        | A successful job alone does not establish that the copy can restore service              |
 
-Two notes on how to set these. Alert on the percentile that appears in your SLO, because a mean latency graph will look fine through an incident that is failing your slowest ten percent of users. And set saturation thresholds from the per-node capacity work in [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) rather than from a generic number, since the point where latency leaves your SLO is specific to your application and your data.
+Alert on the latency percentile in your SLO. Set saturation thresholds from your measurements in [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx), where you determine the load at which latency becomes unacceptable.
 
 ## Get the metrics out
 
-Harper stores analytics locally in `hdb_raw_analytics` and aggregates them into `hdb_analytics`. You can query those directly, but for a real monitoring setup
-export them.
+Harper stores raw analytics in `hdb_raw_analytics` and aggregates them into `hdb_analytics`. Query these tables or export metrics to your monitoring system.
 
 <Tabs>
   <TabItem value="fabric" label="Fabric">
@@ -126,9 +125,9 @@ threads:
 
 `threads.preload` (Added in: v5.2.0) loads a module via Node's `--import`, which is how an agent installs the loader hooks that let it instrument modules imported later. `threads.preloadRequire` (Added in: v5.2.0) uses `--require`, which runs the module body and is typically how an agent's initialization entry actually starts it. Both are documented under [threads configuration](/reference/v5/configuration/options#threads).
 
-Installing loader hooks and starting the agent are two different jobs, and which of your agent's entry points does which is specific to that agent. Some ship one entry that does both; others split them, in which case set both keys. The example above is the split-entry case, and it is the one that produces the most confusing failure: with only the hooks loaded, a tracer will hand out spans with plausible trace ids that are no-ops and export nothing, so your instrumentation looks installed and your collector stays empty.
+Agent entry points vary: some install loader hooks and start the agent together; others need separate `preload` and `preloadRequire` entries. Loading hooks without starting the agent can produce no-op spans and no exports.
 
-Two constraints worth knowing before you plan around this. Both keys apply to worker threads only, and neither works under Bun. And bare specifiers resolve against the `node_modules` of your installed components, so an agent can ship as a dependency of a deployed component rather than as a host-level install.
+Both keys apply only to worker threads and require Node.js. Bare specifiers resolve against installed components' `node_modules`, so the agent can be a component dependency.
 
 Whatever agent you use, follow its own worker-thread documentation, and finish by confirming spans actually arrive at your collector rather than assuming the configuration took.
 
@@ -166,7 +165,7 @@ Harper's logger is built on Node's `Console`, so this renders as a formatted tex
 That is fine for reading during an incident, but a log pipeline cannot key on `component` or `outcome` without parsing the line. If you need queryable fields, serialize the context yourself and log a single JSON string.
 :::
 
-Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The default is `warn`, and `notify` is always logged regardless of level. Choose levels deliberately: a production log at `debug` is a log nobody can read, and one at `error` only has the incidents in it and none of the context.
+Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The default is `warn`, and `notify` is always logged. Choose a level that retains useful incident context without producing excessive volume.
 
 `console.log` output does not reach the log files unless `logging.console` is enabled, so unstructured console output is not a production record. Centralize logs off the node, because the node you most need logs from is the one you are about to restart.
 
@@ -182,7 +181,7 @@ Read logs through the API when you need them from a specific node:
 
 ## The five-minute triage sequence
 
-Run these in order. The goal is not diagnosis, it is narrowing.
+Use these checks to locate the affected layer, then contain the failure before investigating its cause.
 
 1. **Confirm and bound the impact.** What journey, starting exactly when, in which geography or cohort, and which component version is live. Without a start time you cannot correlate anything.
 
@@ -201,19 +200,19 @@ Run these in order. The goal is not diagnosis, it is narrowing.
 
    Differences between peers are more informative than absolute values, because they tell you whether this is one node or the whole cluster.
 
-5. **Check the replication path.** `cluster_status` for the databases this journey needs. Look for a missing peer, `connected: false`, or a widening gap between `lastReceivedRemoteTime` and `lastReceivedLocalTime`, which means stale reads.
+5. **Check replication.** Inspect the expected peer/database sockets in `cluster_status`, sustained latency, and `lastCommitConfirmed` progress while writes continue. Compare `lastReceivedRemoteTime` with the expected source timeline and verify freshness with a sentinel or journey test. Timestamp differences alone do not prove convergence.
 
 6. **Correlate with the last change.** `list_deployments` for what shipped and when, and `get_configuration` read back against what you believe is configured. Remember that a configuration change applied without a restart leaves a node running something other than its stated configuration.
 
 7. **Contain with the smallest reversible action.** Stop a ramp, drain one node, deactivate a feature, restore prior traffic weights, or isolate suspected data. Record the decision, who made it, and the next decision deadline.
 
-Two rules make this sequence work. Silence is a failed gate: if telemetry is missing for the thing you are checking, treat that as a negative signal rather than skipping the step. And containment comes before root cause. You can diagnose after users are being served again.
+If required telemetry is missing, investigate the gap before declaring the service healthy. Record containment actions so the next operator can see what changed.
 
 ### Prove it
 
 Pick a fault and inject it on a non-production cluster, then time yourself. Good candidates: saturate one node's workers, block the replication port on one peer, make a downstream dependency return errors, or deploy a component that fails on one route.
 
-Measure three things. How long until an alert fired. How long until an operator following the sequence above could name the layer. And whether any step gave a misleading answer, which is the most valuable output of the drill, because a misleading signal during a real incident costs more than a missing one.
+Record time to alert, time to identify the affected layer, and any misleading or missing signals. Update the procedure before repeating the drill.
 
 ## Operational notes
 
@@ -229,7 +228,7 @@ Measure three things. How long until an alert fired. How long until an operator 
 - [ ] Alerts on journey success and latency at the SLO percentile, not the mean
 - [ ] Alerts on worker `utilization` and `taskQueueLatency`, thresholds derived from measured per-node capacity
 - [ ] Alerts on replication convergence lag and missing peers
-- [ ] Alerts on storage headroom and backup age
+- [ ] Alerts on storage headroom and the newest fully verified recovery point's age
 - [ ] Metrics exported off the node, via Grafana on Fabric or the Prometheus exporter self-managed
 - [ ] If you run an APM agent, both `threads.preload` and `threads.preloadRequire` set as that agent requires, with spans confirmed at the collector
 - [ ] `analytics.replicate` setting known and deliberate

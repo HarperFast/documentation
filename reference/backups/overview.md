@@ -20,7 +20,7 @@ Managed backups use the RocksDB backup engine. Each backup is a directory under 
 
 Every managed backup includes the database's transaction log — so a restored database keeps its `read_audit_log` history as of the backup point — and, for a database with file-backed blobs, a snapshot of those blobs (skip it with `exclude_blobs`).
 
-Only the RocksDB data files are shared and incremental. The transaction log and the blob snapshot are each copied in full on every backup, so with a large audit-retention window or many blobs, frequent backups cost more than the data-only view suggests.
+Each backup copies the transaction-log snapshot. Blob snapshots use hard links when supported on the same filesystem, and copy the files otherwise. Measure physical repository growth over successive backups, including the log copies and blob snapshots. Exports that do not preserve file sharing require space for the full materialized copies.
 
 The long-running operations (`create_backup`, `verify_backup`, `restore_backup`) run as background [jobs](../operations-api/operations.md#jobs) when invoked through a running server: the operation returns a `job_id` immediately, and [`get_job`](../operations-api/operations.md#get_job) reports the outcome.
 
@@ -34,7 +34,7 @@ The offline path matters for restore. RocksDB is single-writer, so an in-place r
 
 - **Managed backups require the RocksDB storage engine.** For LMDB databases, use [`get_backup`](./operations.md#get_backup) or [volume snapshots](../cli/commands.md#how-backups-work).
 - **Whole-database granularity.** There is no per-table backup or restore. (The one exception: `get_backup` on an LMDB database can stream individual tables, and includes the audit store only with `include_audit`.)
-- **One storage root per database.** A database whose tables use per-table `path` storage configs spans multiple root stores and cannot be backed up with these operations.
+- **One storage root per database.** Backup is rejected if the database's tables resolve to multiple storage roots. A custom database-level `storage.path`, or per-table paths that still resolve to a single root, are supported.
 - **Backups live on the node that created them.** The backup repository is a local directory. RocksDB shares files across backup IDs (a backup ID is not a self-contained folder), so disaster-recovery copies must take the entire per-database repository — `<backupPath>/<database>` — not an individual backup, and must do so while no backup operation is running, or from an atomic filesystem snapshot. A live recursive copy can race `create_backup`/`delete_backup`/`purge_backups` and produce an unrestorable copy. Alternatively, use `get_backup` to pull a snapshot from a running server.
 - **`get_backup` always streams the current state.** It cannot download a historical managed backup; to move a retained backup off-host, copy its whole per-database repository as above.
 - **A restore is a point-in-time rollback.** In a replicated cluster, coordinate a restore with replication before bringing the node back.
@@ -63,7 +63,7 @@ Create a managed backup of the `data` database (the default):
 harper create_backup database=data
 ```
 
-The first backup copies the entire database; each one after that only copies the RocksDB data files that changed, so re-backing-up the data is cheap. (The transaction-log snapshot, and the blob snapshot for databases with file-backed blobs, are copied in full each time — see [how managed backups work](#how-managed-backups-work).) Schedule `create_backup` as often as your recovery point requires, and manage retention with `purge_backups`:
+Later backups share unchanged RocksDB data files, while transaction-log copies and blob snapshots have their own storage cost; see [how managed backups work](#how-managed-backups-work). Schedule `create_backup` as often as your recovery point requires, and manage retention with `purge_backups`:
 
 ```bash
 harper purge_backups database=data keep_count=7

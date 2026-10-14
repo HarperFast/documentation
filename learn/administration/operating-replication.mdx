@@ -6,9 +6,9 @@ sidebar_position: 4
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Replication is how a Harper cluster stays available: peers exchange data directly over WebSockets, there is no primary, and a node that falls behind catches up on its own. The [replication reference](/reference/v5/replication/overview) covers how to configure that. This guide covers the part that only matters once real users depend on it, which is how to tell whether replication is actually working.
+Harper peers exchange data over WebSockets and catch up after interruptions. This guide explains how to monitor replication and verify convergence in production. For configuration, see the [replication reference](/reference/v5/replication/overview).
 
-The distinction that runs through this guide is between a connection and convergence. A connected socket proves two nodes can talk. It does not prove the data a user is about to read is current. Those are different claims, and only one of them is what your traffic admission decision depends on.
+A connected socket proves that peers can communicate. Before admitting user traffic, also verify that the data needed by the application has arrived.
 
 ## What You Will Learn
 
@@ -49,7 +49,7 @@ All tables in a replicated database replicate unless the table opts out. So the 
   <TabItem value="curl" label="curl">
 
 ```bash
-curl -s -X POST https://my-node.example.com:9925/ \
+curl -s -X POST https://operations.my-node.example.com/ \
   -H 'Content-Type: application/json' \
   -u 'admin:password' \
   -d '{"operation":"cluster_status"}'
@@ -59,7 +59,7 @@ curl -s -X POST https://my-node.example.com:9925/ \
   <TabItem value="fetch" label="fetch">
 
 ```javascript
-await fetch('https://my-node.example.com:9925/', {
+await fetch('https://operations.my-node.example.com/', {
 	method: 'POST',
 	headers: {
 		'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ await fetch('https://my-node.example.com:9925/', {
 There is one socket per database per peer, so the sockets present in the response are the ground truth about what is flowing. Run this from every node, not one. Replication direction can be constrained per route, so node A's view of the cluster is not necessarily node B's view, and a one-sided picture is how directional configuration mistakes survive into production.
 
 :::warning
-Whether the `system` database is in your replication scope is the highest-stakes scoping question in a Harper cluster, because `system` holds `hdb_user`, `hdb_role`, and `hdb_nodes`. **It is in scope by default**, since the default replication scope is every database, so unless someone has narrowed it your users and roles already propagate and every node that receives `system` must be trusted with its contents, including encrypted secret rows. That is usually what you want, but it should be a decision rather than a surprise. Confirm your own answer from `cluster_status` and your configuration, and read [replicating the system database with controlled flow](/reference/v5/replication/overview#replicating-the-system-database-with-controlled-flow) before changing it.
+**`system` replicates by default.** It contains users, roles, and encrypted secret rows, so trust every node that receives it with those contents. Confirm the scope in your configuration and live connections before changing it. See [controlled system replication](/reference/v5/replication/overview#replicating-the-system-database-with-controlled-flow) for directional routes and table exclusions.
 :::
 
 ## What moves automatically, and what does not
@@ -92,17 +92,15 @@ Whether the `system` database is in your replication scope is the highest-stakes
 | Node registry (`hdb_nodes`) | Lives in `system`, so it propagates with it. Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes, and see below if you need the registry kept per cluster |
 | Destructive schema changes  | `drop_database` and `drop_table` replicate by default; `drop_attribute` does not                                                                        | A drop is a cluster-wide event unless you pass `"replicated": false`. Verify the result on every node                                                                  |
 
-The three rows most likely to bite you are the returning node, the new node, and the node registry.
-
-On the returning node: it is common to see a routine restart budgeted as though it were a full resynchronization, which makes teams avoid restarts they should be comfortable with. A node whose databases have never synced does download them in full. A node that was briefly offline catches up on what it missed. Measure both on your own data volume once, and use the right number for the right situation.
+Measure incremental catch-up and full synchronization separately. A briefly offline node can catch up from retained transaction history. If its required history has been pruned, a full copy may be needed even though the node has synchronized before.
 
 On the new node, the cost is larger than "one copy from one peer," because the full-copy decision is made per peer and per database rather than once against a bootstrap source. A joining node requests a full copy from every peer it has no resume cursor for. And because replication is bidirectional, each established peer independently decides it has no cursor for the newcomer and requests a full copy _from_ it as well. Joining a cluster of N peers is therefore N inbound transfers plus N outbound transfers of the new node's own (empty) databases, not a single stream from one source.
 
-The practical consequences are worth planning around. Load lands on every existing peer at once rather than on one, so a join during peak traffic is a capacity event for the whole cluster. If you want a single designated source instead, `add_node` accepts `isLeader: true`, which tells the joining node to request its full copy from that peer alone.
+A node join can load every existing peer, so include it in cluster capacity planning. To use one full-copy source, pass `isLeader: true` to `add_node`.
 
-On the registry: a node's advertised record is derived from its configuration file, and it replicates. That means a topology constraint you applied imperatively is superseded the next time that node restarts or reloads components, and the node quietly goes back to advertising itself more broadly than you intended.
+Each node derives its advertised `hdb_nodes` record from its configuration. A restart or component reload can replace constraints applied only through `add_node`; keep durable constraints in config routes.
 
-That propagation is what makes gossip discovery work, and since v5.2 the record each node advertises is directional, derived from its own routes, so replicating `system` no longer collapses a constrained topology into a full mesh. If you need the registry itself kept per cluster rather than shared, that is a deliberate per-route setting: `excludeTables: ['hdb_nodes']` on a route's `sendsTo` or `receivesFrom` entry stops those rows crossing that link while users, roles, and schema still propagate. Its main use is a migration bridge between clusters that should share identity but keep separate topology.
+Registry rows can replicate with `system`. Since v5.2, advertised records describe directional routes, so that exchange can preserve a constrained topology. To keep registries separate across a migration bridge, explicitly exclude `hdb_nodes` on the relevant routes while allowing users and roles through. See [controlled system replication](/reference/v5/replication/overview#replicating-the-system-database-with-controlled-flow).
 
 :::danger
 When replicating configuration, only send cluster-appropriate parameters. Replicating a node-local value such as a port, `node.hostname`, a file path, TLS material, or `replication.hostname`, `url`, or `routes` overwrites every peer's own local value. To apply a cluster-wide change safely, use `set_configuration` with `"replicated": true` for the parameter, then `restart_service` with `"replicated": true`, which restarts nodes one at a time.
@@ -144,9 +142,14 @@ What each field is telling you:
 - **`lastReceivedRemoteTime`** is the source node's timestamp on the newest transaction you have received.
 - **`lastReceivedLocalTime`** is your own clock when you received it.
 
-The last two are the pair that matters. **A widening gap between `lastReceivedRemoteTime` and `lastReceivedLocalTime` means this node is behind and working through a backlog.** That is the signal to alert on for convergence, and it is the one that tells you a returning node is not ready for traffic yet. `sendingMessage` appears while a transaction is actively being sent and is absent when the socket is idle, so its absence is not a fault.
+Check connection state and sustained latency alongside commit progress during writes. Compare `lastReceivedRemoteTime` with the source's expected write timeline, then use a sentinel or journey test to verify freshness. `sendingMessage` appears only while a transaction is being sent; its absence on an idle socket is normal.
 
-Two things will mislead you if you automate on that pair without knowing them. The gap only means "behind" while transactions are actually arriving: on an idle source both stamps freeze, and the gap sits at whatever constant it last reached rather than signalling lag. And because the two stamps come from two different clocks, skew between peers is added to the gap directly, so calibrate your threshold against a healthy baseline rather than treating the raw number as replication delay.
+The receive-time gap can help diagnose delay, with two cautions:
+
+- **It describes received transactions.** On an idle or stalled connection, the timestamps stop moving. Their difference does not measure how far the receiver is behind the latest source write.
+- **It includes clock skew.** The timestamps come from different nodes. Compare against a healthy baseline with synchronized clocks.
+
+Use these fields as supporting evidence, rather than as the sole admission check.
 
 :::tip
 While a database is taking a full copy, these timing fields render as the literal string `"Copying"` rather than a date. Anything that parses them as timestamps will fail on a joining node, which is exactly the node you most want to be watching. Handle that value explicitly.
@@ -159,7 +162,7 @@ Inventory `system.hdb_nodes` alongside this and compare it to your intended topo
 - A peer missing entirely from `connections`, or `connected: false` on a database that serves a critical journey
 - Sustained growth in `latency`, judged against your own baseline
 - `lastCommitConfirmed` not advancing on a peer while writes are occurring
-- A `lastReceivedRemoteTime` to `lastReceivedLocalTime` gap exceeding your admission budget, evaluated only while writes are flowing
+- Received transaction progress falling behind the expected source timeline, confirmed by a stale sentinel or journey result
 - Repeated reconnects, which are visible in the logs even when a point-in-time status check looks healthy
 - Version or configuration drift between peers
 
@@ -175,7 +178,7 @@ await tables.OpsProbe.put(marker.id, marker);
 
 ```bash
 # On the target node: read it back and compare writtenAt
-curl -s https://server-2.example.net:9926/OpsProbe/convergence-probe \
+curl -s https://server-2.example.net/OpsProbe/convergence-probe \
   -u 'admin:password'
 ```
 
@@ -183,13 +186,13 @@ The interval between the write and the moment the peer returns the new value is 
 
 The `replication-latency` metric from [analytics](/reference/v5/analytics/overview#replication-metrics) gives you the continuous version of the same measurement: the difference between the source commit timestamp and local time, reported per node, database, and table. Use the sentinel for a definitive answer during a change, and the metric for a dashboard.
 
-Note that `replication-latency` is not recorded for the `system` database. Since `system` is in replication scope by default and carries your users and roles, a dashboard built only on this metric will show nothing for the database that propagates identity. Use the sentinel, or the `cluster_status` receive-time pair, if you need to watch `system` convergence.
+`replication-latency` is not recorded for `system`. Check its peer sockets and commit progress, then verify that expected identity changes have reached each node. Use a dedicated sentinel if your runbook needs a repeatable test of `system` convergence.
 
 ## Consistency belongs in the application design
 
 Replication makes data available on every peer. It does not make every peer agree at every instant, and a distributed decision made on a node that has not yet converged can observe stale state and act on it.
 
-This is not a Harper limitation to work around, it is the property that lets any node serve any request without a coordinator. But it means a specific class of operation is unsafe if you write it as a plain read followed by a write:
+Concurrent read-then-write operations on different nodes need additional coordination when correctness requires a single decision:
 
 - Claim-once actions: redeeming a code, assigning a unique handle, awarding a one-per-customer offer
 - Hard floors: inventory that must not go negative, a balance that must not overdraw
@@ -225,7 +228,7 @@ On a non-production cluster under write load:
 - [ ] Tables requiring one transaction boundary confirmed to be in one database
 - [ ] Durable topology constraints live in `harper-config.yaml` routes, not only in `add_node` calls
 - [ ] Measured convergence time recorded under load, per critical database
-- [ ] Alerts configured on missing peers, sustained latency growth, stalled `lastCommitConfirmed`, and the remote-to-local receive gap
+- [ ] Alerts configured on missing peers, sustained latency growth, stalled commit progress during writes, and stale sentinel values
 - [ ] Non-commutative operations identified and given an owner, a serialization point, or an external coordinator
 - [ ] Replication certificate expiry dates tracked with an alert
 - [ ] Replication interruption and recovery exercise completed and dated

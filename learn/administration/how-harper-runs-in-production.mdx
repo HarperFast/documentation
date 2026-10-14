@@ -6,7 +6,7 @@ sidebar_position: 1
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You have built and deployed an application, and now real users are going to depend on it. Operating Harper is not the same as operating separate application and database tiers. In Harper, one process holds your component code, the HTTP stack, the local database, and the replication client. That "collapsed stack" architecture reduces several problems you may be used to solving.
+Harper runs your application code, HTTP server, local database, and replication client on the same node. To operate it in production, you need to know how much traffic each node can handle, which data it serves, and how to move traffic when it needs maintenance.
 
 This guide covers what a single Harper node actually contains, and how to understand your deployment before you design anything around it.
 
@@ -27,42 +27,42 @@ This guide covers what a single Harper node actually contains, and how to unders
 
 A Harper node is a single process running your components, an HTTP server, a local storage engine, and peer replication. There is no network hop between your application code and the data it reads, no separate cache tier to keep coherent, and no connection pool to tune between tiers.
 
-There are three main default ports:
+Record the ports used by your deployment:
 
-| Port   | Serves                                                                      | Who should reach it               |
-| ------ | --------------------------------------------------------------------------- | --------------------------------- |
-| `9926` | Application traffic: REST, WebSocket, MQTT-over-WebSocket, component routes | Your traffic layer and your users |
-| `9925` | The [Operations API](/reference/v5/operations-api/overview)                 | Operators and your pipeline only  |
-| `9933` | Secure peer [replication](/reference/v5/replication/overview)               | Other nodes in the cluster only   |
+| Port                               | Serves                                                                      | Who should reach it               |
+| ---------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
+| `9926`                             | Application traffic: REST, WebSocket, MQTT-over-WebSocket, component routes | Your traffic layer and your users |
+| `9925`                             | The [Operations API](/reference/v5/operations-api/overview)                 | Operators and your pipeline only  |
+| Configured secure replication port | Secure peer [replication](/reference/v5/replication/overview)               | Other nodes in the cluster only   |
 
-These are the default values. Confirm the live values using the [`get_configuration`](/reference/v5/operations-api/operations#get_configuration) operation.
+`9925` and `9926` are the default HTTP ports. HTTPS uses `operationsApi.network.securePort` and `http.securePort`, or a TLS-terminating proxy. Use the node's configured URL in the examples throughout this track.
 
-Resolve the replication port rather than assuming it. `9933` is the default a fresh Harper Pro install writes into `harper-config.yaml`, but it is a configured value, not a constant. When no `replication` block is present at all, the secure replication port falls back to the Operations API secure port instead, so it lands on `9925`. That is not a hypothetical: an in-place upgrade carries the previous configuration forward and does not backfill a `replication` block, so an upgraded node with no such block replicates on a different port than a freshly installed one.
+Resolve the effective replication port from `replication.securePort`, falling back to `operationsApi.network.securePort` when it is unset. An upgrade retains the existing configuration, so do not assume that a newly installed node and an upgraded one use the same port.
 
-Read back `http.port`, `operationsApi.network.port`, and the `replication` block. Record what you find. Later guides in this track assume you know these numbers for your own deployment.
+Read the configuration from each node and record its HTTP, HTTPS, and replication ports:
 
-{/* TODO: Insert Tabs example of the get_configuration operation request with JSON parsing. CURL piped to jq and fetch with basic json access + console.log */}
+```json
+{ "operation": "get_configuration" }
+```
 
 :::tip
-Keep `9925` off any public route as the Operations API is for administrative purpsoes such as deploying components, reading logs, and managing configurations. See [security overview](/reference/v5/security/overview).
+Restrict the Operations API to operators and deployment automation. It can deploy components, read logs, and manage configuration. See [security overview](/reference/v5/security/overview).
 :::
 
 ## A node is the unit of both failure and scale
 
-Since the single node is simultaneously the runtime, the database, and the application, they all scale and fail together too. This goes beyond the literal asyncronous execution model of Harper (more information at [TODO](TODO)). If a node fails for any reason, that entire node goes down; not just one part.
+Losing a node removes both its request-handling capacity and access to its local data. Plan for the remaining nodes to serve the application while it is unavailable.
 
-This model is quite different from what separated system architectures are used to. As a result, one must think about their Harper deployment differently.
+Keeping application code and data together removes some of the work associated with separate tiers:
 
 - No network latency on data access, and no tail latency from a saturated connection pool between tiers
 - No cache invalidation problem between an application cache and a database of record (because they are the same thing)
-- No partial-outage state where the application tier is healthy and the data tier is not
-- One capacity number to measure and one thing to size
+- No separate application-to-database connection to monitor
+- Application and data access measured together in your capacity tests
 
-When you lose a node, you lose a whole slice of your service, not one layer of it. This is why the first real design decision in [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) is not your peak throughput. Instead, it is how many nodes you are willing to lose at once, and whether the survivors can carry the load.
+Choose how many simultaneous node failures your service must tolerate, then check whether the survivors can carry peak traffic. [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) walks through that calculation.
 
-Scale works similarly. Adding capacity means adding a node that habdles both requests and data, so a scaling event is also a data movement event (as replication needs to be setup appropriately). Because of this, scaling a Harper system up takes slightly more time overall compared to scaling separted service architectures.
-
-All in all, whenever you think about your Harper application, think about it as one holistic unit. You don't have to worry about individually scaling API layer versus database nodes. Harper executes, fails, and scales all together.
+Adding a node also moves data. Allow time for the databases it serves to synchronize before sending it user traffic.
 
 ## Three differences that change your runbook
 
@@ -70,13 +70,13 @@ All in all, whenever you think about your Harper application, think about it as 
 
 A Harper process will answer a TCP connection and return an HTTP response before it is a good place to send a user request. A new or replacement node has to synchronize the databases it serves before its answers are correct. A returning node has to catch up on transactions it missed.
 
-So liveness and admission are two different decisions, and a load balancer health check that only proves liveness will route users to a node that is technically running and functionally wrong. This is the whole subject of [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx), and it is the single most common gap in a first production deployment.
+Keep a starting node out of traffic until its data and application checks pass. [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx) describes the checks and the return sequence.
 
 ### Replication is peer-to-peer and scoped, so verify your own scope
 
 Harper peers exchange data over WebSockets with mTLS on the secure replication port and discover each other through configured routes. There is no primary. Data mutations and transactions replicate; some things do not, and the scope is configurable per database and per table.
 
-The important operating habit is not memorizing a default. It is checking what your cluster actually replicates, because the answer depends on your configuration, your version, and whether anyone has scoped it since:
+Read the live replication state on each node:
 
 ```json
 {
@@ -90,17 +90,19 @@ The response lists each peer connection and, within it, one socket per database 
 
 Your application ships as a component, deployed with [`deploy_component`](/reference/v5/operations-api/operations#deploy_component) from an immutable reference. Rolling back means deploying the previous immutable reference. There is no image to rebuild, no instance to replace, and no cluster to rebuild to undo a bad release.
 
-That makes reversal fast enough to be a real option under pressure, which in turn makes it worth designing for deliberately rather than improvising. It also means code rollback, configuration rollback, and data recovery are three separate actions with three different blast radii, and conflating them during an incident is how a bad release becomes a data loss event. See [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
+Immutable component references make code rollback repeatable. Configuration rollback and data recovery need separate procedures because they change different parts of the service. See [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
 
 ## Inventory your service boundary
 
-Everything else in this track builds on knowing what you have. Run these four operations against each node and write down the answers.
+Collect the following information from each node and keep it with your runbooks.
+
+The examples use `https://operations.my-node.example.com/` for a configured Operations API endpoint. Replace it with the node's own Operations API URL; a default local installation uses `http://localhost:9925/`.
 
 <Tabs>
   <TabItem value="curl" label="curl">
 
 ```bash
-curl -s -X POST https://my-node.example.com:9925/ \
+curl -s -X POST https://operations.my-node.example.com/ \
   -H 'Content-Type: application/json' \
   -u 'admin:password' \
   -d '{"operation":"system_information","attributes":["system","cpu","memory","disk","threads"]}'
@@ -110,7 +112,7 @@ curl -s -X POST https://my-node.example.com:9925/ \
   <TabItem value="fetch" label="fetch">
 
 ```javascript
-await fetch('https://my-node.example.com:9925/', {
+await fetch('https://operations.my-node.example.com/', {
 	method: 'POST',
 	headers: {
 		'Content-Type': 'application/json',
@@ -150,11 +152,11 @@ Fill in a boundary record you can keep:
 | Critical journeys       | The user-facing paths that must work, named           |
 | Downstream dependencies | Anything Harper calls that can fail independently     |
 
-The last two rows are the ones people skip and the ones that matter most. A healthy Harper process cannot compensate for a failed downstream dependency or for application logic returning wrong answers, so an operating model that only watches Harper will miss the incidents your users actually notice.
+Include application journeys and downstream dependencies in your monitoring. Node health alone will not reveal incorrect responses or failures in services the application calls.
 
 ### Prove it
 
-Before moving on, confirm the picture is real rather than assumed. On a non-production cluster, stop one node and watch what happens to the others: whether peers keep serving, how long the remaining nodes take to show the change in `cluster_status`, and what your traffic layer does about it. You are not measuring anything precisely yet. You are checking that the boundary you wrote down matches the system you have.
+On a non-production cluster, stop one node. Confirm that peers keep serving, note when `cluster_status` shows the change, and check whether the traffic layer stops routing to the node. Compare the result with your inventory and topology plan.
 
 ## Operational notes
 

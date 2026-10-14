@@ -3,19 +3,19 @@ title: Production Readiness Checklist
 sidebar_position: 9
 ---
 
-This is the aggregated launch gate for the whole Administration track. Every item appears in one of the earlier guides, which is where the reasoning lives. This page exists so you have one thing to work down before a launch, and one thing to hand to a reviewer who asks how you operate Harper.
+Use this checklist to review a service before launch. It brings together the checks from the Administration guides, with links to the procedures and explanations.
 
-Copy it into your own runbook and adapt it. It is a starting point for your gate, not a substitute for having one.
+Copy it into your runbook and adapt it to your deployment.
 
 ## How to use this
 
-Each item is a claim about your deployment. A claim counts when there is evidence: a measured number with a date, a written procedure, a configured alert, or a completed drill. "We know about that" is not evidence, and neither is a passing intention.
+Complete each item with evidence: a dated measurement, a written procedure, a configured alert, or a completed drill.
 
-Some items will not apply to you, and that is fine. Mark them not applicable with a reason rather than deleting them, so a reviewer can see the decision was made rather than missed.
+Mark items that do not apply with a reason, so the reviewer can see which decisions were deliberate.
 
-Three things are worth deciding before you start:
+Before you start, agree on:
 
-- **Who signs off.** A gate with no named approver is a document, not a gate.
+- **Who signs off.** Name the person responsible for accepting the evidence.
 - **What "outstanding" means.** Some items can be accepted as gaps with an owner and a date. Decide in advance which ones cannot.
 - **When you run it again.** This is not a one-time launch artifact. Re-run it after a Harper version upgrade, a topology change, or significant data growth, since most of the measured numbers expire.
 
@@ -52,7 +52,7 @@ From [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx).
 From [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
 
 - [ ] Liveness, availability flag, application readiness, and journey synthetic all exist as separate signals
-- [ ] `@harperdb/status-check` deployed, declared in the root `harper-config.yaml` rather than by hand
+- [ ] Fabric's existing status component retained, or `@harperdb/status-check` configured for a self-managed cluster
 - [ ] Traffic layer health check points at `GET /status` on the application port
 - [ ] Availability flag storage still declares `replicate: false`, if you forked the component or persist it yourself
 - [ ] Readiness route scoped to one journey's dependencies, with a timeout on every downstream call
@@ -71,7 +71,7 @@ From [Operating Replication](./operating-replication.mdx).
 - [ ] Tables that must commit together confirmed to be in one database
 - [ ] Durable topology constraints live in `harper-config.yaml` routes, not only in `add_node` calls
 - [ ] Measured convergence time recorded under load, per critical database
-- [ ] Alerts on missing peers, sustained latency growth, stalled `lastCommitConfirmed`, and the receive-time gap
+- [ ] Alerts on missing peers, sustained latency growth, stalled commit progress during writes, and stale sentinel values
 - [ ] Non-commutative operations identified and given an owner, a serialization point, or an external coordinator
 - [ ] Replication certificate expiry tracked with an alert
 - [ ] Replication interruption and recovery exercise completed and dated
@@ -86,7 +86,7 @@ From [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
 - [ ] Cohort ladder defined, from smallest useful sample to full exposure
 - [ ] Stop thresholds and hold times declared before a rollout begins
 - [ ] Named decision owner for advance, hold, stop, and roll back
-- [ ] Pipeline polls the deployment record and the restart job separately
+- [ ] Pipeline checks deployment details and waits for the restart job, then verifies the serving version on every node
 - [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
 - [ ] Configuration changes go through the same change record as code
 - [ ] `get_configuration` read back after every configuration change
@@ -103,7 +103,7 @@ From [Monitoring and Triage](./monitoring-and-triage.mdx).
 - [ ] Alerts on journey success and latency at the SLO percentile, not the mean
 - [ ] Alerts on worker utilization and task queue latency, with thresholds derived from measured capacity
 - [ ] Alerts on replication convergence lag
-- [ ] Alerts on storage headroom and backup age
+- [ ] Alerts on storage headroom and the age of the newest fully verified recovery point
 - [ ] Metrics exported off the node
 - [ ] `analytics.replicate` setting known and deliberate
 - [ ] Structured logs include component, version, node, request id, operation, duration, and outcome
@@ -119,18 +119,25 @@ From [Backup and Recovery](./backup-and-recovery.mdx).
 - [ ] Failure classes enumerated, each with the mechanism that addresses it
 - [ ] Recovery point and recovery time stated per database
 - [ ] Mechanism chosen per database according to its storage engine
-- [ ] No database in scope uses per-table storage paths, or the exclusion is known and accepted
+- [ ] No database in scope has tables spanning multiple storage roots, or the exclusion is known and accepted
 - [ ] Backup cadence matches the stated recovery point
-- [ ] Backup volume sized against the full cost, including the non-incremental transaction-log and blob snapshots
-- [ ] Off-host copy exists in a destination that does not share a failure domain
+- [ ] Repository capacity measured across successive backups, including transaction-log copies and blob hard links
+- [ ] Export capacity accounts for full copies where the destination does not preserve file sharing
+- [ ] Off-host copy exists in a separate failure and administrative boundary
+- [ ] Backup artifacts have immutable identities, manifests, and checksums
+- [ ] Destination encryption, versioning, and retention checked after upload where applicable
+- [ ] Backup writer cannot weaken the destination's retention policy
 - [ ] Managed repository copies take the whole per-database directory, quiesced or from an atomic snapshot
 - [ ] `verify_backup` runs on a schedule
 - [ ] Blob integrity understood to be unverified by `verify_backup`
 - [ ] Restore constraints documented for user databases, component-held databases, and `system`
 - [ ] Restore authority named, and restore execution logged
 - [ ] Restore procedure isolates the node from replication, not just from user traffic
-- [ ] Restore drill completed and dated, with measured recovery time and actual data loss
+- [ ] Restore tested in a disposable, isolated environment using a compatible Harper version
+- [ ] Restored inventory, counts, business invariants, and critical journeys validated
+- [ ] Artifact ID, backup time, validation results, operator, approver, achieved RPO, and achieved RTO recorded
 - [ ] `system` database restore rehearsed offline
+- [ ] Preservation export planned separately where records require long-term, software-independent access
 
 ## Objectives
 

@@ -6,15 +6,14 @@ sidebar_position: 7
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Replication gives you availability. It does not give you recovery, and the reason is worth stating plainly: replication faithfully propagates whatever you write, including the bad write. A destructive operation, a schema mistake, or a release that corrupted data reaches every peer at the speed of your convergence time.
+Replication supports availability, but also propagates destructive writes, schema errors, and application corruption to peers. You need backups to recover an earlier state.
 
-Backups cover the failure classes replication cannot. This guide is about deciding what you need before you pick an operation, getting a copy somewhere the node's failure cannot reach, and knowing your restore constraints before you are in an incident rather than during one.
+This guide covers choosing a backup mechanism, keeping an independent copy, and testing that you can restore service within your recovery targets.
 
 ## What You Will Learn
 
-- The five questions that determine your backup design, answered before any command
-- Which backup mechanism you actually have, since it depends on your storage engine
-- Why a copy on the node that created it is not a backup, and the specific way copying one wrong breaks it
+- How to choose a backup mechanism for your storage engine and recovery targets
+- How to copy and retain backups independently of the source node
 - What `verify_backup` does and does not check
 - Which databases can be restored with the server running, and which cannot
 - Why restoring a database to undo a code bug is usually the wrong move
@@ -28,13 +27,13 @@ Backups cover the failure classes replication cannot. This guide is about decidi
 
 ## Decide before you choose a command
 
-Answer these first. Every operation below is easy, and every one of them is the wrong choice for some of these answers.
+Record these decisions in your reliability plan:
 
-1. **Which failure classes must you survive?** Node loss, storage loss, a bad deployment, an accidental destructive operation, a corrupting application bug, a site or region event, and a control-plane or credential loss are seven different problems. Replication addresses the first one well and the sixth one partially. It addresses none of the rest.
-2. **What is the recovery point and recovery time per database?** Not per cluster. A catalog table and an order ledger rarely deserve the same answer, and paying ledger-grade backup cadence for catalog data is how backup cost becomes a reason to reduce frequency.
-3. **What granularity do you need?** Harper backs up and restores whole databases. There is no per-table restore. If your recovery story requires restoring one table, that requirement has to be met by database layout or by forward repair, and it is far cheaper to learn that now.
-4. **Where must copies live?** How many independent locations, under what retention, and with what access control.
-5. **Who is authorized to execute a restore, and how is that logged?** A restore destroys current data by design. It deserves a named authority and an audit trail.
+1. **Which failures must you survive?** Include node or storage loss, bad deployments, destructive operations, application corruption, regional outages, and compromised credentials. Choose a recovery mechanism for each.
+2. **What are the recovery targets?** State acceptable data loss per database and time to restore each affected journey. Use those targets to set backup frequency and test the restore procedure.
+3. **What granularity do you need?** Managed backups restore whole databases. To recover selected tables or records, restore into an isolated environment and plan a separate data repair. LMDB snapshot options differ; see [backup operations](/reference/v5/backups/operations#get_backup).
+4. **Where must copies live?** Choose independent storage locations, retention periods, and access controls.
+5. **Who may authorize and execute a restore?** Name the approver and operator, and record their actions. An in-place restore replaces current data.
 
 ## Know which mechanism you have
 
@@ -49,7 +48,7 @@ A backup is a whole-database copy: all tables, the transaction log, and any file
 Two limitations to check against your own deployment now rather than later:
 
 - **Managed backups require RocksDB.** For LMDB databases your options are `get_backup` or volume snapshots.
-- **One storage root per database.** Backup is rejected when a database's tables resolve to more than one storage root. A database-level custom `storage.path` is fine, and so is a per-table `path` that still lands on the same root. It is a database whose tables are split across roots that cannot be backed up with these operations at all, and if you have one, your backup strategy for it does not exist yet.
+- **One storage root per database.** Backup is rejected when a database's tables resolve to multiple storage roots. Custom database or table paths are valid if all tables still resolve to one root. Use a separate backup strategy for databases split across roots.
 
 :::
 
@@ -78,7 +77,7 @@ harper purge_backups database=data keep_count=7
 
 Every backup operation runs from the CLI under the same name. With the server running the CLI forwards to the server; with it stopped the command operates directly on the files.
 
-`get_backup` is the exception. It streams from a running server and has no offline form, so with Harper stopped it fails as an unknown command. If you need a copy off a node that is down, start it, or take the backup directory or a volume snapshot instead. Worth knowing before an incident, because a stopped node is exactly when you reach for it.
+`get_backup` requires a running server. Document how to copy the managed backup repository or take a volume snapshot if the server cannot start.
 
   </TabItem>
 </Tabs>
@@ -86,41 +85,42 @@ Every backup operation runs from the CLI under the same name. With the server ru
 Backups of the same database share unchanged RocksDB data files, so the first one copies everything and later ones copy only what changed. Shared files are reference-counted, so deleting a backup removes only files no remaining backup references.
 
 :::warning
-The incremental behavior applies to the RocksDB data files only. **The transaction-log snapshot is copied in full on every backup.** With a large audit-retention window that is real, recurring disk cost that the data-only view hides, so size your backup volume against it rather than against the incremental figure.
+Each backup is a full logical snapshot, but its disk cost depends on file sharing:
 
-Blobs behave differently and are easy to over-budget. Each backup captures a full set of blobs, but the files are hard-linked rather than copied when the backup directory and the blob storage share a filesystem, which is the default layout. In that case the extra space is near zero. They become genuine full copies only when the two live on different filesystems, so putting backups on a separate volume is a real cost decision rather than a free one. Pass `exclude_blobs: true` to skip blobs when that is appropriate.
+- RocksDB backups share unchanged data files within the same repository.
+- The transaction-log snapshot is copied for each backup. Include it when measuring repository growth.
+- Blob snapshots use hard links when the source and destination filesystem support them. Otherwise, they copy the files. Use `exclude_blobs: true` only if your recovery procedure can recover those blobs separately.
+- An export that does not preserve sharing materializes those shared or linked files as separate copies. Budget for the full exported size.
 
-One consequence for disaster recovery: because the blob snapshot is hard-linked, copying a backup repository with an ordinary recursive copy materializes every blob as a full, separate file at the destination.
+Measure physical repository growth over several backups with your retention policy and filesystem. Do not assume that a full logical snapshot consumes its full logical size, or that all snapshot files are hard-linked.
 :::
 
 Do not use `list_backups` sizes for capacity planning. The `size` and `file_count` fields come from the RocksDB backup engine and exclude the transaction-log and blob snapshots, so each entry undercounts, while the shared files between entries mean summing them overcounts. Measure the repository directory instead.
 
 ## Get a copy off the node
 
-This is the step most likely to be missing, and the one where doing it slightly wrong produces a copy that cannot be restored.
+Keep a recoverable copy outside the source node's failure and administrative boundaries. Separate credentials and retention controls should prevent a compromised node or backup writer from deleting that copy or weakening its retention policy.
 
 **Managed backups live on the node that created them.** The repository is a local directory, and RocksDB shares files across backup IDs, so **a backup ID is not a self-contained folder.** Two consequences:
 
 - A disaster-recovery copy has to take the entire per-database repository, `<backupPath>/<database>`, not an individual backup.
 - It has to do that while no backup operation is running, or from an atomic filesystem snapshot. A live recursive copy can race `create_backup`, `delete_backup`, or `purge_backups` and produce an unrestorable copy.
 
-An unrestorable copy is worse than no copy, because it will pass a "backups exist" check and fail during an incident.
-
-The simpler off-host path, and the one to prefer unless you specifically need retained managed backups off the node:
+To take a fresh snapshot directly to another machine, run:
 
 ```bash
 # Pull a snapshot of the current state from a running node
 harper get_backup database=data out=./data-$(date +%Y%m%dT%H%M%S).tar.gz
 
 # Or pull a snapshot of another node, writing it to a file here
-harper get_backup database=data target=https://node-2.example.com:9925 out=./data.tar.gz
+harper get_backup database=data target=https://operations.node-2.example.com out=./data.tar.gz
 ```
 
 `target=` only changes which node the snapshot is read from. It writes a file and nothing else: it does not restore, import, or clone that node's database onto the local one. Turning the file into a live database is a separate, deliberate restore step, performed with Harper stopped.
 
 Note also that `get_backup` always streams the current state. It cannot download a historical managed backup, so it is a way to take a fresh off-host copy, not a way to export your retention history.
 
-Whichever path you choose, the destination must not share a failure domain with the source. A second directory on the same volume survives a deleted file and nothing else.
+Give each exported recovery artifact a unique, immutable identity. Include a manifest with its database, Harper version, backup timestamp, included files, blob roots, and checksums. After upload, read back the destination metadata and confirm the expected identity, size, encryption, versioning, and retention settings where supported. Checksum verification must cover the copy at the destination.
 
 ## Verification is not optional
 
@@ -135,13 +135,13 @@ Whichever path you choose, the destination must not share a failure domain with 
 
 `verify_backup` checks the RocksDB file sizes, their checksums when `verify_checksum` is `true`, which is slower, and the framing of the transaction-log snapshot, which is always checked.
 
-**Blob contents are not verified.** Verification confirms that a backup which recorded blobs still has its blob snapshot present, and fails the backup as corrupt if that snapshot is missing. It does not check the individual blob files for size, checksum, or readability. So verification can pass on a backup whose blobs are damaged, and only a real restore proves they are intact.
+**Blob contents are not verified.** Verification checks that a required blob snapshot is present, but does not check individual blob files for size, checksum, or readability. Validate those separately during restore testing.
 
-More generally, a verified backup is a well-formed backup, not a proven recovery. The only evidence that your recovery works is a restore you have actually performed, which is why the drill at the end of this guide is the point of it.
+Verification checks the backup's structure. A restore test checks whether it can recover your application.
 
 ## Know your restore constraints before the incident
 
-RocksDB is single-writer, so an in-place restore requires the database to be fully closed first. That produces hard constraints you cannot negotiate during an outage:
+An in-place RocksDB restore requires the database to be closed:
 
 | Database                                       | Online restore, server running       | Offline restore, server stopped |
 | ---------------------------------------------- | ------------------------------------ | ------------------------------- |
@@ -152,37 +152,49 @@ RocksDB is single-writer, so an in-place restore requires the database to be ful
 Because the restore runs as a background job, a component holding the database open does not fail your request. It fails inside the job, so you find out from `get_job` rather than from the response. Harper does not track which component uses which database, so it cannot selectively stop one.
 
 :::tip
-That last constraint has an escape hatch worth knowing before you need it. Setting `HARPER_SAFE_MODE` to any value starts Harper without loading your applications and components, while the database, Operations API, and HTTP server come up normally. Harper's own built-in root component still loads; what is skipped is everything you deployed:
+Safe mode skips user applications and components while keeping the built-in root component, database, Operations API, and HTTP server available:
 
 ```bash
 HARPER_SAFE_MODE=1 harper run
 ```
 
-Because no component loads, nothing holds a user database open, so a restore that would fail inside its job can run online. It is also how you get back in when a broken component is what stopped Harper in the first place, since the Operations API is available to inspect, repair, or remove it. Traffic should stay off the node either way. See [safe mode](/reference/v5/configuration/overview#harper_safe_mode).
+This can release user database handles held by application components so an online restore can proceed. It also lets you inspect or remove a component that prevents normal startup. Keep user traffic and replication isolated during recovery. Safe mode does not remove the offline requirement for restoring `system`. See [safe mode](/reference/v5/configuration/overview#harper_safe_mode).
 :::
 
-Two more constraints worth writing into your procedure:
+Also include these constraints in the restore procedure:
 
 - **`target_database` requires the server stopped.** Restoring into a separate database rather than overwriting the source is CLI-only with Harper down. The target must not already exist or must be an empty directory.
 - **An interrupted restore leaves the database unloadable.** On a crash or power loss mid-restore, Harper marks the database as incompletely restored and refuses to load it on the next start. Recover by rerunning `restore_backup` for the same database and `backup_id`. Do not try to load or hand-repair the directory.
 
 ## Restoring in a replicated cluster
 
-A restore is a point-in-time rollback of one node's data. In a cluster, that node then has to rejoin peers that never rolled back, so sequence it deliberately:
+A restored node may be behind peers that have continued accepting writes. Choose which data should be authoritative before reconnecting it.
+
+```mermaid
+flowchart TD
+    Live[Live cluster] --> Artifact[Create immutable recovery artifact]
+    Artifact --> Retained[Independent retained destination]
+    Retained --> Test[Restore in disposable isolated environment]
+    Test --> Validate[Validate storage and application]
+    Validate --> Policy[Choose data authority and replay policy]
+    Policy --> Drain[Drain user traffic from recovery node]
+    Drain --> Isolate[Separately isolate replication]
+    Isolate --> Restore[Restore and validate recovery node]
+    Restore --> Peers[Controlled replication re-entry]
+    Peers --> Traffic[Progressive traffic admission]
+```
+
+For an in-place recovery:
 
 1. Take the node out of rotation with the availability flag, per [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx). Never restore a node that is serving traffic.
-2. **Isolate it from its peers.** This is a separate action from step 1, and the step most likely to be skipped. See the warning below.
-3. Decide what should happen to the restored data: whether it should propagate to peers, or be overwritten by them. Those are two very different outcomes and it is not a decision to improvise once the node is back on the mesh.
+2. **Isolate replication separately.** Stop peer exchange using your tested topology or network controls. Keep that isolation in place across restarts.
+3. Confirm the data authority and replay policy: which writes to preserve, repair, or reapply, and how peers will converge.
 4. Perform the restore, online or offline according to the table above.
 5. Verify data expectations locally before any peer sees the node.
-6. Re-admit the node through the full return sequence, including convergence verification.
+6. Reconnect replication under that policy and verify convergence. Then complete the traffic-admission checks before restoring traffic.
 
 :::danger
-**The availability flag does not stop replication.** It tells your traffic layer to stop sending user requests. Replication is a separate path: peer connections stay up, and the node keeps exchanging transactions the whole time it is "out of rotation."
-
-So a node that is drained but still connected is not isolated. Restore it in place and the rolled-back database is live on the mesh immediately, before you have validated anything. Two things can then happen, both bad: peers overwrite your restored data with newer transactions, or your rolled-back state propagates outward to peers that were never affected.
-
-Isolation is its own step. Stopping Harper and restoring offline is the unambiguous way to get it, which is a further argument for the offline path in a cluster even where the table above permits an online restore. If you restore online, you must have removed the node from the replication topology first, and put it back deliberately in step 6.
+**Draining traffic does not stop replication.** A drained node continues exchanging transactions with peers. An offline restore stops that exchange while Harper is down, but configured routes can reconnect as soon as it starts. Keep replication isolated until validation is complete and you are ready to execute the re-entry policy.
 :::
 
 ## What backups cannot fix
@@ -191,26 +203,29 @@ If a release changed the meaning of persisted data, restoring the database is us
 
 For that failure class, define forward repair instead: a targeted correction, or a replay from the transaction log, that fixes the affected records and leaves the rest alone. Decide which of your failure classes get restore and which get forward repair while you are calm, and record the decision. See [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for how this interacts with release reversal.
 
-### Prove it
+## Test the backup program
 
-A backup you have never restored is a hypothesis. Run this on a non-production cluster and record the numbers:
+Test the copy you would actually use after losing a node, including its destination controls:
 
-1. Create a managed backup, then verify it with `verify_checksum: true`.
-2. Take an off-host copy using the correct procedure for your mechanism, quiesced or from an atomic snapshot if you are copying a managed repository.
-3. Destroy the source database.
-4. Restore it, taking the node out of rotation first, and time from decision to restored service. That is your measured recovery time.
-5. Determine how much data was actually lost against the backup timestamp. That is your measured recovery point.
-6. Validate correctness through the application, not just at the storage layer. Row counts agreeing is not the same as the journey working.
-7. Repeat for the `system` database specifically, offline, since it has different constraints and it is the one people never rehearse.
+1. Create a backup and verify it with `verify_checksum: true`. For other mechanisms, use the corresponding integrity checks.
+2. Export it using the procedure above. Record the immutable artifact ID, backup timestamp, manifest, and checksums. Read back destination metadata and check that the backup writer cannot weaken retention.
+3. Restore the destination copy into a disposable environment with a compatible Harper version. Isolate it from production traffic, replication, and application side effects.
+4. Validate the expected databases, tables, record counts, blob contents, and business invariants. Run the critical user journeys against the restored application.
+5. Rehearse the failure-to-recovery procedure on a non-production cluster. Measure elapsed time from the simulated failure, including detection, transfer, restore, validation, and traffic admission. Compare recovered writes against the failure time to measure actual data loss.
+6. Record the artifact ID, backup time, validation results, operator, approver, and achieved RPO and RTO. Rehearse an offline `system` restore separately.
 
-Both measured numbers feed [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx). If they do not meet your stated targets, one of the two has to change, and it is better that it is the target than a promise you cannot keep.
+Use these results in [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx). If recovery misses a target, improve the procedure or revise the commitment.
+
+Monitor the age of the newest recovery point that has passed the required destination and recovery checks. A successful backup job alone does not establish a usable recovery point.
+
+For records requiring long-term preservation, keep a separate export in a documented format that can be read independently of Harper. Operational backups serve disaster recovery; preservation exports also need to remain usable after the original software is retired. Choose cadence, storage provider, and any physical-media process for your own environment.
 
 ## Operational notes
 
 - **Retention is a policy, not a side effect of disk space.** Use `purge_backups` with an explicit `keep_count` that matches a written retention decision.
 - **Backup operations are `super_user` through the server, and filesystem permissions offline.** An operator with shell access on a node can restore without an API credential, so protect the host accordingly.
 - **Schedule backups per database, matched to that database's recovery point.** A single cluster-wide cadence overspends on some databases and underspends on the ones that matter.
-- **Alert on backup age, and on job failure.** A `create_backup` job that fails silently produces a gap you will find at the worst possible time. Backup age exceeding your recovery point objective is a pageable condition.
+- **Alert on job failure and recovery-point age.** Track the newest fully verified recovery point and alert before its age exceeds your RPO.
 - **Record the storage engine per database in your inventory** and re-check after migrations, since your entire mechanism choice depends on it.
 
 ## Readiness checklist
@@ -220,8 +235,11 @@ Both measured numbers feed [Engineering RPO, RTO, and Uptime](./engineering-rpo-
 - [ ] Storage engine confirmed per database, and the mechanism chosen accordingly
 - [ ] No database in scope has tables spanning more than one storage root, or the exclusion is known and accepted
 - [ ] Backup cadence matches the stated recovery point per database
-- [ ] Backup volume sized against the non-incremental transaction-log snapshot, and against full blob copies if the backup and blob paths are on different filesystems
-- [ ] An off-host copy exists in a destination that does not share a failure domain
+- [ ] Repository growth measured across successive backups, including transaction-log copies and blob hard-link behavior
+- [ ] Export capacity accounts for full copies where file sharing is not preserved
+- [ ] An off-host copy exists across separate failure and administrative boundaries
+- [ ] Artifact identities, manifests, checksums, and destination metadata verified
+- [ ] Backup writer cannot weaken retention
 - [ ] Managed repository copies take the whole `<backupPath>/<database>` directory, quiesced or from an atomic snapshot
 - [ ] `verify_backup` runs on a schedule, with `verify_checksum` at least periodically
 - [ ] Blob contents understood to be unchecked by `verify_backup`, which confirms only that the blob snapshot is present
@@ -229,9 +247,13 @@ Both measured numbers feed [Engineering RPO, RTO, and Uptime](./engineering-rpo-
 - [ ] Restore authority named, and restore execution logged
 - [ ] Restore procedure isolates the node from replication, not just from user traffic, since the availability flag does not stop peer exchange
 - [ ] Safe mode known as the way to restore a database a component holds open, and to reach a node a broken component stopped
-- [ ] Restore drill completed and dated, with measured recovery time and recovery point
+- [ ] Destination copy restored in a disposable, isolated environment with a compatible Harper version
+- [ ] Inventory, counts, blobs, business invariants, and critical journeys validated
+- [ ] Artifact ID, timestamp, validation results, operator, approver, achieved RPO, and achieved RTO recorded
+- [ ] Alerts use the newest fully verified recovery point
 - [ ] `system` database restore rehearsed offline
 - [ ] Forward repair defined for corruption caused by application code
+- [ ] Separate preservation export defined where long-term access is required
 
 ## Additional Resources
 

@@ -5,7 +5,7 @@ sidebar_position: 10
 
 The [Production Readiness Checklist](./production-readiness-checklist.mdx) asks the questions. This is the document that holds the answers.
 
-Copy it, keep one per service, and keep it where your on-call can reach it during an incident rather than in a wiki nobody remembers. It is deliberately short. A reliability plan that takes a day to read is a reliability plan nobody consults at 3am.
+Keep one plan per service, somewhere your on-call team can reach during an incident. Replace the example values with your deployment's measurements and procedures.
 
 Example values are included in italics to show the intended level of specificity. Replace them.
 
@@ -36,9 +36,9 @@ The user-facing paths that must work. Everything else in this plan is stated per
 
 ## 3. Objectives
 
-| Journey | Availability target | Measurement boundary | Recovery time objective | Recovery point objective | Exclusions                                 |
-| ------- | ------------------- | -------------------- | ----------------------- | ------------------------ | ------------------------------------------ |
-|         | _99.95%_            | _at the CDN edge_    | _15 min from detection_ | _5 min_                  | _planned maintenance, third-party outages_ |
+| Journey | Availability target | Measurement boundary | Recovery time objective        | Recovery point objective | Exclusions                                 |
+| ------- | ------------------- | -------------------- | ------------------------------ | ------------------------ | ------------------------------------------ |
+|         | _99.95%_            | _at the CDN edge_    | _15 min from start of failure_ | _5 min_                  | _planned maintenance, third-party outages_ |
 
 Monthly unavailability budget: _21 min 55 sec at 99.95%_
 
@@ -114,6 +114,13 @@ Maintenance policy when a drain would breach `F`: _pause, add capacity, or accep
 - Restore constraints per database: _online, or offline only because a component holds it open_
 - `system` database restore procedure: _offline only, link to runbook_
 - Failure classes assigned to restore versus forward repair: _table_
+- Artifact record: _immutable ID, backup timestamp, manifest and checksum locations_
+- Destination controls: _failure and administrative boundaries, encryption, versioning, retention, read-back evidence_
+- Backup writer permissions: _how retention changes are prevented_
+- Newest fully verified recovery point: _artifact ID, timestamp, validation results, operator, approver_
+- Restore validation: _database/table inventory, counts, business invariants, critical journeys, compatible Harper version_
+- Achieved RPO and RTO: _measured data loss and time from failure to verified service_
+- Preservation export, if required: _format, reader, and retention independent of Harper_
 
 ## 11. Scenario responses
 
@@ -150,7 +157,7 @@ Maintenance policy when a drain would breach `F`: _pause, add capacity, or accep
 
 ## 14. Open risks
 
-Accepted gaps, each with an owner and a date. This section existing and being honest is worth more than it being empty.
+Record accepted gaps with their impact, owner, and review date.
 
 | Risk | Impact if realized | Why accepted | Owner | Review date |
 | ---- | ------------------ | ------------ | ----- | ----------- |
@@ -173,7 +180,7 @@ Most of the numbers in this plan are properties of a Harper version, a data volu
 - Significant data growth
 - Any incident that produced a surprise
 
-Date every number. An undated measurement in a reliability plan is worse than a blank field, because a blank field prompts someone to go and measure.
+Date each measurement so operators can judge whether it still describes the current service.
 
 ## Additional Resources
 

@@ -33,7 +33,7 @@ Offline invocation matters most for restore: an in-place `restore_backup` of the
 
 Creates an incremental directory backup of the database under the configured backup root ([`storage.backupPath`](../configuration/options.md#storage), default `<rootPath>/backup`). Through a running server this runs as a background [job](../operations-api/operations.md#jobs): the operation returns a `job_id` immediately, and [`get_job`](../operations-api/operations.md#get_job) reports the outcome including the new `backup_id`, `size`, and `timestamp`.
 
-Backups of the same database share unchanged RocksDB data files, so the second and subsequent backups only copy the data that changed. The transaction-log snapshot — and the blob snapshot, if the database has file-backed blobs — is copied in full on every backup, so those portions are not incremental; with a large audit-retention window, frequent backups are not free for them. Pass `exclude_blobs: true` to skip the blob snapshot. Use [`purge_backups`](#purge_backups) to manage retention.
+Backups of the same database share unchanged RocksDB data files within the repository. Each backup also copies the transaction-log snapshot. Blob snapshots use hard links when the source and destination filesystem support them, and copy the files otherwise. Pass `exclude_blobs: true` to skip the blob snapshot. Measure physical repository growth to plan capacity, and use [`purge_backups`](#purge_backups) to manage retention.
 
 ```json
 { "operation": "create_backup", "database": "data" }
@@ -68,7 +68,13 @@ harper list_backups database=data
 
 <VersionBadge version="v5.2.0" /> <EngineBadge engines="RocksDB" />
 
-Verifies a managed backup's RocksDB file sizes — and their checksums when `verify_checksum` is `true` (slower) — together with the framing of its transaction-log snapshot (always checked). For a backup that recorded blobs, verification confirms the blob snapshot is still present and fails the backup as corrupt if it is missing, but it does not check individual blob files for size, checksum, or readability — so verification can pass on a backup whose blob contents are damaged. Through a running server this runs as a background [job](../operations-api/operations.md#jobs). `backup_id` is required.
+Verifies a managed backup. `backup_id` is required.
+
+- **RocksDB files:** checks file sizes and, when `verify_checksum` is `true`, checksums. Checksum verification takes longer.
+- **Transaction log:** always checks the snapshot's framing.
+- **Blob snapshot:** checks that a snapshot is present if the backup recorded blobs. A missing snapshot fails verification. Individual blob sizes, checksums, and readability are not checked, so damaged blob contents can pass verification.
+
+Through a running server, verification runs as a background [job](../operations-api/operations.md#jobs). Poll `get_job` for its result.
 
 ```json
 { "operation": "verify_backup", "database": "data", "backup_id": 1, "verify_checksum": true }
