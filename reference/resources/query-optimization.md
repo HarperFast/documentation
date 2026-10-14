@@ -79,6 +79,14 @@ When a secondary index is still being built — for example, just after a new `@
 
 This is a transient condition — the index finishes building in the background, after which the same query succeeds. Clients should retry (with backoff) rather than treating it as an empty result or a permanent failure. On the operations API the error body includes `code` and `retryable`, so callers can branch on `error.code === 'INDEX_REBUILDING'` or `error.retryable`.
 
+### Full-text search
+
+<VersionBadge version="v5.3.0" /> <EngineBadge engines="RocksDB" />
+
+A condition using a `FullText` field declared with `@fullText` is executed by the native full-text engine and ranked with BM25. Compatible `and` filters are evaluated while accepting candidates so a selective structured filter can still fill the requested result page. Harper then loads the current source records and removes stale or deleted candidates.
+
+Keep result pages bounded. Any expression containing prefix or fuzzy-prefix matching has a 100-record native window and is intended for autocomplete-style record lookup. An unbounded query that exceeds the window fails instead of returning a partial result. Use source-field weights to tune ranking, and enable positions, surface terms, and highlighting only when their query features are needed. See [Full-Text Search](../full-text-search/overview.md).
+
 ## Relationships and Joins
 
 Harper supports relationship-based queries that join data across tables. See [Schema documentation](../database/schema.md) for how to define relationships.

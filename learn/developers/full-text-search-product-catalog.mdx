@@ -1,0 +1,192 @@
+---
+title: Add Full-Text Search to a Product Catalog
+description: Configure and query a BM25-ranked product search in Harper.
+---
+
+# Add Full-Text Search to a Product Catalog
+
+<VersionBadge version="v5.3.0" />
+
+This guide adds relevance-ranked text search to a product catalog, then exposes it through Harper's JavaScript and REST APIs.
+
+## What you will build
+
+- A BM25-ranked index over product names, descriptions, and tags
+- A Harper application endpoint with highlights and a structured category filter
+- REST queries for terms, phrases, and record autocomplete
+
+## Prerequisites
+
+- Harper 5.3 or later using RocksDB
+- A component with a GraphQL schema, JavaScript resources, and `rest: true` in its `config.yaml`
+
+## 1. Declare the index
+
+Add `audit: true` to the RocksDB-backed table and declare an `@fullText` index over the fields customers search.
+
+```graphql title="schema.graphql"
+type Product @table(database: "catalog", audit: true) @export {
+	id: ID @primaryKey
+	name: String
+	description: String
+	tags: [String]
+	category: String @indexed
+	price: Float @indexed
+	available: Boolean
+	catalogSearch: FullText
+		@fullText(
+			fields: [
+				{ name: "name", weight: 3, highlight: true }
+				{ name: "description", weight: 1, highlight: true }
+				{ name: "tags" }
+			]
+			filterFields: ["category", "available"]
+			highlighting: { maxFragments: 2, fragmentLength: 120 }
+		)
+}
+```
+
+The query-only field name `catalogSearch` identifies the index. It is not stored with each product. `weight: 3` makes a match in `name` contribute more to BM25 relevance than the same match in `description` or `tags`. Highlighting is enabled only for the fields shown to customers.
+
+`filterFields` copies category and availability into the Tantivy index as typed, score-neutral metadata. This lets Tantivy narrow text matches before Harper loads product records. The product record remains authoritative, and Harper rechecks the conditions before returning it. The `@indexed` declarations are independent Harper secondary indexes; they are not required for Tantivy filter metadata.
+
+## 2. Add records
+
+Use the generated REST endpoint:
+
+```http
+POST /Product/
+Content-Type: application/json
+
+{
+	"id": "shoe-1",
+	"name": "Waterproof trail running shoe",
+	"description": "Lightweight shoe for wet mountain trails",
+	"tags": ["outdoor", "trail"],
+	"category": "footwear",
+	"price": 129,
+	"available": true
+}
+```
+
+Harper commits the record first, then applies the committed change to the local derived full-text index. Every replica performs the same derivation from the transaction it receives.
+
+If the index remains behind for more than 30 seconds, a local write can return retryable `503` code `DERIVED_INDEX_LAGGING`. Retry writes with backoff while the index catches up; freshness options apply only to searches. See [write backpressure](/reference/v5/full-text-search/overview#write-backpressure).
+
+## 3. Search from a Harper application
+
+```javascript title="resources.js"
+export class SearchProducts extends Resource {
+	static async post(_target, data, context) {
+		if (!context?.user) {
+			const error = new Error('Authentication required');
+			error.statusCode = 401;
+			throw error;
+		}
+		const body = (await data) ?? {};
+		const text = typeof body.q === 'string' ? body.q.trim() : '';
+		if (!text) {
+			const error = new Error('q is required');
+			error.statusCode = 400;
+			throw error;
+		}
+		const conditions = [
+			{
+				attribute: 'catalogSearch',
+				comparator: 'matches',
+				value: text,
+				fields: ['name', 'description', 'tags'],
+			},
+			{ attribute: 'available', comparator: 'equals', value: true },
+		];
+		const category = body.category;
+		if (category) conditions.push({ attribute: 'category', comparator: 'equals', value: category });
+		return databases.catalog.Product.search(
+			{
+				conditions,
+				select: ['id', 'name', 'price', '$score', '$highlights'],
+				limit: 20,
+				checkPermission: true,
+			},
+			context
+		);
+	}
+}
+```
+
+Call the resource with an authenticated request:
+
+```http
+POST /SearchProducts/
+Content-Type: application/json
+
+{ "q": "trail", "category": "footwear" }
+```
+
+The category filter is optional; `q` is required.
+
+The full-text index applies the configured availability and optional category metadata while ranking candidates. Harper then loads the current records and checks those conditions again before returning them. Without `filterFields`, the same query remains valid, but Harper applies the conditions after full-text search.
+
+Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). Forwarding the resource's `context` preserves the authenticated caller, and `checkPermission: true` asks the table to enforce that caller's table and source-field permissions. The custom resource must do both. Highlights can expose searched source text even when those fields are absent from `select`.
+
+The search includes `tags`, but that source does not set `highlight: true`. A tag match can rank a product, while `$highlights` omits `tags`.
+
+## 4. Search through REST
+
+The exported table supports the same match comparator:
+
+```http
+GET /Product/?catalogSearch=matches=waterproof%20trail&category=footwear&select(id,name,price,$score,$highlights)&limit(20)
+```
+
+For a phrase:
+
+```http
+GET /Product/?catalogSearch=matches_phrase=trail%20running&limit(20)
+```
+
+For record autocomplete:
+
+```http
+GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&select(id,name)&limit(10)
+```
+
+Prefix search returns matching products. It does not return a dictionary of suggested terms.
+
+REST searches every source field in the index, so the caller must be allowed to read `name`, `description`, and `tags` for these requests. Use `Table.search()` or `search_by_conditions` when a role should search only a subset of sources. See [REST full-text operators](/reference/v5/rest/querying#full-text-operators).
+
+## 5. Choose consistency behavior
+
+Most searches can use the default three-second lag tolerance. When the next request must find a record that was just written, use the JavaScript API and wait for current index coverage:
+
+```javascript
+for await (const product of databases.catalog.Product.search({
+	conditions: [
+		{
+			attribute: 'catalogSearch',
+			comparator: 'matches',
+			value: 'new seasonal product',
+			maxIndexLagMilliseconds: 0,
+			waitForIndexMilliseconds: 10000,
+		},
+	],
+})) {
+	console.log(product);
+}
+```
+
+Do not apply this wait to every catalog request without measuring it. The normal bounded-staleness path keeps search traffic independent of short indexing bursts.
+
+If the index does not reach current coverage within ten seconds, consuming the search returns retryable `503` code `DERIVED_INDEX_LAGGING`. See [freshness controls](/reference/v5/full-text-search/querying#freshness-controls).
+
+## 6. Operate the index
+
+Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests in `unknown`, `needs-rebuild`, or `rebuilding` state return `503` with `code: "INDEX_REBUILDING"` and `retryable: true`. Retry this code with backoff; do not treat every `503` as an index rebuild.
+
+See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.
+
+## Additional resources
+
+- [Full-text search overview](/reference/v5/full-text-search/overview)
+- [Resource API](/reference/v5/resources/resource-api)
+- [Query optimization](/reference/v5/resources/query-optimization)

@@ -229,7 +229,7 @@ The Plugin API is the primary way to implement additional functionality in Harpe
 - `logger.level` — Log level; _Default_: `"info"` (Added in: v4.1.0)
 ```
 
-For inline config option annotations inside list items, plain text `(Added in: vX.Y.Z)` is fine — using the component mid-sentence is awkward. Reserve `<VersionBadge>` for standalone placement after headings.
+Use `<VersionBadge>` after headings or alongside the specific sentence, list item, or table entry it annotates. Use `<EngineBadge engines="RocksDB" />` the same way when behavior is storage-engine-specific; comma-separated values such as `engines="RocksDB, LMDB"` are supported. Keep adjacent version and engine badges together on one line. For dense prose where a component would interrupt the sentence, plain text such as `(Added in: vX.Y.Z)` is fine.
 
 ## Redirects
 
