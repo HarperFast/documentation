@@ -27,6 +27,7 @@ Adds a new Harper instance to the cluster. If `subscriptions` are provided, it c
 - `revoked_certificates` _(optional)_ — array of revoked certificate serial numbers that will not be accepted for any connections
 - `shard` _(optional)_ — shard number for this node. Only needed when using sharding
 - `start_time` _(optional)_ — ISO 8601 UTC datetime. If set, only data after this time is downloaded during initial synchronization instead of the entire database
+- `isLeader` _(optional)_ — select the added node as the source for this node's initial full copy. This controls bootstrap synchronization, not primary ownership or write authority; subsequent replication still follows the configured routes
 - `subscriptions` _(optional)_ — explicit table-level replication relationships. This is optional (and discouraged). Each subscription is an object with:
   - `database` — database name
   - `table` — table name

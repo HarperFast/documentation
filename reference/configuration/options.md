@@ -244,7 +244,7 @@ logging:
 - `path` — Explicit log file path (overrides `root`)
 - `stdStreams` — Write to stdout/stderr; _Default_: `false`
 - `console` — Include `console.*` output in the log file; _Default_: `false`
-- `auditLog` — Enable table transaction audit logging; _Default_: `false`
+- `auditLog` — Enable table transaction audit logging; _Default_: `true`
 - `auditRetention` — Audit log retention duration; _Default_: `3d`
 - `external` — Logging for components using the logger API; sub-options: `level`, `path`
 - `rotation.enabled` / `rotation.compress` / `rotation.interval` / `rotation.maxSize` / `rotation.path` — Log file rotation (activates when `interval` or `maxSize` is set)

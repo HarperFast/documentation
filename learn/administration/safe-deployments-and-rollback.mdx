@@ -170,14 +170,14 @@ A caller timeout does not stop the restart. On v5.3, the deploy response does no
 
 Set these parameters to match your payload size, network, and failure policy:
 
-- `deployment_timeout` (Added in: v5.1.4) is how long a peer waits for the replicated payload before failing, defaulting to 120000 ms. Raise it for large components or slow links.
-- `ignore_replication_errors` (Added in: v5.1.4) treats a peer that fails to receive the deploy as non-fatal. By default a failed peer makes the whole operation return a non-2xx status, while the component is still deployed on the origin node. Decide which behavior you want before you need it, because the default leaves you in a mixed-version state with a failed response, and that is a confusing thing to reason about mid-incident.
+- `deployment_timeout` <VersionBadge version="v5.1.4" /> is how long a peer waits for the replicated payload before failing, defaulting to 120000 ms. Raise it for large components or slow links.
+- `ignore_replication_errors` <VersionBadge version="v5.1.4" /> treats a peer that fails to receive the deploy as non-fatal. By default a failed peer makes the whole operation return a non-2xx status, while the component is still deployed on the origin node. Decide which behavior you want before you need it.
 
 ## Configuration changes are deployments too
 
 Apply the same review, rollout, and rollback checks to configuration changes.
 
-`set_configuration` supports `"replicated": true` (Added in: v5.2.0) to apply a change across the cluster in one call, with per-node outcomes in the response. To finish the change cluster-wide, follow with `restart_service` using `"replicated": true`, which restarts nodes one at a time.
+`set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply a change across the cluster in one call, with per-node outcomes in the response. To finish the change cluster-wide, follow with `restart_service` using `"replicated": true`, which restarts nodes one at a time.
 
 ```json
 {
@@ -209,6 +209,7 @@ Classify the change before choosing a reversal path, because these have differen
 Practices that make each of these real:
 
 - **Keep the previous package addressable and rehearse redeploying it** before launch, not during an incident.
+- **Prefer activating a retained release on v5.3.0 and later.** <VersionBadge version="v5.3.0" /> Use `deploy_component` with the previous `deployment_id` and the appropriate restart mode to restore its installed bytes without resolving or installing again. Verify that every target node still retains it: `deployment.stagingRetention.maxCount` can prune replaced releases. See [going back to a previous release](/reference/v5/operations-api/operations#going-back-to-a-previous-release).
 - **Prefer expand-then-contract schema evolution.** Add the new shape, migrate, then remove the old shape in a separate change. Destructive schema behavior is operation and version dependent, so each destructive change needs an exact written procedure and verification on every node.
 - **Use the same gates for rollback as for forward movement.** Availability, journey synthetic, peer stability, data validation, traffic reconciliation. A rollback is a deployment and can fail like one.
 
@@ -241,6 +242,7 @@ Check every node after rollback; a cluster average can hide nodes still running 
 - [ ] Artifacts are immutable and referenced by pinned version, never by branch
 - [ ] Deploy and expose are separate actions in your pipeline
 - [ ] The previous known-good artifact is addressable, and redeploying it has been rehearsed
+- [ ] On v5.3.0 and later, the previous `deployment_id` is still retained on every target node and activation has been rehearsed
 - [ ] Cohort ladder defined, from smallest useful sample to full exposure
 - [ ] Stop thresholds and hold times declared before the rollout starts
 - [ ] A named decision owner for advance, hold, stop, and roll back

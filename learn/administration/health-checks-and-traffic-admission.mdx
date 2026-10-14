@@ -31,7 +31,7 @@ This guide explains the checks to use and the order for draining a node, changin
 | -------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ---------------------------------- |
 | Process liveness           | A trivial response on the node's HTTP endpoint | Harper is running                                     | Process supervisor, restart policy |
 | Node availability flag     | `GET /status` on the application URL           | An operator or automation says this node should serve | Traffic layer health check         |
-| Application readiness      | A component route on the application URL       | This node can serve this journey right now            | Traffic layer, or your own gating  |
+| Application readiness      | A component route on the application URL       | This node passes its admission checks                 | Operator or admission controller   |
 | Critical-journey synthetic | A real request through the public route        | Users are actually being served                       | Your SLO and alerting              |
 
 The availability flag lets an operator or automation control whether a node receives new traffic. Use it as the routing signal, and use readiness, replication checks, and journey tests to decide when to set it.
@@ -118,40 +118,67 @@ On Fabric, `set_status` with `id=availability` controls the record its status co
 
 Liveness and the availability flag both answer questions about the node. Readiness answers a question about the journey: if traffic arrives for this route right now, will it succeed?
 
-Check only the dependencies needed by the journey routed to this node. A failure in an unrelated subsystem should not remove capacity from a working journey.
+Use readiness to gate admission, not as the load balancer's direct routing signal. Keep node-local failures separate from shared dependency failures: taking every node out during a shared outage removes capacity without fixing the dependency. Report shared failures as degradation and use journey tests to measure their user impact.
+
+Add a node-local probe table to your application's schema. Keep the `graphqlSchema` and `rest` plugins enabled so the authenticated seeding request below can reach the table:
+
+```graphql
+type ReadinessProbe @table(replicate: false) @export {
+	id: ID @primaryKey
+	description: String
+}
+```
 
 Add a resource to your application's `resources.js`:
 
 ```javascript
 import { Resource, tables } from 'harper';
 
+let cachedChecks;
+let cacheUntil = 0;
+let inFlight;
+
+async function checkReadiness() {
+	const checks = {};
+
+	// Keep the node-local storage check to one primary-key lookup.
+	// Use a fresh server-side context for this fixed, non-sensitive read.
+	try {
+		const sentinel = await tables.ReadinessProbe.get('readiness-probe-sentinel', {});
+		checks.data = sentinel ? 'ok' : 'failed';
+	} catch (error) {
+		checks.data = 'failed';
+	}
+
+	// A shared dependency outage is degradation, not a reason to drain every node.
+	try {
+		const res = await fetch('https://pricing.internal.example.com/health', {
+			signal: AbortSignal.timeout(500),
+		});
+		checks.pricing = res.ok ? 'ok' : 'degraded';
+	} catch (error) {
+		checks.pricing = 'degraded';
+	}
+	return checks;
+}
+
+function getChecks() {
+	if (Date.now() < cacheUntil) return Promise.resolve(cachedChecks);
+	return (inFlight ??= checkReadiness()
+		.then((checks) => {
+			cachedChecks = checks;
+			cacheUntil = Date.now() + 2000;
+			return checks;
+		})
+		.finally(() => {
+			inFlight = undefined;
+		}));
+}
+
 export class Readiness extends Resource {
 	static async get() {
-		const checks = {};
-
-		// A bounded read against the table this journey serves.
-		// Keep it to a single primary-key lookup, never a scan.
-		// A missing record resolves to undefined rather than throwing,
-		// so check the result as well as catching a storage fault.
-		try {
-			const sentinel = await tables.Product.get('readiness-probe-sentinel');
-			checks.data = sentinel ? 'ok' : 'failed';
-		} catch (error) {
-			checks.data = 'failed';
-		}
-
-		// Only the downstream dependencies this route needs.
-		try {
-			const res = await fetch('https://pricing.internal.example.com/health', {
-				signal: AbortSignal.timeout(500),
-			});
-			checks.pricing = res.ok ? 'ok' : 'failed';
-		} catch (error) {
-			checks.pricing = 'failed';
-		}
-
-		const ready = Object.values(checks).every((v) => v === 'ok');
-
+		const checks = await getChecks();
+		const ready = checks.data === 'ok';
 		return new Response(JSON.stringify({ ready, checks, version: process.env.APP_VERSION }), {
 			status: ready ? 200 : 503,
 			headers: { 'Content-Type': 'application/json' },
@@ -163,21 +190,21 @@ export class Readiness extends Resource {
 The `jsResource` plugin loads the exported class. Keep it enabled if your application has an explicit `config.yaml`. At the default application mount, the route is `/Readiness`; adjust the probe URL if you configured `urlPath` or `host` routing. See [resource routing](/reference/v5/resources/overview#exporting-resources-as-endpoints) for the path rules.
 
 :::note
-Because the handler is a `static` method, it replaces Harper's built-in dispatch along with the authorization check that lives inside it, so `GET /Readiness` is unauthenticated. That is what a load balancer probe needs, and it is why the endpoint must not return anything you would not publish. Keep the response to check names and outcomes, never connection strings, credentials, or internal hostnames.
+Because the handler is a `static` method, it replaces Harper's built-in dispatch along with its authorization check, so `GET /Readiness` is unauthenticated. Keep the response to check names and outcomes, never connection strings, credentials, or internal hostnames. The shared in-flight check and two-second cache bound repeated reads and outbound requests per worker; also restrict probe access or rate-limit it at your traffic boundary.
 
-If you rewrite this as an instance `get()` instead, authorization comes back and defaults to `super_user` only, which will make your probe start failing with an authorization error rather than a readiness one. In that form you need `allowRead() { return true; }` to keep it reachable.
+If you rewrite this as an instance `get()` instead, authorization comes back and defaults to `super_user` only. Configure explicit authorization for your probe caller rather than assuming that the route remains public.
 :::
 
-Create the sentinel record before enabling the probe. The example assumes `Product` is exported at the server root:
+Create the sentinel record on each node before enabling the probe. The example assumes `ReadinessProbe` is exported at the server root:
 
 ```bash
-curl -s -X PUT https://my-node.example.com/Product/readiness-probe-sentinel \
+curl -s -X PUT https://my-node.example.com/ReadinessProbe/readiness-probe-sentinel \
   -H 'Content-Type: application/json' \
   -u 'admin:password' \
-  -d '{"name":"readiness probe sentinel","description":"do not delete"}'
+  -d '{"description":"readiness probe sentinel - do not delete"}'
 ```
 
-If the table replicates, seed once and confirm the record reaches every node. Otherwise, seed it on each node. Keep the record in place while the probe is in use.
+Keep the probe table node-local and exclude it from application cleanup jobs. A shared pricing failure reports `degraded` but does not make every node unavailable. A `200` therefore establishes node-local readiness, not that every journey dependency is healthy; check the response and the journey synthetic as well.
 
 Bound downstream checks with a timeout. Set `APP_VERSION` in your deployment so the response identifies the component build answering during a rollout.
 

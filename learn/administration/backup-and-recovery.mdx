@@ -90,6 +90,10 @@ Each backup is a full logical snapshot, but its disk cost depends on file sharin
 - RocksDB backups share unchanged data files within the same repository.
 - The transaction-log snapshot is copied for each backup. Include it when measuring repository growth.
 - Blob snapshots use hard links when the source and destination filesystem support them. Otherwise, they copy the files. Use `exclude_blobs: true` only if your recovery procedure can recover those blobs separately.
+- <VersionBadge version="v5.3.0" /> Restoring a backup created with `exclude_blobs: true` requires `allow_engine_only:
+  true`, even into a new database. This explicitly accepts the risk of records pointing at missing or unrelated blob
+  files. Include separate blob recovery and validation in the drill; do not add the flag just to bypass the safety
+  check.
 - An export that does not preserve sharing materializes those shared or linked files as separate copies. Budget for the full exported size.
 
 Measure physical repository growth over several backups with your retention policy and filesystem. Do not assume that a full logical snapshot consumes its full logical size, or that all snapshot files are hard-linked.
@@ -168,7 +172,7 @@ Also include these constraints in the restore procedure:
 
 ## Restoring in a replicated cluster
 
-A restored node may be behind peers that have continued accepting writes. Choose which data should be authoritative before reconnecting it.
+A restored node may be behind peers that have continued accepting writes. Peers can replay newer writes, including the destructive mutations you intended to undo. Restoring one node does not make its backup authoritative; choose which data to preserve or repair and rehearse the re-entry policy before reconnecting it.
 
 ```mermaid
 flowchart TD
@@ -187,11 +191,11 @@ flowchart TD
 For an in-place recovery:
 
 1. Take the node out of rotation with the availability flag, per [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx). Never restore a node that is serving traffic.
-2. **Isolate replication separately.** Stop peer exchange using your tested topology or network controls. Keep that isolation in place across restarts.
+2. **Isolate replication separately.** For example, use a network policy that blocks peer replication in both directions and closes existing peer connections. Keep it effective across restarts, and verify that transactions cannot cross the boundary. Removing a node from the load balancer or setting `"replicated": false` on one operation does not isolate replication.
 3. Confirm the data authority and replay policy: which writes to preserve, repair, or reapply, and how peers will converge.
 4. Perform the restore, online or offline according to the table above.
 5. Verify data expectations locally before any peer sees the node.
-6. Reconnect replication under that policy and verify convergence. Then complete the traffic-admission checks before restoring traffic.
+6. Reconnect replication under the policy you proved in an isolated multi-node drill. If that policy would reintroduce corruption from a peer, keep the affected peers isolated and reconcile their data first. Verify convergence, then complete the traffic-admission checks before restoring traffic.
 
 :::danger
 **Draining traffic does not stop replication.** A drained node continues exchanging transactions with peers. An offline restore stops that exchange while Harper is down, but configured routes can reconnect as soon as it starts. Keep replication isolated until validation is complete and you are ready to execute the re-entry policy.
