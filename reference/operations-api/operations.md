@@ -1779,11 +1779,13 @@ Valid attribute names are `system`, `time`, `cpu`, `memory`, `disk`, `network`, 
 
 ### `set_status` / `get_status` / `clear_status`
 
-Manage application status values. The status types are fixed — `primary`, `maintenance`, `availability` — while the value you store against each is yours to define (availability only accepts `'Available'` or `'Unavailable'`).
+Manage application status values. The status types are fixed — `primary`, `maintenance`, `availability` — while the value you store against each is yours to define (availability only accepts `'Available'` or `'Unavailable'`). `set_status` stores only `status`; any other field in the request is ignored.
 
 Values are **persisted**, stored in the `hdb_status` table in the `system` database, so they survive a restart. That table is declared `replicate: false`, so a status set on one node stays on that node and does not propagate to peers — which is what makes these values usable as node-local coordination markers.
 
-These are a coordination primitive for your own automation: Harper stores and returns them but does not change its own behavior based on them, so they are not a substitute for a real health check. A `get_status` call with no `id` additionally returns Harper-derived state, including a `restartRequired` flag that tracks pending component and code restarts (not configuration changes).
+These are a coordination primitive for your own automation: Harper core stores and returns them but does not change its own behavior based on them, so they are not a substitute for a real health check. A `get_status` call with no `id` additionally returns Harper-derived state, including a `restartRequired` flag that tracks pending component and code restarts (not configuration changes).
+
+On Harper Fabric, the `status-check` component answers the load balancer from the `availability` record, so that record decides whether a node receives traffic. See [Load Balancing and Node Availability](/fabric/load-balancing).
 
 ```json
 { "operation": "set_status", "id": "primary", "status": "active" }

@@ -34,6 +34,11 @@ const sidebarsFabric: SidebarsConfig = {
 		},
 		{
 			type: 'doc',
+			id: 'load-balancing',
+			label: 'Load Balancing & Node Availability',
+		},
+		{
+			type: 'doc',
 			id: 'managing-applications',
 			label: 'Managing Applications',
 		},
