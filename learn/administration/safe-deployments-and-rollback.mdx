@@ -224,7 +224,7 @@ Rehearse a stopped rollout end to end on a non-production cluster:
 1. Declare a threshold before you start, for example "stop if journey success on the new cohort is more than 0.5 percent below the control cohort over five minutes."
 2. Deploy a component that fails that threshold deliberately, to a bounded cohort.
 3. Detect it through your dashboards rather than because you know what you did.
-4. Reverse it, and time from decision to restored traffic. That number is your release RTO, and it belongs in your reliability plan.
+4. Reverse it, and record both the time from the reversal decision to verified service and the total time from failure to verified service. Compare the total, including detection and decision time, with your RTO.
 5. Verify uniform state afterwards: `get_components` on every node, and `list_deployments` showing the reversal.
 
 Check every node after rollback; a cluster average can hide nodes still running the failed release.
@@ -254,7 +254,7 @@ Check every node after rollback; a cluster average can hide nodes still running 
 - [ ] `get_configuration` read back after every configuration change
 - [ ] Schema changes follow expand-then-contract, with destructive operations documented per node
 - [ ] Forward repair defined for changes that alter persisted meaning
-- [ ] Measured release RTO recorded from a rehearsed reversal
+- [ ] Reversal duration and total recovery time recorded from a rehearsal, with the total compared against RTO
 
 ## Additional Resources
 

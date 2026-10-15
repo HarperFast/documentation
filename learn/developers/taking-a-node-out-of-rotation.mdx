@@ -159,8 +159,9 @@ async function checkDependency() {
 			signal: AbortSignal.timeout(2000),
 		});
 		return response.ok ? { ok: true } : { ok: false, reason: `dependency answered ${response.status}` };
-	} catch (error) {
-		return { ok: false, reason: `dependency unreachable: ${error.message}` };
+	} catch {
+		// Fetch errors can include credentials from the URL. Keep them out of logs and markers.
+		return { ok: false, reason: 'dependency unreachable' };
 	}
 }
 

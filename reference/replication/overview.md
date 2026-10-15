@@ -360,7 +360,7 @@ See [Clustering Operations](./clustering.md#cluster-status) for the full respons
 
 ## Initial Synchronization and Resynchronization
 
-Initial synchronization is decided per peer and per database. A new node can request a full copy from each in-scope peer for which it has no resume cursor, so a join can load several peers at once. To select one full-copy source, use [`add_node` with `isLeader: true`](./clustering.md#add-node). After synchronization, replication continues incrementally.
+Initial synchronization is decided per peer and per database. A new node can request a full copy from each in-scope peer for which it has no resume cursor, so a join can load several peers at once. [`add_node` with `isLeader: true`](./clustering.md#add-node) identifies a bootstrap source; it does not prevent full-copy requests to other cursorless peers. After synchronization, replication continues incrementally.
 
 If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions.
 

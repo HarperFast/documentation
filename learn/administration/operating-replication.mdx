@@ -96,7 +96,7 @@ Measure incremental catch-up and full synchronization separately. A briefly offl
 
 On the new node, the cost is larger than "one copy from one peer," because the full-copy decision is made per peer and per database rather than once against a bootstrap source. A joining node requests a full copy from every peer it has no resume cursor for. And because replication is bidirectional, each established peer independently decides it has no cursor for the newcomer and requests a full copy _from_ it as well. Joining a cluster of N peers is therefore N inbound transfers plus N outbound transfers of the new node's own (empty) databases, not a single stream from one source.
 
-A node join can load every existing peer, so include it in cluster capacity planning. To use one full-copy source, pass `isLeader: true` to `add_node`.
+A node join can load every existing peer, so include it in cluster capacity planning. Passing `isLeader: true` to `add_node` identifies a bootstrap source, but does not prevent full-copy requests to other peers that lack a resume cursor. Do not use it to budget for a single transfer.
 
 Each node derives its advertised `hdb_nodes` record from its configuration. A restart or component reload can replace constraints applied only through `add_node`; keep durable constraints in config routes.
 
