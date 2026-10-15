@@ -75,13 +75,10 @@ Use the target node's application URL. The examples assume HTTPS is configured o
   <TabItem value="curl" label="curl">
 
 ```bash
-# Is this node advertising itself as available?
 curl -s -o /dev/null -w '%{http_code}\n' https://my-node.example.com/status
 
-# Take it out of rotation
 curl -s -X DELETE https://my-node.example.com/status -u 'admin:password'
 
-# Put it back
 curl -s -X POST https://my-node.example.com/status -u 'admin:password'
 ```
 
@@ -141,7 +138,6 @@ let inFlight;
 async function checkReadiness() {
 	const checks = {};
 
-	// Keep the node-local storage check to one primary-key lookup.
 	// Use a fresh server-side context for this fixed, non-sensitive read.
 	try {
 		const sentinel = await tables.ReadinessProbe.get('readiness-probe-sentinel', {});

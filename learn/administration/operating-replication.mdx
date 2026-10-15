@@ -168,16 +168,16 @@ Inventory `system.hdb_nodes` alongside this and compare it to your intended topo
 
 ## Prove convergence, not connection
 
-Socket state cannot tell you that a specific business record is current. For anything where the answer matters, write a sentinel and read it back from the peer.
+Socket state cannot tell you that a specific business record is current. Write a sentinel on the source node:
 
 ```javascript
-// On the source node: write a sentinel with a known value
 const marker = { id: 'convergence-probe', writtenAt: Date.now(), from: 'server-1' };
 await tables.OpsProbe.put(marker.id, marker);
 ```
 
+Read it from the target node and compare `writtenAt`:
+
 ```bash
-# On the target node: read it back and compare writtenAt
 curl -s https://server-2.example.net/OpsProbe/convergence-probe \
   -u 'admin:password'
 ```

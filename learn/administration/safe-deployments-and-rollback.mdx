@@ -179,7 +179,7 @@ Apply the same review, rollout, and rollback checks to configuration changes.
 
 `set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply a change across the cluster in one call, with per-node outcomes in the response. For settings that apply on worker restart, follow with `restart_service` using `"replicated": true`, which restarts workers on each node in turn.
 
-Check the setting's restart requirements first. Process-level settings such as [`threads.v8Flags`](/reference/v5/configuration/options#applying-v8-flags) require a full process restart; `restart_service` does not apply them. Drain and restart each node in turn, using `restart` or your process/container manager, and verify it before advancing. The `restart` operation does not replicate.
+Check the setting's restart requirements first. Process-level settings such as [`threads.v8Flags`](/reference/v5/configuration/options#applying-v8-flags) <VersionBadge version="v5.4.0" /> require a full process restart; `restart_service` does not apply them. Drain and restart each node in turn, using `restart` or your process/container manager, and verify it before advancing. The `restart` operation does not replicate.
 
 ```json
 {

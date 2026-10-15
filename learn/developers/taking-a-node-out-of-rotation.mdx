@@ -254,8 +254,6 @@ async function ask(base, path) {
 	}
 }
 
-// Which other nodes are serving: their /Health passes, and their /status says
-// the load balancer may send them traffic. Each is asked at its own address.
 async function otherNodesServing(nodes, me) {
 	const answers = await Promise.all(
 		nodes.map(async (base) => {

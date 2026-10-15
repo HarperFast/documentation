@@ -112,13 +112,15 @@ Keep a recoverable copy outside the source node's failure and administrative bou
 - A disaster-recovery copy has to take the entire per-database repository, `<backupPath>/<database>`, not an individual backup.
 - It has to do that while no backup operation is running, or from an atomic filesystem snapshot. A live recursive copy can race `create_backup`, `delete_backup`, or `purge_backups` and produce an unrestorable copy.
 
-To take a fresh snapshot directly to another machine, run:
+Download a fresh snapshot from the configured node:
 
 ```bash
-# Pull a snapshot of the current state from a running node
 harper get_backup database=data out=./data-$(date +%Y%m%dT%H%M%S).tar.gz
+```
 
-# Or pull a snapshot of another node, writing it to a file here
+Or specify a remote target and write the snapshot to a local file:
+
+```bash
 harper get_backup database=data target=https://operations.node-2.example.com out=./data.tar.gz
 ```
 
