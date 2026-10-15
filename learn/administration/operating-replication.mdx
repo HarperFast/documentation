@@ -103,7 +103,7 @@ Each node derives its advertised `hdb_nodes` record from its configuration. A re
 Registry rows can replicate with `system`. <VersionBadge type="changed" version="v5.2.0" /> Advertised records describe directional routes, so that exchange can preserve a constrained topology. To keep registries separate across a migration bridge, explicitly exclude `hdb_nodes` on the relevant routes while allowing users and roles through. See [controlled system replication](/reference/v5/replication/overview#replicating-the-system-database-with-controlled-flow).
 
 :::danger
-When replicating configuration, only send cluster-appropriate parameters. Replicating a node-local value such as a port, `node.hostname`, a file path, TLS material, or `replication.hostname`, `url`, or `routes` overwrites every peer's own local value. To apply a cluster-wide change safely, use `set_configuration` with `"replicated": true` for the parameter, then `restart_service` with `"replicated": true`, which restarts nodes one at a time.
+When replicating configuration, only send cluster-appropriate parameters. Replicating a node-local value such as a port, `node.hostname`, a file path, TLS material, or `replication.hostname`, `url`, or `routes` overwrites every peer's own local value. Use `set_configuration` with `"replicated": true` for cluster-wide parameters. If the setting applies on worker restart, follow with `restart_service` using `"replicated": true`. For settings that require a full process restart, drain and restart each node in turn; see [configuration changes](./safe-deployments-and-rollback.mdx#configuration-changes-are-deployments-too).
 :::
 
 ## Read `cluster_status` like an operator

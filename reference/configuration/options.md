@@ -232,7 +232,7 @@ logging:
   level: warn
   root: ~/hdb/log
   stdStreams: false
-  auditLog: false
+  auditLog: true
   rotation:
     interval: 1D
     maxSize: 100M

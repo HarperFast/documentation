@@ -169,7 +169,7 @@ Harper's logger is built on Node's `Console`, so this renders as a formatted tex
 That is fine for reading during an incident, but a log pipeline cannot key on `component` or `outcome` without parsing the line. If you need queryable fields, serialize the context yourself and log a single JSON string.
 :::
 
-Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The default is `warn`, and `notify` is always logged. Choose a level that retains useful incident context without producing excessive volume.
+Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The default is `warn`, which drops the example's `info` message. Set [`logging.external.level`](/reference/v5/logging/configuration#loggingexternal) to `info` to retain it, and check the resulting volume. `notify` is always logged.
 
 `console.log` output does not reach the log files unless `logging.console` is enabled, so unstructured console output is not a production record. Centralize logs off the node, because the node you most need logs from is the one you are about to restart.
 

@@ -106,7 +106,7 @@ See [Database / Transaction Logging](../database/transaction.md) for details on 
 
 ```yaml
 logging:
-  auditLog: false
+  auditLog: true
 ```
 
 ### `logging.auditRetention`
@@ -339,7 +339,7 @@ logging:
   file: true
   stdStreams: false
   console: false
-  auditLog: false
+  auditLog: true
   auditRetention: 3d
   rotation:
     enabled: true

@@ -162,7 +162,7 @@ On a non-production cluster, stop one node. Confirm that peers keep serving, not
 
 - **Fabric and self-managed differ in what you own, not in how Harper behaves.** On [Fabric](/fabric), cluster creation, certificates, and the metrics pipeline are managed for you. The failure unit, the replication model, and the admission problem are identical.
 - **Version parity across nodes is an operating requirement, not a nicety.** Mixed versions in a cluster change replication and deployment behavior. Record the version per node in your boundary inventory and alert on drift.
-- **Configuration changes made through the API take effect on restart.** A `set_configuration` call that has not been followed by a restart or `restart_service` leaves a node running something other than its stated configuration. Track pending changes in your change record.
+- **Configuration changes need the restart type required by the setting.** Some apply on worker restart; process-level settings need a full process restart. Track pending changes and follow the [configuration rollout procedure](./safe-deployments-and-rollback.mdx#configuration-changes-are-deployments-too).
 - **`get_status` reports a `restartRequired` flag, but it tracks component and code restarts rather than configuration changes.** Do not rely on it to tell you a configuration change is still pending.
 
 ## Readiness checklist

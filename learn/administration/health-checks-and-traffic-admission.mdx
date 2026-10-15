@@ -93,10 +93,10 @@ const base = 'https://my-node.example.com/status';
 const auth = { Authorization: 'Basic ' + btoa('admin:password') };
 
 const res = await fetch(base);
-console.log(res.status); // 200 available, 404 unavailable
+console.log(res.status);
 
-await fetch(base, { method: 'DELETE', headers: auth }); // out of rotation
-await fetch(base, { method: 'POST', headers: auth }); // back in
+await fetch(base, { method: 'DELETE', headers: auth });
+await fetch(base, { method: 'POST', headers: auth });
 ```
 
   </TabItem>

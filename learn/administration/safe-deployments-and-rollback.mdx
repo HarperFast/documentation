@@ -39,7 +39,7 @@ Decide separately what to build, where to install it, which behavior to enable, 
 For example, validate a route with internal traffic before exposing it publicly. If errors rise, reduce traffic to the release or disable its feature flag while you investigate.
 
 :::danger
-**Component deployment replicates by default.** Pass `"replicated": false` when validating on one node. Other management operations also replicate by default; check the operation's reference before using it during an isolated rollout. [`set_configuration`](/reference/v5/configuration/operations) requires an explicit `"replicated": true`.
+**Component deployment replicates by default.** Pass `"replicated": false` when validating on one node. Other operations have different [replication defaults](/reference/v5/replication/overview#replicated-transactions); check the operation's reference before an isolated rollout.
 :::
 
 `urlPath` mounts a component at an HTTP path and `host` serves it on a virtual hostname. Routing by either has been available since v5.1.0. What arrived in v5.2.0 is declaring that routing on the application's entry in the root `harper-config.yaml`, and the matching `host` parameter on `deploy_component`. Declared that way, the routing is persisted deployment state rather than a runtime toggle. See [HTTP middleware routing](/reference/v5/http/overview#middleware-routing).
