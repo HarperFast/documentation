@@ -42,7 +42,9 @@ Record these decisions in your reliability plan:
 | **Managed backups** <VersionBadge version="v5.2.0" /> | <EngineBadge engines="RocksDB" />       | Incremental, verifiable backups in a server-side repository under `storage.backupPath`                                 |
 | **Snapshot download**                                 | <EngineBadge engines="RocksDB, LMDB" /> | [`get_backup`](/reference/v5/backups/operations#get_backup) streams a snapshot over HTTP, with no server-side artifact |
 
-A backup is a whole-database copy: all tables, the transaction log, and any file-backed blobs. So a restored database keeps its `read_audit_log` history as of the backup point.
+RocksDB managed backups and snapshot downloads include all tables, the transaction log, and file-backed blobs unless you request `exclude_blobs`. Restoring that complete backup preserves its `read_audit_log` history.
+
+LMDB `get_backup` streams the `.mdb` file and does not include external blob files. Table-filtered downloads include the audit store only with `include_audit: true`. If an LMDB database uses file-backed blobs, use a coordinated filesystem or volume backup of the database and every blob root with Harper stopped. An `.mdb` download alone cannot recover those blobs after the source node is lost.
 
 :::warning
 Two limitations to check against your own deployment now rather than later:
@@ -235,7 +237,7 @@ For records requiring long-term preservation, keep a separate export in a docume
 ## Readiness checklist
 
 - [ ] Failure classes enumerated, with the mechanism that addresses each
-- [ ] Recovery point and recovery time stated per database, not per cluster
+- [ ] Database recovery points and journey recovery times recorded using the [objective definitions](./engineering-rpo-rto-and-uptime.mdx#state-objectives-for-each-journey-and-its-data)
 - [ ] Storage engine confirmed per database, and the mechanism chosen accordingly
 - [ ] No database in scope has tables spanning more than one storage root, or the exclusion is known and accepted
 - [ ] Backup cadence matches the stated recovery point per database

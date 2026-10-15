@@ -133,18 +133,22 @@ Whatever agent you use, follow its own worker-thread documentation, and finish b
 
 ## Logs you can use during an incident
 
-Harper's `logger` global takes a message plus a context object from component code:
+Harper's `logger` global takes a message plus a context object from component code. Call this helper after a successful submission, passing the request context and measured duration in milliseconds:
 
 ```javascript
-logger.info('order submitted', {
-	component: 'orders-api',
-	version: process.env.APP_VERSION, // whatever your build injects
-	node: server.hostname,
-	requestId: context.requestId, // requires http.logging.id, see below
-	operation: 'submit',
-	durationMs: elapsed,
-	outcome: 'ok',
-});
+import { server } from 'harper';
+
+function logOrderSubmitted(context, elapsed) {
+	logger.info('order submitted', {
+		component: 'orders-api',
+		version: process.env.APP_VERSION,
+		node: server.hostname,
+		requestId: context.requestId,
+		operation: 'submit',
+		durationMs: elapsed,
+		outcome: 'ok',
+	});
+}
 ```
 
 Include the component and its version, the node, a request or trace identifier, the operation, its duration, the outcome, and a safe error class. That field set is what lets you answer "was this only the new version" and "was this only one node" without guessing, and those are the first two questions in almost every incident.

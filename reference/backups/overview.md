@@ -5,12 +5,12 @@ title: Backups
 
 <!-- Source: HarperFast/harper#1831 (RocksDB managed backup and restore operations) -->
 
-Harper can back up and restore its databases natively. A backup is a whole-database copy — all tables, the audit/transaction log, and any file-backed blobs — so a restored database is a consistent point-in-time image of everything in it. (`get_backup` on an LMDB database is the exception: it can stream a subset of tables, and includes the audit store only when requested.)
+Harper can back up and restore its databases natively. RocksDB managed backups and snapshot downloads include all tables, the audit/transaction log, and file-backed blobs unless `exclude_blobs` is requested. LMDB `get_backup` streams only the `.mdb` file, optionally filtered by table; external blob files need a separate, coordinated backup.
 
 Two complementary mechanisms are available:
 
 - **Managed backups** <VersionBadge version="v5.2.0" /> <EngineBadge engines="RocksDB" /> — incremental, verifiable backups kept in a server-side repository. Harper creates, lists, verifies, deletes, purges, and restores them through the [backup operations](./operations.md).
-- **Snapshot download** <EngineBadge engines="RocksDB, LMDB" /> — [`get_backup`](./operations.md#get_backup) streams a full snapshot of a database over HTTP for storage off-host, with no server-side artifact.
+- **Snapshot download** <EngineBadge engines="RocksDB, LMDB" /> — [`get_backup`](./operations.md#get_backup) streams a RocksDB archive or an LMDB `.mdb` file over HTTP for storage off-host, with no server-side artifact.
 
 Every backup operation is available through the [Operations API](../operations-api/overview.md) and as a [CLI command](./operations.md#running-backup-operations-from-the-cli) under the same operation name.
 
@@ -33,7 +33,7 @@ The offline path matters for restore. RocksDB is single-writer, so an in-place r
 ## Limitations
 
 - **Managed backups require the RocksDB storage engine.** For LMDB databases, use [`get_backup`](./operations.md#get_backup) or [volume snapshots](../cli/commands.md#how-backups-work).
-- **Whole-database granularity.** There is no per-table backup or restore. (The one exception: `get_backup` on an LMDB database can stream individual tables, and includes the audit store only with `include_audit`.)
+- **Whole-database granularity.** There is no per-table backup or restore. The exception is `get_backup` on LMDB, which can stream selected tables; a table-filtered download includes the audit store only with `include_audit`.
 - **One storage root per database.** Backup is rejected if the database's tables resolve to multiple storage roots. A custom database-level `storage.path`, or per-table paths that still resolve to a single root, are supported.
 - **Backups live on the node that created them.** The backup repository is a local directory. RocksDB shares files across backup IDs (a backup ID is not a self-contained folder), so disaster-recovery copies must take the entire per-database repository — `<backupPath>/<database>` — not an individual backup, and must do so while no backup operation is running, or from an atomic filesystem snapshot. A live recursive copy can race `create_backup`/`delete_backup`/`purge_backups` and produce an unrestorable copy. Alternatively, use `get_backup` to pull a snapshot from a running server.
 - **`get_backup` always streams the current state.** It cannot download a historical managed backup; to move a retained backup off-host, copy its whole per-database repository as above.
@@ -124,6 +124,10 @@ harper start
 The target node must have at least as many blob roots configured as the snapshot captured — blob references store their root index, so a missing root leaves those blobs unresolved. For anything beyond the simplest single-root case, prefer [managed backups](#example-incremental-backups-and-restore): `restore_backup` restores the RocksDB files and every blob root automatically.
 
 ### LMDB <EngineBadge engines="LMDB" />
+
+:::warning
+This stream does not include external blob files. For LMDB databases with file-backed blobs, use a coordinated filesystem or volume backup of the `.mdb` file and every configured blob root with Harper stopped. Restore that matching set and validate blob reads before serving traffic; restoring the `.mdb` file alone leaves its external blob references unresolved if the source files are lost.
+:::
 
 For an LMDB database the stream is the database's single `.mdb` file:
 

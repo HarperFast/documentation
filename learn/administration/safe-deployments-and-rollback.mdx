@@ -177,7 +177,9 @@ Set these parameters to match your payload size, network, and failure policy:
 
 Apply the same review, rollout, and rollback checks to configuration changes.
 
-`set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply a change across the cluster in one call, with per-node outcomes in the response. To finish the change cluster-wide, follow with `restart_service` using `"replicated": true`, which restarts nodes one at a time.
+`set_configuration` supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply a change across the cluster in one call, with per-node outcomes in the response. For settings that apply on worker restart, follow with `restart_service` using `"replicated": true`, which restarts workers on each node in turn.
+
+Check the setting's restart requirements first. Process-level settings such as [`threads.v8Flags`](/reference/v5/configuration/options#applying-v8-flags) require a full process restart; `restart_service` does not apply them. Drain and restart each node in turn, using `restart` or your process/container manager, and verify it before advancing. The `restart` operation does not replicate.
 
 ```json
 {
@@ -191,7 +193,7 @@ Apply the same review, rollout, and rollback checks to configuration changes.
 Only replicate cluster-appropriate parameters. Node-local values such as ports, `node.hostname`, file paths, TLS material, and `replication.hostname`, `url`, or `routes` would overwrite every peer's own values. Replicating one of these is a cluster-wide outage delivered in a single API call.
 :::
 
-Configuration changes take effect after restart. `get_status.restartRequired` tracks component and code restarts, so it does not identify pending `set_configuration` changes. Record those changes yourself, restart the affected nodes, and read back `get_configuration` to confirm the intended values.
+`get_status.restartRequired` tracks component and code restarts, so it does not identify pending `set_configuration` changes. Record those changes yourself, use the required restart type, and read back `get_configuration`. Read-back confirms the configured value; verify the running behavior too.
 
 ## Rollback is a designed capability
 

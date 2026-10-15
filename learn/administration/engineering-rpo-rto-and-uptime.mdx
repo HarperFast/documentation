@@ -3,7 +3,7 @@ title: Engineering RPO, RTO, and Uptime
 sidebar_position: 8
 ---
 
-Define recovery point objective (RPO), recovery time objective (RTO), and availability for each critical user journey and failure scenario. This guide helps you choose a recovery mechanism for each target and check it against measured results.
+Define recovery time objective (RTO) and availability per critical journey, and recovery point objective (RPO) per database. Map failures to recovery mechanisms and validate the targets with measured results.
 
 When measured results miss a target, improve the recovery mechanism or revise the target before committing to it.
 
@@ -23,7 +23,7 @@ When measured results miss a target, improve the recovery mechanism or revise th
 - [Backup and Recovery](./backup-and-recovery.mdx) for the recovery mechanisms
 - A named owner who can approve or reject a target, because this exercise produces decisions rather than data
 
-## State the three per journey
+## State objectives for each journey and its data
 
 | Term                     | The question it answers              | How to state it so it is testable                                                                  |
 | ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
@@ -33,7 +33,7 @@ When measured results miss a target, improve the recovery mechanism or revise th
 
 For each target, record the affected journey, when measurement starts, and where you measure it.
 
-**Per journey, not per cluster.** A catalog browse and an order submission fail differently, matter differently, and recover differently. One cluster-wide number overcommits on the cheap journey and undercommits on the expensive one.
+Scope availability and recovery time to each journey, and record the recovery point for every database it depends on. Catalog browsing and order submission can have different targets even when they share a cluster.
 
 **Include detection in recovery time.** Measure from the start of the failure to verified service restoration. Starting at the alert or the operator's decision leaves out time when users were already affected.
 
@@ -47,7 +47,7 @@ Your recovery point objective is a statement about how much acknowledged data yo
 
 Healthy replication and recent backups do not prove that every acknowledged write has reached durable storage. Include the possible loss of unflushed writes in your RPO.
 
-So treat it as an RPO decision rather than a performance one. Enabling it is defensible when the data is reproducible from an upstream source, when the workload is bulk ingest that can simply be re-run, or when peers acknowledge writes before the loss window opens. Outside those cases, leave it off. If it is on anywhere, record which databases and say so next to the recovery point in your plan, because the number no longer means what it appears to.
+Leave `writeAsync` off unless you can accept the loss of unflushed writes, for example because the data can be reproduced from an upstream source or a bulk ingest can be rerun. Asynchronous replication does not guarantee a durable peer copy before the client receives success. If you enable it, record the affected databases and the accepted loss window beside their recovery objectives.
 
 ## Map scenarios to mechanisms
 

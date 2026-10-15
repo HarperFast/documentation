@@ -180,10 +180,7 @@ function checkHealth() {
 // availability loop recognize this node's own address in its list of nodes. The
 // failure reason stays in the loop's log: anyone can read this response.
 export class Health extends Resource {
-	allowRead() {
-		return true;
-	}
-	async get() {
+	static async get() {
 		const { ok } = await checkHealth();
 		return {
 			status: ok ? 200 : 503,
@@ -206,15 +203,15 @@ import { server, tables } from 'harper';
 
 const RECORD = 'availability';
 const ROW = 'this-node'; // RotationMark doesn't replicate, so each node has this one row
-const TICK_MS = 5_000; // how often to look
-const RECHECK_MS = 1_500; // how soon to look again after going out
+const TICK_MS = 5_000;
+const RECHECK_MS = 1_500;
 const OUT_AFTER_MS = 30_000; // failing on every look this long before going out
 const BACK_AFTER_MS = 60_000; // passing on every look this long before coming back
 const ALONE_MS = 30_000; // out, with no other node serving this long: come back anyway
 const JUST_OUT_MS = 10_000; // no other node serving this soon after going out: come back now
 const WRITE_MS = 5_000; // the loop's own Unavailable lands this soon after its row
-const HEALTH_MS = 5_000; // how long the health check has to answer
-const ASK_MS = 3_000; // how long another node has to answer
+const HEALTH_MS = 5_000;
+const ASK_MS = 3_000;
 
 const log = logger.withTag('availability');
 const { RotationMark } = tables;

@@ -27,7 +27,7 @@ Example values are included in italics to show the intended level of specificity
 
 ## 2. Critical journeys
 
-The user-facing paths that must work. Everything else in this plan is stated per journey, so this table defines the scope of all of it.
+List the user-facing paths that must work, including the databases and dependencies each one needs.
 
 | Journey          | Description                   | Databases and tables involved | Downstream dependencies | Owner |
 | ---------------- | ----------------------------- | ----------------------------- | ----------------------- | ----- |
@@ -36,9 +36,11 @@ The user-facing paths that must work. Everything else in this plan is stated per
 
 ## 3. Objectives
 
-| Journey | Availability target | Measurement boundary | Recovery time objective        | Recovery point objective | Exclusions                                 |
-| ------- | ------------------- | -------------------- | ------------------------------ | ------------------------ | ------------------------------------------ |
-|         | _99.95%_            | _at the CDN edge_    | _15 min from start of failure_ | _5 min_                  | _planned maintenance, third-party outages_ |
+Use the [objective definitions](./engineering-rpo-rto-and-uptime.mdx#state-objectives-for-each-journey-and-its-data): availability and recovery time per journey, recovery point per database.
+
+| Journey | Availability target | Measurement boundary | Recovery time objective        | Recovery point objective by database | Exclusions                                 |
+| ------- | ------------------- | -------------------- | ------------------------------ | ------------------------------------ | ------------------------------------------ |
+|         | _99.95%_            | _at the CDN edge_    | _15 min from start of failure_ | _orders: 5 min; catalog: 1 hour_     | _planned maintenance, third-party outages_ |
 
 Monthly unavailability budget: _21 min 55 sec at 99.95%_
 

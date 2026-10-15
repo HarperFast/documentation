@@ -118,7 +118,7 @@ From [Monitoring and Triage](./monitoring-and-triage.mdx).
 From [Backup and Recovery](./backup-and-recovery.mdx).
 
 - [ ] Failure classes enumerated, each with the mechanism that addresses it
-- [ ] Recovery point stated per database and recovery time stated per critical journey
+- [ ] Database recovery points and journey recovery times recorded using the [objective definitions](./engineering-rpo-rto-and-uptime.mdx#state-objectives-for-each-journey-and-its-data)
 - [ ] Mechanism chosen per database according to its storage engine
 - [ ] No database in scope has tables spanning multiple storage roots, or the exclusion is known and accepted
 - [ ] Backup cadence matches the stated recovery point
@@ -144,7 +144,7 @@ From [Backup and Recovery](./backup-and-recovery.mdx).
 
 From [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx).
 
-- [ ] Recovery point, recovery time, and availability stated per journey with the measurement boundary named
+- [ ] Objectives recorded using the [definitions](./engineering-rpo-rto-and-uptime.mdx#state-objectives-for-each-journey-and-its-data), with each journey's measurement boundary and dependent databases named
 - [ ] Exclusions documented
 - [ ] Every scenario in the scenario map has a named mechanism
 - [ ] Availability target converted to minutes per month

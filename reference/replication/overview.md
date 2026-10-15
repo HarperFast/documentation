@@ -386,7 +386,7 @@ The following data operations are replicated across the cluster:
 
 **Destructive schema operations differ from each other, so check before you run one:**
 
-- `drop_database` and `drop_table` **replicate to the whole cluster by default**, like the other operations that accept a `replicated` flag. Pass `"replicated": false` to drop on one node only.
+- `drop_database` and `drop_table` **replicate to the whole cluster by default** on Pro and Fabric. Pass `"replicated": false` to drop on one node only.
 - `drop_attribute` is not replicated and must be run on each node independently.
 
 Data mutations, `drop_database`, `drop_table`, and component deployment replicate by default on Pro and Fabric; pass `"replicated": false` to limit them to one node. [`set_configuration`](../configuration/operations.md#set-configuration) and [`restart_service`](../operations-api/operations.md#restart_service) are opt-in: pass `"replicated": true` for a cluster-wide configuration update or rolling restart.
