@@ -141,7 +141,7 @@ All parameters are passed as `key=value` arguments. Every parameter is optional.
 - `project=<name>` - Component project name. Defaults to the current directory's name for a directory deploy, or is derived from the package for a package deploy.
 - `package=<reference>` - An npm, GitHub, or tarball reference to deploy instead of the current directory (e.g. `HarperDB/app#semver:v1.0.0`).
 - `target=<url>` - Remote Harper instance to deploy to. Omit to deploy to the local instance. A bare host defaults to `https://<host>:9925`.
-- `restart=true` or `restart=rolling` - Restart Harper after deploying. Use `rolling` for a staggered, zero-downtime restart across a cluster. With `rolling`, the command exits `0` once the node you called has taken the release and started the rolling restart's job; see [Waiting for a rolling deploy](#waiting-for-a-rolling-deploy). Cannot be combined with `activate=false`.
+- `restart=true` or `restart=rolling` - Restart Harper after deploying. Use `rolling` to restart a cluster's nodes one at a time; each node stays in rotation while it restarts. With `rolling`, the command exits `0` once the node you called has taken the release and started the rolling restart's job; see [Waiting for a rolling deploy](#waiting-for-a-rolling-deploy). Cannot be combined with `activate=false`.
 - `replicated=false` - Deploy to the node you called only. On Harper Pro and Fabric, a deploy goes to every node in the cluster unless you pass this; Harper core on its own does not replicate.
 - `install_command=<command>` - Override the install command run for the component.
 - `install_timeout=<ms>` - Maximum time, in milliseconds, to allow the install to run.

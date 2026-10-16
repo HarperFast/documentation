@@ -88,6 +88,7 @@ From [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
 - [ ] Stop thresholds and hold times declared before a rollout begins
 - [ ] Named decision owner for advance, hold, stop, and roll back
 - [ ] Pipeline checks deployment details and waits for the restart job, then verifies the serving version on every node
+- [ ] Nodes that must not serve while they change are drained first, since `restart=rolling` keeps each node in rotation
 - [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
 - [ ] Configuration changes go through the same change record as code
 - [ ] `get_configuration` read back after every configuration change
