@@ -280,7 +280,7 @@ replication:
 
 - `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This instance's hostname within the cluster. Subject to the same bare hostname or IP literal requirement as [`node.hostname`](#node) — a URL, `host:port`, or non-string value fails startup. When both are set, `node.hostname` wins.
 - `url` — WebSocket URL peers use to connect to this instance
-- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name` and `sharded`
+- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name`, `replicateTo`, and `sharded`
 - `routes` — Peer nodes; URL strings or `{hostname, port, startTime, revokedCertificates}` objects
 - `port` — Replication port
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
