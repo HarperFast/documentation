@@ -92,7 +92,7 @@ There is one socket per database per peer, so the sockets present in the respons
 | Node registry (`hdb_nodes`) | Lives in `system`, so it propagates with it. Each node rewrites its own self-record from its `harper-config.yaml` routes on restart or component reload | Scoping applied through `add_node` alone does not survive a restart. Put durable constraints in config routes, and see below if you need the registry kept per cluster |
 | Destructive schema changes  | `drop_database` and `drop_table` replicate by default; `drop_attribute` does not                                                                        | A drop is a cluster-wide event unless you pass `"replicated": false`. Verify the result on every node                                                                  |
 
-Measure incremental catch-up and full synchronization separately. A briefly offline node can catch up from retained transaction history. If it was away longer than its peers retain that history, set by [`logging.auditRetention`](/reference/v5/logging/configuration#loggingauditretention) (default `3d`), the peer sends a full copy instead, even though the node has synchronized before.
+Measure incremental catch-up and full synchronization separately. A briefly offline node can catch up from retained transaction history, which its peers keep for [`logging.auditRetention`](/reference/v5/logging/configuration#loggingauditretention) (default `3d`). A node away longer than that needs a full copy, even though it has synchronized before.
 
 On the new node, the cost is larger than "one copy from one peer," because the full-copy decision is made per peer and per database rather than once against a bootstrap source. A joining node requests a full copy from every peer it has no resume cursor for. And because replication is bidirectional, each established peer independently decides it has no cursor for the newcomer and requests a full copy _from_ it as well. Joining a cluster of N peers is therefore N inbound transfers plus N outbound transfers of the new node's own (empty) databases, not a single stream from one source.
 
@@ -168,7 +168,7 @@ Inventory `system.hdb_nodes` alongside this and compare it to your intended topo
 
 ## Prove convergence, not connection
 
-Socket state cannot tell you that a specific business record is current. Add an exported probe table to your application's schema, with `database` set to the database you want to measure. Leave replication on, which is the default; a `replicate: false` table stays on the node that wrote it:
+Socket state cannot tell you that a specific business record is current. Add an exported probe table to your application's schema, in the database you want to measure. Leave replication on, which is the default; a `replicate: false` table stays on the node that wrote it. For another database, change `data` here and in the write below, and give each database's probe table its own name:
 
 ```graphql
 type OpsProbe @table(database: "data") @export {
@@ -182,7 +182,7 @@ Write a sentinel on the source node:
 
 ```javascript
 const marker = { id: 'convergence-probe', writtenAt: Date.now(), from: 'server-1' };
-await tables.OpsProbe.put(marker.id, marker);
+await databases.data.OpsProbe.put(marker.id, marker);
 ```
 
 Read it from the target node and compare `writtenAt`:
