@@ -10,20 +10,20 @@ For a quick reference of every option, see [Configuration Options — `storage`]
 
 ## Durability vs. Throughput
 
-On RocksDB (the default storage engine), Harper does not call `fsync` or `fdatasync` when committing a transaction. RocksDB's own Write-Ahead Log (WAL) is disabled for table stores; instead, each acknowledged commit is written to Harper's transaction log (`database/<db>/transaction_logs/...txnlog`) using a standard write to the OS page cache. On startup, Harper replays the transaction log to recover any committed writes that had not yet been flushed to RocksDB table files.
+On RocksDB (the default storage engine), Harper does not call `fsync` or `fdatasync` when committing a transaction, and RocksDB's own Write-Ahead Log (WAL) is disabled for table stores. When the [transaction log](./transaction.md) is enabled (the default via [`logging.auditLog: true`](../logging/configuration.md) and [`@table(audit: true)`](./transaction.md#enabling-the-transaction-log-per-table)), each acknowledged commit is written to Harper's transaction log (`database/<db>/transaction_logs/`) using a standard write to the OS page cache. On startup, Harper replays the transaction log to recover any committed writes that had not yet been flushed from RocksDB's in-memory memtables to table files.
 
 What an acknowledged write survives on a single node:
 
-- **Harper process crash or restart**: Survived. Committed bytes are already in the OS page cache, so the operating system preserves and flushes them to disk even if the Harper process terminates unexpectedly, and Harper replays the transaction log on restart.
-- **OS crash, kernel panic, power loss, or host failure**: Recent writes that the OS has not yet flushed from the page cache to disk can be lost. The database remains structurally consistent — only the most recent un-flushed commits are at risk.
+- **Harper process crash or restart**: Survived when transaction logging is enabled (the default). Committed bytes are already in the OS page cache, so the operating system preserves and flushes them to disk even if the Harper process terminates unexpectedly, and Harper replays the transaction log on restart. If transaction logging is disabled globally (`logging.auditLog: false`) or for a table (`@table(audit: false)`), no transaction-log entry is written while RocksDB's WAL remains off, so unflushed memtable writes are also lost on a Harper process crash.
+- **OS crash, kernel panic, power loss, or host failure**: Recent writes that the OS has not yet flushed from the page cache to disk can be lost. On a single-node deployment, durability against OS or power failure depends on periodic OS page-cache writeback. The database remains structurally consistent — only the most recent un-flushed commits are at risk.
 
-For durability against machine, OS, power, or storage failure, Harper relies on **replication confirmation** rather than local disk `fsync`. An acknowledgement from another node is a much stronger durability guarantee than a local drive's `fsync`, because in the failures that matter in production — host failure, storage hardware loss, or datacenter outage — a local disk fails or becomes unreachable together with the rest of the machine.
+For durability against machine, OS, power, or storage failure in a multi-node cluster, Harper relies on **replication confirmation** rather than local disk `fsync`. In production failures such as host failure or storage hardware loss, a local disk fails or becomes unreachable together with the rest of the machine, whereas an acknowledgement from a peer node on an independent machine means the write has been committed off-host. Because confirming RocksDB peers also commit to their own OS page cache without `fsync`, surviving a power outage or site-wide failure requires confirming peers in separate power or failure domains.
 
-To require confirmation from one or more peer nodes before a write returns, use [replication confirmation](../replication/sharding.md):
+To require confirmation from `<k>` peer nodes before a write returns, use [replication confirmation](../replication/sharding.md):
 
-- **REST**: Pass [`X-Replicate-To: <n>;confirm=<k>`](../replication/sharding.md#replication-control-via-rest-header) on the request.
-- **Operations API**: Set [`replicatedConfirmation`](../replication/sharding.md#replication-control-via-operations-api) (alongside `replicateTo`) in the operation payload.
-- **Resource API**: Set [`context.replicatedConfirmation`](../replication/sharding.md#programmatic-replication-control) in your resource method.
+- **Operations API**: Set [`replicatedConfirmation: <k>`](../replication/sharding.md#replication-control-via-operations-api) in the operation payload. Omit `replicateTo` to keep full-cluster replication, or set `replicateTo` only when you also want to limit residency (dynamic sharding) to a subset of nodes.
+- **Resource API**: Set [`context.replicatedConfirmation = <k>`](../replication/sharding.md#programmatic-replication-control) in your resource method (leaving `context.replicateTo` unset unless you also want to restrict residency).
+- **REST**: Pass [`X-Replicate-To: <n>;confirm=<k>`](../replication/sharding.md#replication-control-via-rest-header) on the request. Because `<n>` in this header also sets how many additional nodes store the record, set `<n>` to the full peer count (or list all target nodes) when you want full-cluster residency rather than sharding the record to `<n>` peers.
 
 ### `storage.writeAsync`
 
@@ -384,12 +384,15 @@ Retains the pre-compaction backup files after `compactOnStart` runs. Recommended
 
 **Write-heavy ingest, durability via replication:**
 
-On RocksDB (the default), commits already avoid local disk `fsync`; pair a higher queue-time threshold with [replication confirmation](../replication/sharding.md#replication-control-via-rest-header) when writes must be confirmed by peer nodes before returning (on legacy LMDB databases, also add `writeAsync: true`):
+On RocksDB (the default), commits already avoid local disk `fsync`; pair a higher queue-time threshold in `harper-config.yaml` with per-write [replication confirmation](../replication/sharding.md) (`replicatedConfirmation` in the Operations or Resource API, or `X-Replicate-To: <n>;confirm=<k>` over REST with `<n>` set to your peer count) when writes must be confirmed by peer nodes before returning (on legacy LMDB databases, also add `writeAsync: true`):
 
 ```yaml
 storage:
   prefetchWrites: true
   maxTransactionQueueTime: 60s
+  # Per-write replication confirmation is set on the operation/request
+  # (e.g. replicatedConfirmation: 1 or X-Replicate-To: <peers>;confirm=1),
+  # not in harper-config.yaml.
 ```
 
 **Read-heavy cache layer with large blobs:**
