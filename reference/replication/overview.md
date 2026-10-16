@@ -360,9 +360,9 @@ See [Clustering Operations](./clustering.md#cluster-status) for the full respons
 
 ## Initial Synchronization and Resynchronization
 
-When a new node is added and its database has not been previously synced, Harper downloads the full database from the first node it connects to. After the initial sync completes, the node enters replication mode and receives incremental updates.
+Initial synchronization is decided per peer and per database. A new node can request a full copy from each in-scope peer for which it has no resume cursor, so a join can load several peers at once. [`add_node` with `isLeader: true`](./clustering.md#add-node) identifies a bootstrap source; it does not prevent full-copy requests to other cursorless peers. After synchronization, replication continues incrementally.
 
-If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions.
+If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions. Its peers keep that history for [`logging.auditRetention`](../logging/configuration.md#loggingauditretention); a node away longer than that gets a full copy instead, which can leave rows on it that were deleted elsewhere while it was away. Decide how to reconcile such a node before it reconnects.
 
 You can also specify a `start_time` in the `add_node` operation to limit the initial download to data since a given point in time:
 
@@ -384,11 +384,16 @@ The following data operations are replicated across the cluster:
 - Delete
 - Bulk loads (CSV data load, CSV file load, CSV URL load, import from S3)
 
-**Destructive schema operations are not replicated**: `drop_database`, `drop_table`, and `drop_attribute` must be run on each node independently.
+**Destructive schema operations differ from each other, so check before you run one:**
 
-Users and roles are not replicated across the cluster by default. They do propagate when the `system` database (where `hdb_user` and `hdb_role` live) is included in replication; as of v5.2 this no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow).
+- `drop_database` and `drop_table` **replicate to the whole cluster by default** on Pro and Fabric. Pass `"replicated": false` to drop on one node only.
+- `drop_attribute` is not replicated and must be run on each node independently.
 
-Certain management operations — including component deployment and rolling restarts — can also be replicated across the cluster.
+Data mutations, `drop_database`, `drop_table`, and component deployment replicate by default on Pro and Fabric; pass `"replicated": false` to limit them to one node. [`set_configuration`](../configuration/operations.md#set-configuration) and [`restart_service`](../operations-api/operations.md#restart_service) are opt-in: pass `"replicated": true` for a cluster-wide configuration update or rolling restart.
+
+Users and roles **do** propagate by default. They live in the `system` database, and the default replication scope is every database, so `system` is in scope unless you have narrowed it. As of v5.2 replicating `system` no longer forces a full mesh — see [Replicating the `system` database with controlled flow](#replicating-the-system-database-with-controlled-flow). If you narrow the scope to exclude `system`, users and roles stop propagating and must be provisioned on every node by your own automation.
+
+Check each management operation's replication default before using it in a single-node procedure.
 
 ## Inspecting Cluster Configuration
 

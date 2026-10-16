@@ -1,0 +1,187 @@
+---
+title: How Harper Runs in Production
+sidebar_position: 1
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Harper runs your application code, HTTP server, local database, and replication client on the same node. To operate it in production, you need to know how much traffic each node can handle, which data it serves, and how to move traffic when it needs maintenance.
+
+This guide covers what a single Harper node actually contains, and how to understand your deployment before you design anything around it.
+
+## What You Will Learn
+
+- What a Harper node contains, and which port carries which kind of traffic
+- Why the node is your unit of failure and your unit of scale, and what that adds/removes from your operating burden
+- The three ways a Harper runbook differs from a two-tier runbook
+- How to inventory your service boundary with the Operations API, so later guides have something concrete to work from
+
+## Prerequisites
+
+- A running Harper instance, either a [Harper Fabric](/fabric) cluster or a [local installation](../getting-started/install-and-connect-harper.mdx)
+- A `super_user` credential for the Operations API
+- An application deployed to it ([Create your First Application](../getting-started/create-your-first-application.mdx))
+
+## What one node contains
+
+A Harper node is a single process running your components, an HTTP server, a local storage engine, and peer replication. There is no network hop between your application code and the data it reads, no separate cache tier to keep coherent, and no connection pool to tune between tiers.
+
+Record the ports used by your deployment:
+
+| Port                               | Serves                                                                      | Who should reach it               |
+| ---------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
+| `9926`                             | Application traffic: REST, WebSocket, MQTT-over-WebSocket, component routes | Your traffic layer and your users |
+| `9925`                             | The [Operations API](/reference/v5/operations-api/overview)                 | Operators and your pipeline only  |
+| Configured secure replication port | Secure peer [replication](/reference/v5/replication/overview)               | Other nodes in the cluster only   |
+
+`9925` and `9926` are the default HTTP ports. HTTPS uses `operationsApi.network.securePort` and `http.securePort`, or a TLS-terminating proxy. Use the node's configured URL in the examples throughout this track.
+
+Resolve the effective replication port from `replication.securePort`, falling back to `operationsApi.network.securePort` when it is unset. An upgrade retains the existing configuration, so do not assume that a newly installed node and an upgraded one use the same port.
+
+Read the configuration from each node and record its HTTP, HTTPS, and replication ports:
+
+```json
+{ "operation": "get_configuration" }
+```
+
+:::tip
+Restrict the Operations API to operators and deployment automation. It can deploy components, read logs, and manage configuration. See [security overview](/reference/v5/security/overview).
+:::
+
+## A node is the unit of both failure and scale
+
+Losing a node removes both its request-handling capacity and access to its local data. Plan for the remaining nodes to serve the application while it is unavailable.
+
+Keeping application code and data together removes some of the work associated with separate tiers:
+
+- No network latency on data access, and no tail latency from a saturated connection pool between tiers
+- No cache invalidation problem between an application cache and a database of record (because they are the same thing)
+- No separate application-to-database connection to monitor
+- Application and data access measured together in your capacity tests
+
+Choose how many simultaneous node failures your service must tolerate, then check whether the survivors can carry peak traffic. [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) walks through that calculation.
+
+Adding a node also moves data. Allow time for the databases it serves to synchronize before sending it user traffic.
+
+## Three differences that change your runbook
+
+### A process that is up is not a node that should take traffic
+
+A Harper process will answer a TCP connection and return an HTTP response before it is a good place to send a user request. A new or replacement node has to synchronize the databases it serves before its answers are correct. A returning node has to catch up on transactions it missed.
+
+Keep a starting node out of traffic until its data and application checks pass. [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx) describes the checks and the return sequence.
+
+### Replication is peer-to-peer and scoped, so verify your own scope
+
+Harper peers exchange data over WebSockets with mTLS on the secure replication port and discover each other through configured routes. There is no primary. Data mutations and transactions replicate; some things do not, and the scope is configurable per database and per table.
+
+Read the live replication state on each node:
+
+```json
+{
+	"operation": "cluster_status"
+}
+```
+
+The response lists each peer connection and, within it, one socket per database per peer. That tells you which databases are actually flowing, which is the question that matters during an incident. What is in scope, what is deliberately out of it, and how to prove convergence rather than just connection are covered in [Operating Replication](./operating-replication.mdx).
+
+### Reversal is a redeploy, not an infrastructure event
+
+Your application ships as a component, deployed with [`deploy_component`](/reference/v5/operations-api/operations#deploy_component) from an immutable reference. Rolling back means deploying the previous immutable reference. There is no image to rebuild, no instance to replace, and no cluster to rebuild to undo a bad release.
+
+Immutable component references make code rollback repeatable. Configuration rollback and data recovery need separate procedures because they change different parts of the service. See [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
+
+## Inventory your service boundary
+
+Collect the following information from each node and keep it with your runbooks.
+
+The examples use `https://operations.my-node.example.com/` for a configured Operations API endpoint. Replace it with the node's own Operations API URL; a default local installation uses `http://localhost:9925/`.
+
+<Tabs>
+  <TabItem value="curl" label="curl">
+
+```bash
+curl -s -X POST https://operations.my-node.example.com/ \
+  -H 'Content-Type: application/json' \
+  -u 'admin:password' \
+  -d '{"operation":"system_information","attributes":["system","cpu","memory","disk","threads"]}'
+```
+
+  </TabItem>
+  <TabItem value="fetch" label="fetch">
+
+```javascript
+await fetch('https://operations.my-node.example.com/', {
+	method: 'POST',
+	headers: {
+		'Content-Type': 'application/json',
+		'Authorization': 'Basic ' + btoa('admin:password'),
+	},
+	body: JSON.stringify({
+		operation: 'system_information',
+		attributes: ['system', 'cpu', 'memory', 'disk', 'threads'],
+	}),
+});
+```
+
+  </TabItem>
+</Tabs>
+
+:::warning
+The `attributes` array silently drops names it does not recognize, so a typo returns a smaller response rather than an error. The valid values are `system`, `time`, `cpu`, `memory`, `disk`, `network`, `harperdb_processes`, `table_size`, `metrics`, and `threads`. If a response is missing a section you asked for, check the spelling before you check the node.
+:::
+
+Then:
+
+- [`get_components`](/reference/v5/components/applications#get_components) for what is deployed, including which extensions are present
+- [`list_deployments`](/reference/v5/operations-api/operations#list_deployments) for what changed and when
+- [`registration_info`](/reference/v5/operations-api/operations#registration_info) for the Harper version, which `system_information` does not report (it returns the node and npm versions, not Harper's)
+- `cluster_status` for the peers and databases actually connected
+
+Fill in a boundary record you can keep:
+
+| Item                    | Value for your deployment                             |
+| ----------------------- | ----------------------------------------------------- |
+| Harper version          | From `registration_info`                              |
+| Node count and roles    | From `cluster_status` and your topology intent        |
+| Ports in use            | From `get_configuration`                              |
+| Databases               | Which exist, and which replicate                      |
+| Storage engine          | Per database, since it constrains your backup options |
+| Components deployed     | From `get_components`, with the version of each       |
+| Critical journeys       | The user-facing paths that must work, named           |
+| Downstream dependencies | Anything Harper calls that can fail independently     |
+
+Include application journeys and downstream dependencies in your monitoring. Node health alone will not reveal incorrect responses or failures in services the application calls.
+
+### Prove it
+
+On a non-production cluster, stop one node. Confirm that peers keep serving, note when `cluster_status` shows the change, and check whether the traffic layer stops routing to the node. Compare the result with your inventory and topology plan.
+
+## Operational notes
+
+- **Fabric and self-managed differ in what you own, not in how Harper behaves.** On [Fabric](/fabric), cluster creation, certificates, and the metrics pipeline are managed for you. The failure unit, the replication model, and the admission problem are identical.
+- **Version parity across nodes is an operating requirement, not a nicety.** Mixed versions in a cluster change replication and deployment behavior. Record the version per node in your boundary inventory and alert on drift.
+- **Configuration changes need the restart type required by the setting.** Some apply on worker restart; process-level settings need a full process restart. Track pending changes and follow the [configuration rollout procedure](./safe-deployments-and-rollback.mdx#configuration-changes-are-deployments-too).
+- **`get_status` reports a `restartRequired` flag, but it tracks component and code restarts rather than configuration changes.** Do not rely on it to tell you a configuration change is still pending.
+
+## Readiness checklist
+
+- [ ] Ports confirmed from `get_configuration`, not assumed from documentation
+- [ ] Operations API on `9925` is not reachable from the public internet
+- [ ] Harper version recorded per node, with an alert on drift
+- [ ] Databases listed, with replication scope confirmed via `cluster_status`
+- [ ] Storage engine recorded per database
+- [ ] Components and versions recorded from `get_components`
+- [ ] Critical user journeys named and written down
+- [ ] Downstream dependencies named, with their own failure behavior understood
+
+## Additional Resources
+
+- [HTTP server reference](/reference/v5/http/overview) for the application port and server architecture
+- [Operations API overview](/reference/v5/operations-api/overview) and the [full operation list](/reference/v5/operations-api/operations)
+- [Replication overview](/reference/v5/replication/overview) for the peer model, mTLS, routes, and scope
+- [Components overview](/reference/v5/components/overview) for the component model and the available extensions
+- [Database overview](/reference/v5/database/overview) for storage engines and transaction boundaries
+- [Configuration overview](/reference/v5/configuration/overview) for `harper-config.yaml` and restart requirements
+- [Deploying from a CI/CD Pipeline](../developers/deploying-from-ci.mdx) for how application code reaches these nodes

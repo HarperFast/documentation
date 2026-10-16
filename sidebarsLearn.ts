@@ -71,6 +71,11 @@ const sidebarsLearn: SidebarsConfig = {
 					id: 'developers/deploying-from-ci',
 					label: 'Deploying from a CI/CD Pipeline',
 				},
+				{
+					type: 'doc',
+					id: 'developers/taking-a-node-out-of-rotation',
+					label: 'Taking an Unhealthy Node Out of Rotation',
+				},
 			],
 		},
 		{
