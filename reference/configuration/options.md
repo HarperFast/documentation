@@ -312,7 +312,7 @@ storage:
 ```
 
 - `engine` — The database storage engine to use for new databases. Currently supported engines are `rocksdb` and `lmdb`. The default is `rocksdb`. Existing databases will use the engine that was used when they were created.
-- `writeAsync` — Disable disk sync for higher throughput (**disables durability guarantees**); _Default_: `false`
+- `writeAsync` <EngineBadge engines="LMDB" /> — Disable disk sync on commit for the legacy LMDB storage engine (**disables local disk durability guarantees on LMDB**). Has no effect on RocksDB, which does not `fsync` commits; see [Storage Tuning — Durability vs. Throughput](../database/storage-tuning.md#durability-vs-throughput); _Default_: `false`
 - `caching` — In-memory record caching; _Default_: `true`
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)
