@@ -232,7 +232,7 @@ logging:
   level: warn
   root: ~/hdb/log
   stdStreams: false
-  auditLog: false
+  auditLog: true
   rotation:
     interval: 1D
     maxSize: 100M
@@ -244,7 +244,7 @@ logging:
 - `path` — Explicit log file path (overrides `root`)
 - `stdStreams` — Write to stdout/stderr; _Default_: `false`
 - `console` — Include `console.*` output; _Default_: `true`
-- `auditLog` — Enable table transaction audit logging; _Default_: `false`
+- `auditLog` — Enable table transaction audit logging; _Default_: `true`
 - `auditRetention` — Audit log retention duration; _Default_: `3d`
 - `external` — Logging for components using the logger API; sub-options: `level`, `path`
 - `rotation.enabled` / `rotation.compress` / `rotation.interval` / `rotation.maxSize` / `rotation.path` — Log file rotation (activates when `interval` or `maxSize` is set)
@@ -280,7 +280,7 @@ replication:
 
 - `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This instance's hostname within the cluster. Subject to the same bare hostname or IP literal requirement as [`node.hostname`](#node) — a URL, `host:port`, or non-string value fails startup. When both are set, `node.hostname` wins.
 - `url` — WebSocket URL peers use to connect to this instance
-- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name` and `sharded`
+- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name`, `replicateTo`, and `sharded`
 - `routes` — Peer nodes; URL strings or `{hostname, port, startTime, revokedCertificates}` objects
 - `port` — Replication port
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
@@ -312,7 +312,7 @@ storage:
 ```
 
 - `engine` — The database storage engine to use for new databases. Currently supported engines are `rocksdb` and `lmdb`. The default is `rocksdb`. Existing databases will use the engine that was used when they were created.
-- `writeAsync` — Disable disk sync for higher throughput (**disables durability guarantees**); _Default_: `false`
+- `writeAsync` <EngineBadge engines="LMDB" /> — Disable disk sync on commit for the legacy LMDB storage engine (**disables local disk durability guarantees on LMDB**). Has no effect on RocksDB, which does not `fsync` commits; see [Storage Tuning — Durability vs. Throughput](../database/storage-tuning.md#durability-vs-throughput); _Default_: `false`
 - `caching` — In-memory record caching; _Default_: `true`
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)

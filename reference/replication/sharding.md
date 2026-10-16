@@ -30,14 +30,17 @@ There are two main approaches:
 
 ### Replication Count
 
-The simplest way to limit replication is to configure a replication count. Set `replicateTo` in the `replication` section of `harper-config.yaml` to specify how many additional nodes data should be replicated to:
+The simplest way to limit replication is to configure a per-database replication count. Set `replicateTo` on a database entry under `replication.databases` in `harper-config.yaml` to specify how many additional nodes data should be replicated to:
 
 ```yaml
 replication:
-  replicateTo: 2
+  databases:
+    - system
+    - name: data
+      replicateTo: 2
 ```
 
-This ensures each record is stored on three nodes total (the node that first stored it, plus two others).
+This ensures each record in `data` is stored on three nodes total (the node that first stored it, plus two others). Because setting `replication.databases` to a list replaces the `'*'` default (all databases), include `system` and every other database the cluster should continue replicating (see [Data Selection](./overview.md#data-selection)).
 
 ### Replication Control via REST Header
 
@@ -58,7 +61,12 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists.
+The `confirm` parameter can be combined with explicit node lists, or with `*` to require confirmation while keeping the cluster's default replication without pinning residency to a fixed node count:
+
+```http
+PUT /MyTable/3
+X-Replicate-To: *;confirm=1
+```
 
 ### Replication Control via Operations API
 
