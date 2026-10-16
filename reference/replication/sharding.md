@@ -35,11 +35,12 @@ The simplest way to limit replication is to configure a per-database replication
 ```yaml
 replication:
   databases:
+    - system
     - name: data
       replicateTo: 2
 ```
 
-This ensures each record in that database is stored on three nodes total (the node that first stored it, plus two others).
+This ensures each record in `data` is stored on three nodes total (the node that first stored it, plus two others). Because setting `replication.databases` to a list replaces the `'*'` default (all databases), include `system` and every other database the cluster should continue replicating (see [Data Selection](./overview.md#data-selection)).
 
 ### Replication Control via REST Header
 
