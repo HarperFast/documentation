@@ -362,7 +362,7 @@ See [Clustering Operations](./clustering.md#cluster-status) for the full respons
 
 Initial synchronization is decided per peer and per database. A new node can request a full copy from each in-scope peer for which it has no resume cursor, so a join can load several peers at once. [`add_node` with `isLeader: true`](./clustering.md#add-node) identifies a bootstrap source; it does not prevent full-copy requests to other cursorless peers. After synchronization, replication continues incrementally.
 
-If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions. Its peers keep that history for [`logging.auditRetention`](../logging/configuration.md#loggingauditretention); a node away longer than that gets a full copy instead, which can leave rows on it that were deleted elsewhere while it was away. Rebuild such a node from empty, or replace it.
+If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions. Its peers keep that history for [`logging.auditRetention`](../logging/configuration.md#loggingauditretention); a node away longer than that gets a full copy instead, which can leave rows on it that were deleted elsewhere while it was away. Decide how to reconcile such a node before it reconnects.
 
 You can also specify a `start_time` in the `add_node` operation to limit the initial download to data since a given point in time:
 
