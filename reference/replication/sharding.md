@@ -58,7 +58,12 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists.
+The `confirm` parameter can be combined with explicit node lists, or with `*` to require confirmation while keeping the cluster's default replication without pinning residency to a fixed node count:
+
+```http
+PUT /MyTable/3
+X-Replicate-To: *;confirm=1
+```
 
 ### Replication Control via Operations API
 
