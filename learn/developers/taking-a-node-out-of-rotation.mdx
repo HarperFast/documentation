@@ -439,7 +439,7 @@ export function startAvailabilityLoop(checkHealth) {
 
 A few details:
 
-- **One loop per node.** Every worker thread loads the component, so the loop starts only where `server.workerIndex` is `0`. An [isolated application](/reference/v5/components/applications#isolated-applications) runs in one worker, whose index is `0`.
+- **One loop per node.** Every worker thread loads the component, so the loop starts only where `server.workerIndex` is `0`. A worker restart can briefly overlap two; see [Caveats](#caveats). An [isolated application](/reference/v5/components/applications#isolated-applications) runs in one worker, whose index is `0`.
 - **A health check that throws, or does not answer within 5 seconds, counts as failing.** Either way the loop goes on looking.
 - **No user needed.** [`server.operation()`](/reference/v5/http/api#serveroperationoperation-context-authorize) applies no authorization unless you pass `authorize: true`, so the loop can call `set_status` without a user or a role. The `status-check` component calls it the same way.
 - **Recognizing itself.** `AVAILABILITY_NODES` lists every node, so the same `.env` works on all of them. The loop skips the address whose `/Health` reports this node's [`server.hostname`](/reference/v5/http/api#serverhostname).
@@ -610,6 +610,7 @@ When you are done, stop Harper with `npx harper stop`, stop the stand-ins, and d
 - **Someone else's write pauses the loop.** After Fabric or an operator puts back a node the loop took out, the loop leaves that node alone until its health check has passed for 60 seconds, however long the node keeps failing.
 - **"Serving" is what this node sees.** A node that answers at its own hostname counts as serving even if the load balancer cannot reach it, and so does a node that is still running but no longer in the cluster. Keep `AVAILABILITY_NODES` current.
 - **The ownership check has small gaps.** The loop reads the record again just before each write, and after a failed or interrupted write it only claims an `Unavailable` written within 5 seconds of its marker. So someone else's write can be taken for the loop's if it lands a few milliseconds after the loop's own write, or within those 5 seconds when a restart interrupted the loop. Coming back has the same kind of gap: a write landing between the loop's last read and its own `Available` is overwritten. The reverse can happen too: if the loop's own write took longer than 5 seconds and a restart interrupted it, the loop leaves the node out and logs the write as someone else's. After a restart that hit a node mid-write, check its `/status`.
+- **A worker restart can briefly run two loops.** On Linux, including Fabric, Harper starts a replacement worker before it stops the one it replaces, so the old worker `0` and its replacement both run the loop until the old one exits. That can take up to `replication.blobSendDrainTimeout` while it finishes sending blobs. Each loop has its own timers and can write in that window, with the same ownership gaps as above. A worker restart, such as a deploy with `restart`, also ends "not going out again until Harper restarts". After a deploy or restart, check each node's `/status`.
 - **Operation logging.** At log level `info` or more verbose, Harper logs every operation call, including the loop's `get_status` every 5 seconds.
 
 ## Additional Resources

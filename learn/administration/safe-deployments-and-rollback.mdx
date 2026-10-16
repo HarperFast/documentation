@@ -52,7 +52,7 @@ The upload includes everything in the directory except `node_modules`, including
 
 ### A frontend built once
 
-The React and Vue templates load the `@harperfast/vite` plugin, which builds the frontend on each node when the build output is missing, so every node also carries the build toolchain. To build once and ship only the output, keep a second configuration file for the release. It serves the build output with the built-in [`static`](/reference/v5/static-files/overview) plugin and leaves out the Vite plugin:
+The React and Vue templates load the `@harperfast/vite` plugin, which builds the frontend on each node when the build output is missing, so every node also carries the build toolchain. To build once and ship only the output, keep a second configuration file for the release. Copy your `config.yaml` to `deploy.config.yaml`, keep its `rest`, `graphqlSchema`, `jsResource`, and [`static`](/reference/v5/static-files/overview) entries as they are, and remove the `@harperfast/vite` and `@harperfast/schema-codegen` entries, which load packages the release does not install. For the JavaScript React template, that leaves:
 
 ```yaml
 # deploy.config.yaml
@@ -60,7 +60,7 @@ rest: true
 graphqlSchema:
   files: 'schemas/*.graphql'
 jsResource:
-  files: 'resources/*.js'
+  files: 'resources/*.js' # the TypeScript templates use 'resources/*.ts'
 static:
   files: 'dist/**'
 ```
