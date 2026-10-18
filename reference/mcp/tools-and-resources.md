@@ -196,7 +196,7 @@ Notes:
 
 Add `subscribe` to an entry to let MCP clients watch its URIs. It names an instance method that is called the same way as `method` — `(params, context)` on the live class, inside the same transaction carrying the session user — and returns an async iterable. Every value the iterable yields sends one `notifications/resources/updated` with the subscribed URI; the value itself is never sent, so the client re-reads the resource. A URI whose entry has no `subscribe` answers `-32602 resource is not subscribable: <uri>`, as before.
 
-```ts
+```js
 import { RequestTarget, getUser } from 'harper';
 
 export class Order extends tables.Order {
@@ -242,7 +242,7 @@ The contract:
 
 - **Authorize and acquire before returning.** The returned iterable is consumed after the transaction ends, so a check made while iterating no longer runs as the session user. A generator method (`async *watch()`) would run its whole body that way, so a `subscribe` that names one is ignored with a warning, and the entry stays readable.
 - **Release.** Harper releases the stream on `resources/unsubscribe`, when the session's GET stream closes, on `DELETE /mcp`, and when the stream ends or throws: it calls the stream's `end()` if it has one, otherwise its iterator's `return()`. Return a stream with `end()` — a Harper subscription such as `Table.subscribe(...)`, or your own queue. Without `end()`, the iterator must have a `return()` that releases its source at once. A stream with neither, or an async generator with no `end()`, fails the subscribe with `-32603`: there is nothing to call, or `return()` cannot interrupt the generator while it waits for its next value.
-- **Access after subscribe.** Harper ends the stream when the session's bearer token expires, or when its user is dropped or no longer has a role. A [scoped token](/reference/v5/security/jwt-authentication#scoped-tokens-inline-role) belongs to no user, so only its expiry ends the stream. Changes to resource-specific access after subscribe are yours to enforce, for example by checking each change before yielding it.
+- **Access after subscribe.** Harper ends the stream when the session's bearer token expires, or when its user is dropped or no longer has a role. A [scoped token](/reference/v5/security/jwt-authentication#scoped-tokens-inline-role) belongs to no user, so only its expiry ends the stream, and an anonymous session has no identity to lapse, so only the release paths above end its stream. Changes to resource-specific access after subscribe are yours to enforce, for example by checking each change before yielding it.
 - **Workers.** A subscription runs on the worker holding the session's GET stream. If changes can originate on other workers, your stream must deliver them; Harper table subscriptions do.
 - **Errors.** An `AccessViolation`, which Harper's own permission checks throw (for example, a table read with `target.checkPermission` that the user's role does not allow), answers `-32602 permission denied: <uri>`. Any other error, including one your own gate throws, answers `-32603 failed to subscribe: <uri>`; the raw error goes to the server log.
 

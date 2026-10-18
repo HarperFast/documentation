@@ -129,7 +129,7 @@ Subscriptions are also torn down automatically when the session's GET-SSE stream
 
 ## Scope and durability
 
-Subscriptions are **per-worker**: a subscription is bound to the worker that holds the session's SSE stream, and the audit-log change feed delivers commits locally on that worker. A custom resource's stream runs on that worker too, so it must deliver changes that originate on other workers. The live subscription objects can't be persisted, but the durable list of subscribed URIs lives on the `mcp_session` record, which is how they survive a reconnect.
+Subscriptions are **per-worker**: a subscription is bound to the worker that holds the session's SSE stream, and the audit-log change feed delivers commits locally on that worker. A custom resource's stream also runs on that worker, and must itself deliver changes made on other workers, as Harper table subscriptions do. The live subscription objects can't be persisted, but the durable list of subscribed URIs lives on the `mcp_session` record, which is how they survive a reconnect.
 
 ## Resuming a dropped stream
 
