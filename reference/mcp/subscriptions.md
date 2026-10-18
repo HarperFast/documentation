@@ -72,7 +72,7 @@ Anything else returns `-32602`:
 
 Synthetic `harper://*` metadata URIs (`harper://about`, `harper://openapi`, `harper://schema/...`, `harper://operations`) have no change source and are **not** subscribable. They participate in `notifications/resources/list_changed` only.
 
-A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP error <VersionBadge type="changed" version="v5.4.0" />:
+A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 <VersionBadge type="changed" version="v5.4.0" />:
 
 | Answer                                                         | When                                                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
