@@ -62,7 +62,7 @@ A successful subscribe returns an empty result:
 Two kinds of URI can be subscribed to:
 
 - **Row-backed application resources** — the `harper+rest://` URIs that mirror an exported `Resource` (the same ones `resources/list` advertises on the application profile). The URI's path is matched against the `Resources` registry, and the resource is subscribable only if its class implements `subscribe`.
-- **Custom resources that declare `subscribe`** <VersionBadge version="v5.4.0" /> — URIs published through a static `mcpResources` entry. The URI is matched exactly as `resources/read` matches it, and the entry's `subscribe` method supplies the changes. See [Subscribing to custom resources](./tools-and-resources.md#subscribing-to-custom-resources).
+- **Custom resources that declare `subscribe`** (Added in: v5.4.0) — URIs published through a static `mcpResources` entry. The URI is matched exactly as `resources/read` matches it, and the entry's `subscribe` method supplies the changes. See [Subscribing to custom resources](./tools-and-resources.md#subscribing-to-custom-resources).
 
 Anything else returns `-32602`:
 
@@ -72,7 +72,7 @@ Anything else returns `-32602`:
 
 Synthetic `harper://*` metadata URIs (`harper://about`, `harper://openapi`, `harper://schema/...`, `harper://operations`) have no change source and are **not** subscribable. They participate in `notifications/resources/list_changed` only.
 
-A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 <VersionBadge type="changed" version="v5.4.0" />:
+A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 (Changed in: v5.4.0):
 
 | Answer                                                         | When                                                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -141,7 +141,7 @@ Mcp-Session-Id: 0c8f...
 Last-Event-ID: 137
 ```
 
-Harper replays every buffered frame with a higher id (exclusive) before live frames resume, so a brief network blip doesn't drop `notifications/resources/updated` or `list_changed` events. On reconnect, Harper also restores the session's persisted subscriptions from the `mcp_session` record (best-effort — a URI that is no longer subscribable is dropped; one whose subscribe failed, or that nothing on this worker matches yet, stays on the record and is retried on the next reconnect). The GET response does not wait for the restore <VersionBadge type="changed" version="v5.4.0" />: subscriptions are restored after the stream opens, at most eight at a time, and their notifications follow on the stream.
+Harper replays every buffered frame with a higher id (exclusive) before live frames resume, so a brief network blip doesn't drop `notifications/resources/updated` or `list_changed` events. On reconnect, Harper also restores the session's persisted subscriptions from the `mcp_session` record (best-effort — a URI that is no longer subscribable is dropped; one whose subscribe failed, or that nothing on this worker matches yet, stays on the record and is retried on the next reconnect). The GET response does not wait for the restore (Changed in: v5.4.0): subscriptions are restored after the stream opens, at most eight at a time, and their notifications follow on the stream.
 
 Caveats, all best-effort by design:
 
