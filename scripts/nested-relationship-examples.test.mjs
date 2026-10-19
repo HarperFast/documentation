@@ -5,7 +5,7 @@ import assert from 'node:assert';
 import ts from 'typescript';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
-// Keep these fixtures identical to integrationTests/resources/nested-relationship-docs in Harper core.
+// The offline snapshot lets authors validate Markdown without a GitHub connection.
 const fixture = './fixtures/nested-relationship-docs/';
 const examples = JSON.parse(read(fixture + 'examples.json'));
 const rest = read('../reference/rest/querying.md')
