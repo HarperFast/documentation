@@ -50,6 +50,18 @@ A second constraint pushes the same direction: a git-reference deploy authentica
 
 A GitHub Actions job that declares `id-token: write` can ask GitHub for an identity token that says which repository, workflow, and environment it is running for. The Harper CLI trades that token for a one-hour operation token, if it matches a **trust policy** you stored on the cluster. Nothing durable lives in your CI provider, and there is no 30-day refresh token to rotate. See [Workload identity (OIDC)](/reference/v5/cli/authentication#workload-identity-oidc) for how the CLI does this, and [`add_oidc_trust`](/reference/v5/operations-api/operations#add_oidc_trust) for every rule a policy can carry.
 
+**Nothing in the workflow names the policy.** Once it exists, every `harper` command in the deploy job — `harper deploy`, `harper get_job`, anything else — authenticates through it by itself, and may do what the policy's user's role allows, as long as the job has `id-token: write`, `HARPER_CLI_TARGET` is the policy's `audience`, the run matches the policy's claims, and no other credential is configured. [Using it in a workflow](/reference/v5/cli/authentication#using-it-in-a-workflow) lists those conditions.
+
+:::tip
+
+From v5.4.0, for a workflow that deploys when changes merge to a branch, [`harper deploy setup=true
+provider=github-actions`](/reference/v5/cli/commands#github-actions-deploys-oidc) creates a role, a user and a policy
+pinned to that branch, and sets the `HARPER_CLI_TARGET` variable, in one command. Its role allows `deploy_component`,
+`get_job` and `registration_info` only, not the `get_deployment` the role below adds. This guide's workflows deploy on
+version tags, which a branch pin cannot match, so they use the policy below, written by hand.
+
+:::
+
 You set this up once, from your own machine, logged in as a `super_user`:
 
 ```bash
@@ -61,13 +73,14 @@ harper login https://my-cluster.example.com:9925
 The user a trust policy names is the privilege boundary: a matching run gets that user's role. A pipeline does not need `super_user`. Give it a role that lists only the operations the workflows below call:
 
 ```bash
-harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment"]}'
+harper add_role role=ci_deploy permission='{"operations":["deploy_component","get_job","get_deployment","registration_info"]}'
 harper add_user username=ci-deploy role=ci_deploy active=true password="$(openssl rand -base64 32)"
 ```
 
 - **`deploy_component`** is the deploy itself.
 - **`get_job`** is what the wait step polls. The jobs table lists `get_job` as open to any role, but an `operations` allowlist refuses every operation it doesn't list, so without it the wait step fails with `403`.
 - **`get_deployment`** reads the deployment record.
+- **`registration_info`** returns only Harper's version, which `harper deploy` checks before it uploads. Without it the deploy still works, but the cluster logs a refused operation on every run.
 
 `restart_service` is not needed: the rolling restart's job is started by Harper itself, not by the caller. The password is required to create the user, but a GitHub Actions pipeline never uses it, since it authenticates through the trust policy, so this command discards it. [Other CI systems](#other-ci-systems) shows how to set one you keep.
 
@@ -146,10 +159,12 @@ jobs:
       HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install -g harper
+      - run: npm install --global harper@^5.3
       - name: Deploy the tagged commit
         run: harper deploy project=my-app by_ref=true restart=rolling json=true > deploy.json
       - name: Wait for every node to take the release
@@ -175,12 +190,14 @@ For a private repository, add `credential=true` to the deploy command. It attach
 
 A few details worth noting:
 
-- **No secrets.** `HARPER_CLI_TARGET` is the only thing the workflow is given. `id-token: write` lets the CLI request an identity token, and `environment: production` puts the `environment` claim the trust policy requires into it. The CLI prints which policy authenticated it, and as whom, to stderr.
-- **`by_ref=true`** deploys `git+https://github.com/<owner>/<repo>.git#<sha>`, where the SHA is the commit the tag points to (`GITHUB_SHA`). Every node clones that exact commit, even if the tag is moved later. Pass `ref=<tag or sha>` to deploy a different commit.
+- **No secrets.** `HARPER_CLI_TARGET` is the only thing the workflow is given. `id-token: write` lets the CLI request an identity token, and `environment: production` puts the `environment` claim the trust policy requires into it. Any other step in the job could request one too, so the job runs none of the repository's code. The CLI prints which policy authenticated it, and as whom, to stderr.
+- **`persist-credentials: false`** keeps the job's `GITHUB_TOKEN` out of `.git/config`, where `actions/checkout` otherwise leaves it for every later step to read.
+- **`harper@^5.3`** pins the CLI's major version. 5.3 is the first CLI that authenticates with the identity token, and rerunning an old tag after a new major release still installs a 5.x CLI.
+- **`by_ref=true`** deploys `git+https://github.com/<owner>/<repo>.git#<sha>`, where the SHA is the commit the tag points to (`GITHUB_SHA`). Every node clones that exact commit, even if the tag is moved later. Pass `ref=<sha>`, with the full commit SHA, to deploy a different commit. In a private repository, a tag resolves only if the checkout fetched it, as `fetch-depth: 0` does: the CLI looks up anything else with `git ls-remote`, which has no credential once `persist-credentials: false` keeps the token out of `.git/config`.
 - **`replicated` isn't needed.** On Harper Fabric and Harper Pro, a deploy goes to every node in the cluster unless you pass `replicated=false`. Each node fetches and installs the package itself, resolving the credential from the replicated secrets store. Harper core on its own does not replicate.
 - **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. The [preview recipe](#per-pr-previews-with-shared-databases) also uses inline restarts on clusters, with an explicit allowance for concurrent initial restarts. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
 - **`json=true`** prints the deploy's result as JSON on stdout. Progress and authentication messages go to stderr, so `deploy.json` holds only the result. A deploy that fails exits non-zero, which fails the step.
-- **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
+- **The wait step.** With `restart=rolling`, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job, which keeps running after the deploy step has passed. On v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in that job, one at a time, and a node that rejects it fails the job, not the deploy step; the failed job's `message` lists each node's outcome under `activated`. Otherwise every node installs the release before the deploy step passes, and the job only restarts them. The wait step polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. It gives up after 60 polls, about ten minutes. Nodes take a rolling release one after another, each restarting and, on v5.4.0 and later, loading it in a canary that has up to a minute to report, so on a cluster with many nodes raise the count. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
 - **The job lives on one node.** Everything else about a deploy is visible from any node, but Harper does not replicate jobs, so only the node that received the deploy knows the rolling job. Any other node answers `get_job` with an empty list, which the wait step treats as not finished and polls again. So through a load-balanced cluster URL, at least one poll has to reach the node that received the deploy. Routing that keeps the runner on one node sends its polls where the deploy went, and routing that spreads requests across nodes reaches it within a few polls. Routing that sends the polls to a different node than the deploy never does: the step fails, saying the job was not on the node that answered and its outcome is unknown, even when the rollout succeeded. If your load balancer routes that way, use one node's own URL for both the deploy and the wait, and as the trust policy's `audience`. [harper#3060](https://github.com/HarperFast/harper/issues/3060) tracks recording each node's outcome on the deployment record, which replicates and would remove this requirement.
 - **Canary certification** <VersionBadge version="v5.4.0" />. On v5.4.0 and later, `restart=true` and `restart=rolling` load the release in a [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) on each node before that node serves it, except in the cases that section lists, so a release that fails to load is rejected. With `restart=rolling`, the node you called certifies it before the deploy responds, and each other node certifies it as the job reaches it.
 - The token for a private repository is served to git **from memory** on each node — it is never written into a URL, a lockfile, or a file on disk.
@@ -212,23 +229,20 @@ on:
     tags: ['v*']
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    environment: production
     permissions:
       contents: read
       packages: write
-      id-token: write
-    env:
-      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: '@my-org'
-      - run: npm install -g harper
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -238,6 +252,20 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+    env:
+      HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --global harper@^5.3
       - name: Deploy the published version
         run: |
           harper deploy project=my-app package="@my-org/my-app@${GITHUB_REF_NAME#v}" \
@@ -262,14 +290,23 @@ jobs:
           exit 1
 ```
 
+The workflow has two jobs, so the job that can request an identity token runs none of your code:
+
+- **`publish`** installs, builds, tests and publishes, with `contents: read` and `packages: write` only. It can't request an identity token.
+- **`deploy`** runs once `publish` has finished (`needs: publish`), and holds the `production` environment and `id-token: write`. It installs only the Harper CLI, then deploys the published version. The trust policy above still matches it: only this job names the environment, so only its token carries the `environment` claim the policy requires.
+
+GitHub gives every step of a job with `id-token: write` the `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` variables. In a single job, any code the build runs, such as a compromised dependency's install script, could use them to request an identity token with that job's claims, and exchange it for the `ci-deploy` user's operation token. That user can deploy any component on the cluster, and a deployed component runs inside the Harper process. Two jobs narrow that risk, but don't remove it: the package `deploy` installs is still built from the same dependencies, so a compromised one can change what it contains.
+
+If the `production` environment requires reviewers, `publish` publishes the package before anyone approves, since the approval gates only `deploy`.
+
 Note the two credentials play different roles, matching their lifetimes:
 
-- **Publishing**, and installing private `@my-org` dependencies with `npm ci`, use the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`, which includes read). Both happen entirely inside the job, so an ephemeral token is exactly right. A dependency published from another repository has to grant this one access first, under that package's **Manage Actions access** settings.
+- **Publishing**, and installing private `@my-org` dependencies with `npm ci`, use the workflow's ephemeral `GITHUB_TOKEN` (with `packages: write`, which includes read). Both happen entirely inside the `publish` job, so an ephemeral token is exactly right. A dependency published from another repository has to grant this one access first, under that package's **Manage Actions access** settings.
 - **Installing** uses the durable `read:packages` token you stored in Harper as `deploy.my-app.npm.pkg.github.com` — because installs can happen long after this workflow ends.
 
 The deploy step installs the version the tag names, while `npm publish` publishes the version in `package.json`, so the two must agree: `npm version 1.2.3` sets one and creates the other as `v1.2.3`.
 
-`scope: '@my-org'` on `setup-node` sends only `@my-org` packages to GitHub Packages, so `npm install -g harper` still installs from the public registry. The `scope` in `credentials` does the same on each Harper node, so scoped dependencies from the same registry resolve too.
+`scope: '@my-org'` on `setup-node` sends only `@my-org` packages to GitHub Packages, so other dependencies still install from the public registry. The `scope` in `credentials` does the same on each Harper node, so scoped dependencies from the same registry resolve too.
 
 ## Check the deployment record
 
@@ -377,7 +414,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install -g harper
+      - run: npm install --global harper@^5.3
       - name: Update or remove the preview
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

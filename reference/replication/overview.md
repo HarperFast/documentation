@@ -75,6 +75,30 @@ type LocalTableForNode @table(replicate: false) {
 
 Transactions are replicated atomically, which may span multiple tables. You can also control how many nodes data is replicated to using [sharding configuration](./sharding.md).
 
+### Dedicated Replication Threads
+
+<VersionBadge version="v5.4.0" />
+
+By default, replication runs on the same worker threads that serve application requests. Catching up a peer that was offline (streaming its backlog, a full copy, back-pressure handling) can then compete with your application for those threads. Setting `replication.threads` starts that many additional worker threads that run replication only:
+
+```yaml
+replication:
+  securePort: 9933
+  threads: 2
+```
+
+With dedicated replication threads:
+
+- Only the replication threads listen on the replication port, and they own every subscription to other nodes, so both sending and receiving replication data happen off the application threads.
+- The replication threads load no application code. Anything your application installs on a table at runtime is not present there, so applications that rely on it should keep `replication.threads: 0`:
+  - `setResidencyById`: nodes outside a record's residency receive an invalidated, partial copy of it that holds the record's indexed attribute values.
+  - `setComputedAttribute` on an `@indexed` computed attribute: a replication thread cannot maintain that index, so it refuses to receive the database that contains the table. It logs the table and attributes and keeps retrying, and nothing else in that database replicates to this node until `replication.threads` is set back to `0`. Computed attributes defined with `@computed(from: "...")` are not affected.
+- Reads that fetch a missing record from another node still run on the thread serving the request.
+- A dedicated replication port is required: set `replication.securePort` (default `9933`) or `replication.port`, different from the HTTP and operations API ports. Harper refuses to start otherwise.
+- `threads.count: 0` (no worker threads) ignores the setting.
+- On macOS and Windows, which lack `SO_REUSEPORT`, only one replication thread listens on the replication port; the others carry outbound subscriptions.
+- Changing the number of threads takes effect only on a full `restart` of Harper; `restart_service` does not start or stop replication threads. An unscoped `restart_service` does restart the existing replication threads, and deploying or dropping a component does not.
+
 ## Securing Connections
 
 Harper supports PKI-based security and authorization for replication connections. Two authentication methods are supported:
