@@ -120,7 +120,7 @@ Harper passes the setting on to every worker thread (not under Bun). Source maps
 
 The setting applies to modules Node.js loads itself: Harper's core, application code loaded natively (for example with `applications.moduleLoader: native`), and the npm packages that Harper loads natively (under the default `applications.dependencyLoader: auto`, every package that does not depend on Harper; see [Dependency Loading](../components/module-loading.md#dependency-loading)). Harper's VM-based loaders (`vm-current-context`, the default, as well as `vm` and `compartment`) do not apply source maps either way.
 
-On Harper Fabric you do not set the process environment, so `NODE_OPTIONS` is not available there. Stack traces from application code on the default loader are the same either way; those from Harper's core and from natively loaded packages stay unmapped.
+On Fabric clusters that Harper hosts, you do not set the process environment, so `NODE_OPTIONS` is not available there. Stack traces from application code on the default loader are the same either way; those from Harper's core and from natively loaded packages stay unmapped.
 
 Before v5.4.0, source maps were always enabled.
 
