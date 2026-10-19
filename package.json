@@ -20,6 +20,7 @@
 		"format:write": "npm run format -- --write",
 		"lint": "echo 0;",
 		"preview:pr": "node scripts/preview-pr.mjs",
+		"test:examples": "node --test scripts/nested-relationship-examples.test.mjs",
 		"test:workflows": "node scripts/companion-check.test.mjs"
 	},
 	"devDependencies": {
