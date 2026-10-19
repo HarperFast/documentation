@@ -110,13 +110,17 @@ Snapshots can be large (often a sizable fraction of the heap limit) and writing 
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Harper no longer enables source maps by default: Node.js keeps every loaded module's source map in memory on every thread, which costs several megabytes per thread. Without them, stack traces from Harper's core point at the compiled code under `dist/` rather than its TypeScript sources.
-
-To get stack traces that point at the original sources, set the Node.js `--enable-source-maps` flag through `NODE_OPTIONS`. Harper passes the setting on to every worker thread. It applies to modules Node.js loads itself: Harper's core, and application code loaded natively (for example with `applications.moduleLoader: native`). Modules run by Harper's VM-based loaders (`vm-current-context`, the default, as well as `vm` and `compartment`) are not mapped either way.
+Stack traces from Harper's core point at its compiled JavaScript under `dist/`. To map them back to the TypeScript sources, enable source maps with the Node.js `--enable-source-maps` flag, set through `NODE_OPTIONS`:
 
 ```bash
 NODE_OPTIONS=--enable-source-maps harper
 ```
+
+Harper passes the setting on to every worker thread (not under Bun). Source maps cost memory: Node.js keeps every loaded module's source map on every thread, several megabytes per thread, so leave them off unless you are reading stack traces.
+
+The setting applies to modules Node.js loads itself: Harper's core, and application code loaded natively (for example with `applications.moduleLoader: native`). Harper's VM-based loaders (`vm-current-context`, the default, as well as `vm` and `compartment`) do not apply source maps either way. They strip TypeScript types without moving code, so a stack trace from an application they load still points at the right line of the file it loaded.
+
+On Harper Fabric you do not set the process environment, so `NODE_OPTIONS` is not available there. Applications on the default loader get the same stack traces either way; only stack traces from Harper's core stay unmapped.
 
 Before v5.4.0, source maps were always enabled.
 
