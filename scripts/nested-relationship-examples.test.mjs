@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert';
 import ts from 'typescript';
+import { fileURLToPath } from 'node:url';
+import { verifyPeerFixtures } from './fixtures/nested-relationship-docs/github-fixture-fetch.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 // The offline snapshot lets authors validate Markdown without a GitHub connection.
@@ -18,7 +19,7 @@ const blocks = (source, language) =>
 	[...source.matchAll(new RegExp('```' + language + '\\n([\\s\\S]*?)```', 'g'))].map((match) => match[1].trim());
 const normalize = (text) => text.replace(/\s+/g, ' ').trim();
 
-test('all five REST requests and complete responses match the executable core fixture', () => {
+test('all six REST requests and complete responses match the executable core fixture', () => {
 	assert.deepStrictEqual(
 		blocks(rest, 'http'),
 		examples.cases.map((example) => 'GET ' + example.url)
@@ -64,40 +65,16 @@ test('both programmatic requests and complete responses match the executed fixtu
 	assert.deepStrictEqual(blocks(resource, 'json').map(JSON.parse), [examples.single, examples.programmatic]);
 });
 
-async function readPeerFile(path) {
-	const response = await fetch(
-		'https://raw.githubusercontent.com/HarperFast/harper/' +
-			peerRevision +
-			'/integrationTests/resources/nested-relationship-docs/' +
-			path,
-		{ signal: AbortSignal.timeout(15_000) }
-	);
-	assert.strictEqual(response.status, 200, 'Cannot read peer fixture: ' + response.url);
-	return response.text();
-}
-let peerRevision = '';
 test(
 	'paired documentation fixtures stay synchronized across repositories',
-	{ skip: !process.env.CI && !process.env.HARPER_CORE_FIXTURE_ROOT },
+	{ skip: !process.env.CI && !process.env.HARPER_CORE_FIXTURE_ROOT, timeout: 35_000 },
 	async () => {
-		const peerRoot = process.env.HARPER_CORE_FIXTURE_ROOT;
-		if (!peerRoot) {
-			const response = await fetch('https://api.github.com/repos/HarperFast/harper/pulls/3279', {
-				signal: AbortSignal.timeout(15_000),
-			});
-			assert.strictEqual(response.status, 200, 'Cannot resolve companion PR revision');
-			const pr = await response.json();
-			peerRevision = pr.merged_at ? 'main' : pr.head.sha;
-			assert(peerRevision === 'main' || /^[a-f0-9]{40}$/.test(peerRevision));
-		}
-		for (const name of ['examples.json', 'schema.graphql', 'resources.js']) {
-			const expected = readFileSync(new URL(name, new URL(fixture, import.meta.url)), 'utf8');
-			const actual = peerRoot ? readFileSync(resolve(peerRoot, name), 'utf8') : await readPeerFile(name);
-			assert.strictEqual(
-				actual.replace(/\r\n/g, '\n'),
-				expected.replace(/\r\n/g, '\n'),
-				name + ' differs from the companion repository; update both fixtures together'
-			);
-		}
+		await verifyPeerFixtures({
+			localRoot: fileURLToPath(new URL(fixture, import.meta.url)),
+			peerRoot: process.env.HARPER_CORE_FIXTURE_ROOT,
+			repository: 'HarperFast/harper',
+			pull: 3279,
+			peerPath: 'integrationTests/resources/nested-relationship-docs',
+		});
 	}
 );
