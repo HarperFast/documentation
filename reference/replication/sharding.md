@@ -66,7 +66,7 @@ The `confirm` parameter can be combined with explicit node lists.
 
 Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 
-<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. A non-super-user caller receives HTTP 403 when an operation body includes either field with a non-null value, including `replicateTo: 0` and an empty node list.
+<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. For operations that accept these fields, a non-super-user caller receives HTTP 403 when either field has a non-null value, including `replicateTo: 0` and an empty node list.
 
 ```json
 {
