@@ -839,6 +839,59 @@ Dropping the policy is therefore containment against _future_ runs. If you are r
 
 ---
 
+## Network Access
+
+<VersionBadge version="v5.4.0" />
+
+A source address allowlist for the operations API, enforced by a proxy in front of Harper (such as Harper Fabric's), not by Harper itself. Lists live in the replicated `system.hdb_network_access` table, one row per scope, so setting one on any node applies cluster-wide. The only scope is `operations`.
+
+Harper publishes the list in the metadata file it writes for each operations API [Unix domain socket](../configuration/options.md#tls) (`tls.unixDomainSockets: true`), as `allowedSources`, and rewrites that file within moments of any change, on every node, without a restart. A proxy that reads it admits only connections from the listed addresses. A direct connection to the operations API port, or one through a proxy that does not read `allowedSources`, is not restricted.
+
+| Operation            | Description                                       | Role Required |
+| -------------------- | ------------------------------------------------- | ------------- |
+| `set_network_access` | Sets or clears the allowlist for a scope          | super_user    |
+| `get_network_access` | Returns the allowlist for one scope or all scopes | super_user    |
+
+### `set_network_access`
+
+Replaces the scope's list. Each entry in `allow` is an IPv4 or IPv6 CIDR, or a bare address (a `/32` or `/128`). An invalid entry rejects the whole request. Entries are stored in canonical form: lowercase, compressed IPv6, with an explicit prefix. An IPv4-mapped IPv6 client (`::ffff:10.1.2.3`) matches IPv4 entries. Up to 1000 entries.
+
+```json
+{
+	"operation": "set_network_access",
+	"scope": "operations",
+	"allow": ["203.0.113.0/24", "2001:db8::/32", "198.51.100.7"]
+}
+```
+
+An empty `allow` removes the restriction:
+
+```json
+{ "operation": "set_network_access", "scope": "operations", "allow": [] }
+```
+
+**Lockout check.** The request fails with `409` when the new list does not include the address the request came from, because the proxy would then block that client. Add the address, or pass `"force": true` (a boolean) to set the list anyway.
+
+Requests over the local operations API domain socket (`operationsApi.network.domainSocket`, which the `harper` CLI uses on the same host) carry no source address, so they skip this check. That socket is never behind the proxy, which makes it the way to recover from a list that locked you out:
+
+```bash
+harper set_network_access scope=operations allow='[]'
+```
+
+:::caution
+Before setting a list, add every source that reaches the operations API through the proxy, not only your own. This includes management tools such as Studio and, in a cluster where replication uses the operations API port, the other nodes.
+:::
+
+### `get_network_access`
+
+```json
+{ "operation": "get_network_access", "scope": "operations" }
+```
+
+Returns `{ "scope", "allow", "updatedBy", "updatedAt" }`; `allow` is `[]` when no list is set. Without `scope`, returns an array with one entry per scope.
+
+---
+
 ## Components
 
 Operations for deploying and managing Harper components (applications, plugins).
