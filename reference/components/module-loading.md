@@ -171,7 +171,7 @@ A refused addon fails to load with an `IncompatibleNativeAddonError`. The error 
 - a rebuild from source under the running Node.js;
 - a standard Node.js runtime.
 
-The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addon it cannot load. So packages that treat their native accelerator as optional, such as `cbor-x` and `msgpackr`, fall back to their JavaScript implementation.
+The error carries `code: 'ERR_DLOPEN_FAILED'`, the code Node.js uses for an addon it cannot load. Packages that treat their native accelerator as optional, such as `cbor-x` and `msgpackr`, fall back to their JavaScript implementation on any load error.
 
 The check has three limits:
 
