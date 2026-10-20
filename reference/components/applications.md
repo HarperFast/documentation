@@ -83,6 +83,36 @@ export function handleApplication(scope) {
 
 See [Cleanup on Shutdown](./plugin-api.md#cleanup-on-shutdown) for the full shutdown sequence, including how async cleanup is awaited and the time limit it must finish within.
 
+## Writing Files in the Application Directory
+
+An application's directory (`<componentsRoot>/<name>`, available to code as [`scope.directory`](./plugin-api.md#scopedirectory)) belongs to the deploy, not to the running application. Harper does not protect, version, or coordinate files an application writes there at runtime. If your application writes into its own directory — a disk cache, generated assets, uploads, logs, a local database file — managing those files is your responsibility, and the following apply:
+
+- **Each deploy replaces the directory.** The new version contains the deployed package and a fresh dependency install. Files the previous version wrote at runtime are not carried over.
+- **Old and new versions run at the same time.** Workers running the previous version keep running after the new files are on disk, until they are replaced: through the whole of a `restart=rolling` deploy, while each worker is swapped during `restart=true`, and indefinitely for a deploy without `restart`. A path resolves to the directory that is live now, so a file the old code writes by path after the swap lands in the new version's directory, where the new code may read it. A cache entry rendered by the old build can then be served by the new one.
+- **Every worker thread loads the application.** Threads of the same version write concurrently, so a file written in place can be read half-written. Write to a temporary file and rename it into place.
+- **Files are local to one node.** Nothing written to disk replicates to other nodes in a cluster.
+
+To keep runtime files safe:
+
+- **Store state in a Harper [table](../database/overview.md)** rather than on disk. Tables are transactional, shared by every worker, and replicated across a cluster.
+- **Write disk caches and scratch files outside the application directory**, to a path you configure, and **namespace them by build or version** so that the previous version's workers cannot write into the directory the new version reads:
+
+  ```js
+  import { mkdir, readFile } from 'node:fs/promises';
+  import { join } from 'node:path';
+
+  export async function handleApplication(scope) {
+  	const { version } = JSON.parse(await readFile(join(scope.directory, 'package.json'), 'utf8'));
+  	const cacheDir = join(process.env.MY_APP_CACHE_ROOT ?? '/var/cache/my-app', version);
+  	await mkdir(cacheDir, { recursive: true });
+  	// read and write cache files under cacheDir only
+  }
+  ```
+
+  Use an identifier that changes with every deploy you want isolated. A `package.json` version only works if each deploy bumps it; a build ID or a hash of the build output is more robust. Harper does not remove these directories, so delete old ones once no worker of that version is running.
+
+The [Next.js plugin](./nextjs.md#versioned-filesystem-cache) applies this pattern to Next.js's on-disk render and data caches.
+
 ## Remote Management
 
 Managing applications on a remote Harper instance uses the same operations as local management. The recommended approach is to log in first using `harper login` to store an authentication token:
