@@ -880,9 +880,9 @@ Dropping the policy is therefore containment against _future_ runs. If you are r
 
 <VersionBadge version="v5.4.0" />
 
-A source address allowlist for the operations API, enforced by a proxy in front of Harper (such as Harper Fabric's), not by Harper itself. Lists live in the `system.hdb_network_access` table, one row per scope, which replicates like users and roles: with the `system` database replicated (the default), setting a list on any node applies cluster-wide. The only scope is `operations`.
+A source address allowlist for the operations API, enforced by a proxy in front of Harper (such as Harper Fabric's), not by Harper itself. Lists live in the `system.hdb_network_access` table, one row per scope, which replicates like users and roles: a list set on one node reaches every node that receives `system` database replication from it (all nodes, by default). The only scope is `operations`.
 
-Harper publishes the list in the metadata file it writes for each operations API [Unix domain socket](../configuration/options.md#tls), as `allowedSources`, and rewrites that file within moments of any change, on every node that receives it, without a restart. Those sockets exist only when `tls.unixDomainSockets` is `true` and `operationsApi.network.securePort` is set. A proxy that reads it admits only connections from the listed addresses. A direct connection to the operations API port, or one through a proxy that does not read `allowedSources`, is not restricted.
+Harper publishes the list in the metadata file it writes for each operations API [Unix domain socket](../configuration/options.md#tls), as `allowedSources`, and rewrites that file within moments of any change, on every node that receives it, without a restart. Those sockets exist only when `tls.unixDomainSockets` is `true` and `operationsApi.network.securePort` is set. A proxy that reads that file admits only connections from the listed addresses. A direct connection to the operations API port, or one through a proxy that does not read `allowedSources`, is not restricted.
 
 | Operation            | Description                                       | Role Required |
 | -------------------- | ------------------------------------------------- | ------------- |
