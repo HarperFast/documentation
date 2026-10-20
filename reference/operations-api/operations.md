@@ -854,7 +854,7 @@ Harper publishes the list in the metadata file it writes for each operations API
 
 ### `set_network_access`
 
-Replaces the scope's list. Each entry in `allow` is an IPv4 or IPv6 CIDR, or a bare address (a `/32` or `/128`). An invalid entry rejects the whole request. Entries are stored in canonical form: lowercase, compressed IPv6, with an explicit prefix. An IPv4-mapped IPv6 client (`::ffff:10.1.2.3`) matches IPv4 entries. Up to 1000 entries.
+Replaces the scope's list. Each entry in `allow` is an IPv4 or IPv6 CIDR, or a bare address (a `/32` or `/128`). An invalid entry rejects the whole request. Entries are stored in canonical form: lowercase, compressed IPv6, with an explicit prefix; an IPv4-mapped IPv6 entry (`::ffff:10.0.0.0/104`) is stored as the IPv4 network it covers (`10.0.0.0/8`). An entry matches only clients of its own address family, so `::/0` does not admit IPv4 clients; an IPv4-mapped IPv6 client (`::ffff:10.1.2.3`) matches IPv4 entries. Up to 1000 entries.
 
 ```json
 {
