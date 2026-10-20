@@ -870,9 +870,11 @@ An empty `allow` removes the restriction:
 { "operation": "set_network_access", "scope": "operations", "allow": [] }
 ```
 
-**Lockout check.** The request fails with `409` when the new list does not include the address the request came from, because the proxy would then block that client. Add the address, or pass `"force": true` (a boolean) to set the list anyway.
+**Lockout check.** The request fails with `409` when the new list does not include the address the request came from, because the proxy would then block that client. It also fails with `409` when Harper cannot tell the request's source address, as with some requests on the Bun runtime. Add the address, or pass `"force": true` (a boolean) to set the list anyway.
 
-Requests over the local operations API domain socket (`operationsApi.network.domainSocket`, which the `harper` CLI uses on the same host) carry no source address, so they skip this check. That socket is never behind the proxy, which makes it the way to recover from a list that locked you out:
+When the node handling the request does not publish socket metadata (`tls.unixDomainSockets` is off), the response carries a `warning`: the list is stored and replicated, but nothing on that node enforces it.
+
+Requests over the local operations API domain socket (`operationsApi.network.domainSocket`, which the `harper` CLI uses on the same host) skip this check on Node.js. That socket is never behind the proxy, which makes it the way to recover from a list that locked you out:
 
 ```bash
 harper set_network_access scope=operations allow='[]'
