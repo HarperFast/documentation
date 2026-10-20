@@ -843,9 +843,9 @@ Dropping the policy is therefore containment against _future_ runs. If you are r
 
 <VersionBadge version="v5.4.0" />
 
-A source address allowlist for the operations API, enforced by a proxy in front of Harper (such as Harper Fabric's), not by Harper itself. Lists live in the replicated `system.hdb_network_access` table, one row per scope, so setting one on any node applies cluster-wide. The only scope is `operations`.
+A source address allowlist for the operations API, enforced by a proxy in front of Harper (such as Harper Fabric's), not by Harper itself. Lists live in the `system.hdb_network_access` table, one row per scope, which replicates like users and roles: with the `system` database replicated (the default), setting a list on any node applies cluster-wide. The only scope is `operations`.
 
-Harper publishes the list in the metadata file it writes for each operations API [Unix domain socket](../configuration/options.md#tls) (`tls.unixDomainSockets: true`), as `allowedSources`, and rewrites that file within moments of any change, on every node, without a restart. A proxy that reads it admits only connections from the listed addresses. A direct connection to the operations API port, or one through a proxy that does not read `allowedSources`, is not restricted.
+Harper publishes the list in the metadata file it writes for each operations API [Unix domain socket](../configuration/options.md#tls), as `allowedSources`, and rewrites that file within moments of any change, on every node that receives it, without a restart. Those sockets exist only when `tls.unixDomainSockets` is `true` and `operationsApi.network.securePort` is set. A proxy that reads it admits only connections from the listed addresses. A direct connection to the operations API port, or one through a proxy that does not read `allowedSources`, is not restricted.
 
 | Operation            | Description                                       | Role Required |
 | -------------------- | ------------------------------------------------- | ------------- |
@@ -870,7 +870,7 @@ An empty `allow` removes the restriction:
 { "operation": "set_network_access", "scope": "operations", "allow": [] }
 ```
 
-**Lockout check.** The request fails with `409` when the new list does not include the address the request came from, because the proxy would then block that client. It also fails with `409` when Harper cannot tell the request's source address: a call through the MCP server or `server.operation()`, and some requests on the Bun runtime. Add the address, or pass `"force": true` (a boolean) to set the list anyway.
+**Lockout check.** Setting a non-empty list fails with `409` when it does not include the address the request came from, because the proxy would then block that client. It also fails with `409` when Harper cannot tell the request's source address: a call through the MCP server or `server.operation()`, and some requests on the Bun runtime. Add the address, or pass `"force": true` (a boolean) to set the list anyway.
 
 Requests over the local operations API domain socket (`operationsApi.network.domainSocket`, which the `harper` CLI uses on the same host) skip this check on Node.js. That socket is never behind the proxy, which makes it the way to recover from a list that locked you out:
 
@@ -878,7 +878,7 @@ Requests over the local operations API domain socket (`operationsApi.network.dom
 harper set_network_access scope=operations allow='[]'
 ```
 
-When the node handling the request does not publish socket metadata (`tls.unixDomainSockets` is off), the response carries a `warning`: the list is stored and replicated, but nothing on that node enforces it.
+When the node handling the request publishes no operations API socket metadata (it lacks either setting above), the response carries a `warning`: the list is stored and replicated, but nothing on that node enforces it.
 
 :::caution
 Before setting a list, add every source that reaches the operations API through the proxy, not only your own. This includes management tools such as Studio and, in a cluster where replication uses the operations API port, the other nodes.
