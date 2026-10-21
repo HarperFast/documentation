@@ -21,11 +21,12 @@ Harper isolates each application's module context automatically (see [What co-lo
 
 ## What co-located applications share
 
-Harper runs as a single process. Every co-located application shares that process and its worker threads, so it is worth being precise about what is isolated between applications and what is not.
+Harper runs as a single process. Every co-located application shares that process, and, unless it is isolated, its worker threads, so it is worth being precise about what is isolated between applications and what is not.
 
-- **Application source is isolated; some dependencies are not.** Harper loads each application's JavaScript in its own module context using Node.js's VM module loader, giving every application a distinct module cache. One application's own modules, imports, and module-scoped state are not visible to another, so two applications can depend on different packages—or different versions of the same package—without colliding. The exception is dependencies: under the default `dependencyLoader: auto`, packages that do not declare `harper` as a dependency load through Node's loader and share its process-wide cache, so two applications resolving the same package file get the same instance and the same singleton state. Both the loader and the dependency policy are configurable—see [Module Loading](/reference/v5/components/module-loading).
-- **The data layer and Harper APIs are shared.** The objects you reach through the `harper` package or as globals—`tables`, `databases`, and the rest—are the same live, process-wide objects in every application. A record written by one application is immediately visible to every other, and any application can read or write another's tables in-process. This is what makes co-location efficient, and it is why separate databases are a [namespacing convention](#namespacing-data-by-database) rather than an enforced boundary.
+- **Application source is isolated; some dependencies are not.** Harper loads each application's JavaScript in its own module context using Node.js's VM module loader, giving every application a distinct module cache. One application's own modules, imports, and module-scoped state are not visible to another, so two applications can depend on different packages—or different versions of the same package—without colliding. The exception is dependencies: under the default `dependencyLoader: auto`, packages that do not declare `harper` as a dependency load through Node's loader and share its cache within that worker, so two applications in the same worker resolving the same package file get the same instance and the same singleton state. Different workers have separate caches. Both the loader and the dependency policy are configurable—see [Module Loading](/reference/v5/components/module-loading).
+- **Database data is shared by default.** The `tables` and `databases` APIs normally reach the same base databases, whether imported from `harper` or used as globals. An isolated worker has its own API objects but still reaches that shared data. The exception is a database an application [forks](#a-private-fork-of-a-database): its `harper` import of `databases` resolves that name to the fork, while the bare globals still reach the base. A record written to a base database is visible to applications using that same base; writes to a fork stay in that fork. Any application can still read or write unbranched tables in-process. This is what makes co-location efficient, and it is why separate databases are a [namespacing convention](#namespacing-data-by-database) rather than an enforced boundary.
 - **Users, roles, and sessions are instance-wide.** Harper's RBAC belongs to the instance, not to an application. Every application's `roles.yaml` reconciles into the same instance-wide role registry, and a user authenticates against the instance as a whole. See [Access control is instance-wide](#access-control-is-instance-wide).
+- **Worker threads are shared, unless an application is isolated.** By default every worker thread loads every application, so applications share each thread's globals and are restarted together. As of v5.3.0, an application whose root-config entry sets `isolated: true` runs instead in a worker thread of its own that loads no other application, and a redeploy that keeps it isolated restarts only that thread. Its worker listens only on its own Unix domain socket, not on Harper's ports, so it needs a proxy in front that routes its own `host` to that socket. On Harper Fabric the platform does this for a host the cluster claims. See [Isolated applications](/reference/v5/components/applications#isolated-applications) for the requirements and the `threads.maxIsolated` cap.
 - **The process is shared.** Because every application runs in one process, operational actions apply to all of them: restarting the instance restarts every co-located application, and applications cannot change the process working directory. Plan restarts and deployments with the whole instance in mind.
 
 For the full model, see the [JavaScript Environment](/reference/v5/components/javascript-environment) reference.
@@ -54,7 +55,7 @@ For the full list of options, see the [Component Configuration](/reference/v5/co
 
 ## Routing requests to each application
 
-Applications on the same instance share a single HTTP listener and port (`9926` by default). Every request enters one layered middleware chain, and routing determines which application handles it. Harper routes by **hostname**, **URL prefix**, or both, with no dispatch code in the application.
+Applications on the same instance share a single HTTP listener and port (`9926` by default). The exception is an [isolated](/reference/v5/components/applications#isolated-applications) application, which listens only on its own Unix domain socket. Each worker has its own layered middleware chain: a shared worker loads the non-isolated applications, while a dedicated worker loads only its isolated application. Routing determines which application handles a request within that chain. Harper routes by **hostname**, **URL prefix**, or both, with no dispatch code in the application.
 
 ### Mounting an application
 
@@ -101,7 +102,7 @@ An application can also declare `host` on an individual plugin, but a `host` on 
 
 A mount is a routing prefix, not an isolation boundary. Two limits matter when several applications share an instance:
 
-- **A mount does not namespace resources.** REST endpoint paths come from the resources and tables an application exports, and those exports land in a single instance-wide registry. Mounting namespaces the external URL an application answers on; it does not make two applications' exports independent. Two applications that both export a `User` resource still conflict, wherever each is mounted. Give each application uniquely named resources or, preferably, its own database.
+- **A mount does not namespace resources.** REST endpoint paths come from the resources and tables an application exports, and those exports land in the worker's shared registry for the applications it loads. Mounting namespaces the external URL an application answers on; it does not make two applications' exports independent. Two applications that both export a `User` resource still conflict, wherever each is mounted. Give each application uniquely named resources or, preferably, its own database. An [isolated](/reference/v5/components/applications#isolated-applications) application is the exception: its exports are registered only in its own worker thread.
 - **A mount does not host-constrain Fastify routes.** [`fastifyRoutes`](/reference/v5/fastify-routes/overview) registers as a global fallback outside the routed middleware chain, so those routes answer on every hostname. A `urlPath` mount does apply—it becomes the Fastify route prefix—but a `host` mount does not, and Harper refuses to load a host-mounted application that declares `fastifyRoutes` rather than silently serving it unconstrained. Port those routes to [custom resources](/reference/v5/resources/overview) or `server.http()` before mounting the application by host.
 
 ### Custom dispatch in the middleware chain
@@ -133,9 +134,25 @@ When serving several hostnames over TLS, configure a certificate per domain with
 
 Give each application its own database. Its tables then belong to it by name, its resources address them without qualification, and the applications do not collide in the table namespace.
 
-This is namespacing, not enforced isolation. `databases` is a process-wide object, so every co-located component can reach every database through it—a database boundary is a convention that well-behaved application code respects, and nothing in the runtime prevents buggy or untrusted component code from crossing it. Treat co-located applications as sharing one trust domain, and vet component code the way you would vet code you are adding to the same service.
+This is namespacing, not enforced isolation. Each worker has its own `databases` object, which normally reaches the same shared stored data (only an application's `harper` import resolves the names it [forks](#a-private-fork-of-a-database)), so every co-located component can reach every database through it—a database boundary is a convention that well-behaved application code respects, and nothing in the runtime prevents buggy or untrusted component code from crossing it. Treat co-located applications as sharing one trust domain, and vet component code the way you would vet code you are adding to the same service.
 
 That shared access is also what makes co-location useful: when one application needs data from another—an `admin-dashboard` reading from the `listings-api`—it queries the table directly, in-process, rather than opening a network connection to another service.
+
+### A private fork of a database
+
+<VersionBadge version="v5.3.0" />
+
+When an application should work on its own copy of a database rather than share it, such as a second variant of an application running against the same data, declare `branchedDatabases` on its root-config entry:
+
+```yaml
+# ~/hdb/harper-config.yaml
+listings-api-staging:
+  branchedDatabases: [listings]
+```
+
+The first time the application loads, Harper takes a snapshot of each named database as the application's fork. The `databases` the application imports from `harper` then resolves those names to its fork, so its code is unchanged, and every other application keeps using the base. The `tables` import follows only a fork of the default `data` database, so reach any other branched database, like `listings` here, through `databases`. The fork is durable and is never refreshed from the base. It is not replicated: each node of a cluster keeps its own. `drop_component` with `restart=true` removes it.
+
+A fork is still not an enforced boundary. The bare `databases` and `tables` globals reach the base. The application can also still open any database that it did not branch. On v5.3.0 and v5.3.1, an application deployed by `package` or `by_ref` gets no fork at all ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). See [Branched databases](/reference/v5/components/applications#branched-databases) for the requirements and the manual steps that work in the meantime.
 
 When a boundary has to hold against code you do not fully trust, or against a security or compliance requirement, put the application on a separate instance or cluster. That is the only boundary Harper enforces for data.
 
@@ -185,9 +202,7 @@ For local iteration, `harper dev .` runs the application and watches for file ch
 
 ## Deploying across the cluster
 
-The preceding sections deploy an application to a single instance. To deploy it across every node in the cluster, include the `replicated=true` parameter.
-
-When deploying in a clustered environment, set `replicated=true` to spread the deployment to all nodes:
+On Harper Pro and Fabric, a deploy goes to every node in the cluster unless you pass `replicated=false`. Harper core on its own deploys only to the node you call. Passing `replicated=true` makes the cluster-wide deploy explicit:
 
 ```bash
 harper deploy_component \
@@ -197,7 +212,7 @@ harper deploy_component \
   replicated=true
 ```
 
-`target` points to a node's operations endpoint. `replicated=true` sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
+`target` points to a node's operations endpoint, and that node sends the deployment to the rest of the cluster, extending the "deploy everywhere" behavior of Harper's [replication](/reference/v5/replication/overview) to the application itself.
 
 :::note
 Restart afterward to apply the changes—for example, `harper restart target=https://cluster-node-1.example.com:9925 replicated=true`.
