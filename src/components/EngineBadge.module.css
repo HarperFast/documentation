@@ -1,0 +1,7 @@
+.badge {
+	display: inline-block;
+	font-size: 0.8rem;
+	color: var(--ifm-color-content-secondary);
+	font-style: italic;
+	margin-bottom: 0.75rem;
+}
