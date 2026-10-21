@@ -611,6 +611,11 @@ const sidebars: SidebarsConfig = {
 					id: 'environment-variables/overview',
 					label: 'Overview',
 				},
+				{
+					type: 'doc',
+					id: 'environment-variables/encrypted-values',
+					label: 'Encrypted Values',
+				},
 			],
 		},
 		{

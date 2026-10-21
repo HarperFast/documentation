@@ -151,7 +151,7 @@ For record autocomplete:
 GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&select(id,name)&limit(10)
 ```
 
-Prefix search returns matching products. It does not return a dictionary of suggested terms.
+Prefix search returns matching products. It does not return a dictionary of suggested terms. Before v5.4, prefix queries restrict `offset + limit` to 100. In v5.4, bounded pages can go beyond that window within request budgets; each page runs a new query rather than retaining a search. See [paging and prefix result windows](/reference/v5/full-text-search/querying#paging-and-prefix-result-windows).
 
 REST searches every source field in the index, so the caller must be allowed to read `name`, `description`, and `tags` for these requests. Use `Table.search()` or `search_by_conditions` when a role should search only a subset of sources. See [REST full-text operators](/reference/v5/rest/querying#full-text-operators).
 

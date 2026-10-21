@@ -163,7 +163,7 @@ MyTable.setResidency((record) => {
 
 ### By Primary Key Only (`setResidencyById`)
 
-Define a residency function based solely on the primary key. Records (including metadata) are only replicated to the specified nodes — metadata does not need to be replicated everywhere, which allows data to be retrieved without needing access to record data or metadata on the requesting node.
+Define a residency function based solely on the primary key. Records (including metadata) are only replicated to the specified nodes — metadata does not need to be replicated everywhere, which allows data to be retrieved without needing access to record data or metadata on the requesting node. This does not hold with [dedicated replication threads](./overview.md#dedicated-replication-threads) (`replication.threads` above `0`), which do not run the residency function.
 
 Return a shard number:
 
