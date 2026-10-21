@@ -143,9 +143,9 @@ Once shards are configured, use `setResidency` or `setResidencyById` (described 
 
 Define a custom residency function that is called with the full record. Return an array of node hostnames or a shard number.
 
-With this approach, record metadata (including residency information) and indexed properties are replicated to all nodes, but the full record is only stored on the specified nodes.
+With this approach, record metadata (including residency information) and indexed properties are replicated to all nodes, but the full record is only stored on the specified nodes, apart from the short-lived replicas described next.
 
-<VersionBadge type="changed" version="v5.4.0" /> A node outside a record's residency that reads the record fetches it from a resident node and keeps the result as a local replica for `replicaExpiration` seconds (default one hour), renewed by reads after `replicaRefreshFraction` of that time. The record stays where the residency function placed it: a replica is never written back, replicated onward or counted as a resident, and the residents' writes update it like any other copy. See the [`@table` arguments](../database/schema.md#replicaexpiration-and-replicarefreshfraction).
+<VersionBadge type="changed" version="v5.4.0" /> A node outside a record's residency that reads the record fetches it from a resident node and keeps the result as a local replica for `replicaExpiration` seconds (default one hour), renewed by reads after `replicaRefreshFraction` of that time. The record stays where the residency function placed it: a replica is never written back, replicated onward or counted as a resident, and a resident's write turns it back into a stub so the next read fetches the new version. See the [`@table` arguments](../database/schema.md#replicaexpiration-and-replicarefreshfraction).
 
 Return node hostnames:
 
@@ -165,7 +165,7 @@ MyTable.setResidency((record) => {
 
 ### By Primary Key Only (`setResidencyById`)
 
-Define a residency function based solely on the primary key. Records (including metadata) are only replicated to the specified nodes — metadata does not need to be replicated everywhere, which allows data to be retrieved without needing access to record data or metadata on the requesting node. This does not hold with [dedicated replication threads](./overview.md#dedicated-replication-threads) (`replication.threads` above `0`), which do not run the residency function.
+Define a residency function based solely on the primary key. A read from another node is answered by a resident and keeps no local replica. Records (including metadata) are only replicated to the specified nodes — metadata does not need to be replicated everywhere, which allows data to be retrieved without needing access to record data or metadata on the requesting node. This does not hold with [dedicated replication threads](./overview.md#dedicated-replication-threads) (`replication.threads` above `0`), which do not run the residency function.
 
 Return a shard number:
 
@@ -185,7 +185,7 @@ MyTable.setResidencyById((id) => {
 
 ## Disabling Cross-Node Access
 
-By default, sharding allows data stored on specific nodes to be accessed from any node — requests are forwarded transparently. To disable this and only return data if it is stored on the local node, set `replicateFrom` to `false`.
+By default, sharding allows data stored on specific nodes to be accessed from any node — requests are forwarded transparently. To disable this and only return data stored on the local node (including a replica it currently holds), set `replicateFrom` to `false`.
 
 Via the operations API:
 

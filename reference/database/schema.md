@@ -126,13 +126,17 @@ If the server starts at 12:05, the first eviction runs at 12:15 — not 12:20. T
 00:00, 06:00, 12:00, 18:00, ...
 ```
 
-**`replicaExpiration` and `replicaRefreshFraction`**
+#### Eviction with Indexing
+
+Eviction removes non-indexed record data, but it does _not_ remove a record from its secondary indexes. If an evicted record matches a search query, Harper fetches the full record from the source on demand to satisfy the query. This means indexes remain fully functional even when most of the data has been evicted.
+
+#### `replicaExpiration` and `replicaRefreshFraction`
 
 <VersionBadge version="v5.4.0" />
 
-On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches use without contacting another node again, and that the owning nodes' writes update like any other copy. A replica does not move the record and is never replicated onward.
+On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches on that node use without contacting another node again. A replica does not move the record and is never replicated onward. A write by an owner reaches the node as an invalidation, which turns the replica back into a stub, so the next read fetches the new version. Tables sharded by primary key only (`setResidencyById`) keep no replicas.
 
-- **`replicaExpiration`** — Seconds a replica is kept. When the time passes, the replica is reduced back to its indexed stub and the next read fetches the record again. `0` keeps reads as remote reads with no replica. A replica never outlives the record's own `expiration`.
+- **`replicaExpiration`** — Seconds a replica is kept. A sweep that runs every quarter of this time reduces replicas past it back to their indexed stubs, so a replica can be served for up to about a quarter longer than the value; the next read then fetches the record again. `0` keeps reads as remote reads with no replica. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
 
 ```graphql
@@ -142,10 +146,6 @@ type Order @table(replicaExpiration: 86400, replicaRefreshFraction: 0.25) {
 	region: String @indexed
 }
 ```
-
-#### Eviction with Indexing
-
-Eviction removes non-indexed record data, but it does _not_ remove a record from its secondary indexes. If an evicted record matches a search query, Harper fetches the full record from the source on demand to satisfy the query. This means indexes remain fully functional even when most of the data has been evicted.
 
 #### `randomAccessFields`
 
