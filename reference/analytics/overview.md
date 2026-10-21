@@ -143,29 +143,29 @@ Harper automatically tracks the following metrics for all services. Applications
 
 ### HTTP Metrics
 
-| `metric`             | `path`        | `method`       | `type`                      | Unit  | Description                                                                                                  |
-| -------------------- | ------------- | -------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------------------------ |
-| `duration`           | resource path | request method | `cache-hit` or `cache-miss` | ms    | Duration of request handler                                                                                  |
-| `duration`           | route path    | request method | `fastify-route`             | ms    | Duration of Fastify route handler                                                                            |
-| `duration`           | operation     |                | `operation`                 | ms    | Duration of Operations API operation                                                                         |
-| `request-time`       | resource path | request method | `cache-hit` or `cache-miss` | ms    | Time from dispatch to response ready, request queue wait included (see [`request-time`](#request-time))      |
-| `request-time`       | route path    | request method | `fastify-route`             | ms    |                                                                                                              |
-| `request-time`       | operation     |                | `operation`                 | ms    |                                                                                                              |
-| `duration-by-thread` |               |                |                             | ms    | `duration` summed per worker thread, in `hdb_analytics` only (see [per-thread metrics](#per-thread-metrics)) |
-| `success`            | resource path | request method |                             | %     | Percentage of successful requests                                                                            |
-| `success`            | route path    | request method | `fastify-route`             | %     |                                                                                                              |
-| `success`            | operation     |                | `operation`                 | %     |                                                                                                              |
-| `bytes-sent`         | resource path | request method |                             | bytes | Response bytes sent                                                                                          |
-| `bytes-sent`         | route path    | request method | `fastify-route`             | bytes |                                                                                                              |
-| `bytes-sent`         | operation     |                | `operation`                 | bytes |                                                                                                              |
-| `transfer`           | resource path | request method | `operation`                 | ms    | Duration of response transfer                                                                                |
-| `transfer`           | route path    | request method | `fastify-route`             | ms    |                                                                                                              |
-| `transfer`           | operation     |                | `operation`                 | ms    |                                                                                                              |
-| `socket-routed`      |               |                |                             | %     | Percentage of sockets immediately routed                                                                     |
-| `tls-handshake`      |               |                |                             | ms    | TLS handshake duration                                                                                       |
-| `tls-reused`         |               |                |                             | %     | Percentage of TLS sessions reused                                                                            |
-| `cache-hit`          | table name    |                |                             | %     | Percentage of cache hits                                                                                     |
-| `cache-resolution`   | table name    |                |                             | ms    | Duration of resolving uncached entries                                                                       |
+| `metric`             | `path`        | `method`       | `type`                      | Unit  | Description                                                                                                                   |
+| -------------------- | ------------- | -------------- | --------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `duration`           | resource path | request method | `cache-hit` or `cache-miss` | ms    | Duration of request handler                                                                                                   |
+| `duration`           | route path    | request method | `fastify-route`             | ms    | Duration of Fastify route handler                                                                                             |
+| `duration`           | operation     |                | `operation`                 | ms    | Duration of Operations API operation                                                                                          |
+| `request-time`       | resource path | request method | `cache-hit` or `cache-miss` | ms    | Time from dispatch to response ready, request queue wait included (see [`request-time`](#request-time))                       |
+| `request-time`       | route path    | request method | `fastify-route`             | ms    |                                                                                                                               |
+| `request-time`       | operation     |                | `operation`                 | ms    |                                                                                                                               |
+| `duration-by-thread` |               |                |                             | ms    | `duration` per worker thread across all its requests, in `hdb_analytics` only (see [per-thread metrics](#per-thread-metrics)) |
+| `success`            | resource path | request method |                             | %     | Percentage of successful requests                                                                                             |
+| `success`            | route path    | request method | `fastify-route`             | %     |                                                                                                                               |
+| `success`            | operation     |                | `operation`                 | %     |                                                                                                                               |
+| `bytes-sent`         | resource path | request method |                             | bytes | Response bytes sent                                                                                                           |
+| `bytes-sent`         | route path    | request method | `fastify-route`             | bytes |                                                                                                                               |
+| `bytes-sent`         | operation     |                | `operation`                 | bytes |                                                                                                                               |
+| `transfer`           | resource path | request method | `operation`                 | ms    | Duration of response transfer                                                                                                 |
+| `transfer`           | route path    | request method | `fastify-route`             | ms    |                                                                                                                               |
+| `transfer`           | operation     |                | `operation`                 | ms    |                                                                                                                               |
+| `socket-routed`      |               |                |                             | %     | Percentage of sockets immediately routed                                                                                      |
+| `tls-handshake`      |               |                |                             | ms    | TLS handshake duration                                                                                                        |
+| `tls-reused`         |               |                |                             | %     | Percentage of TLS sessions reused                                                                                             |
+| `cache-hit`          | table name    |                |                             | %     | Percentage of cache hits                                                                                                      |
+| `cache-resolution`   | table name    |                |                             | ms    | Duration of resolving uncached entries                                                                                        |
 
 #### `request-time`
 
