@@ -133,6 +133,10 @@ Example aggregate entry:
 }
 ```
 
+<VersionBadge type="changed" version="v5.4.0" />
+
+Gauges that each thread reports and aggregation sums across threads (`memory`, `read-transaction-queue-depth`, `write-transaction-queue-depth`, `mqtt-connections`, and `ws-connections`) carry the aggregation `period` on their aggregate rows; before v5.4.0 it read `0`. Aggregate `memory` and queue-depth rows also no longer carry `threadId`, which held the sum of the reporting threads' ids. Raw entries keep their `threadId`.
+
 ## Standard Metrics
 
 Harper automatically tracks the following metrics for all services. Applications can also define custom metrics via [`server.recordAnalytics()`](../http/api.md#serverrecordanalyticsvalue-metric-path-method-type).
@@ -167,7 +171,7 @@ Harper automatically tracks the following metrics for all services. Applications
 
 <VersionBadge version="v5.4.0" />
 
-`request-time` measures from when Harper dispatches a request to when its response is ready, before the body is sent: the handler time that `duration` records, plus any wait in the HTTP request queue that [`http.requestQueueLimit`](../http/configuration.md#httprequestqueuelimit) bounds. It is recorded only for requests that pass through that queue, which are those with a method other than `GET`, `HEAD`, and `OPTIONS`, and only when analytics is enabled as the request arrives. It does not include the TLS handshake, request parsing, or any wait for the event loop before dispatch; [`event-loop-delay`](#per-thread-metrics) covers that wait. For a request handed to a Fastify route, it also includes the Harper request chain that ran first, such as authentication. Raw entries carry `mean`, `distribution`, and `count`, all in milliseconds, and aggregate rows add percentiles. It is not recorded on Bun.
+`request-time` measures from when Harper dispatches a request to when its response is ready, before the body is sent: the handler time that `duration` records, plus any wait in the HTTP request queue that [`http.requestQueueLimit`](../http/configuration.md#httprequestqueuelimit) bounds. It is recorded only for requests that pass through that queue, which are those with a method other than `GET`, `HEAD`, and `OPTIONS`, and only when analytics is enabled as the request arrives. It does not include the TLS handshake, request parsing, or any wait for the event loop before dispatch; [`event-loop-delay`](#per-thread-metrics) covers that wait. For a request that Node's HTTP server hands to a Fastify route, it also includes the Harper request chain that ran first, such as authentication; a request the uWS backend hands to Fastify records no `request-time`. Raw entries carry `mean` and `distribution` in milliseconds and a `count` of requests, and aggregate rows add percentiles. It is not recorded on Bun.
 
 ### MQTT / WebSocket Metrics
 
@@ -245,7 +249,7 @@ signal when the guard trips. Tune the threshold against a baseline for your work
 
 Each row names its thread in `thread`, the thread's `worker_threads` `threadId`, which changes when a worker is replaced. In `hdb_raw_analytics` the same id is the entry's `threadId`.
 
-`event-loop-delay` comes from Node's [`monitorEventLoopDelay`](https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions), which fires a timer every 20 ms. `mean` and `maxDelay` are the milliseconds by which it fired late, so an idle thread reads about 0, and `count` is the number of timer firings, not requests. A thread writes an entry only in a second in which it recorded other analytics, and the measurement restarts when such a second begins, so a stall during a quiet gap is not reported. It is not recorded on Bun.
+`event-loop-delay` comes from Node's [`monitorEventLoopDelay`](https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions), which fires a timer every 20 ms. `mean` and `maxDelay` are the milliseconds by which it fired late, so an idle thread reads about 0, and `count` is the number of timer firings, not requests. A thread writes an entry only in a second in which it recorded other analytics, and the measurement restarts when such a second begins, so a stall during a quiet gap is not reported. A stall that begins in the same loop turn as that restart, or as a report's flush, is not measured either. It is not recorded on Bun.
 
 `duration-by-thread` exists only in `hdb_analytics`: aggregation splits each `duration` entry by the thread that recorded it, and its percentiles are not kept. The `duration` rows are unchanged, so do not add the two together.
 
