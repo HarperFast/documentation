@@ -87,7 +87,6 @@ const sidebars: SidebarsConfig = {
 					id: 'resources/query-optimization',
 					label: 'Query Optimization',
 				},
-				{ type: 'doc', id: 'resources/full-text-paging', label: 'Full-text Paging' },
 			],
 		},
 		{
