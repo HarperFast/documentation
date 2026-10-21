@@ -143,29 +143,29 @@ Harper automatically tracks the following metrics for all services. Applications
 
 ### HTTP Metrics
 
-| `metric`             | `path`        | `method`       | `type`                      | Unit  | Description                                                                                               |
-| -------------------- | ------------- | -------------- | --------------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| `duration`           | resource path | request method | `cache-hit` or `cache-miss` | ms    | Duration of request handler                                                                               |
-| `duration`           | route path    | request method | `fastify-route`             | ms    | Duration of Fastify route handler                                                                         |
-| `duration`           | operation     |                | `operation`                 | ms    | Duration of Operations API operation                                                                      |
-| `request-time`       | resource path | request method | `cache-hit` or `cache-miss` | ms    | Time from dispatch to response ready, request queue wait included (see [`request-time`](#request-time))   |
-| `request-time`       | route path    | request method | `fastify-route`             | ms    |                                                                                                           |
-| `request-time`       | operation     |                | `operation`                 | ms    |                                                                                                           |
-| `duration-by-thread` | as `duration` | as `duration`  | as `duration`               | ms    | `duration` for one worker thread, in `hdb_analytics` only (see [per-thread metrics](#per-thread-metrics)) |
-| `success`            | resource path | request method |                             | %     | Percentage of successful requests                                                                         |
-| `success`            | route path    | request method | `fastify-route`             | %     |                                                                                                           |
-| `success`            | operation     |                | `operation`                 | %     |                                                                                                           |
-| `bytes-sent`         | resource path | request method |                             | bytes | Response bytes sent                                                                                       |
-| `bytes-sent`         | route path    | request method | `fastify-route`             | bytes |                                                                                                           |
-| `bytes-sent`         | operation     |                | `operation`                 | bytes |                                                                                                           |
-| `transfer`           | resource path | request method | `operation`                 | ms    | Duration of response transfer                                                                             |
-| `transfer`           | route path    | request method | `fastify-route`             | ms    |                                                                                                           |
-| `transfer`           | operation     |                | `operation`                 | ms    |                                                                                                           |
-| `socket-routed`      |               |                |                             | %     | Percentage of sockets immediately routed                                                                  |
-| `tls-handshake`      |               |                |                             | ms    | TLS handshake duration                                                                                    |
-| `tls-reused`         |               |                |                             | %     | Percentage of TLS sessions reused                                                                         |
-| `cache-hit`          | table name    |                |                             | %     | Percentage of cache hits                                                                                  |
-| `cache-resolution`   | table name    |                |                             | ms    | Duration of resolving uncached entries                                                                    |
+| `metric`             | `path`        | `method`       | `type`                      | Unit  | Description                                                                                                  |
+| -------------------- | ------------- | -------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------------------------ |
+| `duration`           | resource path | request method | `cache-hit` or `cache-miss` | ms    | Duration of request handler                                                                                  |
+| `duration`           | route path    | request method | `fastify-route`             | ms    | Duration of Fastify route handler                                                                            |
+| `duration`           | operation     |                | `operation`                 | ms    | Duration of Operations API operation                                                                         |
+| `request-time`       | resource path | request method | `cache-hit` or `cache-miss` | ms    | Time from dispatch to response ready, request queue wait included (see [`request-time`](#request-time))      |
+| `request-time`       | route path    | request method | `fastify-route`             | ms    |                                                                                                              |
+| `request-time`       | operation     |                | `operation`                 | ms    |                                                                                                              |
+| `duration-by-thread` |               |                |                             | ms    | `duration` summed per worker thread, in `hdb_analytics` only (see [per-thread metrics](#per-thread-metrics)) |
+| `success`            | resource path | request method |                             | %     | Percentage of successful requests                                                                            |
+| `success`            | route path    | request method | `fastify-route`             | %     |                                                                                                              |
+| `success`            | operation     |                | `operation`                 | %     |                                                                                                              |
+| `bytes-sent`         | resource path | request method |                             | bytes | Response bytes sent                                                                                          |
+| `bytes-sent`         | route path    | request method | `fastify-route`             | bytes |                                                                                                              |
+| `bytes-sent`         | operation     |                | `operation`                 | bytes |                                                                                                              |
+| `transfer`           | resource path | request method | `operation`                 | ms    | Duration of response transfer                                                                                |
+| `transfer`           | route path    | request method | `fastify-route`             | ms    |                                                                                                              |
+| `transfer`           | operation     |                | `operation`                 | ms    |                                                                                                              |
+| `socket-routed`      |               |                |                             | %     | Percentage of sockets immediately routed                                                                     |
+| `tls-handshake`      |               |                |                             | ms    | TLS handshake duration                                                                                       |
+| `tls-reused`         |               |                |                             | %     | Percentage of TLS sessions reused                                                                            |
+| `cache-hit`          | table name    |                |                             | %     | Percentage of cache hits                                                                                     |
+| `cache-resolution`   | table name    |                |                             | ms    | Duration of resolving uncached entries                                                                       |
 
 #### `request-time`
 
@@ -242,16 +242,16 @@ signal when the guard trips. Tune the threshold against a baseline for your work
 
 <VersionBadge version="v5.4.0" />
 
-| `metric`             | Key attributes              | Other                              | Unit | Description                                                                    |
-| -------------------- | --------------------------- | ---------------------------------- | ---- | ------------------------------------------------------------------------------ |
-| `event-loop-delay`   | `mean`, `maxDelay`, `count` | `thread`                           | ms   | How late the thread's event loop ran a 20 ms timer, on average and at worst    |
-| `duration-by-thread` | `mean`, `count`             | `path`, `method`, `type`, `thread` | ms   | `duration` for the requests one worker thread handled, in `hdb_analytics` only |
+| `metric`             | Key attributes              | Other    | Unit | Description                                                                                |
+| -------------------- | --------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------ |
+| `event-loop-delay`   | `mean`, `maxDelay`, `count` | `thread` | ms   | How late the thread's event loop ran a 20 ms timer, on average and at worst                |
+| `duration-by-thread` | `mean`, `count`             | `thread` | ms   | Handler `duration` across every request one worker thread handled, in `hdb_analytics` only |
 
 Each row names its thread in `thread`, the thread's `worker_threads` `threadId`, which changes when a worker is replaced. In `hdb_raw_analytics` the same id is the entry's `threadId`.
 
-`event-loop-delay` comes from Node's [`monitorEventLoopDelay`](https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions), which fires a timer every 20 ms. `mean` and `maxDelay` are the milliseconds by which it fired late, so an idle thread reads about 0, and `count` is the number of timer firings, not requests. A thread writes an entry only in a second in which it recorded other analytics, and the measurement restarts when such a second begins, so a stall during a quiet gap is not reported. A stall that begins in the same loop turn as that restart, or as a report's flush, is not measured either. It is not recorded on Bun.
+`event-loop-delay` comes from Node's [`monitorEventLoopDelay`](https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions), which fires a timer every 20 ms. `mean` and `maxDelay` are the milliseconds by which it fired late, so an idle thread reads about 0, and `count` is the number of timer firings, not requests. A thread writes an entry only in a second in which it recorded other analytics. The measurement restarts with each report, and again when activity resumes after a quiet gap of more than a second, so a stall during that gap is not reported. A stall that begins in the same loop turn as that restart, or as a report's flush, is not measured either. It is not recorded on Bun.
 
-`duration-by-thread` exists only in `hdb_analytics`: aggregation splits each `duration` entry by the thread that recorded it, and its percentiles are not kept. The `duration` rows are unchanged, so do not add the two together.
+`duration-by-thread` exists only in `hdb_analytics`: aggregation combines every `duration` entry a thread recorded in the period into one row for that thread, with the total `count` and the count-weighted `mean`, and keeps no percentiles. The per-path detail for each thread stays in `hdb_raw_analytics`, whose raw entries carry their `threadId`. The `duration` rows are unchanged, so do not add the two together.
 
 ### Resource Usage Metrics
 
