@@ -145,6 +145,8 @@ Define a custom residency function that is called with the full record. Return a
 
 With this approach, record metadata (including residency information) and indexed properties are replicated to all nodes, but the full record is only stored on the specified nodes.
 
+<VersionBadge type="changed" version="v5.4.0" /> A node outside a record's residency that reads the record fetches it from a resident node and keeps the result as a local replica for `replicaExpiration` seconds (default one hour), renewed by reads after `replicaRefreshFraction` of that time. The record stays where the residency function placed it: a replica is never written back, replicated onward or counted as a resident, and the residents' writes update it like any other copy. See the [`@table` arguments](../database/schema.md#replicaexpiration-and-replicarefreshfraction).
+
 Return node hostnames:
 
 ```javascript
