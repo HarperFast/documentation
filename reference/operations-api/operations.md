@@ -122,6 +122,10 @@ Drops a database and all its tables/records. Supports `"replicated": true` to pr
 { "operation": "drop_database", "database": "dev" }
 ```
 
+:::warning
+If a component uses the dropped database, restart Harper afterwards so the component reloads against the change. Use `{ "operation": "restart" }` on a single node, or a [rolling restart](#restart_service) on a cluster, so nodes restart one at a time and the cluster keeps serving. Use `"replicated": true` to drop it on every node.
+:::
+
 ### `create_table`
 
 Creates a new table. Optional fields: `database` (defaults to `data`), `attributes` (array defining schema), `expiration` (TTL in seconds).
@@ -142,6 +146,10 @@ Drops a table and all associated records. Supports `"replicated": true`.
 ```json
 { "operation": "drop_table", "database": "dev", "table": "dog" }
 ```
+
+:::warning
+If a component uses the dropped table, restart Harper afterwards so the component reloads against the change. Use `{ "operation": "restart" }` on a single node, or a [rolling restart](#restart_service) on a cluster, so nodes restart one at a time and the cluster keeps serving. Use `"replicated": true` to drop it on every node.
+:::
 
 ### `create_attribute`
 
