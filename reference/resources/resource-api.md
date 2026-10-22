@@ -532,7 +532,7 @@ Post.sourcedFrom(BlogSource);
 
 #### Read consistency across databases
 
-A resolver's reads are snapshot-consistent as long as every table it reads lives in the same [database](../database/overview.md#databases) — Harper pins a single transaction snapshot per database, so multiple `get()` calls into tables in that database always see the same point-in-time view, no matter how the resolver interleaves them.
+A resolver's ordinary reads use one transaction snapshot per [database](../database/overview.md#databases), so multiple `get()` calls into tables in that database see the same point-in-time view. Native `Table.lock()` can reload committed data and release an earlier snapshot; acquire the lock before reading the value used in a condition. See [native record locks](../database/concurrency.md#native-record-locks) for this exception and its limits.
 
 That snapshot is scoped per database. If a resolver reads from one database, `await`s something (an upstream fetch, another async call), and then reads from a second database, the second read is not guaranteed to reflect the same point in time as the first — it can observe writes that landed on the second database during the `await`.
 
