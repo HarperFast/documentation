@@ -218,6 +218,19 @@ product.save();
 
 ---
 
+### `lock(target: RequestTarget | Id, options?, context?): Promise<Resource>`
+
+<VersionBadge version="v5.3.0" />
+<EngineBadge engines="RocksDB" />
+
+On a table, acquires a native record lock and returns a mutable Resource instance in the supplied or ambient transaction. Lock before other writes and before reading the condition, then update the returned record and `await record.save()`. The default transaction-scoped lock releases on commit or abort.
+
+Options are `scope` (`'node'` or `'cluster'`), `lease` and `timeout` (milliseconds, each defaulting to `30000`), and `hold` (default `false`). Cluster coordination requires Harper Pro; explicit `scope: 'cluster'` fails closed when unavailable. Locks are cooperative: ordinary unlocked writes still proceed. This server API does not perform authorization or expose a REST method.
+
+See [Concurrency and Consistency](../database/concurrency.md#native-record-locks) for option defaults, participating writers, `record.unlock()`, errors, a worked example, and timestamp and recovery limits.
+
+---
+
 ### `publish(target: RequestTarget | Id, message: object, context?: Resource | Context): Promise<void>`
 
 Publishes a message to a record/topic using the same primary key structure as records.
@@ -941,21 +954,21 @@ The arguments these instance methods receive depend on [`static loadAsInstance`]
 
 ## Concurrency and Safe Concurrent Writes
 
-When multiple writers may touch the same record concurrently, only atomic deltas are safe. Harper resolves deltas at commit time, so the committed result is exact regardless of how the writers interleave:
+Use atomic deltas for concurrent increments and decrements. Harper resolves deltas at commit time, preserving competing increments without an application read/modify/write loop:
 
 ```javascript
 record.addTo('counter', 1); // increment
 record.subtractFrom('stock', 1); // decrement
 ```
 
-Read-then-write patterns — "compare-and-set" — are not safe under concurrency. This includes version-guarded updates (`ifVersion`), create-only "first write wins", reading a value to decide and then writing it back, and HTTP `If-Match` / conditional writes. All of these read a value _before_ commit and are not re-validated _at_ commit, so two concurrent writers can both pass the check. Modeling state as commutative deltas avoids the problem entirely.
+An unprotected read/check/write is not atomic compare-and-swap. Two requests can pass the same check before either commits. Do not infer `ifVersion`, create-only "first write wins", or `If-Match` write guarantees from a preceding read or conditional GET support. For a condition that must hold while updating a record, evaluate [`Table.lock()`](#locktarget-requesttarget--id-options-context-promiseresource) and require every conflicting writer to participate.
 
 A few limitations to design around:
 
 - `addTo` and `subtractFrom` return no value, and a read-back immediately after a write is not guaranteed to reflect your own committed result. You cannot use them to read "your position" for an exactly-once claim or a hard limit.
 - `subtractFrom` has no floor; concurrent decrements can drive a value negative.
 
-For non-commutative operations — claim-once, hard caps, inventory floors, state-machine transitions — serialize the operation through a single owning process, or use an external lock or coordinator. This matters more in a cluster: a counter replicates and converges eventually, but a decision made on one node's not-yet-converged view can be wrong during the replication window. A rate limiter built this way, for example, can transiently over-admit when requests are spread across nodes.
+For claim-once behavior, inventory floors, or guarded state transitions, start with Harper's native locks and check their scope and limits before introducing an external coordinator. Harper also handles storage-level optimistic transaction conflicts internally; rejecting a stale form is a separate application policy. See [Concurrency and Consistency](../database/concurrency.md) for these distinctions, transaction boundaries, and the multi-record and cluster recovery limits.
 
 ## Returning Errors and Status Codes
 
