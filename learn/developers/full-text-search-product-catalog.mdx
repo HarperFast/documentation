@@ -176,11 +176,13 @@ for await (const product of databases.catalog.Product.search({
 
 Do not apply this wait to every catalog request without measuring it. The normal bounded-staleness path keeps search traffic independent of short indexing bursts.
 
-If the index does not reach current coverage within ten seconds, consuming the search returns retryable `503` code `DERIVED_INDEX_LAGGING`. See [freshness controls](/reference/v5/full-text-search/querying#freshness-controls).
+If the index does not reach current coverage within ten seconds, iteration throws an error with `statusCode: 503`, `code: "DERIVED_INDEX_LAGGING"`, and `retryable: true`. See [freshness controls](/reference/v5/full-text-search/querying#freshness-controls).
 
 ## 6. Operate the index
 
 Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests in `unknown`, `needs-rebuild`, or `rebuilding` state return `503` with `code: "INDEX_REBUILDING"` and `retryable: true`. Retry this code with backoff; do not treat every `503` as an index rebuild.
+
+The custom resource in step 3 streams its returned iterable. HTTP error statuses apply before response headers are sent; a failure after streaming starts is a terminal stream error and cannot change the HTTP status. Consumers must also handle that terminal error. See [freshness and streaming errors](/reference/v5/full-text-search/querying#freshness-controls).
 
 See the [full-text configuration reference](/reference/v5/full-text-search/configuration) and [query reference](/reference/v5/full-text-search/querying) for every option and match mode.
 
