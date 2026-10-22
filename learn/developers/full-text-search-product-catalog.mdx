@@ -22,7 +22,7 @@ This guide adds relevance-ranked text search to a product catalog, then exposes 
 
 ## 1. Declare the index
 
-Add `audit: true` to the RocksDB-backed table and declare an `@fullText` index over the fields customers search.
+Declare an `@fullText` index over the fields customers search on a RocksDB-backed table. Ordinary tables inherit enabled audit logging by default, but a new full-text table requires explicit `audit: true` for its transaction-log recovery source. See the [audit requirement](/reference/v5/full-text-search/configuration) for existing tables.
 
 ```graphql title="schema.graphql"
 type Product @table(database: "catalog", audit: true) @export {
@@ -122,13 +122,13 @@ Content-Type: application/json
 { "q": "trail", "category": "footwear" }
 ```
 
-The category filter is optional; `q` is required.
+This custom resource accepts a structured JSON search body through POST. The category filter is optional; `q` is required. For URL-based GET searches, use the exported table endpoint in step 4.
 
 Harper applies the availability and optional category conditions while accepting current product records. Existing secondary indexes can narrow candidates; rejected records do not count toward the requested page.
 
 Calls through `tables` and `databases` use Harper's [trusted server-side context](/reference/v5/components/javascript-environment#tables). Forwarding the resource's `context` preserves the authenticated caller, and `checkPermission: true` asks the table to enforce that caller's table and source-field permissions. The custom resource must do both. Highlights can expose searched source text even when those fields are absent from `select`.
 
-The search includes `tags`, but that source does not set `highlight: true`. A tag match can rank a product, while `$highlights` omits `tags`.
+Matches in `tags` contribute to search results and ranking, but `$highlights` does not include tag matches because `tags` is not configured with `highlight: true`.
 
 ## 4. Search through REST
 
