@@ -30,6 +30,8 @@ Atomic deltas are appropriate for counters. A stock decrement is safe as a delta
 
 `await Table.lock(id, options?, context?)` acquires a lock and returns a mutable record joined to the supplied or ambient transaction. Acquire it before other writes and before reading the value used by the condition. Mutate the returned record and call `await record.save()`. With the default `hold: false`, the transaction releases the lock on commit or abort. Do not call `record.unlock()` before the transaction commits.
 
+For a missing id, `lock()` returns a mutable record without stored values; setting its properties and saving creates the record. Initialize missing counter values explicitly. In the reservation example below, a missing quantity fails the stock check.
+
 `lock()` is an in-process API for server Resources and Components. It has no authorization check of its own and is not a REST `LOCK` method. Authenticate and authorize the caller before using it. Ordinary requests do not automatically acquire record locks.
 
 ### Options and Lifetime
@@ -47,7 +49,7 @@ Prefer transaction-scoped locks. A lock acquired outside a request or explicit `
 
 When correctness requires cross-node coordination, set `scope: 'cluster'` explicitly. This fails closed if the Harper Pro cluster-lock transport and home-map configuration are unavailable. With an implicit default, a core-only deployment can fall back to node scope; the existence of `lock()` alone does not establish cluster protection. Revisit an explicit `scope: 'node'` before adding nodes.
 
-Cluster locks require RocksDB, Harper Pro with `replication.recordLocks: true`, and an agreed home map for the database. The map names every participating node; a record's **home** is the node that arbitrates its locks. A **generation** identifies one agreed version of that map. Enabling the configuration flag alone does not create a map. Follow the versioned [home-map setup and transition procedure](https://github.com/HarperFast/harper-pro/blob/v5.3.2/replication/RECORD_LOCK_HOMES_DESIGN.md#the-operation): agree the complete participant list, stage and stop the old generation, drain outstanding locks, then activate the agreed generation. Do not derive separate maps from each node's current view of reachable peers.
+Cluster locks require RocksDB, Harper Pro with [`replication.recordLocks: true`](../configuration/options.md#replication), and an agreed home map for the database. The map names every participating node; a record's **home** is the node that arbitrates its locks. A **generation** identifies one agreed version of that map. Enabling the configuration flag alone does not create a map. Pro's `record_lock_apply_homes` operation coordinates the transition for an operator-supplied participant list. Follow its versioned [home-map setup and transition procedure](https://github.com/HarperFast/harper-pro/blob/v5.3.2/replication/RECORD_LOCK_HOMES_DESIGN.md#the-operation): agree the complete participant list, stage and stop the old generation, drain outstanding locks, then activate the agreed generation. Do not derive separate maps from each node's current view of reachable peers.
 
 ### Participating Writers
 
@@ -82,6 +84,8 @@ export async function reserveOne(id) {
 
 The condition failure throws, so the transaction aborts and releases its lock. Returning an error-shaped object would instead commit. With stock `1`, two competing calls should produce one reservation and one insufficient-stock error, leaving stock `0`. This single-record example does not establish the multi-record or cluster recovery guarantees discussed below.
 
+Inside a request handler, `transaction()` joins the active request transaction. Returning from `reserveOne()` does not commit the decrement or release the lock; that happens when the request transaction completes. Keep slow or external work outside that transaction. A later handler failure rolls the reservation back. In a background task without an active transaction, the callback's completion commits and releases the lock.
+
 ### Errors
 
 Lock rejections expose `error.statusCode`:
@@ -99,7 +103,7 @@ Application retries are separate from Harper's internal commit retries. Account 
 
 Locks leave normal conflict resolution unchanged in both node and cluster scope. Earlier writes or another lock in the same transaction can fix its timestamp before a later locked update. That update can lose to an intervening commit even after reading its value, with all writers participating and no clock skew or crash. Acquiring several locks in one request therefore does not establish serializable multi-record read/check/write. Atomic deltas help only where the invariant permits them. Clock skew or a deliberately future transaction timestamp can also let a predecessor's write outrank its successor's under last-write-wins.
 
-Cluster locks provide exclusion, not global serializable transactions or quorum durability. On a clean handoff, the home retains **release dependencies**, the replication positions the next holder must receive before using the record. Home restart, generation change, or eviction can lose those dependencies even after a clean release. Recovery then uses a **barrier**, a check that earlier writes have settled and replicated. An unreachable predecessor can block acquisition; a native commit that settles after that barrier can leave a successor reading stale data. Client retries, replication headers, and origin pinning do not establish a stronger guarantee. Define and verify any stronger cross-record or cross-node requirement before designing additional coordination.
+Cluster locks provide exclusion, not global serializable transactions or quorum durability. On a clean handoff, the home retains **release dependencies**, the replication positions the next holder must receive before using the record. Home restart, generation change, or eviction from the home's bounded dependency cache can lose those dependencies even after a clean release. Recovery then uses a **barrier**, a check that earlier writes have settled and replicated. An unreachable predecessor can block acquisition; a native commit that settles after that barrier can leave a successor reading stale data. Client retries, replication headers, and origin pinning do not establish a stronger guarantee. Define and verify any stronger cross-record or cross-node requirement before designing additional coordination.
 
 The versioned [lock contract](https://github.com/HarperFast/harper/blob/v5.3.2/resources/record-locks.md) and [Table implementation](https://github.com/HarperFast/harper/blob/v5.3.2/resources/Table.ts) describe these boundaries.
 
