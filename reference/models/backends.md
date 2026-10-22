@@ -106,11 +106,11 @@ models:
         query: 'search_query: '
 ```
 
-`inputPrefixes` is supported only on `models.embedding` entries with `backend: openai`; it is rejected on OpenAI generative entries and on the other built-in backends. Its `document` and `query` values are optional strings, including empty strings; non-string values and unknown keys are rejected. Unresolved `${VAR}` placeholders cause the entry to fail registration. Quote values to preserve trailing spaces.
+`inputPrefixes` is supported only on `models.embedding` entries with `backend: openai`; it is rejected on OpenAI generative entries and on the other built-in backends. Its `document` and `query` values are optional strings, including empty strings; non-string values and unknown keys are rejected. An unresolved `${VAR}` prefix is a registration-time error: Harper logs it and skips that entry at startup without blocking other entries, or keeps the previous entry on reload. Quote values to preserve trailing spaces.
 
-Harper prepends the matching string to each input in the batch when `embed()` specifies `inputType: 'document'` or `inputType: 'query'`. With no `inputType`, no `inputPrefixes`, or no matching key, the input is sent unchanged. Prefixes belong to the selected logical entry.
+Harper prepends the matching string to each input in the batch when `embed()` specifies `inputType: 'document'` or `inputType: 'query'`. With no `inputType`, no `inputPrefixes`, or no matching key, the input is sent unchanged. Each fallback entry applies its own prefixes to the original input.
 
-The `/v1/embeddings` gateway does not set `inputType`, so its callers must add task prefixes themselves.
+Harper's OpenAI-compatible HTTP embedding endpoint, `POST /v1/embeddings`, does not set `inputType`, so its callers must add task prefixes themselves.
 
 The `@embed` write hook sets `inputType: 'document'`. Set `inputType: 'query'` when embedding search text:
 
@@ -120,7 +120,7 @@ const [queryVector] = await models.embed('What is Harper?', { inputType: 'query'
 
 Both [nomic-embed-text-v1](https://huggingface.co/nomic-ai/nomic-embed-text-v1#usage) and [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5#usage) require `"search_document: "` for retrieval documents and `"search_query: "` for retrieval queries. For other models, follow the model author's instructions and leave prefixes unset unless required.
 
-Prefixes are concatenated exactly: Harper does not trim text or detect an existing prefix. Remove any application wrapper adding the same prefix when enabling this option, and leave it unset if the endpoint already adds the task instruction. Existing entries retain their previous behavior until configured. A config reload applies prefix changes immediately. Changing the text sent for existing documents requires rewriting their source fields to re-embed those documents; switching from a wrapper that already adds these exact strings preserves input bytes.
+Prefixes are concatenated exactly: Harper does not trim text or detect an existing prefix. Remove any application wrapper adding the same prefix when enabling this option, and leave it unset if the endpoint already adds the task instruction. Existing embedding config entries retain their previous behavior until configured. A config reload applies prefix changes immediately. Changing the text sent for existing documents requires rewriting their source fields to re-embed those documents; switching from a wrapper that already adds these exact strings preserves input bytes.
 
 Ollama already applies these two prefixes for model names containing `nomic-embed-text` when `inputType` is present. Its existing behavior is unchanged; `inputPrefixes` is an OpenAI embedding setting.
 
