@@ -41,6 +41,8 @@ Atomic deltas are appropriate for counters. A stock decrement is safe as a delta
 | `timeout` | `number` (milliseconds) | `30000`                                                                   | Maximum wait for acquisition. Choose a value within the request's latency budget. The option is `timeout`, not `timeoutMs`. |
 | `hold`    | `boolean`               | `false`                                                                   | `true` keeps the lock beyond the transaction until explicit `record.unlock()` or lease expiry.                              |
 
+`lease` must be a finite number from `100` to `300000`; `timeout` must be a finite number from `1` to `300000`. Invalid options reject with `400`. In particular, `timeout: 0` is not a non-blocking acquisition option.
+
 Prefer transaction-scoped locks. A lock acquired outside a request or explicit `transaction()` can remain held until unlock or expiry. Keep external network calls outside the critical section: aborting a Harper transaction cannot undo a payment or another external side effect.
 
 When correctness requires cross-node coordination, set `scope: 'cluster'` explicitly. This fails closed if the Harper Pro cluster-lock transport and home-map configuration are unavailable. With an implicit default, a core-only deployment can fall back to node scope; the existence of `lock()` alone does not establish cluster protection. Revisit an explicit `scope: 'node'` before adding nodes.
