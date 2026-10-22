@@ -961,7 +961,7 @@ record.addTo('counter', 1); // increment
 record.subtractFrom('stock', 1); // decrement
 ```
 
-An unprotected read/check/write is not atomic compare-and-swap. Two requests can pass the same check before either commits. Do not infer `ifVersion`, create-only "first write wins", or `If-Match` write guarantees from a preceding read or conditional GET support. For a condition that must hold while updating a record, evaluate [`Table.lock()`](#locktarget-requesttarget--id-options-context-promiseresource) and require every conflicting writer to participate.
+An unprotected read/check/write is not atomic compare-and-swap. Two requests can pass the same check before either commits. In Harper 5.3.2, application-facing table writes do not expose an `ifVersion` precondition, and automatic REST writes do not enforce `If-Match`. A preceding read or conditional GET does not establish create-only "first write wins" behavior. For a condition that must hold while updating a record, evaluate [`Table.lock()`](#locktarget-requesttarget--id-options-context-promiseresource) and require every conflicting writer to participate.
 
 A few limitations to design around:
 

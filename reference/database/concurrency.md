@@ -6,7 +6,7 @@ title: Concurrency and Consistency
 
 Harper provides request transactions, atomic increments and decrements, storage conflict resolution, and native record locks. Choose the primitive that protects your application's requirement before adding client write queues, JavaScript mutexes, version columns, compare-and-swap (CAS) retry loops, lock tables, external coordinators, or sticky routing. Application coordination is needed only for a requirement those primitives do not satisfy.
 
-This page describes Harper 5.3.2. Check the deployed version, storage engine, topology, and Harper Pro configuration before selecting a lock scope.
+Harper 5.3.2 is the verification baseline for this page, not an upper version limit. Check the deployed version, storage engine, topology, and Harper Pro configuration before selecting a lock scope.
 
 ## Choose a Primitive
 
@@ -19,7 +19,7 @@ This page describes Harper 5.3.2. Check the deployed version, storage engine, to
 | Resolve storage-level optimistic transaction conflicts                            | Harper's internal conflict resolution and commit retries     | These do not rerun application checks or external side effects.                                |
 | Reject an edit because a form is stale                                            | A server-enforced stale-edit precondition                    | This is an application policy, separate from storage conflict handling.                        |
 
-Transactions provide a consistent snapshot and atomic writes across tables in one database. They do not by themselves make a read/check/write sequence exclusive against another request. See [`transaction()`](./api.md#transactioncontext-callback) and the [Resource instance methods](../resources/resource-api.md#resource-instance-methods).
+Transactions normally provide a consistent read snapshot and atomic writes across tables in one database. Lock acquisition reloads committed data and can release an earlier read snapshot, so acquire the lock before reading the condition. A transaction alone does not make a read/check/write sequence exclusive against another request. See [`transaction()`](./api.md#transactioncontext-callback) and the [Resource instance methods](../resources/resource-api.md#resource-instance-methods).
 
 Atomic deltas are appropriate for counters. A stock decrement is safe as a delta, but "stock must never go below zero" also needs protection for the check. The same distinction applies to balance floors, capacity limits, claim-once behavior, and ordered ticket allocation.
 
@@ -46,6 +46,8 @@ Atomic deltas are appropriate for counters. A stock decrement is safe as a delta
 Prefer transaction-scoped locks. A lock acquired outside a request or explicit `transaction()` can remain held until unlock or expiry. Keep external network calls outside the critical section: aborting a Harper transaction cannot undo a payment or another external side effect.
 
 When correctness requires cross-node coordination, set `scope: 'cluster'` explicitly. This fails closed if the Harper Pro cluster-lock transport and home-map configuration are unavailable. With an implicit default, a core-only deployment can fall back to node scope; the existence of `lock()` alone does not establish cluster protection. Revisit an explicit `scope: 'node'` before adding nodes.
+
+Cluster locks require RocksDB, Harper Pro with `replication.recordLocks: true`, and an agreed home map for the database. The map names every participating node; a record's **home** is the node that arbitrates its locks. A **generation** identifies one agreed version of that map. Enabling the configuration flag alone does not create a map. Follow the versioned [home-map setup and transition procedure](https://github.com/HarperFast/harper-pro/blob/v5.3.2/replication/RECORD_LOCK_HOMES_DESIGN.md#the-operation): agree the complete participant list, stage and stop the old generation, drain outstanding locks, then activate the agreed generation. Do not derive separate maps from each node's current view of reachable peers.
 
 ### Participating Writers
 
@@ -97,7 +99,7 @@ Application retries are separate from Harper's internal commit retries. Account 
 
 Locks leave normal conflict resolution unchanged in both node and cluster scope. Earlier writes or another lock in the same transaction can fix its timestamp before a later locked update. That update can lose to an intervening commit even after reading its value, with all writers participating and no clock skew or crash. Acquiring several locks in one request therefore does not establish serializable multi-record read/check/write. Atomic deltas help only where the invariant permits them. Clock skew or a deliberately future transaction timestamp can also let a predecessor's write outrank its successor's under last-write-wins.
 
-Cluster locks provide exclusion, not global serializable transactions or quorum durability. Clean handoff freshness depends on the home retaining release dependencies. Home restart, generation change, or eviction can lose those dependencies even after a clean release. On recovery, an unreachable predecessor or a native commit that settles after the recovery barrier can leave a successor reading stale data. Client retries, replication headers, and origin pinning do not establish a stronger guarantee. Define and verify any stronger cross-record or cross-node requirement before designing additional coordination.
+Cluster locks provide exclusion, not global serializable transactions or quorum durability. On a clean handoff, the home retains **release dependencies**, the replication positions the next holder must receive before using the record. Home restart, generation change, or eviction can lose those dependencies even after a clean release. Recovery then uses a **barrier**, a check that earlier writes have settled and replicated. An unreachable predecessor can block acquisition; a native commit that settles after that barrier can leave a successor reading stale data. Client retries, replication headers, and origin pinning do not establish a stronger guarantee. Define and verify any stronger cross-record or cross-node requirement before designing additional coordination.
 
 The versioned [lock contract](https://github.com/HarperFast/harper/blob/v5.3.2/resources/record-locks.md) and [Table implementation](https://github.com/HarperFast/harper/blob/v5.3.2/resources/Table.ts) describe these boundaries.
 
@@ -105,7 +107,7 @@ The versioned [lock contract](https://github.com/HarperFast/harper/blob/v5.3.2/r
 
 Harper handles storage-level optimistic transaction conflicts and retries commits internally. An application version field, browser CAS loop, or whole-request retry wrapper is not needed to duplicate that work. The [commit implementation](https://github.com/HarperFast/harper/blob/v5.3.2/resources/DatabaseTransaction.ts) does not rerun the handler's business logic.
 
-For a conditional update, evaluate native `lock()` first within its supported scope. A separate version comparison followed by `put()` or `patch()` is not atomic CAS. Conditional GET and ETag support does not by itself establish `If-Match` write semantics.
+For a conditional update, evaluate native `lock()` first within its supported scope. A separate version comparison followed by `put()` or `patch()` is not atomic CAS. In Harper 5.3.2, application-facing table writes do not expose an `ifVersion` precondition, and automatic REST writes do not enforce `If-Match`. Conditional GET and ETag support does not change that.
 
 "Warn or reject if this form is stale" is a separate product requirement. A product-specific revision token can serve that policy, but needs an atomic server-enforced comparison and write. For a single record, acquire the lock first in the transaction, compare the client's token with the locked record's revision, reject a mismatch with `409`, otherwise advance the revision and save. All conflicting writers must participate, and the scope, timestamp, and recovery limits must satisfy the requirement. Verify the revision representation and supported precondition mechanism for the deployed version before implementing it.
 

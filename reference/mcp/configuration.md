@@ -189,7 +189,7 @@ Semantics to know:
 - The handler runs **after** the in-memory buckets admit the call, so rate-limited clients cannot spam a table-backed handler.
 - **Fail-closed**: a handler that throws **denies** the call. Cost protection that silently disables itself on a bug is worse than a hard failure. The raw error is written to the server log only; the client sees a sanitized message.
 - Harper calls the handler once per attempted tool call; counting strategy (increment on check vs on success) is the handler's business.
-- **Race-safety is the handler's business too.** It can run concurrently for the same identity — within a worker (interleaving across `await` boundaries) and across workers. A naive read-then-write counter like the example above can undercount under concurrency and admit calls past the limit; make the read-modify-write atomic (a transaction that serializes conflicting writers, a compare-and-set retry loop, or a store with native atomic increments) for production use.
+- **Race-safety is the handler's business too.** It can run concurrently for the same identity, within a worker and across workers. The illustrative read-then-write counter above can undercount and admit calls past the limit. For a strict limit on one record, use an explicit `transaction()` and acquire `Table.lock()` before reading the count, check the limit, then increment and save the locked record. Every conflicting writer must use that path. Select node or cluster scope for the deployment and check the timestamp and recovery limits in [Concurrency and Consistency](../database/concurrency.md). A transaction alone does not serialize these checks, and an atomic increment alone does not enforce a ceiling.
 
 ## `mcp.session.*`
 
