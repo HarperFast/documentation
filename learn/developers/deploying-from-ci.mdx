@@ -341,7 +341,7 @@ harper deploy project=my-app by_ref=true \
 
 Keep the workflow's wait step when using `restart=rolling`. For a single-node instance, use `restart=true` instead. Changing isolation makes canary certification unavailable on v5.4.0 and later; see [Canary certification](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker).
 
-Turning isolation on or off also restarts the shared workers. So does creating an isolated application before v5.4.0; from v5.4.0, its first `restart=true` deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
+Turning isolation off also restarts the shared workers, as does turning it on for an application they had loaded, or, before v5.4.0, creating an isolated application. From v5.4.0, a new isolated application's first `restart=true` deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
 
 ## Per-PR previews with shared databases
 
