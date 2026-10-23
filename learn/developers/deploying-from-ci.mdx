@@ -337,7 +337,7 @@ harper deploy project=my-app by_ref=true \
 
 Keep the workflow's wait step when using `restart=rolling`. For a single-node instance, use `restart=true` instead. Changing isolation makes canary certification unavailable on v5.4.0 and later; see [Canary certification](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker).
 
-Creating an isolated application, or turning isolation on or off, also restarts the shared workers. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
+Turning isolation on or off also restarts the shared workers. So does creating an isolated application before v5.4.0; from v5.4.0, its first deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
 
 ## Per-PR previews with shared databases
 
@@ -465,9 +465,22 @@ Cleanup checks component files and running workers separately on **each listed n
 
 The deploy still propagates to peers by default on Fabric and Pro, and a failed peer install fails the CLI unless `ignore_replication_errors` is set. Do not enable that option here. Cleanup uses direct node calls specifically to recover from asymmetric deploy or drop state.
 
-`restart=true` waits for the restart on the answering node, but a successful response does not establish that every peer loaded the application: a peer restart can be slow or fail, and a node can refuse isolation. This workflow prints the URL but does not probe preview health. Check [application status](/reference/v5/operations-api/operations#set_status--get_status--clear_status) on each node with an administrator account and verify the routed preview endpoint. This recipe uses inline restarts instead of the production workflows' rolling job. **The first deploy of each preview can restart shared workers on all nodes concurrently**, disrupting existing connections. Use a dedicated preview cluster if that interruption is unacceptable; adapting the [rolling workflow](#path-a-deploy-a-tagged-release-from-your-repository) also requires granting `get_job` to the preview role and retaining its wait step.
+`restart=true` waits for the restart on the answering node, but a successful response does not establish that every peer loaded the application: a peer restart can be slow or fail, and a node can refuse isolation. This workflow prints the URL but does not probe preview health. Check [application status](/reference/v5/operations-api/operations#set_status--get_status--clear_status) on each node with an administrator account and verify the routed preview endpoint. This recipe uses inline restarts instead of the production workflows' rolling job. **Before v5.4.0, the first deploy of each preview restarts the shared workers on all nodes concurrently**, disrupting existing connections; from v5.4.0, it starts only the preview's own worker. On earlier versions, use a dedicated preview cluster if that interruption is unacceptable; adapting the [rolling workflow](#path-a-deploy-a-tagged-release-from-your-repository) also requires granting `get_job` to the preview role and retaining its wait step.
 
 Fork PRs are skipped; keep that same-repository condition. The policy pins `workflow_ref` so a PR cannot change the trusted workflow to mint a token with different commands; `event_name` explicitly authorizes `pull_request_target`, which Harper otherwise refuses unless constrained. Provision the hostname before opening the preview URL; successful deployment alone does not make an unconfigured hostname reachable. Close unused previews to release worker slots. Dropping a running isolated preview stops its worker and normally reclaims retained installs; inspect node logs if storage cleanup fails. Removing an application does not undo its shared-database writes or remove DNS and Fabric custom-domain registrations; clean up that routing separately.
+
+#### Cleanup in one call on v5.4.0
+
+<VersionBadge version="v5.4.0" />
+
+When every node runs v5.4.0 or later, cleanup is one replicated drop through `HARPER_CLI_TARGET`. The per-node targets, their trust policies, and the role's `get_components` and `system_information` grants are then unnecessary. Replace the `cleanup_node` function and its loop with:
+
+```bash
+harper drop_component project="$PROJECT" json=true > drop.json
+jq -e '.error == null and all(.replicated[]?; .error == null)' drop.json > /dev/null
+```
+
+The drop stops the preview's worker on every node without restarting the shared workers, with no `restart` needed. A node that no longer has the preview's files only stops a worker left running there, and restarts nothing, so rerunning a failed cleanup is safe. The response's `replicated` results give each node's outcome; see [`drop_component`](/reference/v5/components/applications#drop_component). A node on an earlier version keeps the worker running until its next restart, so keep the per-node cleanup while any node runs one.
 
 ### Private sources and built artifacts
 
@@ -483,7 +496,7 @@ For applications that need a build, build and publish an immutable package versi
 
 ### Adding private database forks later
 
-The recipe deliberately omits `branchedDatabases`. On v5.3.0 and v5.3.1, a package deployment ignores that key when loading the application ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). Follow [Branched databases](/reference/v5/components/applications#branched-databases) for current behavior and limitations; database forks can be added to the recipe once that deployment path is fixed. Revisit cleanup then as well: a drop with `restart=false` leaves fork storage in place.
+The recipe deliberately omits `branchedDatabases`. On v5.3.0 and v5.3.1, a package deployment ignores that key when loading the application ([harper#3071](https://github.com/HarperFast/harper/issues/3071)). Follow [Branched databases](/reference/v5/components/applications#branched-databases) for current behavior and limitations; database forks can be added to the recipe once that deployment path is fixed. Revisit cleanup then as well: before v5.4.0, a drop with `restart=false` leaves fork storage in place. From v5.4.0, dropping an isolated preview removes its forks with or without `restart`.
 
 ## Other CI systems
 
