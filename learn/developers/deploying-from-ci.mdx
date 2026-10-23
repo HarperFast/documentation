@@ -484,7 +484,7 @@ if [ "$(jq -r .state <<< "$PR")" = closed ] ||
 fi
 ```
 
-The check fails the job when a node reports an error, or reports no outcome, as a node on an earlier version does. The drop stops the preview's worker on every node without restarting the shared workers, with no `restart` needed. A node that no longer has the preview's files only stops a worker left running there, and restarts nothing, so rerunning a failed cleanup is safe. The response's `replicated` results give each node's outcome; see [`drop_component`](/reference/v5/components/applications#drop_component). A node on an earlier version keeps the worker running until its next restart, so keep the per-node cleanup while any node runs one.
+The check fails the job when a node reports an error, or reports no outcome, as a node on an earlier version does. The drop stops the preview's worker on every node without restarting the shared workers, with no `restart` needed, and each node answers only once that worker has stopped. A node that no longer has the preview's files only stops a worker left running there, and restarts nothing, so rerunning a failed cleanup is safe. The response's `replicated` results give each node's outcome; see [`drop_component`](/reference/v5/components/applications#drop_component). A node on an earlier version keeps the worker running until its next restart, so keep the per-node cleanup while any node runs one.
 
 ### Private sources and built artifacts
 
