@@ -57,7 +57,7 @@ The policy is immutable once activated, including removal of the directive. Rede
 
 ## Ownership, reads, and writes
 
-Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads can fetch the full body from an owner and cache a temporary replica. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
+Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads fetch the full body from an owner. RocksDB can cache a temporary replica; LMDB proxies the read without caching it. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
 
 A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot.
 
@@ -134,6 +134,8 @@ Existing residency IDs remain readable but no longer decide placement. Key-deriv
 
 ### Rollback
 
-For a key-derived policy, restore the previous binary together with the equivalent legacy schema and `setResidencyById` function. No record conversion is needed. Keep the installed map for a later upgrade.
+For a key-derived policy, first stop new replica admissions on every node, demote or evict existing RocksDB replicas, and verify that none remain. An earlier binary can interpret a replica as a full owned record. Lowering `replicaExpiration` does not rewrite existing deadlines or prove that the table is drained.
+
+After verifying the drain, restore the previous binary together with the equivalent legacy schema and `setResidencyById` function. Key policies need no slot-format conversion. Keep the installed map for a later upgrade.
 
 An attribute policy writes a new local primary/audit format. In-place downgrade to an earlier binary is unsupported. Restore a backup from before activation; writes since that backup may be lost. Protocol fallback does not make an earlier binary understand the new local storage format.
