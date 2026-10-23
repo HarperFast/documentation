@@ -43,7 +43,7 @@ This ensures each record is stored on three nodes total (the node that first sto
 
 With the REST interface, you can specify replication targets and confirmation requirements per request using the `X-Replicate-To` header:
 
-<VersionBadge type="changed" version="v5.4.0" /> — Only a principal with the `super_user` permission can send `X-Replicate-To`. Other callers receive HTTP 403 whenever the header has a value, including on read requests and for values such as `0`, a node list, or `*`. Application code can still set replication options on a trusted context.
+<VersionBadge type="changed" version="v5.4.0" /> — Only a principal with the `super_user` permission can send `X-Replicate-To`. Other callers receive HTTP 403 whenever the header has a value, including on read requests and for values such as `0`, a node list, or `*`. Application code can still set replication options on a trusted context; see [Programmatic Replication Control](#programmatic-replication-control).
 
 ```http
 PUT /MyTable/3
@@ -66,7 +66,7 @@ The `confirm` parameter can be combined with explicit node lists.
 
 Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 
-<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. For operations that accept these fields, a non-super-user caller receives HTTP 403 when either field has a non-null value, including `replicateTo: 0` and an empty node list.
+<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. For operations that accept these fields, a non-super-user caller receives HTTP 403 when either field has a non-null value, including `replicateTo: 0` and an empty node list. Application code can still set them; see [Programmatic Replication Control](#programmatic-replication-control).
 
 ```json
 {
@@ -94,18 +94,20 @@ Or specify explicit nodes:
 
 ### Programmatic Replication Control
 
-Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method:
+Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method. Here the application, not the client, decides how widely an order is replicated and whether to wait for a peer:
 
 ```javascript
-class MyTable extends tables.MyTable {
+export class Order extends tables.Order {
 	put(record) {
 		const context = this.getContext();
 		context.replicateTo = 2; // or an array of node names
-		context.replicatedConfirmation = 1;
+		if (record.total >= 10000) context.replicatedConfirmation = 1;
 		return super.put(record);
 	}
 }
 ```
+
+Values your code sets on the context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `context.replicateTo` or `context.replicatedConfirmation` gives that client the control the `super_user` check removes.
 
 ### Confirmation Failure After a Local Commit
 
