@@ -145,7 +145,11 @@ Define a custom residency function that is called with the full record. Return a
 
 With this approach, record metadata (including residency information) and indexed properties are replicated to all nodes, but the full record is only stored on the specified nodes, apart from the short-lived replicas described next.
 
-<VersionBadge type="changed" version="v5.4.0" /> A node outside a record's residency that reads the record fetches it from a resident node and keeps the result as a local replica for `replicaExpiration` seconds (default one hour), renewed by reads after `replicaRefreshFraction` of that time. The record stays where the residency function placed it: a replica is never written back, replicated onward or counted as a resident, and a resident's write turns it back into a stub so the next read fetches the new version. See the [`@table` arguments](../database/schema.md#replicaexpiration-and-replicarefreshfraction).
+<VersionBadge type="changed" version="v5.4.0" />
+
+<EngineBadge engines="RocksDB" />
+
+On RocksDB, a node outside a record's residency that reads the record fetches it from a resident node and keeps the result as a local replica for `replicaExpiration` seconds (default one hour), renewed by reads after `replicaRefreshFraction` of that time. The record stays where the residency function placed it: a replica is never written back, replicated onward or counted as a resident, and a resident's write turns it back into a stub so the next read fetches the new version. See the [`@table` arguments](../database/schema.md#replicaexpiration-and-replicarefreshfraction). On the deprecated LMDB engine, remote reads are always proxy reads; no local replica is stored and no replica sweep runs.
 
 Return node hostnames:
 

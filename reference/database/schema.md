@@ -81,7 +81,7 @@ Optional arguments:
 | `eviction`               | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                                                                  |
 | `scanInterval`           | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                                                                               |
 | `replicate`              | `Boolean` | true                          | Enable replication of this table                                                                                                             |
-| `replicaExpiration`      | `Int`     | `3600`                        | Seconds a record fetched from another node is kept as a [local replica](#replicaexpiration-and-replicarefreshfraction); `0` keeps no replica |
+| `replicaExpiration`      | `Float`   | `3600`                        | Seconds a record fetched from another node is kept as a [local replica](#replicaexpiration-and-replicarefreshfraction); `0` keeps no replica |
 | `replicaRefreshFraction` | `Float`   | `0.5`                         | Fraction of `replicaExpiration` after which a read of a replica renews its lifetime; `1` never renews                                        |
 | `cacheControl`           | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table                                                  |
 | `randomAccessFields`     | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                                                                      |
@@ -134,9 +134,13 @@ Eviction removes non-indexed record data, but it does _not_ remove a record from
 
 <VersionBadge version="v5.4.0" />
 
+<EngineBadge engines="RocksDB" />
+
+Local replicas are RocksDB-only. On the deprecated LMDB engine, remote reads remain proxy reads: no replica is stored and no replica sweep runs, regardless of these settings. The options still validate on LMDB.
+
 On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches on that node use without contacting another node again. A replica does not move the record and is never replicated onward. A write by an owner reaches the node as an invalidation, which turns the replica back into a stub, so the next read fetches the new version. Tables sharded by primary key only (`setResidencyById`) keep no replicas.
 
-- **`replicaExpiration`** — Seconds a replica is kept. A sweep that runs every quarter of this time (at least once a second) reduces replicas past it back to their indexed stubs, so a replica can be served for up to about a quarter longer than the value; the next read then fetches the record again. `0` keeps reads as remote reads with no replica. A replica never outlives the record's own `expiration`, if it has one.
+- **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` keeps reads as remote reads with no replica. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
 
 ```graphql
