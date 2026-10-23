@@ -48,6 +48,14 @@ When a query is executed, conditions are evaluated against the database. Indexed
 
 **Rule of thumb**: Use `equals`, range operators, and `starts_with` on indexed fields. Avoid `contains`, `ends_with`, and `not_equal` as the sole or first condition in large datasets.
 
+### Full-text search
+
+<VersionBadge version="v5.3.0" /> <EngineBadge engines="RocksDB" />
+
+A condition using a `FullText` field declared with `@fullText` is executed by the native full-text engine and ranked with BM25. Compatible `and` filters narrow the matches. Harper loads current source records and removes stale or deleted candidates before returning them.
+
+Keep result pages bounded. Before v5.4, prefix and fuzzy-prefix expressions restrict `offset + limit` to 100. In v5.4, bounded queries can traverse beyond that window within request budgets; an unbounded query can still fail when it exceeds a native window or configured limit. See [paging and prefix result windows](../full-text-search/querying.md#paging-and-prefix-result-windows). Use source-field weights to tune ranking, and enable positions, surface terms, and highlighting only when their query features are needed. See [Full-Text Search](../full-text-search/overview.md).
+
 ### Indexed vs. Non-Indexed Fields
 
 Indexed fields provide `O(log n)` lookup — fast even as the dataset grows. Non-indexed fields require `O(n)` full table scans.

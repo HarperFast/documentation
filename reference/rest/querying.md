@@ -70,6 +70,34 @@ For date fields, colons must be URL-encoded as `%3A`:
 GET /Product/?listDate=gt=2017-03-08T09%3A30%3A00.000Z
 ```
 
+### Full-Text Operators
+
+<VersionBadge version="v5.3.0" /> <EngineBadge engines="RocksDB" />
+
+For a `FullText` field carrying `@fullText`, use the field name as the query attribute and choose a full-text comparator:
+
+```http
+GET /Product/?catalogSearch=matches=waterproof%20trail
+GET /Product/?catalogSearch=matches_phrase=trail%20running
+GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&limit(10)
+```
+
+REST supports `matches`, `matches_all`, `matches_phrase`, `matches_prefix`, `matches_fuzzy`, and `matches_fuzzy_prefix`, plus a `not_` form of each. A negated full-text condition requires a non-negated condition on the same index. Repeat the parameter to provide both conditions:
+
+```http
+GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather
+```
+
+REST's `limit(start,end)` uses an exclusive end. In v5.4, this prefix query skips 100 eligible products and requests the next 10, within request budgets:
+
+```http
+GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&limit(100,110)
+```
+
+Use `Table.search()` or `search_by_conditions` when conditions need source-field selection, condition-level highlighting, or freshness controls. See [Querying Full-Text Indexes](../full-text-search/querying.md) for ranking, highlights, query combinations, and freshness controls.
+
+The REST URL syntax searches every source field in the index, so the caller must be allowed to read every source field. Before v5.4, prefix and fuzzy-prefix queries restrict `offset + limit` to 100. In v5.4, bounded full-text and autocomplete queries can pass that native window within request budgets; source-version checks and filters run before records count toward the offset and limit. Each page is a new query and can see concurrent changes. See [paging and prefix result windows](../full-text-search/querying.md#paging-and-prefix-result-windows). Full-text queries cannot provide an exact total count. On a REST interface with `exactCount: true`, a `Prefer: count=exact` request returns an unavailable total (`Content-Range: items <range>/*`). Without that opt-in, Harper applies `count=estimated` instead and can return an estimate.
+
 ### Chained Conditions (Range)
 
 Omit the attribute name on the second condition to chain it against the same attribute:
@@ -185,10 +213,10 @@ Counting is opt-in: without the header, no count is computed and no count header
 
 Send a `Prefer` header on a `GET` (or `HEAD`) request to a collection:
 
-| Value             | Meaning                                                                                                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `count=exact`     | The exact number of matching records. Scans the full matched set, so it is off by default (see [below](#enabling-exact-counts)) and served as an estimate unless enabled for the REST interface. |
-| `count=estimated` | A fast planner/table estimate. Cheap, approximate.                                                                                                                                               |
+| Value             | Meaning                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `count=exact`     | The exact number of matching records when the query plan can count them. Scans the full matched set, so it is off by default (see [below](#enabling-exact-counts)) and served as an estimate unless enabled for the REST interface. When enabled, full-text and other custom-index queries report an unavailable total instead. |
+| `count=estimated` | A fast planner/table estimate. Cheap, approximate.                                                                                                                                                                                                                                                                              |
 
 ```http
 GET /Product/?category=software&limit(0,25)
@@ -216,7 +244,7 @@ The response status is always `200` — `Content-Range` is informational (Harper
 
 ### Unavailable totals
 
-The total is reported as `*` (for example `Content-Range: items 0-24/*`) when it cannot be produced — an exact scan that hits its guardrail (counting the tail past the requested page is bounded by a 1,000,000-row cap and a ~1-second budget, and abandons the total rather than truncating the page), or a query with no cardinality estimate (for example a `!=` or `=ct=` (contains) condition). `Preference-Applied` still echoes the requested mode, so an unavailable total (`.../*`) is distinct from a request that asked for no count.
+The total is reported as `*` (for example `Content-Range: items 0-24/*`) when it cannot be produced — an exact scan that hits its guardrail (counting the tail past the requested page is bounded by a 1,000,000-row cap and a ~1-second budget, and abandons the total rather than truncating the page), a full-text or other custom-index query, or a query with no cardinality estimate (for example a `!=` or `=ct=` (contains) condition). `Preference-Applied` still echoes the requested mode, so an unavailable total (`.../*`) is distinct from a request that asked for no count.
 
 ### Enabling exact counts
 
