@@ -103,22 +103,32 @@ Setup exchanges carry the map version/digest and a separate shard-list digest. A
 
 ## Convert an existing by-id table without moving records
 
-1. Back up the database and upgrade all writers. Keep the current `setResidencyById` function running during the comparison.
-2. Install a custom map that reproduces the function's numeric shard result exactly, from one designated node. Wait for the same snapshot on every participant.
-3. Run `verify_residency_slots` on each node while its application worker still runs the old function:
+### 1. Prepare the existing table
 
-   ```json
-   {
-   	"operation": "verify_residency_slots",
-   	"database": "data",
-   	"table": "Item",
-   	"policy": { "slots": 10, "slotFrom": "Number(id.slice(-1))" }
-   }
-   ```
+Back up the database and upgrade all writers. Keep the current `setResidencyById` function running during the comparison.
 
-   This POST operation requires `super_user`. It scans local records and compares the actual old function's numeric shard with the proposed policy and installed map. It reports `checked`, `mismatches`, bounded mismatch samples, observed slots, departed node names, and map identity. It does not rewrite records or activate the policy. A sample of present keys cannot prove equivalence for every future key; the operator must confirm the functions are equivalent.
+### 2. Install the equivalent map
 
-4. Require zero mismatches and matching maps on every participant. Deploy the directive and remove the setter. The existing deployment can keep writing during the comparison; this is not a quiescing migration operation.
+Install a custom map that reproduces the function's numeric shard result exactly, from one designated node. Wait for the same snapshot on every participant.
+
+### 3. Compare placement on every node
+
+Run `verify_residency_slots` on each node while its application worker still runs the old function:
+
+```json
+{
+	"operation": "verify_residency_slots",
+	"database": "data",
+	"table": "Item",
+	"policy": { "slots": 10, "slotFrom": "Number(id.slice(-1))" }
+}
+```
+
+This POST operation requires `super_user`. It scans local records and compares the actual old function's numeric shard with the proposed policy and installed map. It reports `checked`, `mismatches`, bounded mismatch samples, observed slots, departed node names, and map identity. It does not rewrite records or activate the policy. A sample of present keys cannot prove equivalence for every future key; the operator must confirm the functions are equivalent.
+
+### 4. Activate the directive
+
+Require zero mismatches and matching maps on every participant. Deploy the directive and remove the setter. The existing deployment can keep writing during the comparison; this is not a quiescing migration operation.
 
 Existing residency IDs remain readable but no longer decide placement. Key-derived records receive no new slot metadata. A stale component that calls a forbidden setter after activation fails visibly and must be updated.
 
