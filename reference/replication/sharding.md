@@ -94,20 +94,29 @@ Or specify explicit nodes:
 
 ### Programmatic Replication Control
 
-Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method. Here the application, not the client, decides how widely an order is replicated and whether to wait for a peer:
+Set `replicateTo` on the context in a resource method. It applies to the writes made after you set it. Here the application, not the client, decides how widely an order is replicated:
 
 ```javascript
 export class Order extends tables.Order {
 	put(record) {
 		const context = this.getContext();
-		context.replicateTo = 2; // or an array of node names
-		if (record.total >= 10000) context.replicatedConfirmation = 1;
+		context.replicateTo = record.total >= 10000 ? 3 : 1; // or an array of node names
 		return super.put(record);
 	}
 }
 ```
 
-Values your code sets on the context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `context.replicateTo` or `context.replicatedConfirmation` gives that client the control the `super_user` check removes.
+`replicatedConfirmation` is read when a transaction starts. A request's transaction has already started when your resource method runs, so setting `replicatedConfirmation` on its context there has no effect. To wait for peer confirmation from code, pass it in the context of a new [transaction](../database/api.md#transactioncontext-callback):
+
+```javascript
+await transaction({ replicatedConfirmation: 1 }, async () => {
+	await tables.Order.put(order);
+});
+```
+
+That transaction commits on its own, separately from any request transaction that is running.
+
+Values your code sets on a context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `replicateTo` or `replicatedConfirmation` gives that client the control the `super_user` check removes.
 
 ### Confirmation Failure After a Local Commit
 
