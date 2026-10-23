@@ -341,7 +341,7 @@ harper deploy project=my-app by_ref=true \
 
 Keep the workflow's wait step when using `restart=rolling`. For a single-node instance, use `restart=true` instead. Changing isolation makes canary certification unavailable on v5.4.0 and later; see [Canary certification](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker).
 
-Turning isolation on or off also restarts the shared workers. So does creating an isolated application before v5.4.0; from v5.4.0, its first deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
+Turning isolation on or off also restarts the shared workers. So does creating an isolated application before v5.4.0; from v5.4.0, its first `restart=true` deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
 
 ## Per-PR previews with shared databases
 
@@ -465,7 +465,7 @@ jobs:
 
 The workflow reads the PR's current state, base branch, and head SHA from GitHub, rather than deploying the default-branch commit in `GITHUB_SHA`. Its concurrency group serializes updates and cleanup for that PR without canceling a deploy midway. A delayed run sees a closed or retargeted PR and cleans up instead of recreating the preview. The job filter ignores title/body edits and unrelated updates on other base branches, while admitting closures and base-branch edits. The fresh API read remains authoritative.
 
-Cleanup checks component files and running workers separately on **each listed node**, so it also handles a worker left running after files were removed. An absent node is skipped: dropping an absent preview with `restart=true` can restart its shared workers. Each necessary drop uses `replicated=false`, and requests a restart only when that node has the preview worker. Files without a worker are dropped with `restart=false`; the node's shared workers stay running. It then verifies the component and worker are both absent; a successful drop response alone is insufficient. The loop attempts the remaining nodes after an error and fails the job with each failed target in the summary. After a failed, timed-out, or interrupted run, rerun cleanup and check those nodes directly with an administrator account; do not reuse the project name until cleanup has completed on every node. An omitted node cannot be checked or cleaned by this workflow.
+Cleanup checks component files and running workers separately on **each listed node**, so it also handles a worker left running after files were removed. An absent node is skipped: before v5.4.0, dropping an absent preview with `restart=true` can restart its shared workers. Each necessary drop uses `replicated=false`, and requests a restart only when that node has the preview worker. Files without a worker are dropped with `restart=false`; the node's shared workers stay running. It then verifies the component and worker are both absent; a successful drop response alone is insufficient. The loop attempts the remaining nodes after an error and fails the job with each failed target in the summary. After a failed, timed-out, or interrupted run, rerun cleanup and check those nodes directly with an administrator account; do not reuse the project name until cleanup has completed on every node. An omitted node cannot be checked or cleaned by this workflow.
 
 The deploy still propagates to peers by default on Fabric and Pro, and a failed peer install fails the CLI unless `ignore_replication_errors` is set. Do not enable that option here. Cleanup uses direct node calls specifically to recover from asymmetric deploy or drop state.
 
@@ -477,14 +477,18 @@ Fork PRs are skipped; keep that same-repository condition. The policy pins `work
 
 <VersionBadge version="v5.4.0" />
 
-When every node runs v5.4.0 or later, cleanup is one replicated drop through `HARPER_CLI_TARGET`. The per-node targets, their trust policies, and the role's `get_components` and `system_information` grants are then unnecessary. Replace the `cleanup_node` function and its loop with:
+When every node runs v5.4.0 or later, cleanup is one replicated drop through `HARPER_CLI_TARGET`. The per-node targets, their trust policies, and the role's `get_components` and `system_information` grants are then unnecessary. In the workflow, delete the `PREVIEW_NODE_TARGETS` entry under `env:` and the `jq` line that validates it, and replace the cleanup branch, from `if [ "$(jq -r .state <<< "$PR")" = closed ]` through its `fi`, with:
 
 ```bash
-harper drop_component project="$PROJECT" json=true > drop.json
-jq -e '.error == null and all(.replicated[]?; .error == null)' drop.json > /dev/null
+if [ "$(jq -r .state <<< "$PR")" = closed ] ||
+   [ "$(jq -r .base.ref <<< "$PR")" != main ]; then
+  harper drop_component project="$PROJECT" json=true > drop.json
+  jq -e '[., .replicated[]?] | all(.error == null and (.componentRemoved | type == "boolean"))' drop.json > /dev/null
+  exit 0
+fi
 ```
 
-The drop stops the preview's worker on every node without restarting the shared workers, with no `restart` needed. A node that no longer has the preview's files only stops a worker left running there, and restarts nothing, so rerunning a failed cleanup is safe. The response's `replicated` results give each node's outcome; see [`drop_component`](/reference/v5/components/applications#drop_component). A node on an earlier version keeps the worker running until its next restart, so keep the per-node cleanup while any node runs one.
+The check fails the job when a node reports an error, or reports no outcome, as a node on an earlier version does. The drop stops the preview's worker on every node without restarting the shared workers, with no `restart` needed. A node that no longer has the preview's files only stops a worker left running there, and restarts nothing, so rerunning a failed cleanup is safe. The response's `replicated` results give each node's outcome; see [`drop_component`](/reference/v5/components/applications#drop_component). A node on an earlier version keeps the worker running until its next restart, so keep the per-node cleanup while any node runs one.
 
 ### Private sources and built artifacts
 
