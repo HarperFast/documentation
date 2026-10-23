@@ -527,7 +527,7 @@ set -euo pipefail
 ID=$(jq -r '.deployment_id' deploy.json)
 for attempt in $(seq 60); do
   sleep 10
-  RECORD=$(curl --fail-with-body -s "$HARPER_OPS_URL" \
+  RECORD=$(curl --fail-with-body -s --max-time 30 "$HARPER_OPS_URL" \
     -H "Content-Type: application/json" \
     -H "Authorization: $HARPER_OPS_AUTH" \
     -d "{\"operation\": \"get_deployment\", \"deployment_id\": \"$ID\"}") || continue
@@ -540,7 +540,7 @@ echo "After 60 polls, deployment $ID was still rolling out"
 exit 1
 ```
 
-A node the record has not replicated to yet answers with an error or an earlier status, which the loop polls again. Otherwise, on a cluster before v5.4.0 or when `certification` is `unavailable`, the response has no `status` and only the job follows the other nodes, so poll `get_job` for it with the same header:
+A node the record has not replicated to yet answers with an error or an earlier status, which the loop polls again. The loop gives up after 60 polls, about ten minutes, where `harper deploy` allows ten minutes for each node, so on a cluster with several nodes raise the count. Otherwise, on a cluster before v5.4.0 or when `certification` is `unavailable`, the response has no `status` and only the job follows the other nodes, so poll `get_job` for it with the same header:
 
 ```bash
 set -euo pipefail
@@ -549,7 +549,7 @@ JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
 LAST="could not be read"
 for attempt in $(seq 60); do
   sleep 10
-  JOB=$(curl --fail-with-body -s "$HARPER_OPS_URL" \
+  JOB=$(curl --fail-with-body -s --max-time 30 "$HARPER_OPS_URL" \
     -H "Content-Type: application/json" \
     -H "Authorization: $HARPER_OPS_AUTH" \
     -d "{\"operation\": \"get_job\", \"id\": \"$JOB_ID\"}") || continue
