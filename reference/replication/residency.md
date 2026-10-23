@@ -8,7 +8,7 @@ title: Declarative residency
 
 `@residency` fixes a table's placement policy in its schema. Every application, operations, and replication thread applies the same policy. A key or record selects a slot, the database's installed slot map selects a shard, and `replication.shard` identifies that shard's current nodes.
 
-Upgrade every schema and data writer before activation. Wire compatibility with earlier peers allows delivery and reads; it does not make an earlier writer enforce the policy.
+Upgrade every schema and data writer before activation. Wire compatibility with earlier peers allows delivery and reads; it does not make an earlier writer enforce the policy. Fallback to peers that cannot advertise a shard-list digest requires an installed custom map and no configured list on either side; otherwise setup disagrees and placement is blocked.
 
 ## Configuration
 
