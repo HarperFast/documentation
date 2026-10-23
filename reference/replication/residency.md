@@ -53,7 +53,7 @@ type Item @table @residency(slots: 10, slotFrom: "Number(id.slice(-1))") {
 
 Expressions must be self-contained, deterministic, and synchronous. They compile on every thread without application helpers. A non-integer or out-of-range result refuses the write. Schema expressions are trusted code, as with computed expressions; they are not a sandbox.
 
-The policy is immutable once activated, including removal of the directive. Redeploying the same policy is idempotent. Calling `setResidency` or `setResidencyById` on a declarative table fails; remove those calls when converting.
+The policy is immutable once activated, including removal of the directive. Redeploying the same policy is idempotent. Calling `setResidency` or `setResidencyById` on a declarative table fails; remove those calls when converting. Existing tables can adopt a key-derived policy with an equivalent custom map. Attribute policies must be declared on a new table because existing rows have no stored slots.
 
 ## Ownership, reads, and writes
 
