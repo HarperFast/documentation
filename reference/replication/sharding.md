@@ -114,6 +114,28 @@ replication:
   shard: 1
 ```
 
+### Complete shard-id set
+
+<VersionBadge version="v5.4.0" />
+
+For [declarative residency](./residency.md), configure `replication.shards` next to `replication.shard`:
+
+```yaml
+replication:
+  shard: 0
+  shards: [0, 1]
+```
+
+`replication.shards` is the complete set of shard IDs available to the deployment: unique integers from `0` through `65535`. Every node uses the same set; order does not matter. Its own `replication.shard` must be in the list.
+
+The list is required only for a database that has declarative tables and no installed slot map. First activation computes the default map solely from the slot count and the sorted list and installs it as a versioned snapshot. Concurrent installers with equal inputs produce the same snapshot and digest. A database converted with a custom map does not need the list.
+
+Once installed, the snapshot is authoritative. Changing the list never recomputes placement. Adding an ID only makes that shard available for future reassignment; it moves no records.
+
+Setup exchanges include a digest of the list. Nodes with different lists refuse declarative writes on both sides, even after a map is installed. A configured list on one peer and no list on another also differs. A node whose own shard is outside its list, or which needs an initial map but has no list, also refuses placement. The condition appears in `cluster_status.residency` and is logged once. Plan for this write refusal during a rolling list change.
+
+### Other shard configuration
+
 Or assign shards per route:
 
 ```yaml
@@ -135,7 +157,7 @@ Or dynamically via the operations API by including `shard` in an `add_node` or `
 }
 ```
 
-Once shards are configured, use `setResidency` or `setResidencyById` (described below) to assign records to specific shards.
+Once shards are configured, use [declarative residency](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
 
 ## Custom Sharding
 
