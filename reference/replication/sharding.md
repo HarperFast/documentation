@@ -106,15 +106,17 @@ export class Order extends tables.Order {
 }
 ```
 
-`replicatedConfirmation` is read when a transaction starts. A request's transaction has already started when your resource method runs, so setting `replicatedConfirmation` on its context there has no effect. To wait for peer confirmation from code, pass it in the context of a new [transaction](../database/api.md#transactioncontext-callback):
+`replicatedConfirmation` is read when a transaction starts. A request's transaction has already started when your resource method runs, so setting `replicatedConfirmation` on its context there has no effect. To wait for peer confirmation from code, pass it in a new context object to [`transaction()`](../database/api.md#transactioncontext-callback). Do not pass the request's context, or a copy of it: it already holds the request's transaction, so `transaction()` joins that transaction and the count is ignored.
 
 ```javascript
-await transaction({ replicatedConfirmation: 1 }, async () => {
+import { tables, transaction } from 'harper';
+
+await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async () => {
 	await tables.Order.put(order);
 });
 ```
 
-That transaction commits on its own, separately from any request transaction that is running.
+That transaction commits on its own, separately from any request transaction that is running: if the request fails afterwards, this write stays committed. Set `replicateTo` on the same object when you need both.
 
 Values your code sets on a context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `replicateTo` or `replicatedConfirmation` gives that client the control the `super_user` check removes.
 
