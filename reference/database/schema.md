@@ -138,9 +138,11 @@ Eviction removes non-indexed record data, but it does _not_ remove a record from
 
 Local replicas are RocksDB-only. On the deprecated LMDB engine, remote reads remain proxy reads: no replica is stored and no replica sweep runs, regardless of these settings. The options still validate on LMDB.
 
+On RocksDB, reload workers after changing these options: an already-loaded table can retain its previous settings when another worker updates the schema. Setting `replicaExpiration: 0` stops new admissions and the sweep; existing replicas remain until overwritten or evicted.
+
 On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches on that node use without contacting another node again. A replica does not move the record and is never replicated onward. A write by an owner reaches the node as an invalidation, which turns the replica back into a stub, so the next read fetches the new version. Tables sharded by primary key only (`setResidencyById`) keep no replicas.
 
-- **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` keeps reads as remote reads with no replica. A replica never outlives the record's own `expiration`, if it has one.
+- **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` disables new replica admissions and the sweep. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
 
 ```graphql
