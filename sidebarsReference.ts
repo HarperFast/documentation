@@ -616,6 +616,11 @@ const sidebars: SidebarsConfig = {
 					id: 'replication/sharding',
 					label: 'Sharding',
 				},
+				{
+					type: 'doc',
+					id: 'replication/residency',
+					label: 'Declarative residency',
+				},
 			],
 		},
 		{
