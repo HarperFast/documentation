@@ -138,7 +138,7 @@ Eviction removes non-indexed record data, but it does _not_ remove a record from
 
 Local replicas are RocksDB-only. On the deprecated LMDB engine, remote reads remain proxy reads: no replica is stored and no replica sweep runs, regardless of these settings. The options still validate on LMDB.
 
-On RocksDB, reload workers after changing these options: an already-loaded table can retain its previous settings when another worker updates the schema. Setting `replicaExpiration: 0` stops new admissions and the sweep; existing replicas remain until overwritten or evicted.
+On RocksDB, schema rescans apply changes to already-loaded tables on other workers. The new lifetime applies to subsequent admissions and renewals; existing deadlines are not rewritten. Setting `replicaExpiration: 0` stops new admissions and the sweep; existing replicas remain until overwritten or evicted.
 
 On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches on that node use without contacting another node again. A replica does not move the record and is never replicated onward. A write by an owner reaches the node as an invalidation, which turns the replica back into a stub, so the next read fetches the new version. Tables sharded by primary key only (`setResidencyById`) keep no replicas.
 
