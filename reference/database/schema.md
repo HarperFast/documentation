@@ -73,18 +73,18 @@ type MyTable @table {
 
 Optional arguments:
 
-| Argument                 | Type      | Default                       | Description                                                                                                                                  |
-| ------------------------ | --------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `table`                  | `String`  | type name                     | Override the table name                                                                                                                      |
-| `database`               | `String`  | `"data"`                      | Database to place the table in                                                                                                               |
-| `expiration`             | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                                                                                |
-| `eviction`               | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                                                                  |
-| `scanInterval`           | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                                                                               |
-| `replicate`              | `Boolean` | true                          | Enable replication of this table                                                                                                             |
-| `replicaExpiration`      | `Float`   | `3600`                        | Seconds a record fetched from another node is kept as a [local replica](#replicaexpiration-and-replicarefreshfraction); `0` keeps no replica |
-| `replicaRefreshFraction` | `Float`   | `0.5`                         | Fraction of `replicaExpiration` after which a read of a replica renews its lifetime; `1` never renews                                        |
-| `cacheControl`           | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table                                                  |
-| `randomAccessFields`     | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                                                                      |
+| Argument                 | Type      | Default                       | Description                                                                                                                                      |
+| ------------------------ | --------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `table`                  | `String`  | type name                     | Override the table name                                                                                                                          |
+| `database`               | `String`  | `"data"`                      | Database to place the table in                                                                                                                   |
+| `expiration`             | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                                                                                    |
+| `eviction`               | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                                                                      |
+| `scanInterval`           | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                                                                                   |
+| `replicate`              | `Boolean` | true                          | Enable replication of this table                                                                                                                 |
+| `replicaExpiration`      | `Float`   | `3600`                        | Seconds a record fetched from another node is kept as a [local replica](#replicaexpiration-and-replicarefreshfraction); `0` stops new admissions |
+| `replicaRefreshFraction` | `Float`   | `0.5`                         | Fraction of `replicaExpiration` after which a read of a replica renews its lifetime; `1` never renews                                            |
+| `cacheControl`           | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table                                                      |
+| `randomAccessFields`     | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                                                                          |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
