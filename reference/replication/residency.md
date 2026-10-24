@@ -39,6 +39,8 @@ type Item @table @residency(slots: 1024) {
 | `slotFrom`    | Optional JavaScript expression returning an integer from `0` through `slots - 1`. Key policies expose `id`.                                                     |
 | `byAttribute` | Default `false`. When `true`, the expression also exposes `record` and its attribute names, and the slot is stored with the record. Requires a secondary index. |
 
+Declarative tables require audit logging and table replication. Harper refuses activation with `@table(audit: false)`, effective `logging.auditLog: false`, or `@table(replicate: false)`, and refuses disabling these table settings later. The replication route must also reach an owner.
+
 Without `slotFrom`, the slot is the unsigned FNV-1a 32-bit hash of the key's ordered-binary encoding, modulo `slots`. Its offset basis is `2166136261` and its multiplier is `16777619`.
 
 An explicit key policy can preserve an existing partition function:
@@ -59,7 +61,7 @@ The policy is immutable once activated, including removal of the directive. Rede
 
 Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads fetch the full body from an owner. RocksDB can cache a temporary replica; LMDB proxies the read without caching it. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
 
-A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot has not arrived locally, DELETE is refused until placement is known; local absence cannot prove that the record is absent on its owners.
+A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot is unknown locally, DELETE returns 503; local absence cannot prove that the record is absent on its owners. This also applies to never-created keys and purged tombstones. Retrying alone cannot resolve permanent unknown placement; send the deletion to a node that still has the slot metadata.
 
 `replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner accepts a local write, retains only its index projection (or nothing for an index-free key policy), and sends the complete body through replication to the owners. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
 
@@ -73,7 +75,7 @@ type RegionalItem @table @residency(slots: 10, slotFrom: "region", byAttribute: 
 }
 ```
 
-Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner is connected, the change is refused before commit.
+Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. This handoff uses full-record replacement ordering: an older concurrent patch does not merge into the replacement. Use application concurrency controls when writers can update a record while its slot changes. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner is connected, the change is refused before commit.
 
 A connection can fail after admission. An error with `replicationUnconfirmed: true` after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
 
