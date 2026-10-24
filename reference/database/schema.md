@@ -73,16 +73,17 @@ type MyTable @table {
 
 Optional arguments:
 
-| Argument             | Type      | Default                       | Description                                                                                 |
-| -------------------- | --------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| `table`              | `String`  | type name                     | Override the table name                                                                     |
-| `database`           | `String`  | `"data"`                      | Database to place the table in                                                              |
-| `expiration`         | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                               |
-| `eviction`           | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                 |
-| `scanInterval`       | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                              |
-| `replicate`          | `Boolean` | true                          | Enable replication of this table                                                            |
-| `cacheControl`       | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table |
-| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                     |
+| Argument             | Type      | Default                       | Description                                                                                                                                                                             |
+| -------------------- | --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `table`              | `String`  | type name                     | Override the table name                                                                                                                                                                 |
+| `database`           | `String`  | `"data"`                      | Database to place the table in                                                                                                                                                          |
+| `expiration`         | `Int`     | —                             | Seconds until a record goes stale (useful for caching tables)                                                                                                                           |
+| `eviction`           | `Int`     | `0`                           | Additional seconds after `expiration` before a record is physically removed                                                                                                             |
+| `replicaExpiration`  | `Float`   | `3600`                        | Since v5.4.0. Seconds to cache a fetched residency replica on RocksDB; `0` disables admission without draining existing replicas. See [rollback](../replication/residency.md#rollback). |
+| `scanInterval`       | `Int`     | `(expiration + eviction) / 4` | Seconds between eviction scans                                                                                                                                                          |
+| `replicate`          | `Boolean` | true                          | Enable replication of this table                                                                                                                                                        |
+| `cacheControl`       | `String`  | —                             | `Cache-Control` header value emitted on anonymous GET/HEAD 200/304 responses for this table                                                                                             |
+| `randomAccessFields` | `Boolean` | `storage.randomAccessFields`  | [Pin this table's record encoding](#randomaccessfields)                                                                                                                                 |
 
 **`expiration`, `eviction`, and `scanInterval`**
 
@@ -211,6 +212,12 @@ export class Product extends tables.Product {
 ```
 
 See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the full caching behavior and how `Cache-Control` interacts with authentication headers.
+
+### `@residency`
+
+<VersionBadge version="v5.4.0" />
+
+Defines an immutable placement policy on a schema-defined table. `slots` is required (`1`–`65536`); `slotFrom` optionally supplies a deterministic JavaScript expression; `byAttribute: true` evaluates the record and requires a secondary index. The database's installed map resolves each slot to a deployment shard. See [Declarative Residency](../replication/residency.md) for examples, configuration, conversion and rollback.
 
 ### `@export`
 

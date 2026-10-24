@@ -183,7 +183,8 @@ Returns an array of status objects from the cluster, including active WebSocket 
 		}
 	],
 	"node_name": "server-1.domain.com",
-	"is_enabled": true
+	"is_enabled": true,
+	"residency": {}
 }
 ```
 
@@ -195,6 +196,27 @@ Returns an array of status objects from the cluster, including active WebSocket 
 | `lastReceivedRemoteTime` | Timestamp (from the originating node) of the last received transaction                                                              |
 | `lastReceivedLocalTime`  | Local time when the last transaction was received. A gap between this and `lastReceivedRemoteTime` suggests the node is catching up |
 | `sendingMessage`         | Timestamp of the transaction actively being sent. Absent when waiting for the next transaction                                      |
+
+---
+
+### Declarative Residency Status
+
+<VersionBadge version="v5.4.0" />
+
+The top-level `cluster_status.residency` field is keyed by database and describes active or attempted declarative tables. It is empty in the legacy-table example above. Each entry has:
+
+| Field               | Meaning                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `version`, `digest` | Installed map identity; absent if no map is installed.                                                                     |
+| `shardsDigest`      | Digest of the configured shard set, or `null` when no list is configured.                                                  |
+| `blocked`           | Whether a reported configuration or map-agreement condition blocks placement.                                              |
+| `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map. |
+
+A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for a non-owner attribute-slot transition, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
+
+### Residency Map Operations
+
+The POST operations [`initialize_residency_slots`](./residency.md#installed-maps) and [`verify_residency_slots`](./residency.md#3-compare-placement-on-every-node) require `super_user`. The former installs a snapshot without moving records; the latter compares the actual legacy function against a proposed key policy without modifying data. Their request examples, parameters and result fields are in the linked procedures.
 
 ---
 
