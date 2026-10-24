@@ -316,6 +316,52 @@ Returns the user object for the given username without verifying credentials. Us
 
 ---
 
+## `server.registerBearerValidator(validator, options?)`
+
+<VersionBadge version="v5.4.0" />
+
+```ts
+server.registerBearerValidator(
+	validator: (token: string, request: Request, signal: AbortSignal) => BearerValidatorResult | Promise<BearerValidatorResult>,
+	options?: { timeoutMs?: number }
+): () => void
+```
+
+Lets a component accept `Authorization: Bearer` tokens that Harper did not issue, such as access tokens from the component's own OAuth authorization server. A token a validator accepts sets `request.user` before routing, so every Harper-owned route on the application port — REST, GraphQL, WebSocket and MQTT-over-WebSocket, and MCP — authorizes it like any other Harper user.
+
+Harper checks its own operation and refresh tokens first. A Bearer token Harper rejects as invalid is offered to each registered validator in registration order, until one claims it. Validators do not run on a dedicated operations API port. Applications load in no fixed order, so a validator should claim only tokens it can identify, for example by issuer.
+
+A validator returns one of:
+
+| Return                                         | Result                                                                                                                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `null` or `undefined`                          | Not this validator's token. The next validator runs; if none claims it, the token is treated as unrecognized (see [Authentication and fallthrough](./overview.md#authentication-and-fallthrough)). |
+| `{ username, authExpiresAt?, authCacheable? }` | Authenticate as the Harper user `username`, resolved through [`server.getUser()`](#servergetuserusername), with that user's own role.                                                              |
+
+The object may contain only these fields; any other field, including `role`, fails the request. Permissions always come from the user's role. A user that `server.getUser()` cannot find, or one without a role, is rejected like an unknown user.
+
+- `authExpiresAt` - epoch seconds when the authentication expires: the cached result is dropped, live subscriptions opened with the token end, and its MQTT last-will message is no longer published. It can be at most a year ahead; when omitted, it is 5 minutes after authentication. If the token is a JWT, Harper also caps it at the token's `exp` claim and refuses the token once that has passed, even when the validator accepted it. Harper does not verify the JWT, so the validator must still check expiry, and should return the verified expiry here.
+- `authCacheable` - `false` to run the validator on every request. Otherwise Harper caches the result by the `Authorization` header until `authExpiresAt` and reuses it on every route, so a validator whose answer depends on the request (for example a token bound to one resource's audience) must return `false`.
+
+To refuse a token the validator recognizes (wrong audience, revoked, expired), throw `credentialRejectionError(message, 401)` or a `markCredentialRejection(error)`-tagged error, both exported from `harper`. That is reported like a rejected Harper token. Any other thrown error, or exceeding `timeoutMs`, fails the request with a generic `401` and logs the error server-side.
+
+`options.timeoutMs` limits each call to the validator (default `5000`, maximum `60000`). The validators and the `server.getUser()` lookup of a returned username also share one deadline per request, equal to the largest `timeoutMs` among the registered validators: if one validator takes 3 seconds to decline, the next has what remains. When a limit runs out, the request fails with a generic `401`, and a validator still running has its `signal` aborted; pass `signal` to `fetch` or other I/O the validator starts. A limit cannot interrupt synchronous work. A request authenticated this way cannot use the token to create Harper tokens with `create_authentication_tokens`; that operation still accepts a username and password.
+
+The returned function unregisters the validator. Registrations last for the life of the worker thread. A plugin that registers through the `scope.server` passed to `handleApplication` has them removed if that load fails.
+
+```js
+import { server, credentialRejectionError } from 'harper';
+
+server.registerBearerValidator(async (token, request, signal) => {
+	const claims = await verifyMyAccessToken(token, { signal }); // returns null for tokens this issuer did not sign
+	if (!claims) return null;
+	if (claims.aud !== 'https://api.example.com') throw credentialRejectionError('wrong audience', 401);
+	return { username: claims.harper_user, authExpiresAt: claims.exp };
+});
+```
+
+---
+
 ## `server.resources`
 
 The central registry of all resources exported for REST, MQTT, and other protocols.
