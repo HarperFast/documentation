@@ -16,7 +16,8 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 - Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 - **Required before every commit/PR:** run `npm run format:write`, then confirm `npm run format:check` is clean. This is a hard gate, not advisory — CI fails any unformatted PR (see [CI](#ci)).
 - Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `plans/`, `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
-- `npm run lint` runs `test:examples`: documented-example checks and fixture-fetch reliability tests. In CI, it also compares fixtures against the companion core revision; locally set `HARPER_CORE_FIXTURE_ROOT` to compare an offline core checkout.
+- `npm run lint` runs oxlint over JavaScript and TypeScript with warnings treated as errors.
+- `npm run test:examples` separately runs documented-example checks and fixture-fetch reliability tests. In CI, it also compares fixtures against the companion core revision; locally set `HARPER_CORE_FIXTURE_ROOT` to compare an offline core checkout.
 
 ## Content Style
 

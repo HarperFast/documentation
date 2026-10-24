@@ -65,7 +65,7 @@ CI runs `npm run format:check` on every pull request and will fail if anything i
 
 Run `npm run lint` to lint JavaScript and TypeScript with oxlint. Warnings fail the check. The vendor-provided Reo loader (`static/js/reo.js`) is excluded.
 
-Run `npm run test:examples` separately to validate the executable nested-relationship examples and fixture-fetch helper. CI runs both commands as separate checks.
+Run `npm run test:examples` separately to validate the executable nested-relationship examples and fixture-fetch helper. CI runs both commands as separate steps in the required Lint Check job.
 
 ## Site Organization
 
