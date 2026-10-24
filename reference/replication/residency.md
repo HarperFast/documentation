@@ -61,7 +61,7 @@ Owners store full records. With secondary indexes, other nodes keep index projec
 
 A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot.
 
-`replicateTo` selects delivery targets; it cannot change declarative ownership. A non-owner write requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
+`replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner write requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
 
 ### Attribute-slot changes
 
