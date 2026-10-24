@@ -1080,7 +1080,7 @@ Response:
 
 The wait follows the restart's own progress rather than a fixed timeout, so a wide thread pool, a slow component install, or a worker draining in-flight work does not cut it short. That also means the response can take as long as the install plus the restart — tens of seconds on a slow install with many worker threads — so a caller with a short request timeout should use `"restart": "rolling"` and poll its job instead. If it does give up — the restart stopped reporting progress, ran past the wait's absolute ceiling, or left a worker thread that could not be replaced — the restart continues in the background and the Harper log says which of those happened. A restart that fails does not fail the deploy: the component is already installed and replicated.
 
-`"restart": "rolling"` does not restart the other nodes inline: it starts a `restart_service` job and returns its `restartJobId` to poll. Both certify the release in a canary worker before rolling it out; see the next section. When the deploy's `certification` is `unavailable`, the job only restarts the other nodes, and reports each node's outcome as a [replicated `restart_service`](#restart_service-replicated) does: it ends `ERROR` if any node did not restart.
+`"restart": "rolling"` does not restart the other nodes inline: it starts a `restart_service` job and returns its `restartJobId` to poll. Both certify the release in a canary worker before rolling it out, except in the cases the next section lists. When the deploy's `certification` is `unavailable`, the job only restarts the other nodes, and reports each node's outcome as a [replicated `restart_service`](#restart_service-replicated) does: it ends `ERROR` if any node did not restart.
 
 `drop_component` accepts `"restart": true` and waits for the restart the same way (v5.3.0). Dropping a running isolated application stops only that application's worker; dropping an already-absent application can restart the shared workers. On Pro and Fabric it propagates to peers by default unless `replicated` is `false`. Inspect its `replicated` results for peer failures; a successful local response does not establish successful cleanup on every node.
 
@@ -1789,7 +1789,7 @@ How the roll treats a node that does not restart:
 - **It could not be reached, or refused the request.** The node is reported as not restarted, and the roll goes on to the next node.
 - **Its write queue was full.** The node is retried after the other nodes, up to three attempts in total.
 
-Before v5.4.0, a node that could not be reached or refused the request was listed in `result.replicated`, but the job still ended `COMPLETE`.
+Before v5.4.0, a node that could not be reached or refused the request was listed in `result.replicated` as `{ node, message }`, the same shape as a node that restarted, and the job still ended `COMPLETE`. A node whose restart job failed or timed out did end the job `ERROR`, but without `result.replicated`.
 
 #### `scope`
 
