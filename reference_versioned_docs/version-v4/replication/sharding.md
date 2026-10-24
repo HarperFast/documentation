@@ -49,7 +49,13 @@ X-Replicate-To: 2;confirm=1
 ```
 
 - `2` — replicate to two additional nodes
-- `confirm=1` — wait for confirmation from one additional node before responding
+- `confirm=1` — wait for confirmation from one additional peer before responding (see below for exactly what this confirms)
+
+`confirm=N` (and the operation-body/programmatic `replicatedConfirmation: N` used below) waits until any N peer acknowledgements have come in — not N specific peers, and not necessarily N distinct ones: this version doesn't deduplicate by peer identity, so the same peer crossing the write's replicated position twice (for example, after being restored from an earlier backup and replaying) can satisfy more than one of the N on its own. N must also be a positive integer; it isn't validated, and a non-integer value's behavior is unspecified. A peer outside the record's residency still counts, once its replication position passes the write — even though it may hold only an invalidation entry, or nothing at all for that record. So confirmation cannot guarantee that N full copies exist, or that any particular node — even one named in `X-Replicate-To`/`replicateTo` — has the write.
+
+`X-Replicate-To`/`replicateTo` controls where the record is stored — whether given as a count or an explicit node list — but only under the default residency. A table's `setResidency` or `setResidencyById` function (see Custom Sharding below) takes precedence over it, and placement is independent of what the confirmation count counts either way.
+
+This version has no timeout on an unmet confirmation count — a request can block indefinitely, even waiting on an otherwise healthy peer, if an acknowledgement that crosses the write's position arrives before the wait is registered — and only rejects, after the write (or delete) has already committed locally, a count larger than the total number of other nodes it knows about, not specifically the peers this node replicates the database to.
 
 Specify exact destination nodes by hostname:
 
@@ -58,7 +64,7 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists.
+The `confirm` parameter can be combined with explicit node lists, but as above it still only counts whichever peer acknowledgements come in, not specifically from the listed nodes. (A bare count and a node list can't be combined in one `X-Replicate-To` value — `X-Replicate-To: 2,node1` parses `2` as a hostname, not a count.)
 
 ### Replication Control via Operations API
 
@@ -77,6 +83,8 @@ Specify `replicateTo` and `replicatedConfirmation` in the operation body:
 	"replicatedConfirmation": 1
 }
 ```
+
+`replicatedConfirmation` and `replicateTo` carry the same confirmation and placement semantics as `confirm` and `X-Replicate-To` over REST — see [Replication Control via REST Header](#replication-control-via-rest-header) above for exactly what confirmation does, and doesn't, guarantee.
 
 Or specify explicit nodes:
 
@@ -102,6 +110,8 @@ class MyTable extends tables.MyTable {
 	}
 }
 ```
+
+As above, these carry the same semantics as `confirm` and `X-Replicate-To` over REST — see [Replication Control via REST Header](#replication-control-via-rest-header) above.
 
 ## Static Sharding
 
