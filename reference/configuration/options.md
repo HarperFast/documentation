@@ -293,6 +293,7 @@ replication:
 - `blobSendDrainTimeout` — Maximum time (ms) a worker waits for in-flight replication blob **sends** to finish before shutting down during a restart, so a rolling restart (e.g., a component deploy reload) doesn't interrupt a transfer in progress. Only sends that are still making progress are waited on; `0` disables draining; _Default_: `600000`
 - `failOver` — Failover to alternate node if peer unreachable; _Default_: `true`
 - `shard` — Shard ID for traffic routing; see [Sharding](../replication/sharding.md)
+- `shards` — Complete array of unique shard IDs, integers `0`–`65535`; order does not matter. Required for a declarative database with no installed map; custom-map conversion can omit it. All peers must agree, and the local `shard` must be included when configured. Changing it never recomputes an installed map; see [Complete shard-id set](../replication/sharding.md#complete-shard-id-set). (Added in: v5.4.0)
 - `mtls.certificateVerification` — Certificate revocation checking (CRL/OCSP) for replication connections; see [Certificate Verification](../security/certificate-verification.md)
 - `logging` — Replication event logging; sub-options: `path`, `level`, `tag`, `stdStreams`. See [Logging Configuration](../logging/configuration.md)
 

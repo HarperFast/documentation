@@ -1658,16 +1658,18 @@ Operations for configuring and managing Harper cluster replication.
 
 Detailed documentation: [Replication & Clustering](../replication/clustering.md)
 
-| Operation               | Description                                                     | Role Required |
-| ----------------------- | --------------------------------------------------------------- | ------------- |
-| `add_node`              | Adds a Harper instance to the cluster                           | super_user    |
-| `update_node`           | Modifies an existing node's subscriptions                       | super_user    |
-| `remove_node`           | Removes a node from the cluster                                 | super_user    |
-| `cluster_status`        | Returns current cluster connection status                       | super_user    |
-| `configure_cluster`     | Bulk-creates/resets cluster subscriptions across multiple nodes | super_user    |
-| `cluster_set_routes`    | Adds routes to the replication routes config (PATCH/upsert)     | super_user    |
-| `cluster_get_routes`    | Returns the current replication routes config                   | super_user    |
-| `cluster_delete_routes` | Removes routes from the replication routes config               | super_user    |
+| Operation                    | Description                                                      | Role Required |
+| ---------------------------- | ---------------------------------------------------------------- | ------------- |
+| `add_node`                   | Adds a Harper instance to the cluster                            | super_user    |
+| `update_node`                | Modifies an existing node's subscriptions                        | super_user    |
+| `remove_node`                | Removes a node from the cluster                                  | super_user    |
+| `initialize_residency_slots` | Installs a custom database slot map without moving records       | super_user    |
+| `verify_residency_slots`     | Compares a legacy placement function with a proposed slot policy | super_user    |
+| `cluster_status`             | Returns current cluster connection status                        | super_user    |
+| `configure_cluster`          | Bulk-creates/resets cluster subscriptions across multiple nodes  | super_user    |
+| `cluster_set_routes`         | Adds routes to the replication routes config (PATCH/upsert)      | super_user    |
+| `cluster_get_routes`         | Returns the current replication routes config                    | super_user    |
+| `cluster_delete_routes`      | Removes routes from the replication routes config                | super_user    |
 
 ### `add_node`
 
@@ -1681,6 +1683,18 @@ Adds a remote Harper node to the cluster. If `subscriptions` are not provided, a
 	"authorization": { "username": "admin", "password": "password" }
 }
 ```
+
+### `initialize_residency_slots`
+
+<VersionBadge version="v5.4.0" />
+
+POST; requires `super_user`. Takes `database`, `slots` and complete nonoverlapping `ranges` (`start`, exclusive `end`, `shard`). Returns the installed versioned snapshot. Installs metadata only and refuses changes to active slot assignments. See [Installed maps](../replication/residency.md#installed-maps).
+
+### `verify_residency_slots`
+
+<VersionBadge version="v5.4.0" />
+
+POST; requires `super_user`. Takes `database`, `table` and a proposed key-derived `policy` (`slots`, optional `slotFrom`). The existing application worker must still run its legacy function, and a custom map must be installed. Returns `checked`, `mismatches`, bounded samples, observed slots, departed node names and map identity. It neither rewrites records nor activates the policy. See [Compare placement](../replication/residency.md#3-compare-placement-on-every-node).
 
 ### `cluster_status`
 

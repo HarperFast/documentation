@@ -238,6 +238,12 @@ export class Product extends tables.Product {
 
 See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the full caching behavior and how `Cache-Control` interacts with authentication headers.
 
+### `@residency`
+
+<VersionBadge version="v5.4.0" />
+
+Defines an immutable placement policy on a schema-defined table. `slots` is required (`1`–`65536`); `slotFrom` optionally supplies a deterministic JavaScript expression; `byAttribute: true` evaluates the record and requires a secondary index. The database's installed map resolves each slot to a deployment shard. See [Declarative Residency](../replication/residency.md) for examples, configuration, conversion and rollback.
+
 ### `@export`
 
 Exposes the table as an externally accessible resource endpoint, available via REST, MQTT, and other interfaces.

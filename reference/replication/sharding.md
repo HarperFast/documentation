@@ -14,7 +14,7 @@ title: Sharding
 
 Harper's replication system supports sharding — storing different data across different subsets of nodes — while still allowing data to be accessed from any node in the cluster. This enables horizontal scalability for storage and write performance, while maintaining optimal data locality and consistency.
 
-When sharding is configured, requests for records that don't reside on the handling node are automatically forwarded to the appropriate node transparently. Clients do not need to know where data is stored.
+A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [declarative residency](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
 
 By default (without sharding), Harper replicates all data to all nodes.
 
@@ -118,7 +118,7 @@ replication:
 
 <VersionBadge version="v5.4.0" />
 
-For [declarative residency](./residency.md), configure `replication.shards` next to `replication.shard`:
+For the first default map of a new [declarative residency](./residency.md) table, configure `replication.shards` next to `replication.shard`:
 
 ```yaml
 replication:
@@ -136,7 +136,7 @@ Setup exchanges include a digest of the list. Nodes with different lists refuse 
 
 ### Other shard configuration
 
-Or assign shards per route:
+Shards can also be assigned per route:
 
 ```yaml
 replication:
@@ -232,6 +232,8 @@ X-Replicate-From: none
 ```
 
 ## See Also
+
+- [Declarative Residency](./residency.md)
 
 - [Replication Overview](./overview.md) — How Harper's replication system works
 - [Clustering Operations](./clustering.md) — Operations API for managing cluster nodes
