@@ -43,6 +43,8 @@ This ensures each record is stored on three nodes total (the node that first sto
 
 With the REST interface, you can specify replication targets and confirmation requirements per request using the `X-Replicate-To` header:
 
+<VersionBadge type="changed" version="v5.4.0" /> — Only a principal with the `super_user` permission can send `X-Replicate-To`. Other callers receive HTTP 403 whenever the header has a value, including on read requests and for values such as `0`, a node list, or `*`. Application code can still set replication options on a trusted context; see [Programmatic Replication Control](#programmatic-replication-control).
+
 ```http
 PUT /MyTable/3
 X-Replicate-To: 2;confirm=1
@@ -63,6 +65,8 @@ The `confirm` parameter can be combined with explicit node lists.
 ### Replication Control via Operations API
 
 Specify `replicateTo` and `replicatedConfirmation` in the operation body:
+
+<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. For operations that accept these fields, a non-super-user caller receives HTTP 403 when either field has a non-null value, including `replicateTo: 0` and an empty node list. Application code can still set them; see [Programmatic Replication Control](#programmatic-replication-control).
 
 ```json
 {
@@ -90,18 +94,59 @@ Or specify explicit nodes:
 
 ### Programmatic Replication Control
 
-Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method:
+Set `replicateTo` on the context in a resource method. It applies to the writes made after you set it. Here the application, not the client, decides how widely an order is replicated:
 
 ```javascript
-class MyTable extends tables.MyTable {
+export class Order extends tables.Order {
 	put(record) {
 		const context = this.getContext();
-		context.replicateTo = 2; // or an array of node names
-		context.replicatedConfirmation = 1;
+		context.replicateTo = record.total >= 10000 ? 3 : 1; // or an array of node names
 		return super.put(record);
 	}
 }
 ```
+
+`replicatedConfirmation` is read when a transaction starts. A request's transaction has already started when your resource method runs, so setting `replicatedConfirmation` on its context there has no effect. To wait for peer confirmation from code, pass it in a new context object to [`transaction()`](../database/api.md#transactioncontext-callback). Do not pass the request's context, or a copy of it: it already holds the request's transaction, so `transaction()` joins that transaction and the count is ignored.
+
+```javascript
+import { tables, transaction } from 'harper';
+
+await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async () => {
+	await tables.Order.put(order);
+});
+```
+
+That transaction commits on its own, separately from any request transaction that is running: if the request fails afterwards, this write stays committed. Set `replicateTo` on the same object when you need both.
+
+Values your code sets on a context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `replicateTo` or `replicatedConfirmation` gives that client the control the `super_user` check removes.
+
+### Confirmation Failure After a Local Commit
+
+<VersionBadge version="v5.4.0" />
+
+A replication confirmation failure can occur after the write has committed locally. When that happens, the rejected commit error and the REST or operations API error body include `replicationUnconfirmed: true` and `retryable: false`. Terminal JSON, NDJSON, and SSE stream error records also carry these fields. Every local database write in that commit's linked transaction has finished committing, but the requested peer confirmation was not obtained. This provides the same local durability as a successful write response; it does not add an fsync guarantee.
+
+For example, a REST error for a confirmation timeout can contain:
+
+```json
+{
+	"type": "error:ServerError",
+	"code": "ServerError",
+	"title": "Timed out after 900000ms waiting for replication confirmation from 2 node(s) for database \"data\" (received 1)",
+	"status": 504,
+	"instance": "/MyTable/3",
+	"replicationUnconfirmed": true,
+	"retryable": false
+}
+```
+
+The existing error status, code, and message remain available. An operations error has its usual `error` field plus `code`, `replicationUnconfirmed: true`, and `retryable: false`. Programmatic errors wrap the original rejection in `cause`; text-only protocol errors use the new `ReplicationConfirmationError` class name. Check this flag before compensating or retrying a non-idempotent write, because replaying the request could repeat an insert or apply an update twice. The flag does not return auto-generated record keys; use client-selected identifiers when you need to inspect the written records after a failed response.
+
+The flag covers writes issued to the reported commit, not later application steps that were never reached after its rejection. If an enclosing scope rolls back its pending writes, its error omits the flag while preserving `retryable: false` because an independent inner write may already have committed.
+
+Pre-commit refusals, including a confirmation count that cannot be met, do not carry this flag. Its absence does not establish that nothing was written: independent database commits can fail partially. A rejected commit ends its transaction scope; start a fresh transaction for subsequent writes.
+
+Confirmation currently applies to the first database a transaction writes to, and only when it uses RocksDB. This outcome flag covers the linked local commits; it does not enable confirmation for later databases or the LMDB storage engine.
 
 ## Static Sharding
 
