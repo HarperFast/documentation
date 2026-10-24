@@ -211,7 +211,7 @@ MyTable.setResidencyById((id) => {
 
 ## Disabling Cross-Node Access
 
-By default, sharding allows data stored on specific nodes to be accessed from any node — requests are forwarded transparently. To disable this and only return data stored on the local node (including a replica it currently holds), set `replicateFrom` to `false`.
+By default, a key read for a record not stored locally fetches it from a node that holds it. To disable this and only return data stored on the local node (including a replica it currently holds), set `replicateFrom` to `false`.
 
 Via the operations API:
 

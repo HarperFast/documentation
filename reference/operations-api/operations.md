@@ -1694,11 +1694,11 @@ POST; requires `super_user`. Takes `database`, `slots` and complete nonoverlappi
 
 <VersionBadge version="v5.4.0" />
 
-POST; requires `super_user`. Takes `database`, `table` and a proposed key-derived `policy` (`slots`, optional `slotFrom`). The existing application worker must still run its legacy function, and a custom map must be installed. Returns `checked`, `mismatches`, bounded samples, observed slots, departed node names and map identity. It neither rewrites records nor activates the policy. See [Compare placement](../replication/residency.md#3-compare-placement-on-every-node).
+POST; requires `super_user`. Takes `database`, `table` and a proposed key-derived `policy` (`slots`, optional `slotFrom`). The existing application worker must still run its legacy function, and a custom map must be installed. Returns `checked`, `mismatches`, bounded samples, observed slots, departed node names (stored legacy owners absent from the current known-node list) and map identity. It neither rewrites records nor activates the policy. See [Compare placement](../replication/residency.md#3-compare-placement-on-every-node).
 
 ### `cluster_status`
 
-Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`).
+Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`). Its top-level `residency` object reports per-database map identity and placement blockers; see [Declarative Residency Status](../replication/clustering.md#declarative-residency-status).
 
 ```json
 { "operation": "cluster_status" }

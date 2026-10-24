@@ -51,7 +51,7 @@ type Item @table @residency(slots: 10, slotFrom: "Number(id.slice(-1))") {
 }
 ```
 
-Expressions must be self-contained, deterministic, and synchronous. They compile on every thread without application helpers. A non-integer or out-of-range result refuses the write. Schema expressions are trusted code, as with computed expressions; they are not a sandbox.
+Expressions must be self-contained, deterministic, and synchronous. They compile on every thread without application helpers. An expression that throws, returns a Promise, or produces a non-integer or out-of-range result refuses the write. The last-digit example assumes string keys, matching the existing function being converted. Schema expressions are trusted code, as with computed expressions; they are not a sandbox.
 
 The policy is immutable once activated, including removal of the directive. Redeploying the same policy is idempotent. Calling `setResidency` or `setResidencyById` on a declarative table fails; remove those calls when converting. Existing tables can adopt a key-derived policy with an equivalent custom map. Attribute policies must be declared on a new table because existing rows have no stored slots.
 
@@ -83,6 +83,8 @@ Each database has one versioned snapshot in `system.hdb_residency_slots`. The sn
 
 For a new declarative table with no map, first activation installs version `1` from only the declared slot count and sorted `replication.shards`: slot `k` maps to `shards[k % shards.length]`. Equal inputs produce the same snapshot and digest on simultaneous installers. The installed snapshot is then authoritative. Changes to the configured shard list never regenerate it.
 
+The first table activated supplies the default slot count; Harper does not choose the maximum across a schema. For tables with different slot counts, install one custom map covering the largest count and wait for the same snapshot on every node before deploying the tables. A later table needing more slots requires an explicit `initialize_residency_slots` extension that preserves every active assignment. It never extends the default automatically. Do not run different initial schema deployments concurrently.
+
 An existing table requires a custom map before activation, even if this node currently holds no rows. A custom map can be installed without `replication.shards`:
 
 ```json
@@ -100,6 +102,8 @@ An existing table requires a custom map before activation, even if this node cur
 This POST operation requires `super_user` and returns the installed snapshot. It changes metadata only. An exact retry is a no-op. Once a declarative table is active, existing assignments cannot change; coverage can only extend without changing active slots. Same-version divergent snapshots are refused rather than resolved by last-write-wins. Deleting the installed map does not trigger default reconstruction.
 
 Setup exchanges carry the map version/digest and a separate shard-list digest. A missing or conflicting map blocks dependent placement and replication progress and appears in `cluster_status.residency`. A conflict on the system stream can also hold later system updates. Repair the conflicting configuration/map and reconnect; do not assume that skipping the offending record is safe. Resolving independently initialized, differently placed databases may require restoring or exporting the losing data. Reassignments that move data are a separate feature.
+
+There is no operation to delete or reset an active map. If an accidentally initialized joining node has no unique data, stop its traffic and reprovision it with a fresh data directory; receive or install the cluster's exact snapshot before deploying the declarative application. Do not delete individual system-table files. If it has unique data, preserve a backup and restore/export that data before reprovisioning. In custom-map deployments, leaving `replication.shards` unset on every participant prevents premature default installation; lists must still agree across peers.
 
 ## Convert an existing by-id table without moving records
 
@@ -124,7 +128,7 @@ Run `verify_residency_slots` on each node while its application worker still run
 }
 ```
 
-This POST operation requires `super_user`. It scans local records and compares the actual old function's numeric shard with the proposed policy and installed map. It reports `checked`, `mismatches`, bounded mismatch samples, observed slots, departed node names, and map identity. It does not rewrite records or activate the policy. A sample of present keys cannot prove equivalence for every future key; the operator must confirm the functions are equivalent.
+This POST operation requires `super_user`. It scans local records and compares the actual old function's numeric shard with the proposed policy and installed map. It reports `checked`, `mismatches`, bounded mismatch samples, observed slots, departed node names, and map identity. It does not rewrite records or activate the policy. Hostname-array functions are not converted: the first nonnumeric return rejects the operation with HTTP 400, rather than counting as a mismatch or inferring a shard. `departedNodeNames` lists names found in stored legacy residency lists that are absent from the node's current known-node list (including itself). A sample of present keys cannot prove equivalence for every future key; the operator must confirm the functions are equivalent.
 
 ### 4. Activate the directive
 
@@ -138,7 +142,7 @@ For a key-derived policy, drain cached RocksDB replicas before changing binaries
 
 1. Back up the database. Pause application requests and background jobs on **every node**, including reads that could admit another replica. Keep them paused through the downgrade.
 2. Set `@table(replicaExpiration: 0)` in each affected table's schema and restart every node on the **current** binary, preserving its residency directive. This table argument is in seconds; zero disables new replica admissions. It does not rewrite existing replica deadlines, so waiting for a new, shorter lifetime does not establish a drain.
-3. Run the following trusted maintenance code for each affected table on every node. Run it inside the application worker with access to `tables`; do not expose it as a public endpoint. It uses this version's primary metadata (`REPLICA = 4`) to evict only cached replicas, preserving owned rows and index projections.
+3. Run the following trusted maintenance code for each affected table on every node. Run it inside the application worker with access to `tables`; do not expose it as a public endpoint. This procedure is for the 5.4 implementation and uses internal primary metadata (`REPLICA = 4`); verify the matching implementation before using it with another release. It evicts only cached replicas, preserving owned rows and legacy-compatible invalidated index projections. The runtime TTL call below repeats step 2 defensively on this table handle and preserves its other TTL settings. These APIs are trusted worker internals, not Operations API commands.
 
 ```js
 async function drainResidencyReplicas(Table) {
