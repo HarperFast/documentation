@@ -39,7 +39,7 @@ type Item @table @residency(slots: 1024) {
 | `slotFrom`    | Optional JavaScript expression returning an integer from `0` through `slots - 1`. Key policies expose `id`.                                                     |
 | `byAttribute` | Default `false`. When `true`, the expression also exposes `record` and its attribute names, and the slot is stored with the record. Requires a secondary index. |
 
-Declarative tables require audit logging and table replication. Harper refuses activation with `@table(audit: false)`, effective `logging.auditLog: false`, or `@table(replicate: false)`, and refuses disabling these table settings later. The replication route must also reach an owner.
+Declarative tables require [per-table audit logging](../database/transaction.md#enabling-the-transaction-log-per-table) and table replication. Harper refuses activation with `@table(audit: false)`, effective `logging.auditLog: false`, or `@table(replicate: false)`, and refuses disabling these table settings later. The replication route must also reach an owner.
 
 Without `slotFrom`, the slot is the unsigned FNV-1a 32-bit hash of the key's ordered-binary encoding, modulo `slots`. Its offset basis is `2166136261` and its multiplier is `16777619`.
 
@@ -61,7 +61,7 @@ The policy is immutable once activated, including removal of the directive. Rede
 
 Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads fetch the full body from an owner. RocksDB can cache a temporary replica; LMDB proxies the read without caching it. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
 
-A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot is unknown locally, DELETE returns 503; local absence cannot prove that the record is absent on its owners. This also applies to never-created keys and purged tombstones. Retrying alone cannot resolve permanent unknown placement; send the deletion to a node that still has the slot metadata.
+A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot is unknown locally, DELETE returns 503; local absence cannot prove that the record is absent on its owners. The message begins `Attribute residency slot is unknown`. This response does not distinguish a delayed projection from a never-created key or a purged tombstone. If another node still has the slot metadata, send the deletion there. If no node has it, DELETE cannot succeed anywhere; retrying alone cannot fix that condition. Stop automatic retries and use application-level knowledge to establish whether the key ever existed. Local absence is not proof that it was deleted.
 
 `replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner accepts a local write, retains only its index projection (or nothing for an index-free key policy), and sends the complete body through replication to the owners. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
 
@@ -101,7 +101,7 @@ An existing table requires a custom map before activation, even if this node cur
 }
 ```
 
-This POST operation requires `super_user` and returns the installed snapshot. It changes metadata only. An exact retry is a no-op. Once a declarative table is active, existing assignments cannot change; coverage can only extend without changing active slots. Same-version divergent snapshots are refused rather than resolved by last-write-wins. Deleting the installed map does not trigger default reconstruction.
+This POST operation requires `super_user` and returns the installed snapshot. It changes metadata only. An exact retry is a no-op. Once a declarative table is active, existing assignments cannot change; coverage can only extend without changing active slots. Same-version divergent snapshots are refused rather than resolved by last-write-wins. Deleting an installed map is refused. If its stored snapshot is lost or corrupted, Harper does not reconstruct it from configuration.
 
 Setup exchanges carry the map version/digest and a separate shard-list digest. A missing or conflicting map blocks dependent placement and replication progress and appears in `cluster_status.residency`. A conflict on the system stream can also hold later system updates. Repair the conflicting configuration/map and reconnect; do not assume that skipping the offending record is safe. Resolving independently initialized, differently placed databases may require restoring or exporting the losing data. Reassignments that move data are a separate feature.
 

@@ -120,6 +120,12 @@ That transaction commits on its own, separately from any request transaction tha
 
 Values your code sets on a context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `replicateTo` or `replicatedConfirmation` gives that client the control the `super_user` check removes.
 
+### Confirmation outcomes
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+LMDB now waits for requested peer confirmation, as RocksDB does. This can add peer latency to existing LMDB applications that use `confirm` or `replicatedConfirmation`. Explicit confirmation still applies only to the first database written by the transaction.
+
 ### Confirmation Failure After a Local Commit
 
 <VersionBadge version="v5.4.0" />
@@ -140,13 +146,15 @@ For example, a REST error for a confirmation timeout can contain:
 }
 ```
 
-The existing error status, code, and message remain available. An operations error has its usual `error` field plus `code`, `replicationUnconfirmed: true`, and `retryable: false`. Programmatic errors wrap the original rejection in `cause`; text-only protocol errors use the new `ReplicationConfirmationError` class name. Check this flag before compensating or retrying a non-idempotent write, because replaying the request could repeat an insert or apply an update twice. The flag does not return auto-generated record keys; use client-selected identifiers when you need to inspect the written records after a failed response.
+The existing error status, code, and message remain available. An operations error has its usual `error` field plus `code`, `replicationUnconfirmed: true`, and `retryable: false`. Programmatic errors wrap the original rejection in `cause`; text-only protocol errors use the new `ReplicationConfirmationError` class name. Check this flag before compensating or retrying a non-idempotent write, because replaying the request could repeat an insert or apply an update twice. The flag does not return auto-generated record keys; use client-selected identifiers and apply the application's concurrency controls when you need to inspect the written records after a failed response.
 
 The flag covers writes issued to the reported commit, not later application steps that were never reached after its rejection. If an enclosing scope rolls back its pending writes, its error omits the flag while preserving `retryable: false` because an independent inner write may already have committed.
 
 Pre-commit refusals, including a confirmation count that cannot be met, do not carry this flag. Its absence does not establish that nothing was written: independent database commits can fail partially. A rejected commit ends its transaction scope; start a fresh transaction for subsequent writes.
 
 Confirmation currently applies to the first database a transaction writes to. This outcome flag covers the linked local commits; it does not enable confirmation for later databases.
+
+[Attribute-slot transitions](./residency.md#attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
 
 ## Static Sharding
 
