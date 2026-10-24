@@ -12,7 +12,7 @@ title: Sharding
 
 <VersionBadge type="changed" version="v4.5.0" /> — expanded sharding functionality: Harper now honors write requests with residency information that will not be stored on the local node, and nodes can be declaratively configured as part of a shard.
 
-Harper's replication system supports sharding — storing different data across different subsets of nodes — while still allowing data to be accessed from any node in the cluster. This enables horizontal scalability for storage and write performance, while maintaining optimal data locality and consistency.
+Harper's replication system supports sharding — storing different data across different subsets of nodes. Single-key reads can fetch records from their owners across shards. Sharding distributes storage and write work across nodes.
 
 A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [declarative residency](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
 
