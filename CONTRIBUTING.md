@@ -21,7 +21,7 @@ You don't need to get type, area, or milestone exactly right when filing — mai
 
 Before contributing, please ensure you have the following installed:
 
-- Node.js (version 22)
+- Node.js (version 22.12.0 or later; `.node-version` selects Node 24)
 - npm (version 10 - included with Node.js)
 
 ## Set Up
