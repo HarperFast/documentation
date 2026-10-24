@@ -99,6 +99,8 @@ With dedicated replication threads:
 - On macOS and Windows, which lack `SO_REUSEPORT`, only one replication thread listens on the replication port; the others carry outbound subscriptions.
 - Changing the number of threads takes effect only on a full `restart` of Harper; `restart_service` does not start or stop replication threads. An unscoped `restart_service` does restart the existing replication threads, and deploying or dropping a component does not.
 
+Schema-defined [declarative residency](./residency.md) runs on application, operations and dedicated replication threads; it is an alternative to the thread-local residency setters.
+
 ## Securing Connections
 
 Harper supports PKI-based security and authorization for replication connections. Two authentication methods are supported:
