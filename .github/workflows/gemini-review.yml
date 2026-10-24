@@ -94,8 +94,9 @@ jobs:
         - **Redirects**: `historic-redirects.ts` keeps old URLs alive. Renaming or
           moving a page without a redirect breaks external links.
         - **Tooling**: `npm run typecheck` (tsc) and `format:check` (prettier).
-          `npm run lint` is a no-op stub (`echo 0`) — do not treat a green lint as
-          evidence of anything.
+          `npm run lint` runs documented-example and fixture-fetch tests, including
+          live companion-fixture parity in CI. It does not execute Harper; the
+          companion core suite owns native HTTP response verification.
         - Do not comment on formatting; prettier owns it.
     secrets:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
