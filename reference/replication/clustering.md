@@ -183,7 +183,8 @@ Returns an array of status objects from the cluster, including active WebSocket 
 		}
 	],
 	"node_name": "server-1.domain.com",
-	"is_enabled": true
+	"is_enabled": true,
+	"residency": {}
 }
 ```
 
@@ -202,7 +203,7 @@ Returns an array of status objects from the cluster, including active WebSocket 
 
 <VersionBadge version="v5.4.0" />
 
-A `cluster_status` object also includes `residency`, keyed by database, for active or attempted declarative declarations. Each entry has:
+The top-level `cluster_status.residency` field is keyed by database and describes active or attempted declarative tables. It is empty in the legacy-table example above. Each entry has:
 
 | Field               | Meaning                                                                                                                    |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
