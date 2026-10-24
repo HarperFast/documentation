@@ -31,6 +31,11 @@ const sidebars: SidebarsConfig = {
 				},
 				{
 					type: 'doc',
+					id: 'database/concurrency',
+					label: 'Concurrency and Consistency',
+				},
+				{
+					type: 'doc',
 					id: 'database/data-loader',
 					label: 'Data Loader',
 				},

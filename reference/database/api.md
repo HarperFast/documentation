@@ -153,17 +153,19 @@ On normal callback completion the transaction is committed automatically. If the
 
 ### Transaction Scope and Atomicity
 
-Transactions span a single database. All tables within the same database share a single transactional context: reads return a consistent snapshot, and writes across multiple tables are committed atomically. If code accesses tables in different databases, each database gets its own transaction with no cross-database atomicity guarantee.
+Transactions span a single database. All tables within the same database share a single transactional context: reads normally return a consistent snapshot, and writes across multiple tables are committed atomically. Lock acquisition can refresh the read state, as described below. If code accesses tables in different databases, each database gets its own transaction with no cross-database atomicity guarantee.
 
 For deeper background on Harper's transaction model, see [Storage Algorithm](./storage-algorithm.md).
 
 ## Read Consistency
 
-Each request reads from a consistent point-in-time snapshot. Within a single request:
+Ordinary reads in a request use a consistent point-in-time snapshot. Within a single request:
 
 - a query response never mixes partially-written records;
 - a long or streamed scan holds the snapshot it started with, so it does not observe writes that land mid-scan;
 - multiple reads in the same request transaction see the same snapshot.
+
+Native `Table.lock()` is an exception: it reloads committed data and can release an earlier read snapshot. Acquire the lock before reading the value used in a condition; do not rely on a pre-lock read remaining repeatable after acquisition. See [Concurrency and Consistency](./concurrency.md#native-record-locks) for lock scope and limits.
 
 Across separate requests there is no shared snapshot. A common pattern — querying for matching rows in one request, then fetching each by id in a later request — runs the two reads at two different points in time. If the data changes in between (a row is deleted or expires, say), the second read can disagree with the first; a query may return an id whose subsequent fetch returns a 404. This is expected: it is two independent snapshots, not a consistency bug.
 

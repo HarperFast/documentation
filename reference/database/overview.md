@@ -108,6 +108,7 @@ For deeper coverage of each database feature, see the dedicated pages in this se
 
 - **[Schema](./schema.md)** — Defining table structure, types, indexes, relationships, and computed properties using GraphQL schema syntax
 - **[API](./api.md)** — The `tables`, `databases`, `transaction()`, and `createBlob()` globals for interacting with the database from code
+- [Concurrency and Consistency](./concurrency.md) - Transactions, atomic deltas, native record locks, and their consistency limits
 - **[Data Loader](./data-loader.md)** — Loading seed or initial data into tables as part of component deployment
 - **[Storage Algorithm](./storage-algorithm.md)** — How Harper stores data using LMDB with universal indexing and ACID compliance
 - **[Storage Tuning](./storage-tuning.md)** — Tuning `storage.*` options for production: durability vs. throughput, compression, blob paths, reclamation
