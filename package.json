@@ -18,7 +18,7 @@
 		"format": "prettier .",
 		"format:check": "npm run format -- --check",
 		"format:write": "npm run format -- --write",
-		"lint": "npm run test:examples",
+		"lint": "oxlint --deny-warnings .",
 		"preview:pr": "node scripts/preview-pr.mjs",
 		"test:examples": "node --test scripts/nested-relationship-examples.test.mjs scripts/github-fixture-fetch.test.mjs",
 		"test:workflows": "node scripts/companion-check.test.mjs"
@@ -39,6 +39,7 @@
 		"@mdx-js/react": "3.1.1",
 		"@signalwire/docusaurus-plugin-llms-txt": "1.2.2",
 		"clsx": "2.1.1",
+		"oxlint": "1.31.0",
 		"prettier": "3.8.1",
 		"prism-react-renderer": "2.4.1",
 		"react": "19.2.4",
