@@ -12,7 +12,7 @@ Upgrade every schema and data writer before activation. Wire compatibility with 
 
 ## Configuration
 
-Configure the complete shard-id set on every node. See [`replication.shards`](./sharding.md#complete-shard-id-set) for initialization and mismatch handling.
+For a new declarative table with no installed map, configure the complete shard-id set on every node. A custom-map conversion does not require this list; leave it unset on both sides when using legacy-peer fallback. See [`replication.shards`](./sharding.md#complete-shard-id-set) for initialization and mismatch handling.
 
 ```yaml
 replication:
@@ -59,9 +59,9 @@ The policy is immutable once activated, including removal of the directive. Rede
 
 Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads fetch the full body from an owner. RocksDB can cache a temporary replica; LMDB proxies the read without caching it. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
 
-A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot.
+A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot has not arrived locally, DELETE is refused until placement is known; local absence cannot prove that the record is absent on its owners.
 
-`replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner write requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
+`replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner accepts a local write, retains only its index projection (or nothing for an index-free key policy), and sends the complete body through replication to the owners. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
 
 ### Attribute-slot changes
 
@@ -75,7 +75,7 @@ type RegionalItem @table @residency(slots: 10, slotFrom: "region", byAttribute: 
 
 Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner is connected, the change is refused before commit.
 
-A connection can fail after admission. A confirmation failure after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
+A connection can fail after admission. An error with `replicationUnconfirmed: true` after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
 
 ## Installed maps
 
@@ -97,7 +97,7 @@ An existing table requires a custom map before activation, even if this node cur
 }
 ```
 
-This POST operation requires `super_user`. It changes metadata only. An exact retry is a no-op. Once a declarative table is active, existing assignments cannot change; coverage can only extend without changing active slots. Same-version divergent snapshots are refused rather than resolved by last-write-wins. Deleting the installed map does not trigger default reconstruction.
+This POST operation requires `super_user` and returns the installed snapshot. It changes metadata only. An exact retry is a no-op. Once a declarative table is active, existing assignments cannot change; coverage can only extend without changing active slots. Same-version divergent snapshots are refused rather than resolved by last-write-wins. Deleting the installed map does not trigger default reconstruction.
 
 Setup exchanges carry the map version/digest and a separate shard-list digest. A missing or conflicting map blocks dependent placement and replication progress and appears in `cluster_status.residency`. A conflict on the system stream can also hold later system updates. Repair the conflicting configuration/map and reconnect; do not assume that skipping the offending record is safe. Resolving independently initialized, differently placed databases may require restoring or exporting the losing data. Reassignments that move data are a separate feature.
 
@@ -109,7 +109,7 @@ Back up the database and upgrade all writers. Keep the current `setResidencyById
 
 ### 2. Install the equivalent map
 
-Install a custom map that reproduces the function's numeric shard result exactly, from one designated node. Wait for the same snapshot on every participant.
+Install a custom map that reproduces the function's numeric shard result exactly, from one designated node. Wait for the same snapshot on every participant before enabling the directive. On a newly joining node in a custom-map deployment, install or receive that snapshot before deploying its declarative application; otherwise first activation would initialize a default map from the local list.
 
 ### 3. Compare placement on every node
 
@@ -134,8 +134,30 @@ Existing residency IDs remain readable but no longer decide placement. Key-deriv
 
 ### Rollback
 
-For a key-derived policy, first stop new replica admissions on every node, demote or evict existing RocksDB replicas, and verify that none remain. An earlier binary can interpret a replica as a full owned record. Lowering `replicaExpiration` does not rewrite existing deadlines or prove that the table is drained.
+For a key-derived policy, drain cached RocksDB replicas before changing binaries: an earlier binary can interpret one as a full owned record. LMDB does not cache these replicas. Key policies themselves need no slot-format conversion.
 
-After verifying the drain, restore the previous binary together with the equivalent legacy schema and `setResidencyById` function. Key policies need no slot-format conversion. Keep the installed map for a later upgrade.
+1. Back up the database. Pause application requests and background jobs on **every node**, including reads that could admit another replica. Keep them paused through the downgrade.
+2. Set `@table(replicaExpiration: 0)` in each affected table's schema and restart every node on the **current** binary, preserving its residency directive. This table argument is in seconds; zero disables new replica admissions. It does not rewrite existing replica deadlines, so waiting for a new, shorter lifetime does not establish a drain.
+3. Run the following trusted maintenance code for each affected table on every node. Run it inside the application worker with access to `tables`; do not expose it as a public endpoint. It uses this version's primary metadata (`REPLICA = 4`) to evict only cached replicas, preserving owned rows and index projections.
+
+```js
+async function drainResidencyReplicas(Table) {
+	const REPLICA = 4;
+	Table.setTTLExpiration({ replicaExpiration: 0 });
+	for (const entry of Table.primaryStore.getRange({ start: true })) {
+		if (entry.metadataFlags & REPLICA) await Table.evict(entry.key, entry.value, entry.version);
+	}
+	let remaining = 0;
+	for (const entry of Table.primaryStore.getRange({ start: true })) if (entry.metadataFlags & REPLICA) remaining++;
+	if (remaining) throw new Error(`${remaining} replicas remain; do not downgrade`);
+	return { remaining };
+}
+await drainResidencyReplicas(tables.Item);
+```
+
+4. Require `{ remaining: 0 }` for every affected table on every node. Eviction is version-checked; a busy replica can survive a pass, so a nonzero result refuses the downgrade. Do not use ordinary record counts as proof: projections and replicas share keys.
+5. Remove the maintenance code, restore the previous binary with the equivalent legacy schema and `setResidencyById` function, then resume traffic. Keep the installed slot map for a later upgrade.
+
+There is no built-in replica-drain operation. If you cannot run and verify this maintenance procedure, restore a preactivation backup instead of attempting an in-place downgrade.
 
 An attribute policy writes a new local primary/audit format. In-place downgrade to an earlier binary is unsupported. Restore a backup from before activation; writes since that backup may be lost. Protocol fallback does not make an earlier binary understand the new local storage format.

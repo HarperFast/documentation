@@ -198,6 +198,27 @@ Returns an array of status objects from the cluster, including active WebSocket 
 
 ---
 
+### Declarative Residency Status
+
+<VersionBadge version="v5.4.0" />
+
+A `cluster_status` object also includes `residency`, keyed by database, for active or attempted declarative declarations. Each entry has:
+
+| Field               | Meaning                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `version`, `digest` | Installed map identity; absent if no map is installed.                                                                     |
+| `shardsDigest`      | Digest of the configured shard set, or `null` when no list is configured.                                                  |
+| `blocked`           | Whether a reported configuration or map-agreement condition blocks placement.                                              |
+| `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map. |
+
+A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for a non-owner attribute-slot transition, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
+
+### Residency Map Operations
+
+The POST operations [`initialize_residency_slots`](./residency.md#installed-maps) and [`verify_residency_slots`](./residency.md#3-compare-placement-on-every-node) require `super_user`. The former installs a snapshot without moving records; the latter compares the actual legacy function against a proposed key policy without modifying data. Their request examples, parameters and result fields are in the linked procedures.
+
+---
+
 ### Configure Cluster
 
 Bulk creates or resets subscriptions for any number of remote nodes. **Resets and replaces any existing clustering setup.**
