@@ -90,18 +90,39 @@ Or specify explicit nodes:
 
 ### Programmatic Replication Control
 
-Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method:
+Set `replicateTo` programmatically in a resource method:
 
 ```javascript
 class MyTable extends tables.MyTable {
 	put(record) {
 		const context = this.getContext();
 		context.replicateTo = 2; // or an array of node names
-		context.replicatedConfirmation = 1;
 		return super.put(record);
 	}
 }
 ```
+
+`replicatedConfirmation` is read when a transaction starts. A request transaction has already started when its resource method runs. To request confirmation from application code, pass a fresh context to [`transaction()`](../database/api.md#transactioncontext-callback), rather than reusing or copying the request context:
+
+```javascript
+import { tables, transaction } from 'harper';
+
+await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async () => {
+	await tables.MyTable.put(record);
+});
+```
+
+This is an independent transaction: failure of an outer request does not roll back its committed writes.
+
+### Confirmation outcomes
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+LMDB now waits for requested peer confirmation, as RocksDB does. This can add peer latency to existing LMDB applications that use `confirm` or `replicatedConfirmation`. Explicit confirmation still applies only to the first database written by the transaction.
+
+Confirmation can fail after local commit. An error carrying `replicationUnconfirmed: true` and `retryable: false` means the local writes committed but the requested confirmation was not obtained. It does not mean the writes rolled back. Inspect the records using application-selected keys and apply the application's concurrency controls before retrying a non-idempotent request. Pre-commit refusals do not carry that flag; its absence alone does not prove that no independent write committed.
+
+[Attribute-slot transitions](./residency.md#attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
 
 ## Static Sharding
 
