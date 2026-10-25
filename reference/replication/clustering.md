@@ -212,7 +212,7 @@ The top-level `cluster_status.residency` field is keyed by database and describe
 | `blocked`           | Whether a reported configuration or map-agreement condition blocks placement.                                              |
 | `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map. |
 
-A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for a non-owner attribute-slot transition, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
+A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for an attribute-slot transition from a writer outside the new owner set, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
 
 ### Residency Map Operations
 
