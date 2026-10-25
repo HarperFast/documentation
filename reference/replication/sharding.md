@@ -111,8 +111,8 @@ export class Order extends tables.Order {
 ```javascript
 import { tables, transaction } from 'harper';
 
-await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async () => {
-	await tables.Order.put(order);
+await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async (txn) => {
+	await tables.Order.put(order, txn);
 });
 ```
 
@@ -286,7 +286,6 @@ X-Replicate-From: none
 
 ## See Also
 
-- [Declarative Residency](./residency.md)
-
+- [Declarative Residency](./residency.md) — Fixed slot policies and authoritative database maps
 - [Replication Overview](./overview.md) — How Harper's replication system works
 - [Clustering Operations](./clustering.md) — Operations API for managing cluster nodes
