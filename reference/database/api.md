@@ -136,7 +136,7 @@ Two details matter outside a request context:
 
 ### Replication confirmation
 
-Set `replicatedConfirmation` on a fresh context before calling `transaction()` to request confirmation for its writes. Pass the callback's `txn` argument to table methods to bind them explicitly. Reusing a context with an active transaction does not change that transaction's confirmation settings. See [replication confirmation](../replication/sharding.md#programmatic-replication-control) for the independent-transaction example and uncertain-outcome behavior.
+Set `replicatedConfirmation` on a fresh context before calling `transaction()` to request confirmation for its writes. Pass the callback's `txn` argument to table methods to bind them explicitly. Reusing a context with an active transaction does not change that transaction's confirmation settings. See the [independent-transaction example](../replication/sharding.md#programmatic-replication-control) and [uncertain-outcome behavior](../replication/sharding.md#confirmation-outcomes).
 
 ### Nesting
 
