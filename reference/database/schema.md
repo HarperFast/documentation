@@ -775,7 +775,7 @@ export class Reports extends tables.Reports {
 
 For vector queries, `rowFilter` participates in HNSW traversal. A caller therefore receives the k nearest _matching_ records rather than "nearest k, minus filtered records." `rowFilter` can apply to every candidate visited; prefer indexed query conditions for predicates that can be expressed declaratively.
 
-On a declarative residency non-owner, invalidation values contain only the local index projection. A `rowFilter` on an unindexed field therefore sees it as missing; see the [subscription limitation](../replication/residency.md#ownership-reads-and-writes).
+On a declarative residency non-owner, invalidation values contain only the local index projection. A `rowFilter` on an unindexed field therefore sees it as missing; see the [subscription limitation](../replication/residency.md#subscription-filters).
 
 `rowFilter` applies only when a non-raw `put` or `invalidate` event carries a row value. Delete tombstones, value-less invalidations, raw events, and published messages may not contain the complete current record. A subscription that needs such events can also provide an `eventFilter`:
 
