@@ -63,7 +63,7 @@ Owners store full records. With secondary indexes, other nodes keep index projec
 
 A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot is unknown locally, DELETE returns 503 with a message beginning `Attribute residency slot is unknown`. This response does not distinguish a delayed projection from a never-created key or a purged tombstone; local absence cannot prove that the record is absent on its owners. If another node still has the slot metadata, send the deletion there. If no node has it, DELETE cannot succeed anywhere; retrying alone cannot fix that condition. Stop automatic retries and use application-level knowledge to establish whether the key ever existed. Local absence is not proof that it was deleted.
 
-`replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner accepts a local write, retains only its index projection (or nothing for an index-free key policy), and sends the complete body through replication to the owners. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
+`replicateTo` cannot override a declarative policy; the installed slot map determines where full records are retained. A non-owner accepts a local write and sends the complete body through replication to the owners. On an indexed RocksDB table with positive `replicaExpiration`, it also retains the complete written body as a temporary local replica, allowing an immediate local read while delivery is pending. A newer invalidation replaces it, and the replica sweep expires it. With expiration zero or LMDB, it retains only the index projection; an index-free key policy retains nothing. A replica is a cache, so crash recovery may restore a projection instead. Ingest-heavy non-owners should budget space for approximately their serialized bytes written per second multiplied by `replicaExpiration`, or set expiration to zero. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support declarative residency because branches do not replicate.
 
 ### Attribute-slot changes
 
@@ -75,9 +75,30 @@ type RegionalItem @table @residency(slots: 10, slotFrom: "region", byAttribute: 
 }
 ```
 
-Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. This handoff uses full-record replacement ordering: an older concurrent patch does not merge into the replacement. Use application concurrency controls when writers can update a record while its slot changes. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner is connected, the change is refused before commit.
+Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. This handoff uses full-record replacement ordering: an older concurrent patch does not merge into the replacement. Use application concurrency controls when writers can update a record while its slot changes. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner has an active subscription and recent received activity within `replication.pingTimeout`, the change is refused before commit. This can also refuse an owner whose base copy is not progressing.
+
+Automatic slot-move confirmation waits up to `replication.residencyConfirmationTimeout` (default `30000` ms). Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` instead (default `900000` ms, raised to `blobTimeout` when the confirmation setting is omitted). Both settings are read when a confirmation starts. An explicit setting can lower that timeout independently of blob transfers. Slow transfers can therefore exceed the automatic timeout even on a healthy link.
 
 A connection can fail after admission. An error with `replicationUnconfirmed: true` after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
+
+### Subscription filters
+
+Non-owner invalidation events contain only indexed fields. A subscription `rowFilter` evaluates that event payload even if a complete replica exists locally. Predicates on unindexed fields can miss updates; a negated predicate can also pass because the field is missing. Use indexed fields for these predicates. Do not use an unindexed event predicate to decide whether a subscriber may learn a record's id or indexed fields.
+
+### Configuration failures and peer identity
+
+Invalid residency configuration at startup quarantines the affected database before replay. Its reads and writes return `DATABASE_RESIDENCY_BLOCKED` with the configuration reason and `retryable: false`; replication does not subscribe or advance its cursor. Other databases and the operations API remain available. `cluster_status.residency` reports the blocked database. Repair the configuration and restart the node to replay its retained tail. Repairing a system map or restarting an individual worker does not clear the quarantine.
+
+A peer's announced node name must match its authenticated identity or an alias explicitly bound by its configured route or node record. For a canonical hostname reached through an IP address, configure both identities:
+
+```yaml
+replication:
+  routes:
+    - hostname: node-b
+      url: wss://192.0.2.20:9933
+```
+
+The canonical name is used for topology and confirmations. An announcement cannot create an alias or claim another known node's identity.
 
 ## Installed maps
 
