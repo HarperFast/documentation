@@ -184,7 +184,7 @@ Returns an array of status objects from the cluster, including active WebSocket 
 	],
 	"node_name": "server-1.domain.com",
 	"is_enabled": true,
-	"residency": {}
+	"sharding": {}
 }
 ```
 
@@ -199,11 +199,11 @@ Returns an array of status objects from the cluster, including active WebSocket 
 
 ---
 
-### Declarative Residency Status
+### Sharding Status
 
 <VersionBadge version="v5.4.0" />
 
-The top-level `cluster_status.residency` field is keyed by database and describes active or attempted declarative tables. It is empty in the legacy-table example above. Each entry has:
+The top-level `cluster_status.sharding` field is keyed by database and describes active or attempted declarative tables. It is empty in the legacy-table example above. Each entry has:
 
 | Field               | Meaning                                                                                                                    |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -216,7 +216,7 @@ A clear status is not proof that an owner is connected; write admission also che
 
 ### Residency Map Operations
 
-The POST operations [`initialize_residency_slots`](./residency.md#installed-maps) and [`verify_residency_slots`](./residency.md#3-compare-placement-on-every-node) require `super_user`. The former installs a snapshot without moving records; the latter compares the actual legacy function against a proposed key policy without modifying data. Their request examples, parameters and result fields are in the linked procedures.
+The POST operations [`initialize_shard_map`](./residency.md#installed-maps) and [`verify_shard_map`](./residency.md#3-compare-placement-on-every-node) require `super_user`. The former installs a snapshot without moving records; the latter compares the actual legacy function against a proposed key policy without modifying data. Their request examples, parameters and result fields are in the linked procedures.
 
 ---
 

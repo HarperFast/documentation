@@ -146,7 +146,7 @@ On a table whose records live on specific nodes (see [sharding](../replication/s
 - **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` disables new replica admissions and the sweep. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
 
-[Declarative residency](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for either key- or attribute-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
+[Sharding](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for either key- or attribute-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
 
 ```graphql
 # Keep fetched records for a day; a read after six hours renews them
@@ -240,11 +240,11 @@ export class Product extends tables.Product {
 
 See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the full caching behavior and how `Cache-Control` interacts with authentication headers.
 
-### `@residency`
+### `@sharded`
 
 <VersionBadge version="v5.4.0" />
 
-Defines an immutable placement policy on a schema-defined table. `slots` is required (`1`–`65536`); `slotFrom` optionally supplies a deterministic JavaScript expression; `byAttribute: true` evaluates the record and requires a secondary index. The database's installed map resolves each slot to a deployment shard. See [Declarative Residency](../replication/residency.md) for examples, configuration, conversion and rollback.
+Defines an immutable placement policy on a schema-defined table. `@sharded` hashes the primary key; `by: "tenantId"` hashes that attribute's non-null value with the same hash. `slotFrom` optionally chooses the integer logical slot with a compiled deterministic expression. `slots` is a database-wide value (`1` through `65536`): omit it to adopt the installed map's count, or `1024` if no map exists; an explicit different count is refused. Attribute policies require a secondary index. The database map resolves each slot to a deployment shard. See [Sharding](../replication/residency.md) for tenant affinity, regional placement, configuration, conversion, limitations and rollback.
 
 ### `@export`
 
@@ -775,7 +775,7 @@ export class Reports extends tables.Reports {
 
 For vector queries, `rowFilter` participates in HNSW traversal. A caller therefore receives the k nearest _matching_ records rather than "nearest k, minus filtered records." `rowFilter` can apply to every candidate visited; prefer indexed query conditions for predicates that can be expressed declaratively.
 
-On a declarative residency non-owner, invalidation values contain only the local index projection. A `rowFilter` on an unindexed field therefore sees it as missing; see the [subscription limitation](../replication/residency.md#subscription-filters).
+On a non-owner for a sharded table, invalidation values contain only the local index projection. A `rowFilter` on an unindexed field therefore sees it as missing; see the [subscription limitation](../replication/residency.md#subscription-filters).
 
 `rowFilter` applies only when a non-raw `put` or `invalidate` event carries a row value. Delete tombstones, value-less invalidations, raw events, and published messages may not contain the complete current record. A subscription that needs such events can also provide an `eventFilter`:
 

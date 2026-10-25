@@ -14,13 +14,17 @@ title: Sharding
 
 Harper's replication system supports sharding — storing different data across different subsets of nodes. Single-key reads can fetch records from their owners across shards. Sharding distributes storage and write work across nodes.
 
-A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [declarative residency](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
+A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [sharding](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
 
 By default (without sharding), Harper replicates all data to all nodes.
 
-## Approaches to Sharding
+## Schema-defined sharding
 
-There are two main approaches:
+In v5.4, use [`@sharded`](./residency.md) for a shared schema policy across all workers. `@sharded` hashes primary keys, `@sharded(by: "tenantId")` keeps a tenant together, and a compiled `slotFrom` expression plus a custom map supports regional data-residency requirements. Slot counts belong to the database. See the [one-slot-per-value limitation](./residency.md#limitations).
+
+## Older per-record mechanisms
+
+The `setResidency`, `setResidencyById`, `getResidency` and residency-list APIs below retain their names. They are the older mechanism, with two approaches:
 
 **Dynamic sharding** — the location (residency) of records is determined dynamically based on where the record was written, the record's data, or a custom function. Records can be relocated dynamically based on where they are accessed. Residency information is specific to each record.
 
@@ -122,7 +126,7 @@ LMDB now waits for requested peer confirmation, as RocksDB does. This can add pe
 
 Confirmation can fail after local commit. An error carrying `replicationUnconfirmed: true` and `retryable: false` means the local writes committed but the requested confirmation was not obtained. It does not mean the writes rolled back. Inspect the records using application-selected keys and apply the application's concurrency controls before retrying a non-idempotent request. Pre-commit refusals do not carry that flag; its absence alone does not prove that no independent write committed.
 
-[Attribute-slot transitions](./residency.md#attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
+[Attribute-slot transitions](./residency.md#regional-placement-and-attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
 
 ## Static Sharding
 
@@ -139,7 +143,7 @@ replication:
 
 <VersionBadge version="v5.4.0" />
 
-For the first default map of a new [declarative residency](./residency.md) table, configure `replication.shards` next to `replication.shard`:
+For the first default map of a new [sharding](./residency.md) table, configure `replication.shards` next to `replication.shard`:
 
 ```yaml
 replication:
@@ -153,7 +157,7 @@ The list is required only for a database that has declarative tables and no inst
 
 Once installed, the snapshot is authoritative. Changing the list never recomputes placement. Adding an ID only makes that shard available for future reassignment; it moves no records.
 
-Setup exchanges include a digest of the list. Nodes with different lists refuse declarative writes on both sides, even after a map is installed. A configured list on one peer and no list on another also differs. A node whose own shard is outside its list, or which needs an initial map but has no list, also refuses placement. The condition appears in `cluster_status.residency` and is logged once. Plan for this write refusal during a rolling list change.
+Setup exchanges include a digest of the list. Nodes with different lists refuse declarative writes on both sides, even after a map is installed. A configured list on one peer and no list on another also differs. A node whose own shard is outside its list, or which needs an initial map but has no list, also refuses placement. The condition appears in `cluster_status.sharding` and is logged once. Plan for this write refusal during a rolling list change.
 
 ### Other shard configuration
 
@@ -178,7 +182,7 @@ Or dynamically via the operations API by including `shard` in an `add_node` or `
 }
 ```
 
-Once shards are configured, use [declarative residency](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
+Once shards are configured, use [sharding](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
 
 ## Custom Sharding
 
@@ -254,6 +258,6 @@ X-Replicate-From: none
 
 ## See Also
 
-- [Declarative Residency](./residency.md) — Fixed slot policies and authoritative database maps
+- [Sharding](./residency.md) — Fixed slot policies and authoritative database maps
 - [Replication Overview](./overview.md) — How Harper's replication system works
 - [Clustering Operations](./clustering.md) — Operations API for managing cluster nodes

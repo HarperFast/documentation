@@ -637,12 +637,12 @@ const sidebars: SidebarsConfig = {
 				{
 					type: 'doc',
 					id: 'replication/sharding',
-					label: 'Sharding',
+					label: 'Sharding and legacy APIs',
 				},
 				{
 					type: 'doc',
 					id: 'replication/residency',
-					label: 'Declarative residency',
+					label: 'Schema-defined sharding',
 				},
 			],
 		},
