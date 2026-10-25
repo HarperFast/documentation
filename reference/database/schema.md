@@ -143,10 +143,10 @@ On RocksDB, schema rescans apply changes to already-loaded tables on other worke
 
 On a table whose records live on specific nodes (see [sharding](../replication/sharding.md#by-record-content-setresidency)), a node that does not hold a record fetches it from a node that does. The fetched record is kept locally as a _replica_: a complete copy that reads and searches on that node use without contacting another node again. A replica does not move the record and is never replicated onward. A write by an owner reaches the node as an invalidation, which turns the replica back into a stub, so the next read fetches the new version. Tables sharded by primary key only (`setResidencyById`) keep no replicas.
 
-[Declarative residency](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for either key- or attribute-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
-
 - **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` disables new replica admissions and the sweep. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
+
+[Declarative residency](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for either key- or attribute-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
 
 ```graphql
 # Keep fetched records for a day; a read after six hours renews them
@@ -775,7 +775,9 @@ export class Reports extends tables.Reports {
 
 For vector queries, `rowFilter` participates in HNSW traversal. A caller therefore receives the k nearest _matching_ records rather than "nearest k, minus filtered records." `rowFilter` can apply to every candidate visited; prefer indexed query conditions for predicates that can be expressed declaratively.
 
-`rowFilter` applies only when a non-raw `put` or `invalidate` event carries an authoritative row value. Delete tombstones, value-less invalidations, raw events, and published messages may not contain the complete current record. A subscription that needs such events can also provide an `eventFilter`:
+On a declarative residency non-owner, invalidation values contain only the local index projection. A `rowFilter` on an unindexed field therefore sees it as missing; see the [subscription limitation](../replication/residency.md#ownership-reads-and-writes).
+
+`rowFilter` applies only when a non-raw `put` or `invalidate` event carries a row value. Delete tombstones, value-less invalidations, raw events, and published messages may not contain the complete current record. A subscription that needs such events can also provide an `eventFilter`:
 
 ```javascript
 subscribe(request) {
