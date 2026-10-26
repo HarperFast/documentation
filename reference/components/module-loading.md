@@ -103,16 +103,16 @@ The default is a deliberate compromise: packages that depend on `harper` want ap
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-`lockdown` controls whether and when Harper locks the JavaScript intrinsics (the built-in constructors and their prototypes), which makes prototype pollution attacks harder. A typical pollution payload adds a property that every object then inherits, such as `__proto__.isAdmin`. Every mode except `none` blocks adding properties to the locked intrinsics. The modes differ in when they lock, and in whether code can still change a property that already exists.
+`lockdown` controls whether and when Harper locks the JavaScript intrinsics (the built-in constructors and their prototypes), which makes prototype pollution attacks harder. A typical pollution payload adds a property that every object then inherits, such as `__proto__.isAdmin`. Every mode except `none` blocks adding properties to the locked intrinsics (see [What is locked](#what-is-locked) for the exceptions). The modes differ in when they lock, and in whether code can still change a property that already exists.
 
-| Mode                                                          | Locks by                                                                     | When                              | Add or delete a property | Change an existing writable property |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------- | ------------------------ | ------------------------------------ |
-| `seal-after-load` (default) <VersionBadge version="v5.4.0" /> | Sealing                                                                      | After all components have loaded  | Blocked                  | Allowed                              |
-| `seal` <VersionBadge version="v5.4.0" />                      | Sealing                                                                      | Before any application code loads | Blocked                  | Allowed                              |
-| `freeze-after-load`                                           | Freezing                                                                     | After all components have loaded  | Blocked                  | Blocked                              |
-| `freeze`                                                      | Freezing                                                                     | Before any application code loads | Blocked                  | Blocked                              |
-| `ses`                                                         | Full SES lockdown via the [`ses`](https://www.npmjs.com/package/ses) package | Before any application code loads | Blocked                  | Blocked                              |
-| `none`                                                        | Nothing                                                                      | -                                 | Allowed                  | Allowed                              |
+| Mode                                                          | Locks by                                                                     | When                              | Add or delete a property | Assign to an existing writable property |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------- | ------------------------ | --------------------------------------- |
+| `seal-after-load` (default) <VersionBadge version="v5.4.0" /> | Sealing                                                                      | After all components have loaded  | Blocked                  | Allowed                                 |
+| `seal` <VersionBadge version="v5.4.0" />                      | Sealing                                                                      | Before any application code loads | Blocked                  | Allowed                                 |
+| `freeze-after-load`                                           | Freezing                                                                     | After all components have loaded  | Blocked                  | Blocked                                 |
+| `freeze`                                                      | Freezing                                                                     | Before any application code loads | Blocked                  | Blocked                                 |
+| `ses`                                                         | Full SES lockdown via the [`ses`](https://www.npmjs.com/package/ses) package | Before any application code loads | Blocked                  | Blocked                                 |
+| `none`                                                        | Nothing                                                                      | -                                 | Allowed                  | Allowed                                 |
 
 `ses` is the strictest mode, and the most likely to break packages that change built-ins. Any other mode name, including a misspelled one, behaves like `freeze`.
 
@@ -122,9 +122,11 @@ The seal and freeze modes lock `Object`, `Array`, `Promise`, `BigInt`, `String`,
 
 ### Sealing and freezing
 
-Sealing stops properties from being added or deleted, and leaves the existing ones as they were: a writable property such as `Array.prototype.map` can still be assigned, and a read-only one such as `Math.PI` stays read-only. An object can therefore shadow any inherited method by plain assignment (`obj.toString = fn`, `arr.push = fn`).
+Sealing stops properties from being added, deleted, or reconfigured: `Object.defineProperty` cannot make an existing property configurable, change whether it is enumerable, or turn it into a getter. Each property keeps its value and writability, so a writable property such as `Array.prototype.map` can still be assigned, and a read-only one such as `Math.PI` stays read-only. An object can shadow any inherited method by plain assignment (`obj.toString = fn`, `arr.push = fn`).
 
-Freezing also makes every existing property read-only. That blocks changing a prototype method, and it also blocks shadowing one on an instance: assigning `arr.push = fn` throws in strict-mode code. Harper keeps a few commonly shadowed methods, such as `toString` and `Promise.prototype.then`, assignable on instances. Choose `freeze-after-load` when you want existing intrinsic properties to be unchangeable too.
+Freezing also makes every existing property read-only. That blocks changing a prototype method, and it also blocks shadowing one on an instance: assigning `arr.push = fn` throws in strict-mode code. Harper keeps a few commonly shadowed methods, such as `toString` and `Promise.prototype.then`, assignable on instances.
+
+Because sealing leaves existing properties writable, a pollution payload that overwrites an existing method, such as `__proto__.toString`, still succeeds under the seal modes. That mostly breaks behavior (a denial of service) rather than granting access, and it is the trade the default accepts. Choose `freeze-after-load` when you want existing intrinsic properties to be unchangeable too.
 
 `seal-after-load` replaced `freeze-after-load` as the default in v5.4.0 because frozen prototypes are slow on Node.js. With them, V8 takes a slow path for every store into an array hole (such as filling a `new Array(n)`) for all code on that thread, Harper's own included: in Harper's benchmark, msgpackr decoding inside a worker ran about four times slower under `freeze-after-load` than under `seal-after-load`. Sealing does not have that cost.
 
@@ -134,9 +136,9 @@ Under `seal-after-load` and `freeze-after-load`, a component or its dependencies
 
 ### Upgrading and downgrading
 
-New installs get `seal-after-load`. An upgrade keeps the value already in `harper-config.yaml`, so an instance installed before v5.4.0 keeps `freeze-after-load` (or `freeze`, if it was installed on v5.0.0 or v5.0.1) until you change it.
+New installs get `seal-after-load`. An upgrade keeps the value already in `harper-config.yaml`: an instance installed on v5.0.2 through v5.3 keeps `freeze-after-load` until you change it, and one installed on v5.0.0 or v5.0.1 keeps `freeze`. If the file has no `lockdown` value, as after an in-place upgrade from v4, Harper does not lock the intrinsics at all; set the value to turn lockdown on.
 
-Before downgrading an instance that uses a seal mode to a release older than v5.4.0, set `lockdown: freeze-after-load`. Those releases do not recognize the seal modes, so they treat them as `freeze` and lock before any application code loads, and a dependency that extends an intrinsic while it loads then fails. Even with `freeze-after-load`, the older release freezes rather than seals, so code that changes an existing intrinsic property after load, which sealing allows, throws there.
+Before downgrading an instance that uses a seal mode to v5.0.2 through v5.3, set `lockdown: freeze-after-load`. Those releases do not recognize the seal modes, so they treat them as `freeze` and lock before any application code loads, and a dependency that extends an intrinsic while it loads then fails. Even with `freeze-after-load`, the older release freezes rather than seals, so code that assigns to an existing intrinsic property after load, which sealing allows, throws there. v5.0.0 and v5.0.1 have no after-load mode: on those releases, only `none` lets a dependency extend an intrinsic while it loads.
 
 ## Allowed Directory
 
@@ -214,7 +216,7 @@ The check has three limits:
 For most applications the default is the right choice, and the settings on this page are worth changing only in response to a concrete problem.
 
 - **A package breaks under the VM loader.** Try `dependencyLoader: native` first — it keeps application context for your own source. Fall back to `moduleLoader: native` only if the problem is in first-party code.
-- **A dependency changes an intrinsic and now throws.** Under the default `seal-after-load`, only adding or deleting a property after components have loaded throws; assigning to an existing writable property, or extending an intrinsic while the component loads, works. Under the freeze modes, assigning to an existing property throws too. `lockdown: none` is the temporary workaround; the durable fix is in the dependency.
+- **A dependency changes an intrinsic and now throws.** Under the default `seal-after-load`, a change throws only if it happens after components have loaded and adds or deletes a property, or reconfigures one with `Object.defineProperty` (for example, passing `configurable: true`); assigning to an existing writable property works at any time. Under the freeze modes, assigning to an existing property throws too. `lockdown: none` is the temporary workaround; the durable fix is in the dependency.
 - **`instanceof` fails on a value that crossed the Harper boundary.** You are on `vm`. Move to `vm-current-context`.
 - **You need per-application intrinsics or a custom global.** `vm` is the mode that provides them; accept the compatibility cost.
 - **You need to spawn a sidecar process.** Stay on a VM loader and keep the spawning code in component source, reached with `import`. See [Child Processes](./javascript-environment.md#child-processes).

@@ -144,9 +144,11 @@ For most applications the default is the right choice. Choose `vm` only if you s
 
 ### Intrinsic Lockdown
 
-The default lockdown mode (`seal-after-load` since v5.4.0, `freeze-after-load` before it) seals JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all application code has loaded, which makes prototype pollution attacks harder. If application code or a dependency adds a property to an intrinsic prototype at runtime (after startup), it throws a `TypeError` in strict-mode code. Under `freeze-after-load`, changing an existing property throws too.
+The default lockdown mode (`seal-after-load` since v5.4.0, `freeze-after-load` before it) seals JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all components have loaded, which makes prototype pollution attacks harder. If application code or a dependency adds a property to an intrinsic prototype at runtime (after startup), it throws a `TypeError` in strict-mode code. Under `freeze-after-load`, changing an existing property throws too.
 
 If a dependency does this and you need a temporary workaround, set `lockdown: none`. The other modes (`seal`, `freeze-after-load`, `freeze`, `ses`) are covered under [Intrinsic Lockdown](/reference/v5/components/module-loading#intrinsic-lockdown).
+
+The default is the value a new install writes to `harper-config.yaml`. An in-place upgrade keeps the file it had, and a configuration carried over from v4 has no `lockdown` value, so Harper does not lock the intrinsics until you add one.
 
 ### Allowed Directory
 
