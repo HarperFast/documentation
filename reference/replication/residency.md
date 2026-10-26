@@ -10,7 +10,7 @@ Schema-defined sharding requires RocksDB. `@sharded` and `initialize_shard_map` 
 
 `@sharded` fixes a table's placement policy in its schema. Every application, operations, and replication thread applies the same policy. A key or record selects a slot, the database's installed slot map selects a shard, and `replication.shard` identifies that shard's current nodes.
 
-Upgrade every schema and data writer before activation. Wire compatibility with earlier peers allows delivery and reads; it does not make an earlier writer enforce the policy. Fallback to peers that cannot advertise a shard-list digest requires an installed custom map and no configured list on either side; otherwise setup disagrees and placement is blocked.
+Upgrade every schema and data writer before activation. Wire compatibility with earlier peers allows delivery and reads; it does not make an earlier writer enforce the policy. With an installed custom map, recovery-capable peers may omit `replication.shards` only when neither side configures a list. This configuration fallback does not waive the sharding-recovery capability requirement: an older peer can receive compatible records and serve reads, but its announcement holds sharded writes until it is upgraded or removed.
 
 ## Configuration
 
@@ -81,7 +81,9 @@ A key-policy table without secondary indexes stores nothing on non-owners; reads
 
 ### Regional placement and attribute-slot changes
 
-`@sharded(by: "region", slotFrom: ...)` with `initialize_shard_map` is how to meet data-residency requirements. The expression selects logical slots; the map assigns those slots to regional shards. The schema does not encode shard IDs or node names.
+`@sharded(by: "region", slotFrom: ...)` with `initialize_shard_map` places full owned records on regional shards. The expression selects logical slots; the map assigns those slots to shards. The schema does not encode shard IDs or node names.
+
+Owner placement is not a boundary on every copy or transfer. Non-owners retain indexed projections, can cache full read/write replicas, and retain audit bodies for writes they accept. Reads can transfer the complete body across regions. Setting `@table(replicaExpiration: 0)` prevents new temporary replicas; it does not purge existing replicas or writer audit history. Account for indexed fields, request routing, caches and audit retention when planning regional data placement.
 
 Install this map before declaring the table. Configure Asia's nodes with `replication.shard: 0` and Europe's nodes with `replication.shard: 1`:
 
@@ -109,7 +111,7 @@ The omitted count adopts the regional database's three slots. `asia` selects slo
 
 Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. This handoff uses full-record replacement ordering: an older concurrent patch does not merge into the replacement. Use application concurrency controls when writers can update a record while its slot changes. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner has an active subscription and recent received activity within [`replication.pingTimeout`](../configuration/options.md#replication), the change is refused before commit. This can also refuse an owner whose base copy is not progressing.
 
-Automatic slot-move confirmation waits up to `replication.shardingConfirmationTimeout` (default `30000` ms). Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` instead (default `900000` ms, raised to `blobTimeout` when the confirmation setting is omitted). Both settings are read when a confirmation starts. An explicit setting can lower that timeout independently of blob transfers. Slow transfers can therefore exceed the automatic timeout even on a healthy link.
+Automatic slot-move confirmation waits up to `replication.shardingConfirmationTimeout` (default `30000` ms). Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` instead (default `900000` ms, raised to `replication.blobTimeout` when the configuration key `replication.confirmationTimeout` is unset). Both settings are read when a confirmation starts. An explicit setting can lower that timeout independently of blob transfers. Slow transfers can therefore exceed the automatic timeout even on a healthy link.
 
 A connection can fail after admission. An error with `replicationUnconfirmed: true` after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
 
@@ -264,6 +266,8 @@ This is the same operator assertion of completeness as the by-id procedure; Harp
 Key-derived conversion retains existing non-owner full copies locally; it does not relocate, purge, rewrite, or change the versions of existing rows. Those copies do not confer ownership or qualify the node as an owned-slot recovery source. Index-free reads load from the owner rather than trusting a retained non-owner body; indexed tables receive ordinary invalidations. Bootstrap may add missing non-owner index projections. Subsequent writes follow the new replica/projection placement rules. Conversion alone therefore does not remove previously replicated bodies from a region; account for those copies when planning a data-residency cutover.
 
 ### Rollback
+
+The in-place procedure below applies to key-derived tables converted from an equivalent `setResidencyById` policy. It does not restore full replication for a table that had no residency function: removing `@sharded` cannot backfill full bodies on former non-owners. For that conversion, restore a complete preactivation backup instead. Preserve and reconcile writes accepted after the backup before restoring it, or those writes can be lost.
 
 For a key-derived policy, drain cached RocksDB replicas before changing binaries: an earlier binary can interpret one as a full owned record. Key policies themselves need no slot-format conversion.
 
