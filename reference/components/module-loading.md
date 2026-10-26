@@ -138,7 +138,7 @@ Under `seal-after-load` and `freeze-after-load`, a component or its dependencies
 
 New installs get `seal-after-load`. An upgrade keeps the value already in `harper-config.yaml`: an instance installed on v5.0.2 through v5.3 keeps `freeze-after-load` until you change it, and one installed on v5.0.0 or v5.0.1 keeps `freeze`. If the file has no `lockdown` value, as after an in-place upgrade from v4, Harper does not lock the intrinsics at all; set the value to turn lockdown on.
 
-Before downgrading an instance that uses a seal mode to v5.0.1 through v5.3, set `lockdown: freeze-after-load`. Those releases do not recognize the seal modes, so they treat them as `freeze` and lock before any application code loads, and a dependency that extends an intrinsic while it loads then fails. Even with `freeze-after-load`, the older release freezes rather than seals, so code that assigns to an existing intrinsic property after load, which sealing allows, throws there. v5.0.0 has no after-load mode: on that release, only `none` lets a dependency extend an intrinsic while it loads.
+Before downgrading an instance that uses a seal mode to v5.0.1 through v5.3, set `lockdown: freeze-after-load` (added in v5.0.1, and the default from v5.0.2). Those releases do not recognize the seal modes, so they treat them as `freeze` and lock before any application code loads, and a dependency that extends an intrinsic while it loads then fails. Even with `freeze-after-load`, the older release freezes rather than seals, so code that assigns to an existing intrinsic property after load, which sealing allows, throws there. v5.0.0 has no after-load mode: on that release, only `none` lets a dependency extend an intrinsic while it loads.
 
 ## Allowed Directory
 
