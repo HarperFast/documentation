@@ -68,7 +68,7 @@ Content-Type: application/json
 }
 ```
 
-Harper commits the record first, then applies the committed change to the local derived full-text index. Every replica performs the same derivation from the transaction it receives.
+Harper commits the record first, then applies the committed change to the local derived full-text index. Each replica performs the same derivation after it has received both the full-text schema declaration and the record transactions.
 
 If the index remains behind for more than 30 seconds, a local write can return retryable `503` code `DERIVED_INDEX_LAGGING`. Retry writes with backoff while the index catches up; freshness options apply only to searches. See [write backpressure](/reference/v5/full-text-search/overview#write-backpressure).
 
