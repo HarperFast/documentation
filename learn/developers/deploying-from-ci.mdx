@@ -170,7 +170,7 @@ jobs:
       - name: Wait for every node to take the release
         run: |
           # From v5.4.0 a certified rolling deploy waited for every node itself.
-          [ -z "$(jq -r '.rollout.status // empty' deploy.json)" ] || exit 0
+          [ "$(jq -r '.rollout.status // empty' deploy.json)" != success ] || exit 0
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
           [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
           LAST="could not be read"
@@ -276,7 +276,7 @@ jobs:
       - name: Wait for every node to take the release
         run: |
           # From v5.4.0 a certified rolling deploy waited for every node itself.
-          [ -z "$(jq -r '.rollout.status // empty' deploy.json)" ] || exit 0
+          [ "$(jq -r '.rollout.status // empty' deploy.json)" != success ] || exit 0
           JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
           [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
           LAST="could not be read"
