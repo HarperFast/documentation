@@ -153,6 +153,8 @@ Choose one recovery route before restarting a node whose local data or audit his
 
 A node reusing a name whose earlier origin history is known to peers, without the corresponding local history, refuses sharded writes and cannot serve as an owned-slot recovery source. Its recovery status reports `origin-history-lost` and names both remedies: restore a complete backup, or rejoin under a new node name. Waiting for its clock to advance does not repair the missing history.
 
+While this node lacks its frozen origin start, outgoing replication for the affected database is held, including ordinary tables sharing its stream. Ordinary local writes can still succeed; that response does not confirm delivery to another node. Stop all application writes to that database before recovery, preserve any unique ordinary-table writes accepted after the failure, and export or restore them before replacing the root. Other databases remain independent.
+
 Co-owners continue relaying the old name's retained audit entries after membership removal. Keep those co-owners and their audit history available until lagging peers have received the old writes; membership removal does not replace normal audit retention requirements. The new name's writes use a separate origin, so receiving them does not certify receipt of the old origin's pending writes.
 
 If an entire shard was lost, a new name alone cannot recover its bodies: restore a complete backup. Each name restored without its original audit needs the snapshot-only route above. A new storage root in an initialized database cannot borrow another root's origin history; recover missing history before enabling writes.
