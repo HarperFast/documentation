@@ -124,7 +124,7 @@ All module loading behavior is controlled by the `applications` section in `harp
 
 ```yaml
 applications:
-  lockdown: seal-after-load # default; see below
+  lockdown: seal-after-load # new-install default; see below
   moduleLoader: vm-current-context # vm-current-context (default) | vm | native | compartment
   dependencyLoader: auto # auto (default) | app | native
   allowedDirectory: app # app (default) | any
@@ -144,7 +144,7 @@ For most applications the default is the right choice. Choose `vm` only if you s
 
 ### Intrinsic Lockdown
 
-The default lockdown mode, `seal-after-load` (since v5.4.0), seals JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all components have loaded, which makes prototype pollution attacks harder. If application code or a dependency adds a property to an intrinsic prototype at runtime (after startup), it throws a `TypeError` in strict-mode code. Before v5.4.0 the default froze the intrinsics instead, so changing an existing property throws too.
+The default lockdown mode, `seal-after-load` (since v5.4.0), seals JavaScript intrinsics (`Object`, `Array`, `Promise`, `Map`, `Set`, and others) after all components have loaded, which makes prototype pollution attacks harder. If application code or a dependency adds, deletes, or reconfigures a property on an intrinsic prototype at runtime (after startup), it throws a `TypeError` in strict-mode code. Before v5.4.0 the default froze the intrinsics instead (`freeze-after-load` from v5.0.2, `freeze` in v5.0.0 and v5.0.1), which also blocks changing an existing property.
 
 If a dependency does this and you need a temporary workaround, set `lockdown: none`. The other modes (`seal`, `freeze-after-load`, `freeze`, `ses`) are covered under [Intrinsic Lockdown](/reference/v5/components/module-loading#intrinsic-lockdown).
 
