@@ -1688,7 +1688,9 @@ Adds a remote Harper node to the cluster. If `subscriptions` are not provided, a
 
 <VersionBadge version="v5.4.0" />
 
-POST; requires `super_user`. Takes `database`, `slots` and complete nonoverlapping `ranges` (`start`, exclusive `end`, `shard`). Returns the installed versioned snapshot. Installs metadata only and refuses changes to active slot assignments. See [Installed maps](../replication/residency.md#installed-maps).
+POST; requires `super_user` and a RocksDB database. Takes `database`, `slots` and complete nonoverlapping `ranges` (`start`, exclusive `end`, `shard`). Returns the installed versioned snapshot. Installs metadata only and refuses changes to active slot assignments. See [Installed maps](../replication/residency.md#installed-maps).
+
+For a legacy conversion, call with `database`, `existing_owner: true` and `expected_digest` instead. This records the operator's assertion that this local owning node has complete bodies for its slots; Harper does not verify completeness. It requires an already-installed map with exactly that digest, rejects `slots` or `ranges` in the same call, and does not declare a sharded table. The receipt is local to the captured root generations and tables. Assert on each owning node, with legacy writers paused until activation is ready throughout the cluster. See [Converting an existing table](../replication/residency.md#convert-an-existing-by-id-table-without-moving-records).
 
 ### `verify_shard_map`
 

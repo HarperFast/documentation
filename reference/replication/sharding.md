@@ -14,7 +14,7 @@ title: Sharding
 
 Harper's replication system supports sharding — storing different data across different subsets of nodes. Single-key reads can fetch records from their owners across shards. Sharding distributes storage and write work across nodes.
 
-A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [sharding](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
+A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [schema-defined sharding](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
 
 By default (without sharding), Harper replicates all data to all nodes.
 
@@ -118,6 +118,8 @@ await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async (txn) => 
 
 This is an independent transaction: failure of an outer request does not roll back its committed writes.
 
+On `@sharded` tables, `replicateTo` does not change placement; the database map determines owners. Explicit `replicatedConfirmation` counts acknowledgments from other owners for each affected owner set in the first written database. A local temporary replica cannot satisfy it. See [ownership, reads, and writes](./residency.md#ownership-reads-and-writes).
+
 ### Confirmation outcomes
 
 <VersionBadge type="changed" version="v5.4.0" />
@@ -143,7 +145,7 @@ replication:
 
 <VersionBadge version="v5.4.0" />
 
-For the first default map of a new [sharding](./residency.md) table, configure `replication.shards` next to `replication.shard`:
+For the first default map of a new [schema-defined sharding](./residency.md) table, configure `replication.shards` next to `replication.shard`:
 
 ```yaml
 replication:
@@ -182,7 +184,7 @@ Or dynamically via the operations API by including `shard` in an `add_node` or `
 }
 ```
 
-Once shards are configured, use [sharding](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
+Once shards are configured, use [schema-defined sharding](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
 
 ## Custom Sharding
 
@@ -258,6 +260,6 @@ X-Replicate-From: none
 
 ## See Also
 
-- [Sharding](./residency.md) — Fixed slot policies and authoritative database maps
+- [Schema-defined sharding](./residency.md) — Fixed slot policies and authoritative database maps
 - [Replication Overview](./overview.md) — How Harper's replication system works
 - [Clustering Operations](./clustering.md) — Operations API for managing cluster nodes

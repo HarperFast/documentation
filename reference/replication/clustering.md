@@ -205,16 +205,18 @@ Returns an array of status objects from the cluster, including active WebSocket 
 
 The top-level `cluster_status.sharding` field is keyed by database and describes active or attempted declarative tables. It is empty in the legacy-table example above. Each entry has:
 
-| Field               | Meaning                                                                                                                    |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `version`, `digest` | Installed map identity; absent if no map is installed.                                                                     |
-| `shardsDigest`      | Digest of the configured shard set, or `null` when no list is configured.                                                  |
-| `blocked`           | Whether a reported configuration or map-agreement condition blocks placement.                                              |
-| `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map. |
+| Field               | Meaning                                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`, `digest` | Installed map identity; absent if no map is installed.                                                                                                                           |
+| `shardsDigest`      | Digest of the configured shard set, or `null` when no list is configured.                                                                                                        |
+| `blocked`           | Whether a reported configuration or map-agreement condition blocks placement.                                                                                                    |
+| `recovery`          | Bootstrap/recovery phase and reason. `origin-history-lost` refuses a reused name without its audit; restore a complete backup or rejoin with a fresh root under a new node name. |
+| `waitingOrigins`    | Origins waiting for a direct source or certified same-shard relay, with the missing source described.                                                                            |
+| `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map.                                                       |
 
 A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for an attribute-slot transition from a writer outside the new owner set, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
 
-### Residency Map Operations
+### Shard map operations
 
 The POST operations [`initialize_shard_map`](./residency.md#installed-maps) and [`verify_shard_map`](./residency.md#3-compare-placement-on-every-node) require `super_user`. The former installs a snapshot without moving records; the latter compares the actual legacy function against a proposed key policy without modifying data. Their request examples, parameters and result fields are in the linked procedures.
 
