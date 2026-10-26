@@ -20,7 +20,7 @@ By default (without sharding), Harper replicates all data to all nodes.
 
 ## Schema-defined sharding
 
-In v5.4, use [`@sharded`](./residency.md) for a shared schema policy across all workers. `@sharded` hashes primary keys, `@sharded(by: "tenantId")` keeps a tenant together, and a compiled `slotFrom` expression plus a custom map supports regional data-residency requirements. Slot counts belong to the database. See the [one-slot-per-value limitation](./residency.md#limitations).
+In v5.4, use [`@sharded`](./residency.md) for a shared schema policy across all workers. `@sharded` hashes primary keys, `@sharded(by: "tenantId")` keeps a tenant together, and a compiled `slotFrom` expression plus a custom map places owners on regional shards. [Regional placement](./residency.md#regional-placement-and-attribute-slot-changes) also explains the projections, replicas, audit bodies and read transfers that can cross those regions. Slot counts belong to the database. See the [one-slot-per-value limitation](./residency.md#limitations).
 
 ## Older per-record mechanisms
 
@@ -31,6 +31,8 @@ The `setResidency`, `setResidencyById`, `getResidency` and residency-list APIs b
 **Static sharding** — each node is assigned to a specific numbered shard, and each record is replicated to the nodes in that shard based on the primary key, regardless of where the data was written or accessed. More predictable than dynamic sharding: data location is always determinable from the primary key.
 
 ## Dynamic Sharding
+
+The configuration, REST, Operations API and programmatic `replicateTo` examples below control legacy residency. On `@sharded` tables, `replicateTo` does not override the installed map: only the map determines owners. See [ownership, reads, and writes](./residency.md#ownership-reads-and-writes).
 
 ### Replication Count
 
