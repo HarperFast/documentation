@@ -520,7 +520,7 @@ EOF
 
 `#semver:v1.2.3` resolves the reference through your repository's semver tags; `#<sha>` pins an exact commit. For a registry deploy, use the `package` and `credentials` from Path B. `set -euo pipefail` stops the script at the first failed command, including a `curl` whose output goes through `tee`, so a failed deploy never reaches the wait below.
 
-Then wait for every node. When the response has `"status": "rolling_out"` <VersionBadge version="v5.4.0" />, the [deployment record](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) follows the rolling job, and it replicates, so any node can answer for it. Poll [`get_deployment`](/reference/v5/operations-api/operations#get_deployment) with the same header until the record finishes:
+Then wait for every node. When the response has `"status": "rolling_out"` <VersionBadge version="v5.4.0" />, the [deployment record](/reference/v5/operations-api/operations#get_deployment) follows the rolling job, and it replicates, so any node can answer for it. Poll [`get_deployment`](/reference/v5/operations-api/operations#get_deployment) with the same header until the record finishes:
 
 ```bash
 set -euo pipefail
