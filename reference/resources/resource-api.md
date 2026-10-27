@@ -216,6 +216,21 @@ product.subtractFrom('quantity', 1);
 product.save();
 ```
 
+<VersionBadge type="changed" version="v5.4.0" />
+
+Only the properties you assign or change are written. Reading a property, including a sub-object or an array element, is not a write: it is not sent to the source's `patch` on a [write-through caching](#write-through-caching) table, and it adds nothing to the audit history. A sub-object or array you change is written as its whole new value.
+
+A `Date` or `Bytes` (`Buffer` / `Uint8Array`) value must be reassigned to be saved. Changing it in place, such as `product.when.setTime(...)` or `product.bytes[0] = 9`, is not tracked. Build a new value and assign it:
+
+```javascript
+product.when = new Date(product.when.getTime() + 60_000);
+const bytes = Buffer.from(product.bytes);
+bytes[0] = 9;
+product.bytes = bytes;
+```
+
+On a table that is not [`@sealed`](../database/schema.md#sealed), assigning a property the schema does not declare (`product.extra = 'x'`) saves it, even when nothing else changed.
+
 ---
 
 ### `publish(target: RequestTarget | Id, message: object, context?: Resource | Context): Promise<void>`
@@ -834,14 +849,16 @@ Cookie-based sessions are intended for browser clients. For non-browser clients 
 
 ## Resource Instance Methods
 
-A Resource instance is used to update and interact with a single record/resource. It provides functionality for updating properties, accessing property values, and managing record lifecycle. The Resource instance is normally retrieved from the static `update()` method. An instance from a table has updatable properties that can used to access and update individual properties (for properties declared in the table's schema), as well methods for more advanced updates and saving data. For example:
+A Resource instance is used to update and interact with a single record/resource. It provides functionality for updating properties, accessing property values, and managing record lifecycle. The Resource instance is normally retrieved from the static `update()` method. An instance from a table has updatable properties that can be used to access and update individual properties, as well as methods for more advanced updates and saving data. For example:
 
 ```javascript
 const product = await Product.update(32);
-product.status = 'active'; // we can directly change properties on the updatable record, if they are declared in the schema
+product.status = 'active'; // we can directly change properties on the updatable record
 product.subtractFrom('quantity', 1); // We can use CRDT incrementation/decrementation to safely update the quantity
 product.save();
 ```
+
+Properties declared in the schema can be assigned directly. On a table that is not `@sealed`, an undeclared property can be assigned too, and is saved. See [`update()`](#updatetarget-requesttarget--id-updates-object-promiseresource) for what a tracked record writes.
 
 ### `save()`
 
@@ -849,7 +866,7 @@ This saves the current state of the resource to the database in the current tran
 
 This method only saves data when using RocksDB storage engine, and is a no-op when using LMDB.
 
-### `addTo(property: string, value: number)`
+### `addTo(property: string, value: number | bigint)`
 
 Adds `value` to `property` using CRDT incrementation — safe for concurrent updates across threads and nodes.
 
@@ -863,13 +880,21 @@ static async post(target, data) {
 // GET /MyTable/test?foo=bar → primary key is 'test?foo=bar'
 ```
 
-### `subtractFrom(property: string, value: number)`
+<VersionBadge type="changed" version="v5.4.0" /> Calls on the same property in one transaction combine:
 
-Subtracts `value` from `property` using CRDT incrementation.
+- Two deltas add up. `record.addTo('n', 5); record.addTo('n', 3)` adds 8 as one commutative addition, which still merges with other writers' additions.
+- A delta after an assignment adds to the assigned value. `record.n = 100; record.addTo('n', 7)` stores 107. The write is still an assignment, so it replaces a concurrent writer's change instead of merging with it.
+- An assignment after `addTo` replaces the pending delta.
+
+### `subtractFrom(property: string, value: number | bigint)`
+
+Subtracts `value` from `property` using CRDT incrementation. It combines with other calls in the transaction the same way as [`addTo`](#addtoproperty-string-value-number--bigint).
+
+<VersionBadge type="changed" version="v5.4.0" /> `value` can be a BigInt, like `addTo`: `record.subtractFrom('total', 35n)`.
 
 ### `set(property: string, value: any): void`
 
-Sets a property to `value`. Equivalent to direct property assignment (`record.property = value`), but can be used when the property name is dynamic and not declared in the schema.
+Sets a property to `value`. Equivalent to direct property assignment (`record.property = value`), but useful when the property name is dynamic. On a table that is not `@sealed`, the property does not need to be declared in the schema.
 
 ```javascript
 const record = await Table.update(target.id);
@@ -954,6 +979,7 @@ A few limitations to design around:
 
 - `addTo` and `subtractFrom` return no value, and a read-back immediately after a write is not guaranteed to reflect your own committed result. You cannot use them to read "your position" for an exactly-once claim or a hard limit.
 - `subtractFrom` has no floor; concurrent decrements can drive a value negative.
+- Assigning a property and calling `addTo` on it in the same transaction makes the write an assignment, which does not merge with concurrent writers. See [`addTo`](#addtoproperty-string-value-number--bigint).
 
 For non-commutative operations — claim-once, hard caps, inventory floors, state-machine transitions — serialize the operation through a single owning process, or use an external lock or coordinator. This matters more in a cluster: a counter replicates and converges eventually, but a decision made on one node's not-yet-converged view can be wrong during the replication window. A rate limiter built this way, for example, can transiently over-admit when requests are spread across nodes.
 
