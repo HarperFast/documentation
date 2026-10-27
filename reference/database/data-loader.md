@@ -128,10 +128,11 @@ This design makes data files safe to redeploy repeatedly — across deployments,
 
 :::note Upgrading from versions before 5.4.0
 
-Records loaded by an earlier version stay as they are, and most keep receiving data file updates. Two kinds stop receiving them:
+Records loaded by an earlier version stay as they are, and most keep receiving data file updates. These stop receiving them:
 
-- **Tables with a custom primary key.** Of the records an earlier version loaded into such a table, only the one it loaded last is still recognized as loaded from the data file. Records that also have an `id` field are not affected.
+- **Tables with a custom primary key.** Earlier versions tracked these records by their `id` field. Records with a unique `id` value keep receiving updates. Of the records with no `id` field, or with the same `id` value, only one is still recognized as loaded from the data file.
 - **Files that name a database whose table name also exists in the default `data` database.** Records an earlier version loaded into the named database's table are no longer recognized. Records it loaded into the `data` table instead are no longer the file's target and are left there.
+- **Names that contain a colon.** Records an earlier version loaded into a table whose name, or whose data file's `database`, contains `:` are no longer recognized.
 
 To have the data file manage such a record again, delete it; the next load inserts it from the data file.
 
