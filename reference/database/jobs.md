@@ -12,6 +12,7 @@ Harper uses an asynchronous job system for long-running data operations. When a 
 
 Job status values:
 
+- `CREATED` — the job is queued and has not started
 - `IN_PROGRESS` — the job is currently running
 - `COMPLETE` — the job finished successfully
 - `ERROR` — the job failed; its `message` holds the error

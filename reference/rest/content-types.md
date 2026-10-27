@@ -50,7 +50,7 @@ Comma-separated values format, suitable for data export and spreadsheet import/e
 
 ## When a Streamed Response Fails
 
-A collection query, or any resource that returns an iterable, is streamed: Harper sends the `200` status and headers, then writes records as it reads them. If reading fails after that, the status can no longer change, so the failure is reported in the body.
+A collection query, or any resource that returns an iterable, is streamed: Harper sends the `200` status and headers, then writes records as it reads them. If reading fails after that, the status can no longer change, so the failure shows up in the body.
 
 ### JSON
 
@@ -70,9 +70,9 @@ A request that writes and then streams a result, such as a `POST` whose handler 
 
 On RocksDB, a long streamed read can fail this way when the client stops reading for longer than [`storage.maxTransactionOpenTime`](../database/storage-tuning.md#storagemaxtransactionopentime).
 
-### NDJSON and Server-Sent Events
+### Other Formats
 
-These formats end a failed stream with a terminal record and are unchanged in v5.4.0:
+NDJSON and Server-Sent Events end a failed stream with a terminal record, unchanged in v5.4.0:
 
 | Format                                                              | Terminal record                                          |
 | ------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -80,6 +80,8 @@ These formats end a failed stream with a terminal record and are unchanged in v5
 | [Server-Sent Events](./server-sent-events.md) (`text/event-stream`) | An `event: harper-error` event whose `data` is `{ ... }` |
 
 The object has `error` (the error code or class name), `message`, and, when they apply, `status`, `replicationUnconfirmed: true`, and `retryable: false`.
+
+CSV and MessagePack responses write no error record. Harper aborts the response, which can end at a record boundary and look like a shorter, valid result, so treat a network error while reading as a failed read.
 
 ## Content Type via URL Extension
 

@@ -54,11 +54,13 @@ storage:
 
 ### `storage.maxTransactionOpenTime`
 
+<EngineBadge engines="RocksDB" />
+
 Type: `number` (milliseconds)
 
 Default: `30000`
 
-The maximum time a transaction may stay open without activity. Harper checks open transactions once per this interval, so a stalled transaction is closed between one and two intervals after its last activity.
+The maximum time a transaction may stay open without activity. Give a number of milliseconds; unlike `maxTransactionQueueTime`, this option does not take a duration string such as `30s`. LMDB databases ignore it and use a fixed 30 seconds. Harper checks open transactions once per this interval, so a stalled transaction is closed between one and two intervals after its last activity.
 
 - A transaction with uncommitted writes from an application request is aborted, and the request fails with status `422`. Split long-running work into smaller transactions.
 - A read-only transaction has its read snapshot released. On RocksDB, a read that continues afterwards fails with `ReadSnapshotExpiredError` (status `503`).
