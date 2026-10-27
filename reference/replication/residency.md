@@ -203,6 +203,10 @@ There is no operation to delete or reset an active map. If an accidentally initi
 
 ## Limitations
 
+A known concurrent-write gap affects attribute-derived slots. If a PATCH encounters a native storage retry while a concurrent PUT changes the slot-deriving attribute, the retried PATCH can land in a new slot without delivering the complete record to its new owners. Key-derived slots are unaffected. This gap remains when transaction-log abort markers are unavailable or disabled; it closes once the storage binding supplies them and Harper enables them.
+
+With markers active for the logged transaction, Harper instead refuses a retry whose merged slot changed, returning a retryable 409 that names the table and record. The refused write commits nothing. Re-execute the application operation as a fresh attempt so normal placement, local-only refusal and new-owner confirmation rules apply. Harper does not automatically re-run the application callback or serialize attribute-slot writes.
+
 Owner recovery requires the [sources described above](#recovery-sources). Arbitrary cross-shard owner recovery is deferred to [#1123](https://github.com/HarperFast/harper-pro/issues/1123).
 
 Every record with the same `by` value lands in one slot. One region or large tenant therefore cannot be split across shards merely by moving slots. A future `spread` argument (name open) is tracked in [#1122](https://github.com/HarperFast/harper-pro/issues/1122). It would distribute one value over a range using the primary-key hash, with `spread: 1` preserving today's behavior; moving those slots would be handled by #1053. This argument is not available in this release.
