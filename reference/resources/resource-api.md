@@ -216,6 +216,8 @@ product.subtractFrom('quantity', 1);
 product.save();
 ```
 
+#### What a tracked record writes
+
 <VersionBadge type="changed" version="v5.4.0" />
 
 Only the properties you assign or change are written. Reading a property, including a sub-object or an array element, is not a write: nothing is saved for it, nothing is added to the audit history, and on a [write-through caching](#write-through-caching) table nothing is sent to the source's `patch`. A sub-object or array you change is written as its whole new value.
@@ -858,7 +860,7 @@ product.subtractFrom('quantity', 1); // We can use CRDT incrementation/decrement
 product.save();
 ```
 
-Properties declared in the schema can be assigned directly. On a table that is not `@sealed`, an undeclared property can be assigned too, and is saved. See [`update()`](#updatetarget-requesttarget--id-updates-object-promiseresource) for what a tracked record writes.
+Properties declared in the schema can be assigned directly. On a table that is not `@sealed`, an undeclared property can be assigned too, and is saved. See [What a tracked record writes](#what-a-tracked-record-writes).
 
 ### `save()`
 
@@ -880,7 +882,7 @@ static async post(target, data) {
 // GET /MyTable/test?foo=bar → primary key is 'test?foo=bar'
 ```
 
-<VersionBadge type="changed" version="v5.4.0" /> Calls on the same property in one transaction combine:
+As of v5.4.0, calls on the same property in one transaction combine:
 
 - Two deltas add up. `record.addTo('n', 5); record.addTo('n', 3)` adds 8 as one commutative addition, which still merges with other writers' additions.
 - A delta after an assignment adds to the assigned value. `record.n = 100; record.addTo('n', 7)` stores 107. The write is still an assignment, so it replaces a concurrent writer's change instead of merging with it.
@@ -890,7 +892,7 @@ static async post(target, data) {
 
 Subtracts `value` from `property` using CRDT incrementation. It combines with other calls in the transaction the same way as [`addTo`](#addtoproperty-string-value-number).
 
-<VersionBadge type="changed" version="v5.4.0" /> `value` can be a BigInt, like `addTo`: `record.subtractFrom('total', 35n)`.
+As of v5.4.0, `value` can be a BigInt, like `addTo`: `record.subtractFrom('total', 35n)`.
 
 ### `set(property: string, value: any): void`
 
