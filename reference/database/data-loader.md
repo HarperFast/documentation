@@ -24,7 +24,11 @@ dataLoader:
 
 ## Data File Format
 
-Each data file loads records into a single table. The file specifies the target database, table, and an array of records.
+Each data file loads records into a single table. The file specifies the target database, table, and an array of records. `database` is optional; a file without it loads into the default `data` database.
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+A file that names a database loads only into that database. If the table does not exist there, the Data Loader creates it there. Earlier versions, when the named database had no such table, loaded the file into a same-named table in the default `data` database if one existed.
 
 ### JSON Example
 
@@ -94,7 +98,7 @@ Because the Data Loader runs on every startup and deployment, change detection i
 
 1. All specified data files are read (JSON or YAML)
 2. Each file is validated to reference a single table
-3. Records are inserted or updated based on content hash comparison:
+3. Each record is matched to the stored record with the same primary key, and inserted or updated based on content hash comparison:
    - New records are inserted if they don't exist
    - Existing records are updated only if the data file content has changed
    - Records created outside the Data Loader (via Operations API, REST, etc.) are never overwritten
@@ -104,16 +108,34 @@ Because the Data Loader runs on every startup and deployment, change detection i
 
 ### Change Detection
 
+<VersionBadge type="changed" version="v5.4.0" />
+
+Records are matched and tracked by the table's primary key, whether that is `id` or a custom [`@primaryKey`](./schema.md#primarykey) field. Earlier versions matched records by their `id` field only, so on a table with another primary key they rewrote every record on each load, overwriting user edits.
+
 | Scenario                                           | Behavior                                         |
 | -------------------------------------------------- | ------------------------------------------------ |
 | New record                                         | Inserted; content hash stored                    |
 | Unchanged record                                   | Skipped (no writes)                              |
+| Same content with object keys in a different order | Skipped (no writes)                              |
 | Changed data file                                  | Updated via `patch`, preserving any extra fields |
 | Record created by user (not data loader)           | Never overwritten                                |
 | Record modified by user after load                 | Preserved, not overwritten                       |
 | Extra fields added by user to a data-loaded record | Preserved during updates                         |
 
+Key order in nested objects does not count as a content change, so reordering a nested object's keys in the data file does not update the record. Before v5.4.0, only the order of a record's top-level keys was ignored. Array element order still counts.
+
 This design makes data files safe to redeploy repeatedly — across deployments, node scaling, and system restarts — without losing manual modifications or causing unnecessary writes.
+
+:::note Upgrading from versions before 5.4.0
+
+Records loaded by an earlier version stay as they are, and most keep receiving data file updates. Two kinds stop receiving them:
+
+- **Tables with a custom primary key.** Of the records an earlier version loaded into such a table, only the one it loaded last is still recognized as loaded from the data file. Records that also have an `id` field are not affected.
+- **Files that name a database whose table name also exists in the default `data` database.** Records an earlier version loaded into the named database's table are no longer recognized. Records it loaded into the `data` table instead are no longer the file's target and are left there.
+
+To have the data file manage such a record again, delete it; the next load inserts it from the data file.
+
+:::
 
 ## Best Practices
 
