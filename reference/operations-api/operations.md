@@ -343,6 +343,8 @@ All bulk import/export operations are asynchronous and return a job ID. Use [`ge
 
 Exports query results to a local path on the server. Formats: `json` or `csv`.
 
+<VersionBadge type="changed" version="v5.4.0" /> If the query fails partway through a `json` export, the job ends with status `ERROR` and the partial file is removed. Before v5.4.0, the job completed and the file could hold a complete-looking array ending in an `error` element.
+
 ```json
 {
 	"operation": "export_local",
