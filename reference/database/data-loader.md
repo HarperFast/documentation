@@ -26,10 +26,6 @@ dataLoader:
 
 Each data file loads records into a single table. The file specifies the target database, table, and an array of records. `database` is optional; a file without it loads into the default `data` database.
 
-<VersionBadge type="changed" version="v5.4.0" />
-
-A file that names a database loads only into that database. If the table does not exist there, the Data Loader creates it there. Earlier versions, when the named database had no such table, loaded the file into a same-named table in the default `data` database if one existed.
-
 ### JSON Example
 
 ```json
@@ -68,6 +64,12 @@ records:
 ```
 
 One table per file. To load data into multiple tables, create a separate file for each table.
+
+### Target Database
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+A file that names a database loads only into that database. If the table does not exist there, the Data Loader creates it there. Earlier versions, when the named database had no such table, loaded the file into a same-named table in the default `data` database if one existed.
 
 ## File Patterns
 
