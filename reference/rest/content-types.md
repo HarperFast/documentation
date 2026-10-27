@@ -81,7 +81,7 @@ NDJSON and Server-Sent Events end a failed stream with a terminal record, unchan
 
 The object has `error` (the error code or class name), `message`, and, when they apply, `status`, `replicationUnconfirmed: true`, and `retryable: false`.
 
-CSV and MessagePack responses write no error record. Harper aborts the response, which can end at a record boundary and look like a shorter, valid result, so treat a network error while reading as a failed read.
+A MessagePack response writes no error record. Harper aborts it, and the body can end at a record boundary and look like a shorter, valid result, so treat a network error while reading as a failed read.
 
 ## Content Type via URL Extension
 
