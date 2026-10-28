@@ -203,11 +203,9 @@ There is no operation to delete or reset an active map. If an accidentally initi
 
 ## Limitations
 
-A known concurrent-write gap affects attribute-derived slots. If a PATCH encounters a native storage retry while a concurrent PUT changes the slot-deriving attribute, the retried PATCH can land in a new slot without delivering the complete record to its new owners. Key-derived slots are unaffected. This gap remains when transaction-log abort markers are unavailable or disabled; it closes once the storage binding supplies them and Harper enables them.
+For attribute-derived slots, a PATCH racing a slot-changing PUT returns a retryable 409 naming the table and record when its logged native retry has abort markers. Re-execute the application operation as a fresh attempt; Harper does not automatically re-run the callback. An invalid slot expression then receives the normal pre-log 400.
 
-The RocksDB 2.12.0 binding does not provide this protection. The fixes are tracked in [rocksdb-js#970](https://github.com/HarperFast/rocksdb-js/pull/970) and [#973](https://github.com/HarperFast/rocksdb-js/pull/973); Harper must also enable the markers. This sharding feature does not enable them or add an operator setting for them. Until that rollout, avoid overlapping PATCHes with slot-changing PUTs on the same record. A successful response alone does not prove that this race delivered the complete record to its new owners.
-
-With markers active for the logged transaction, Harper instead refuses a retry whose merged slot changed, returning a retryable 409 that names the table and record. The refused write commits nothing. Re-execute the application operation as a fresh attempt so normal placement, local-only refusal and new-owner confirmation rules apply. Harper does not automatically re-run the application callback or serialize attribute-slot writes.
+This race is closed once abort markers are enabled (5.4 default, [rocksdb-js#970](https://github.com/HarperFast/rocksdb-js/pull/970)/[#973](https://github.com/HarperFast/rocksdb-js/pull/973); Harper enablement pending); without them, a logged retry commits at its admitted slot.
 
 Owner recovery requires the [sources described above](#recovery-sources). Arbitrary cross-shard owner recovery is deferred to [#1123](https://github.com/HarperFast/harper-pro/issues/1123).
 
