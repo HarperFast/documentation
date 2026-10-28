@@ -21,7 +21,7 @@ For a complete reference of all available configuration options, see [Configurat
 
 ## The Configuration File
 
-To change a configuration value, edit `harper-config.yaml` and save. **Harper must be restarted for changes to take effect.**
+To change a configuration value, edit `harper-config.yaml` and save. **Restart Harper to apply file edits.** See [Set Configuration](./operations.md#set-configuration) for settings that require a full process restart.
 
 Configuration keys use camelCase (e.g. `operationsApi`). Nested keys use dot notation conceptually (e.g. `operationsApi.network.port`).
 
@@ -315,6 +315,6 @@ Built-in plugins (REST, HTTP, operations API, etc.) and the core database are un
 ## See Also
 
 - [Configuration Options](./options.md) — complete reference for every `harper-config.yaml` key
-- [Worker Thread Debugging](./debugging.md) — attaching Node.js inspector to Harper's worker threads
+- [Worker Thread Debugging](./debugging.md) — attaching Node.js inspector to Harper's worker threads, and enabling source maps in stack traces
 - [Storage Tuning](../database/storage-tuning.md) — production tuning of `storage.*` options
 - [Logging Configuration](../logging/configuration.md) — main and per-subsystem log settings

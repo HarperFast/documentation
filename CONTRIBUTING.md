@@ -21,7 +21,7 @@ You don't need to get type, area, or milestone exactly right when filing — mai
 
 Before contributing, please ensure you have the following installed:
 
-- Node.js (version 22)
+- Node.js (version 22.12.0 or later; `.node-version` selects Node 24)
 - npm (version 10 - included with Node.js)
 
 ## Set Up
@@ -60,6 +60,12 @@ npm run format:check
 ```
 
 CI runs `npm run format:check` on every pull request and will fail if anything is unformatted. If CI fails on formatting, run `npm run format:write` locally and commit the result. Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
+
+## Code Checks
+
+Run `npm run lint` to lint JavaScript and TypeScript with oxlint. Warnings fail the check. The vendor-provided Reo loader (`static/js/reo.js`) is excluded.
+
+Run `npm run test:examples` separately to validate the executable nested-relationship examples and fixture-fetch helper. CI runs both commands as separate steps in the required Lint Check job.
 
 ## Site Organization
 
@@ -229,7 +235,7 @@ The Plugin API is the primary way to implement additional functionality in Harpe
 - `logger.level` — Log level; _Default_: `"info"` (Added in: v4.1.0)
 ```
 
-For inline config option annotations inside list items, plain text `(Added in: vX.Y.Z)` is fine — using the component mid-sentence is awkward. Reserve `<VersionBadge>` for standalone placement after headings.
+Use `<VersionBadge>` after headings or alongside the specific sentence, list item, or table entry it annotates. Use `<EngineBadge engines="RocksDB" />` the same way when behavior is storage-engine-specific; comma-separated values such as `engines="RocksDB, LMDB"` are supported. Keep adjacent version and engine badges together on one line. For dense prose where a component would interrupt the sentence, plain text such as `(Added in: vX.Y.Z)` is fine.
 
 ## Redirects
 

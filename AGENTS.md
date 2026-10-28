@@ -16,7 +16,8 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 - Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 - **Required before every commit/PR:** run `npm run format:write`, then confirm `npm run format:check` is clean. This is a hard gate, not advisory — CI fails any unformatted PR (see [CI](#ci)).
 - Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `plans/`, `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
-- The lint script is a no-op (`echo 0`); do not expect `npm run lint` to catch issues.
+- `npm run lint` runs oxlint over JavaScript and TypeScript with warnings treated as errors.
+- `npm run test:examples` separately runs documented-example checks and fixture-fetch reliability tests. In CI, it also compares fixtures against the companion core revision; locally set `HARPER_CORE_FIXTURE_ROOT` to compare an offline core checkout.
 
 ## Content Style
 
@@ -65,7 +66,7 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 
 ## Testing
 
-- There is no automated test suite. Verification is done by running the dev server or build.
+- `npm run test:examples` checks the documented requests/responses and fixture-fetch behavior; `npm run test:workflows` checks companion workflow scenarios. The companion core suite executes the request/response fixtures against Harper.
 - `npm run build` is the best end-to-end check — it will fail on broken links, missing imports, or MDX errors.
 - `npm run typecheck` checks TypeScript config files only.
 - Known issue: `npm run serve` (post-build preview) 404s on paths like `/docs/4.X` locally due to an upstream `serve-handler` bug. This is not a real breakage — see CONTRIBUTING.md for details.
@@ -75,7 +76,7 @@ Prefer plain ASCII characters in Markdown unless a typographic character is genu
 
 ## CI
 
-- CI runs `npm run build` and `npm run format:check` on pull requests.
+- CI runs the production build, TypeScript Check, Lint Check, Format Check and Workflow Tests on pull requests. Lint Check receives a read-only token for the live companion-fixture comparison.
 - If CI fails on formatting, run `npm run format:write` locally and commit the result.
 
 ## Issues & Project Management
