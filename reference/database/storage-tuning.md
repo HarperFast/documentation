@@ -305,7 +305,7 @@ Controls behavior when memtable memory reaches `writeBufferManagerSize`:
 
 The default (`false`) is a soft cap because a stalling manager pauses every writer in the process. When the budget is held across enough column families, nothing triggers the flush that would release the writers, and only a restart recovers. The cost of the soft cap is memory: total memtable memory can overshoot the budget during bursts. Set to `true` for a strict memory bound when write backpressure is acceptable. With stalls allowed, the default [flush policy](#storagerockswritebuffermanagerflushpolicy) becomes `largestAcrossDBs` <VersionBadge version="v5.4.0" />, which flushes memory held by idle databases instead of waiting on it.
 
-`allowStall` and `writeBufferManagerFlushPolicy` take effect on the live manager; `costToCache` is fixed at first creation.
+`allowStall` and `writeBufferManagerFlushPolicy` are re-applied to the running manager when they change, so restarting the worker threads (`restart_service`) is enough to change them. `costToCache` is fixed when the manager is first created.
 
 ### `storage.rocks.writeBufferManagerFlushPolicy`
 
@@ -321,7 +321,7 @@ Selects which memtable is flushed when memtable memory is over `writeBufferManag
 - `largest` — Currently behaves like `oldest`, because Harper's databases use atomic flush.
 - `largestAcrossDBs` — A background thread flushes whichever database holds the most memtable memory, even if it is not being written.
 
-The default follows `writeBufferManagerAllowStall`. With stalls allowed, `oldest` can stall writes forever: the writer waits for memory that is held by idle databases, and `oldest` only flushes the database being written.
+While no policy is set, the default follows `writeBufferManagerAllowStall`, including later changes to it. With stalls allowed, `oldest` can stall writes forever: the writer waits for memory that is held by idle databases, and `oldest` only flushes the database being written.
 
 ```yaml
 storage:
@@ -330,7 +330,7 @@ storage:
     writeBufferManagerFlushPolicy: largestAcrossDBs
 ```
 
-Has no effect when `storage.rocks.writeBufferManagerSize` is `0`. Invalid values are ignored and the default is used. Once set, the policy stays in effect until Harper fully restarts (the `restart` operation): removing it from the configuration, or restarting only the worker threads with `restart_service`, does not restore the default.
+Has no effect when `storage.rocks.writeBufferManagerSize` is `0`. Invalid values are ignored and the default is used. A changed value applies when the worker threads restart (`restart_service`). Once set, though, a policy stays in effect until Harper fully restarts (the `restart` operation): removing it from the configuration and restarting only the worker threads does not restore the default.
 
 ### `storage.rocks.arenaBlockSize`
 
