@@ -11,7 +11,7 @@ This guide deploys a Harper application to a cluster, waits until every node run
 ## What You Will Learn
 
 - How to deploy a Harper backend, or a frontend built once, from your machine or from GitHub Actions
-- What `restart=rolling` does and does not do, and how to wait for it
+- How to choose between `restart=true` and `restart=rolling`, and when to poll a job
 - How to roll back from the CLI or from Studio
 - How to limit a release's first traffic, and decide when to advance, hold, or reverse
 - How to classify a change so you reverse the right thing, and why reversing the wrong thing can cause data loss
@@ -28,25 +28,35 @@ This guide deploys a Harper application to a cluster, waits until every node run
 
 ### Log in
 
-Set the cluster's Operations API URL once per shell, then log in with the cluster's admin username and password:
+Set the cluster's Operations API URL in your project's `.env`:
 
-```bash
-export HARPER_CLI_TARGET=https://my-cluster.example.com:9925
-harper login "$HARPER_CLI_TARGET"
+```dotenv
+HARPER_CLI_TARGET='https://my-cluster.example.com:9925'
 ```
 
-The CLI saves a token for that URL. Later `harper` commands in the shell use `HARPER_CLI_TARGET` as their target.
+`npm create harper@latest` asks for your cluster URL and writes it here, normalized to `https://<host>:9925`. If you skipped the prompt, replace the placeholder. From the project directory, log in:
+
+```bash
+harper login
+```
+
+Press Enter to accept the `.env` value at the **Cluster Target URL** prompt, then enter the cluster's admin username and password. The CLI saves a token in `~/.harperdb/credentials.json`, not in `.env`.
+
+<VersionBadge version="v5.1.0" />
+
+The CLI loads `.env` from the directory you run it in. Commands such as `harper deploy`, `harper list_deployments`, and `harper get_job` then need no `target=`. Pinning the target here keeps this project's commands from falling back to the last cluster you logged in to. An existing environment variable wins over `.env`, so CI can still set `HARPER_CLI_TARGET` from a repository variable. See [authentication](/reference/v5/cli/authentication) for the full precedence rules.
+
+The target URL is not a secret. To share it with your team, remove `.env` from the template's `.gitignore` and commit the file, or force-add it. Templates ignore `.env` and `.env.*`, except `.env.example`. Keep credentials such as `CLI_TARGET_USERNAME` and `CLI_TARGET_PASSWORD` out of it: the deploy upload includes `.env`, so its contents reach every node.
 
 ### A Harper backend
 
 An application that runs from source, such as a `create-harper` project without a frontend build, deploys straight from its directory:
 
 ```bash
-cd my-app
-harper deploy project=my-app restart=rolling json=true > deploy.json
+harper deploy project=my-app restart=true
 ```
 
-`create-harper` projects run the same deploy, without `json=true`, as `npm run deploy`. The CLI packages the directory and uploads it, and Harper installs its dependencies. On Fabric and Harper Pro, a deploy reaches every node unless you pass `replicated=false`.
+The CLI packages the directory and uploads it, and Harper installs its dependencies. On Fabric and Harper Pro, a deploy reaches every node unless you pass `replicated=false`. The `create-harper` templates' `npm run deploy` script uses `restart=rolling` and polls the job; see [Choose a restart mode](#choose-a-restart-mode).
 
 The upload includes everything in the directory except `node_modules`, including `.git` and any `.env` file. Deploy from a clean checkout, or stage only the files you want to ship, as the next section does.
 
@@ -73,20 +83,11 @@ npm run build
 rm -rf deploy && mkdir deploy
 cp -R dist schemas resources deploy/
 cp deploy.config.yaml deploy/config.yaml
-(cd deploy && harper deploy project=my-app restart=rolling json=true) > deploy.json
+cp .env deploy/.env
+(cd deploy && harper deploy project=my-app restart=true)
 ```
 
-The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
-
-### Wait for every node
-
-With `restart=rolling`, the deploy returns once the node you called has the release. The other nodes take it in a job that keeps running afterwards. Poll it until it prints `COMPLETE`:
-
-```bash
-harper get_job id="$(jq -r '.restartJobId' deploy.json)" json=true | jq -r '.[0].status'
-```
-
-`ERROR` means the rollout failed, and `harper get_job` without the `jq` filter shows the job's `message`. `null` means the node that answered does not have the job: Harper does not replicate jobs, so poll the node that received the deploy. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). When the job completes, check the serving version on every node through your readiness route or a journey test.
+Copy only the target-only `.env` described above. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
 
 ### Deploy from GitHub Actions
 
@@ -157,39 +158,55 @@ jobs:
       - run: npm install --global harper@^5.3
       - name: Deploy the release
         working-directory: deploy
-        run: harper deploy project=my-app restart=rolling json=true > "$RUNNER_TEMP/deploy.json"
-      - name: Wait for every node to take the release
-        run: |
-          JOB_ID=$(jq -r '.restartJobId // empty' "$RUNNER_TEMP/deploy.json")
-          [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
-          LAST="could not be read"
-          for attempt in $(seq 60); do
-            sleep 10
-            harper get_job id="$JOB_ID" json=true > "$RUNNER_TEMP/job.json" || continue
-            case $(jq -r '.[0].status // "MISSING"' "$RUNNER_TEMP/job.json") in
-              COMPLETE) exit 0 ;;
-              ERROR) jq -r '.[0].message' "$RUNNER_TEMP/job.json"; exit 1 ;;
-              MISSING) LAST="was not on the node that answered; its outcome is unknown" ;;
-              *) LAST="was still running" ;;
-            esac
-          done
-          echo "After 60 polls, job $JOB_ID $LAST"
-          exit 1
+        run: harper deploy project=my-app restart=true
 ```
 
 The `build` job runs your dependencies' install scripts and build tools, and cannot request an identity token. The `deploy` job can, and it runs none of your repository's code: it installs only the Harper CLI and uploads the built release. [Path B](../developers/deploying-from-ci.mdx#path-b-build-in-ci-publish-to-github-packages-deploy-the-artifact) explains this split, and publishes the build to a registry instead, which gives the release a version you can redeploy from any machine.
 
-## What `restart=rolling` does
+## Choose a restart mode
 
-`restart=rolling` restarts the node you called, then each other node in turn. It waits for one node's restart to finish before it starts the next, and returns a `restartJobId` to poll. It does not:
+Use `restart=true` for the deployments above. The node you called installs the release, then sends it to every other node at the same time. Each node installs it and replaces its HTTP workers a few at a time while the others keep serving. The node you called restarts last. Peer restarts overlap, so several nodes are short some workers at the same time.
 
-- **Take a node out of rotation.** Each node keeps taking traffic while its workers are replaced a few at a time. Harper does not mark the node unavailable or drain its connections. [harper#2975](https://github.com/HarperFast/harper/issues/2975) tracks load-balancer-aware rolling deploys.
-- **Run your checks between nodes.** It moves on when a node's restart finishes, not when your readiness route or journey tests pass. From v5.4.0, [canary certification](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) rejects a release that fails to load, but it does not run your checks.
-- **Prove that every node restarted.** Without canary certification (before v5.4.0, or when the deploy's `certification` is `unavailable`), the job records an error for a node it cannot reach and continues to the next one. A `COMPLETE` job can still leave a node on the old release.
+<VersionBadge type="changed" version="v5.3.0" />
 
-To keep traffic off a node while it changes, drain it first, as in [isolated node validation](#limit-a-releases-first-traffic) or the [drain and return sequence](./health-checks-and-traffic-admission.mdx#drain-a-node-and-bring-it-back).
+From v5.3.0, each node waits for its restart before answering, and the command returns once every node has answered. There is no job to poll. If a node fails to take the deploy, the command fails with a non-zero exit and names it, unless you set `ignore_replication_errors`. The release stays deployed on the node you called. A failed restart does not fail the deploy, so check the serving version on every node through your readiness route or a journey test. Before v5.3.0, the command returns as soon as the restart is requested.
 
-`restart=true` restarts each node as it applies the replicated deploy, so restarts can overlap and reduce serving capacity. Use it for one drained node, a single-node instance, or development. On v5.2, it returns as soon as the restart is requested. <VersionBadge type="changed" version="v5.3.0" /> From v5.3.0, it waits for the restart on the node you called, up to ten minutes. A caller timeout does not stop the restart, and the response does not report restart success, so check the serving version. For later versions, see [restart and certification behavior](/reference/v5/operations-api/operations#restarting-restart).
+Use `restart=rolling` when you would rather change one node at a time. A `restart_service` job changes the node you called, then each other node in turn.
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+From v5.4.0, unless the result's `certification` is `unavailable`, the other nodes only stage the release and the job activates it on each in turn. The CLI waits until every node has taken it, exiting non-zero and naming any node that did not. `wait=false` exits early; `wait_timeout=<ms>` bounds the wait, which defaults to ten minutes per node. See [waiting for a rolling deploy](/reference/v5/cli/commands#waiting-for-a-rolling-deploy).
+
+<VersionBadge version="v5.4.0" />
+
+For both modes, the node you called [certifies the release in a canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) before any other node receives it. A release that fails to load is rejected and replicated nowhere.
+
+Neither mode takes a node out of rotation, drains its connections, or runs your checks between nodes. [harper#2975](https://github.com/HarperFast/harper/issues/2975) tracks load-balancer-aware deployments. To keep traffic off a node while it changes, drain it first, as in [isolated node validation](#limit-a-releases-first-traffic) or the [drain and return sequence](./health-checks-and-traffic-admission.mdx#drain-a-node-and-bring-it-back).
+
+### Wait for every node
+
+Before v5.4.0, or when `certification` is `unavailable`, a rolling deploy returns once the node you called has the release. Poll its `restartJobId` until `COMPLETE` or `ERROR`:
+
+```bash
+harper deploy project=my-app restart=rolling json=true > deploy.json
+(
+  JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
+  [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
+  for attempt in $(seq 60); do
+    sleep 10
+    harper get_job id="$JOB_ID" json=true > job.json || continue
+    case $(jq -r '.[0].status // "MISSING"' job.json) in
+      COMPLETE) echo COMPLETE; exit 0 ;;
+      ERROR) jq -r '.[0].message' job.json; exit 1 ;;
+      MISSING) echo "Job is not on the node that answered" ;;
+    esac
+  done
+  echo "Job $JOB_ID did not complete within 60 polls"
+  exit 1
+)
+```
+
+Jobs are not replicated, so deploy to and poll the same node's direct URL. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). Without certification, including before v5.4.0, a `COMPLETE` job can still leave a node it could not reach on the old release. Check the serving version on every node afterwards.
 
 Two deploy parameters control replication failures:
 
@@ -212,10 +229,12 @@ harper list_deployments project=my-app status=success limit=5 json=true \
 Activate the release you want back:
 
 ```bash
-harper deploy project=my-app deployment_id=<deployment_id> restart=rolling json=true > deploy.json
+printf 'Deployment ID to restore: '
+read -r DEPLOYMENT_ID
+harper deploy project=my-app deployment_id="$DEPLOYMENT_ID" restart=true
 ```
 
-Nothing is rebuilt or reinstalled. Wait for the job and check every node, as for any rolling deploy. A node that no longer keeps the release refuses it: [`deployment.stagingRetention.maxCount`](/reference/v5/configuration/options#deployment) sets how many replaced releases each node keeps, defaulting to `5`. See [going back to a previous release](/reference/v5/operations-api/operations#going-back-to-a-previous-release) for which releases are kept.
+Nothing is rebuilt or reinstalled. The command waits for every node to answer; check the serving version on every node afterwards. A node that no longer keeps the release refuses it: [`deployment.stagingRetention.maxCount`](/reference/v5/configuration/options#deployment) sets how many replaced releases each node keeps, defaulting to `5`. See [going back to a previous release](/reference/v5/operations-api/operations#going-back-to-a-previous-release) for which releases are kept.
 
 Before v5.3.0, or when no node keeps the release, deploy the previous release again: check out its commit and repeat the deploy, or pass the previous version as `package`.
 
@@ -227,7 +246,7 @@ In [Harper Studio](/reference/v5/studio/overview), open the cluster and go to **
 
 ## Limit a release's first traffic
 
-A rolling deploy changes every node. To test a release on part of your traffic first, separate installing it from exposing it, and decide at each step whether to expand.
+A replicated deploy changes every node. To test a release on part of your traffic first, separate installing it from exposing it, and decide at each step whether to expand.
 
 ```mermaid
 flowchart TD
@@ -251,13 +270,13 @@ flowchart TD
 5. **Expand.** Increase exposure only after minimum sample and hold conditions pass, and keep enough healthy capacity on the old version to reverse.
 6. **Close.** Verify the same release and configuration on every node, restore intended traffic, and record the outcome with the measurements that supported each decision.
 
-| Pattern                       | How Harper is used                                                         | Fits when, and watch out for                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Isolated node validation      | Drain one node, deploy with `replicated=false`, validate, re-admit a group | Strongest validation before any user sees the release. Needs spare capacity and a direct URL for each node |
-| Replicated rolling deployment | `harper deploy` with `restart=rolling`                                     | Simple once you trust the release. Each node stays in rotation while it restarts                           |
-| Feature-targeted release      | Deploy compatible code broadly, enable it by flag, header, or tenant       | Best when behavior can be separated from deployment. Assign an owner and a removal date to each flag       |
-| Parallel environment          | Deploy to a separate node pool, shift traffic after validation             | Strong isolation and fast reversal. Write ownership and replication between pools need real design         |
-| Regional progression          | Deploy the same release region by region, exposing each after its checks   | Limits the blast radius. One region does not predict every traffic shape                                   |
+| Pattern                  | How Harper is used                                                         | Fits when, and watch out for                                                                                     |
+| ------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Isolated node validation | Drain one node, deploy with `replicated=false`, validate, re-admit a group | Strongest validation before any user sees the release. Needs spare capacity and a direct URL for each node       |
+| Replicated deployment    | `harper deploy` with `restart=true` or `restart=rolling`                   | Use `true` for overlapping peer restarts, or `rolling` to change one node at a time. Both keep nodes in rotation |
+| Feature-targeted release | Deploy compatible code broadly, enable it by flag, header, or tenant       | Best when behavior can be separated from deployment. Assign an owner and a removal date to each flag             |
+| Parallel environment     | Deploy to a separate node pool, shift traffic after validation             | Strong isolation and fast reversal. Write ownership and replication between pools need real design               |
+| Regional progression     | Deploy the same release region by region, exposing each after its checks   | Limits the blast radius. One region does not predict every traffic shape                                         |
 
 Isolated node validation needs at least three nodes, so the others can carry the traffic of the node you hold out. Take one node out of rotation with the [drain sequence](./health-checks-and-traffic-admission.mdx#drain-a-node-and-bring-it-back), log in to its own URL, and deploy to it alone:
 
@@ -277,10 +296,10 @@ Run your readiness route and journey tests against that node directly, then admi
 
 ```bash
 harper deploy project=orders-api package=@my-org/orders-api@2.4.1 \
-  restart=rolling json=true > deploy.json
+  restart=true
 ```
 
-[Wait for the job](#wait-for-every-node), then check every node. On Harper Pro 5.2, also read `harper get_deployment deployment_id="$(jq -r .deployment_id deploy.json)"` and check its `status` and `peer_results` for install and replication failures.
+On v5.3.0 and later, the command waits for every node to answer. Check the serving version on every node afterwards. To change one node at a time, use [the rolling mode](#choose-a-restart-mode).
 
   </TabItem>
 </Tabs>
@@ -357,10 +376,10 @@ Rehearse a stopped rollout end to end on a non-production cluster:
 - [ ] Cohort ladder defined, from smallest useful sample to full exposure
 - [ ] Stop thresholds and hold times declared before the rollout starts
 - [ ] A named decision owner for advance, hold, and roll back
-- [ ] Pipeline waits for the rolling job, then checks the serving version on every node
-- [ ] Nodes that must not serve while they change are drained first, since `restart=rolling` keeps each node in rotation
+- [ ] Pipeline waits for the chosen restart mode to finish, polling the job when required, then checks the serving version on every node
+- [ ] Nodes that must not serve while they change are drained first, since neither restart mode takes nodes out of rotation
 - [ ] `replicated=false` used deliberately wherever a change is meant to reach one node only, since replication is the default
-- [ ] Cluster deploys use `restart=rolling`, not `restart=true`
+- [ ] Restart mode chosen deliberately: overlapping peer restarts with `restart=true`, or one node at a time with `restart=rolling`
 - [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
 - [ ] Configuration changes go through the same change record as code, and `get_configuration` is read back after each one
 - [ ] Schema changes follow expand-then-contract, with destructive operations documented per node

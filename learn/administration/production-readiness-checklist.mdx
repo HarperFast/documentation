@@ -87,8 +87,8 @@ From [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx).
 - [ ] Cohort ladder defined, from smallest useful sample to full exposure
 - [ ] Stop thresholds and hold times declared before a rollout begins
 - [ ] Named decision owner for advance, hold, stop, and roll back
-- [ ] Pipeline checks deployment details and waits for the restart job, then verifies the serving version on every node
-- [ ] Nodes that must not serve while they change are drained first, since `restart=rolling` keeps each node in rotation
+- [ ] Pipeline checks deployment details and waits for the chosen restart mode to finish, polling the job when required, then verifies the serving version on every node
+- [ ] Nodes that must not serve while they change are drained first, since neither restart mode takes nodes out of rotation
 - [ ] `deployment_timeout` and `ignore_replication_errors` set deliberately
 - [ ] Configuration changes go through the same change record as code
 - [ ] `get_configuration` read back after every configuration change
@@ -133,6 +133,7 @@ From [Backup and Recovery](./backup-and-recovery.mdx).
 - [ ] `verify_backup` runs on a schedule
 - [ ] Blob integrity understood to be unverified by `verify_backup`
 - [ ] Restore constraints documented for user databases, component-held databases, and `system`
+- [ ] Off-host `get_backup` file restore procedure written down and rehearsed with Harper stopped, including manual extraction and blob-root recovery; `restore_backup` cannot read the file
 - [ ] Restore authority named, and restore execution logged
 - [ ] Restore procedure isolates the node from replication, not just from user traffic
 - [ ] Restore tested in a disposable, isolated environment using a compatible Harper version
@@ -151,6 +152,7 @@ From [Engineering RPO, RTO, and Uptime](./engineering-rpo-rto-and-uptime.mdx).
 - [ ] Availability target converted to minutes per month
 - [ ] Error budget policy states what changes when the budget runs low
 - [ ] Backup cadence reconciled against recovery point
+- [ ] `storage.writeAsync` confirmed off, or the databases it is on recorded beside their recovery point
 - [ ] Restore time plus detection time reconciled against recovery time
 - [ ] Convergence time reconciled against the admission gate
 - [ ] Every unreconciled gap has an owner and a date

@@ -124,7 +124,9 @@ Or specify a remote target and write the snapshot to a local file:
 harper get_backup database=data target=https://operations.node-2.example.com out=./data.tar.gz
 ```
 
-`target=` only changes which node the snapshot is read from. It writes a file and nothing else: it does not restore, import, or clone that node's database onto the local one. Turning the file into a live database is a separate, deliberate restore step, performed with Harper stopped.
+`target=` only changes which node the snapshot is read from. It writes a file and nothing else: it does not restore, import, or clone that node's database onto the local one.
+
+`restore_backup` accepts only a managed `backup_id` from the node's own repository; it cannot read a `get_backup` file. Follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped. For RocksDB, extract the engine files excluding `blobs/` into the database directory, then extract each `blobs/<rootIndex>/` tree into its configured blob root. Extracting the whole archive into the database directory loses blob data; `exclude_blobs=true` archives contain none. For LMDB, replace `<storage.path>/<database>.mdb`; recover external blobs from a coordinated filesystem or volume backup.
 
 Note also that `get_backup` always streams the current state. It cannot download a historical managed backup, so it is a way to take a fresh off-host copy, not a way to export your retention history.
 
@@ -149,7 +151,7 @@ Verification checks the backup's structure. A restore test checks whether it can
 
 ## Know your restore constraints before the incident
 
-An in-place RocksDB restore requires the database to be closed:
+An in-place RocksDB restore with `restore_backup` requires the database to be closed:
 
 | Database                                       | Online restore, server running       | Offline restore, server stopped |
 | ---------------------------------------------- | ------------------------------------ | ------------------------------- |
@@ -197,7 +199,7 @@ For an in-place recovery:
 1. Take the node out of rotation with the availability flag, per [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx). Never restore a node that is serving traffic.
 2. **Isolate replication separately.** For example, use a network policy that blocks peer replication in both directions and closes existing peer connections. Keep it effective across restarts, and verify that transactions cannot cross the boundary. Removing a node from the load balancer or setting `"replicated": false` on one operation does not isolate replication.
 3. Confirm the data authority and replay policy: which writes to preserve, repair, or reapply, and how peers will converge.
-4. Perform the restore, online or offline according to the table above.
+4. For a managed backup, use `restore_backup` with its `backup_id`, online or offline according to the table above. For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped, including the blob roots.
 5. Verify data expectations locally before any peer sees the node.
 6. Reconnect replication under the policy you proved in an isolated multi-node drill. If that policy would reintroduce corruption from a peer, keep the affected peers isolated and reconcile their data first. Verify convergence, then complete the traffic-admission checks before restoring traffic.
 
@@ -252,6 +254,7 @@ For records requiring long-term preservation, keep a separate export in a docume
 - [ ] `verify_backup` runs on a schedule, with `verify_checksum` at least periodically
 - [ ] Blob contents understood to be unchecked by `verify_backup`, which confirms only that the blob snapshot is present
 - [ ] Restore constraints documented for user databases, component-held databases, and `system`
+- [ ] Off-host `get_backup` file restore procedure written down and rehearsed with Harper stopped, including manual extraction and blob-root recovery; `restore_backup` cannot read the file
 - [ ] Restore authority named, and restore execution logged
 - [ ] Restore procedure isolates the node from replication, not just from user traffic, since the availability flag does not stop peer exchange
 - [ ] Safe mode known as the way to restore a database a component holds open, and to reach a node a broken component stopped
