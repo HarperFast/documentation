@@ -330,7 +330,7 @@ storage:
     writeBufferManagerFlushPolicy: largestAcrossDBs
 ```
 
-Has no effect when `storage.rocks.writeBufferManagerSize` is `0`. Invalid values are ignored and the default is used. A changed value applies when the worker threads restart (`restart_service`). Once set, though, a policy stays in effect until Harper fully restarts (the `restart` operation): removing it from the configuration and restarting only the worker threads does not restore the default.
+Has no effect when `storage.rocks.writeBufferManagerSize` is `0`. A changed value applies when the worker threads restart (`restart_service`). Once set, though, a policy stays in effect until Harper fully restarts (the `restart` operation): removing it from the configuration and restarting only the worker threads does not restore the default. An invalid value is ignored, the same as removing the key: the default applies if no policy was set earlier in the process, otherwise the earlier policy stays.
 
 ### `storage.rocks.arenaBlockSize`
 
