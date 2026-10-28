@@ -50,7 +50,7 @@ Comma-separated values format, suitable for data export and spreadsheet import/e
 
 ## When a Streamed Response Fails
 
-A collection query, or any resource that returns an iterable, is streamed: Harper sends the `200` status and headers, then writes records as it reads them. If reading fails after that, the status can no longer change, so the failure shows up in the body.
+A collection query, or any resource that returns an iterable, is streamed: Harper sends the `200` status and headers, then writes records as it reads them. If reading fails after that, the status can no longer change, so JSON, NDJSON and Server-Sent Events report the failure in the body.
 
 ### JSON
 

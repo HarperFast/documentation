@@ -2295,7 +2295,7 @@ Detailed documentation: [Database Jobs](../database/jobs.md)
 
 ### `get_job`
 
-Returns job status (`COMPLETE`, `IN_PROGRESS`, `ERROR`), timing, and result message for the specified job ID. Bulk import/export operations return a job ID on initiation, as does a `deploy_component` with `"restart": "rolling"`, as `restartJobId`. [`restart_service`](#restart_service) also returns one; with `"replicated": true`, its job's `status` and `result.replicated` report whether each node restarted, as [`replicated`](#restart_service-replicated) describes.
+Returns job status (`CREATED`, `IN_PROGRESS`, `COMPLETE`, `ERROR`), timing, and result message for the specified job ID. Bulk import/export operations return a job ID on initiation, as does a `deploy_component` with `"restart": "rolling"`, as `restartJobId`. [`restart_service`](#restart_service) also returns one; with `"replicated": true`, its job's `status` and `result.replicated` report whether each node restarted, as [`replicated`](#restart_service-replicated) describes.
 
 ```json
 { "operation": "get_job", "id": "4a982782-929a-4507-8794-26dae1132def" }
