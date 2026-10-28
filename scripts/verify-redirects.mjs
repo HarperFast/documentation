@@ -117,7 +117,7 @@ async function checkPath(path) {
 
 /** Worker-pool concurrency. */
 async function runWithConcurrency(items, worker, limit) {
-	const results = new Array(items.length);
+	const results = Array.from({ length: items.length });
 	let i = 0;
 	let done = 0;
 	const total = items.length;
