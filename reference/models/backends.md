@@ -160,7 +160,7 @@ The model identifier's vendor prefix (`anthropic.`, `meta.`, `amazon.titan-`, `c
 From v5.4.0, an embedding entry whose `model` is Cohere embed v3 (`cohere.embed-english-v3`, `cohere.embed-multilingual-v3`, and their `-light` variants) or Cohere embed v4 (`cohere.embed-v4`) has the `truncate` capability, for [`embed()` calls with `truncate: true`](./api#truncating-long-inputs):
 
 - Cohere embed v4: Harper sends `truncate: 'RIGHT'`.
-- Cohere embed v3: Bedrock rejects a text over 2,048 characters before any token truncation, so Harper first cuts each text to 2,048 characters (never splitting a surrogate pair), then sends `truncate: 'END'`. Short prose then uses less than the model's 512-token window. Without `truncate: true`, Cohere v3 still cuts tokens by default, but a text over 2,048 characters is rejected.
+- Cohere embed v3: Harper first cuts each text to 2,048 characters (never splitting a surrogate pair), then sends `truncate: 'END'`. The character cut is needed because Bedrock rejects a text over 2,048 characters before any token truncation. Short prose then uses less than the model's 512-token window. Without `truncate: true`, Cohere v3 still cuts tokens by default. A text over 2,048 characters is still rejected.
 
 Titan embedding models have no truncation setting and do not advertise the capability.
 
