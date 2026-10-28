@@ -56,9 +56,19 @@ Use production-like conditions when measuring throughput:
 - **Replication catch-up load.** A node that is feeding a recovering peer is doing work that does not appear in its own request metrics. Measure with a peer synchronizing, because that is precisely the state you will be in when you are already down a node.
 - **Traffic imbalance.** Configured weights express intent. Actual request distribution is what consumes capacity, and it is rarely even.
 
-Measure each node separately rather than dividing a cluster total by node count. An average conceals the one node that is about to tip.
+Measure each node separately rather than dividing a cluster total by node count. The CLI saves a login per URL. Log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
 
 <Tabs>
+  <TabItem value="cli" label="CLI">
+
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper system_information attributes='["cpu","memory","disk","network","threads","harperdb_processes"]' target="$node" json=true
+done
+```
+
+  </TabItem>
   <TabItem value="curl" label="curl">
 
 ```bash
@@ -135,7 +145,7 @@ Compare your measured detection and recovery times with the budget. A manual res
 
 Run the failure state rather than calculating it. On a cluster carrying representative load at your expected peak:
 
-1. Record per-node request rate, latency, and saturation as a baseline.
+1. Record per-node request rate and latency from analytics, and saturation with the `system_information` loop above. Repeat those measurements during the drain and rejoin.
 2. Drain one node using the sequence from [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx).
 3. Measure what the survivors do: request rate, latency at your SLO percentile, CPU and worker pressure, and whether any user-visible errors appeared during the transition.
 4. Keep the drained node out of user traffic while it rejoins replication. Measure the survivors while they carry peak traffic and feed the recovering peer.

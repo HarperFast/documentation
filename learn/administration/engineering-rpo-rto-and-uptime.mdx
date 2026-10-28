@@ -45,6 +45,15 @@ Your recovery point objective is a statement about how much acknowledged data yo
 
 [`storage.writeAsync`](/reference/v5/database/storage-tuning#storagewriteasync) defaults to `false`. Set it to `true` and Harper stops calling `fsync` on commit, so a write returns as soon as it is queued to the operating system's page cache. Throughput on write-heavy workloads improves substantially. The cost is that a power loss or OS crash between the commit and the flush to disk loses the most recent transactions, even though your application was told they succeeded. The database stays structurally consistent; only the newest writes are gone.
 
+Read each node's configuration and inspect `storage.writeAsync`. The CLI saves a login per URL. Log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
+
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper get_configuration target="$node" json=true
+done
+```
+
 Healthy replication and recent backups do not prove that every acknowledged write has reached durable storage. Include the possible loss of unflushed writes in your RPO.
 
 Leave `writeAsync` off unless you can accept the loss of unflushed writes, for example because the data can be reproduced from an upstream source or a bulk ingest can be rerun. Asynchronous replication does not guarantee a durable peer copy before the client receives success. If you enable it, record the affected databases and the accepted loss window beside their recovery objectives.

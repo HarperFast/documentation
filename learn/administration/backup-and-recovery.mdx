@@ -3,9 +3,6 @@ title: Backup and Recovery
 sidebar_position: 7
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Replication supports availability, but also propagates destructive writes, schema errors, and application corruption to peers. You need backups to recover an earlier state.
 
 This guide covers choosing a backup mechanism, keeping an independent copy, and testing that you can restore service within your recovery targets.
@@ -56,33 +53,26 @@ Two limitations to check against your own deployment now rather than later:
 
 ## Create and retain managed backups
 
-<Tabs>
-  <TabItem value="api" label="Operations API">
-
-```json
-{
-	"operation": "create_backup",
-	"database": "data"
-}
-```
-
-Through a running server this returns a `job_id` immediately. Poll [`get_job`](/reference/v5/operations-api/operations#get_job) for the outcome, which includes the new `backup_id`, `size`, and `timestamp`. Treat the job result as the completion signal, not the original response.
-
-  </TabItem>
-  <TabItem value="cli" label="CLI">
+Use the backup node's direct Operations API URL for every command and job poll. A load-balanced URL can send the poll to another node. Log in once to that URL, for example `harper login https://node-1.example.com:9925`.
 
 ```bash
-harper create_backup database=data
-harper list_backups database=data
-harper purge_backups database=data keep_count=7
+harper create_backup database=data target=https://node-1.example.com:9925 json=true
 ```
 
-Every backup operation runs from the CLI under the same name. With the server running the CLI forwards to the server; with it stopped the command operates directly on the files.
+Through a running server this returns a `job_id` immediately. Substitute it below and repeat until [`get_job`](/reference/v5/operations-api/operations#get_job) reports `COMPLETE` or `ERROR`. A successful result includes the new `backup_id`, `size`, and `timestamp`.
 
-`get_backup` requires a running server. Document how to copy the managed backup repository or take a volume snapshot if the server cannot start.
+```bash
+harper get_job id='<job_id>' target=https://node-1.example.com:9925 json=true
+```
 
-  </TabItem>
-</Tabs>
+After completion, list the backups and apply your retention policy:
+
+```bash
+harper list_backups database=data target=https://node-1.example.com:9925 json=true
+harper purge_backups database=data keep_count=7 target=https://node-1.example.com:9925
+```
+
+With a remote target, every command runs on that server. With no remote target configured and the local server stopped, backup commands operate directly on local files. `get_backup` requires a running server; document how to copy the managed repository or take a volume snapshot if it cannot start.
 
 Backups of the same database share unchanged RocksDB data files, so the first one copies everything and later ones copy only what changed. Shared files are reference-counted, so deleting a backup removes only files no remaining backup references.
 
@@ -134,14 +124,14 @@ Give each exported recovery artifact a unique, immutable identity. Include a man
 
 ## Verification is not optional
 
-```json
-{
-	"operation": "verify_backup",
-	"database": "data",
-	"backup_id": 1,
-	"verify_checksum": true
-}
+Use the `backup_id` returned by the completed creation job (`1` here):
+
+```bash
+harper verify_backup database=data backup_id=1 verify_checksum=true \
+  target=https://node-1.example.com:9925 json=true
 ```
+
+Poll the returned `job_id` on the same node with `get_job`, as above, until it reports `COMPLETE` or `ERROR`.
 
 `verify_backup` checks the RocksDB file sizes, their checksums when `verify_checksum` is `true`, which is slower, and the framing of the transaction-log snapshot, which is always checked.
 
@@ -178,7 +168,7 @@ Also include these constraints in the restore procedure:
 
 ## Restoring in a replicated cluster
 
-A restored node may be behind peers that have continued accepting writes. Peers can replay newer writes, including the destructive mutations you intended to undo. Restoring one node does not make its backup authoritative; choose which data to preserve or repair and rehearse the re-entry policy before reconnecting it.
+A restored node may be behind peers that have continued accepting writes. Peers can replay newer writes, including the destructive mutations you intended to undo. If its restored data and saved replication position predate the peers' retained history, copies run in both directions and can bring deleted rows back onto peers. Follow the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) before reconnecting. Restoring one node does not make its backup authoritative; choose which data to preserve or repair and rehearse the re-entry policy before reconnecting it.
 
 ```mermaid
 flowchart TD
@@ -199,7 +189,14 @@ For an in-place recovery:
 1. Take the node out of rotation with the availability flag, per [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx). Never restore a node that is serving traffic.
 2. **Isolate replication separately.** For example, use a network policy that blocks peer replication in both directions and closes existing peer connections. Keep it effective across restarts, and verify that transactions cannot cross the boundary. Removing a node from the load balancer or setting `"replicated": false` on one operation does not isolate replication.
 3. Confirm the data authority and replay policy: which writes to preserve, repair, or reapply, and how peers will converge.
-4. For a managed backup, use `restore_backup` with its `backup_id`, online or offline according to the table above. For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped, including the blob roots.
+4. For an online managed restore allowed by the table above, use its `backup_id` (`1` here) and poll the returned job on the same node:
+
+   ```bash
+   harper restore_backup database=data backup_id=1 target=https://node-1.example.com:9925 json=true
+   ```
+
+   For an offline restore, use the [local CLI procedure](/reference/v5/backups/operations#running-backup-operations-from-the-cli). For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped, including the blob roots.
+
 5. Verify data expectations locally before any peer sees the node.
 6. Reconnect replication under the policy you proved in an isolated multi-node drill. If that policy would reintroduce corruption from a peer, keep the affected peers isolated and reconcile their data first. Verify convergence, then complete the traffic-admission checks before restoring traffic.
 
@@ -217,7 +214,7 @@ For that failure class, define forward repair instead: a targeted correction, or
 
 Test the copy you would actually use after losing a node, including its destination controls:
 
-1. Create a backup and verify it with `verify_checksum: true`. For other mechanisms, use the corresponding integrity checks.
+1. Run the creation and polling commands above, then `verify_backup` with `verify_checksum=true` and check its job outcome. For other mechanisms, use the corresponding integrity checks.
 2. Export it using the procedure above. Record the immutable artifact ID, backup timestamp, manifest, and checksums. Read back destination metadata and check that the backup writer cannot weaken retention.
 3. Restore the destination copy into a disposable environment with a compatible Harper version. Isolate it from production traffic, replication, and application side effects.
 4. Validate the expected databases, tables, record counts, blob contents, and business invariants. Run the critical user journeys against the restored application.

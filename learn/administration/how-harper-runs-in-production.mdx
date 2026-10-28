@@ -39,10 +39,13 @@ Record the ports used by your deployment:
 
 Resolve the effective replication port from `replication.securePort`, falling back to `operationsApi.network.securePort` when it is unset. An upgrade retains the existing configuration, so do not assume that a newly installed node and an upgraded one use the same port.
 
-Read the configuration from each node and record its HTTP, HTTPS, and replication ports:
+Read the configuration from each node and record its HTTP, HTTPS, and replication ports. The CLI saves a login per URL. Log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
 
-```json
-{ "operation": "get_configuration" }
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper get_configuration target="$node" json=true
+done
 ```
 
 :::tip
@@ -78,10 +81,11 @@ Harper peers exchange data over WebSockets with mTLS on the secure replication p
 
 Read the live replication state on each node:
 
-```json
-{
-	"operation": "cluster_status"
-}
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper cluster_status target="$node" json=true
+done
 ```
 
 The response lists each peer connection and, within it, one socket per database per peer. That tells you which databases are actually flowing, which is the question that matters during an incident. What is in scope, what is deliberately out of it, and how to prove convergence rather than just connection are covered in [Operating Replication](./operating-replication.mdx).
@@ -99,6 +103,14 @@ Collect the following information from each node and keep it with your runbooks.
 The examples use `https://operations.my-node.example.com/` for a configured Operations API endpoint. Replace it with the node's own Operations API URL; a default local installation uses `http://localhost:9925/`.
 
 <Tabs>
+  <TabItem value="cli" label="CLI">
+
+```bash
+harper system_information target=https://operations.my-node.example.com/ \
+  attributes='["system","cpu","memory","disk","threads"]' json=true
+```
+
+  </TabItem>
   <TabItem value="curl" label="curl">
 
 ```bash
@@ -132,12 +144,16 @@ await fetch('https://operations.my-node.example.com/', {
 The `attributes` array silently drops names it does not recognize, so a typo returns a smaller response rather than an error. The valid values are `system`, `time`, `cpu`, `memory`, `disk`, `network`, `harperdb_processes`, `table_size`, `metrics`, and `threads`. If a response is missing a section you asked for, check the spelling before you check the node.
 :::
 
-Then:
+Collect [components](/reference/v5/components/applications#get_components), [deployment history](/reference/v5/operations-api/operations#list_deployments), and the [Harper version](/reference/v5/operations-api/operations#registration_info) from each node. `system_information` reports Node.js and npm versions, not Harper's. Use the `cluster_status` loop above for connected peers and databases.
 
-- [`get_components`](/reference/v5/components/applications#get_components) for what is deployed, including which extensions are present
-- [`list_deployments`](/reference/v5/operations-api/operations#list_deployments) for what changed and when
-- [`registration_info`](/reference/v5/operations-api/operations#registration_info) for the Harper version, which `system_information` does not report (it returns the node and npm versions, not Harper's)
-- `cluster_status` for the peers and databases actually connected
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper get_components target="$node" json=true
+  harper list_deployments target="$node" json=true
+  harper registration_info target="$node" json=true
+done
+```
 
 Fill in a boundary record you can keep:
 
@@ -156,7 +172,7 @@ Include application journeys and downstream dependencies in your monitoring. Nod
 
 ### Prove it
 
-On a non-production cluster, stop one node. Confirm that peers keep serving, note when `cluster_status` shows the change, and check whether the traffic layer stops routing to the node. Compare the result with your inventory and topology plan.
+On a non-production cluster, stop one node. Confirm that peers keep serving, repeat the `cluster_status` loop above to note when it shows the change, and check whether the traffic layer stops routing to the node. Compare the result with your inventory and topology plan.
 
 ## Operational notes
 

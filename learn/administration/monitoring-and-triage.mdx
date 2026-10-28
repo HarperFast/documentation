@@ -62,6 +62,8 @@ Alert on the latency percentile in your SLO. Set saturation thresholds from your
 
 ## Get the metrics out
 
+The CLI examples use direct Operations API URLs. Log in once to each URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
+
 Harper stores raw analytics in `hdb_raw_analytics` and aggregates them into `hdb_analytics`. Query these tables or export metrics to your monitoring system.
 
 <Tabs>
@@ -74,13 +76,9 @@ Use the [Grafana integration](/fabric/grafana-integration). It ships dashboards 
 
 Deploy [`@harperdb/prometheus-exporter`](https://github.com/HarperFast/prometheus-exporter) and scrape it into whatever you already run:
 
-```json
-{
-	"operation": "deploy_component",
-	"project": "prometheus-exporter",
-	"package": "@harperdb/prometheus-exporter",
-	"restart": "rolling"
-}
+```bash
+harper deploy project=prometheus-exporter package=@harperdb/prometheus-exporter \
+  restart=rolling target=https://node-1.example.com:9925
 ```
 
 Once deployed, the scrape endpoint is `/<project>/metrics` on the application port, so the call above exposes it at `/prometheus-exporter/metrics`. The route is authorized, so give your scraper a credential rather than expecting it to be open.
@@ -96,14 +94,15 @@ For the saturation, commit-time, and storage rows you will need to query `hdb_an
 
 To find out what is actually available on your version rather than guessing from documentation:
 
-```json
-{
-	"operation": "list_metrics",
-	"metric_types": ["builtin", "custom"]
-}
+```bash
+harper list_metrics metric_types='["builtin","custom"]' target=https://node-1.example.com:9925 json=true
 ```
 
-Then [`describe_metric`](/reference/v5/analytics/operations#describe_metric) for the shape of any one of them.
+Use [`describe_metric`](/reference/v5/analytics/operations#describe_metric) for one metric's shape:
+
+```bash
+harper describe_metric metric=resource-usage target=https://node-1.example.com:9925 json=true
+```
 
 Your application can add its own metrics with [`server.recordAnalytics()`](/reference/v5/http/api#serverrecordanalyticsvalue-metric-path-method-type), which is how you get business-level signals such as checkout completion onto the same dashboard as node saturation. That correlation is usually what tells you whether a technical symptom matters.
 
@@ -175,12 +174,8 @@ Levels run `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `notify`. The
 
 Read logs through the API when you need them from a specific node:
 
-```json
-{
-	"operation": "read_log",
-	"limit": 200,
-	"level": "error"
-}
+```bash
+harper read_log limit=200 level=error target=https://node-1.example.com:9925 json=true
 ```
 
 ## The five-minute triage sequence
@@ -191,22 +186,46 @@ Use these checks to locate the affected layer, then contain the failure before i
 
 2. **Compare the public route against a direct node call.** Request the same journey through your traffic layer, then directly against each node on `9926`. If direct calls succeed and the public route fails, you are looking at the traffic layer or the availability flag, not at Harper.
 
-3. **Check admission state on every node.** `GET /status` on `9926` and your readiness route. A node advertising unavailable is a node deliberately or accidentally out of rotation, and finding that here saves a lot of time.
+3. **Check admission state on every node.** Use each node's configured application URL for `/status` and your readiness route. An unavailable node is out of rotation.
+
+   ```bash
+   for node in https://node-1.example.com https://node-2.example.com https://node-3.example.com; do
+     echo "== $node"
+     curl -s -o /dev/null -w '%{http_code}\n' "$node/status"
+     curl -s -w '\n%{http_code}\n' "$node/Readiness"
+   done
+   ```
 
 4. **Compare a suspect node against a healthy peer.** Same call, both nodes, then diff:
 
-   ```json
-   {
-   	"operation": "system_information",
-   	"attributes": ["cpu", "memory", "threads", "harperdb_processes"]
-   }
+   ```bash
+   for node in node-1 node-2; do
+     harper system_information target="https://$node.example.com:9925" \
+       attributes='["cpu","memory","threads","harperdb_processes"]' json=true > "$node.json"
+   done
+   diff -u node-1.json node-2.json
    ```
 
    Differences between peers are more informative than absolute values, because they tell you whether this is one node or the whole cluster.
 
 5. **Check replication.** Inspect the expected peer/database sockets in `cluster_status`, sustained latency, and `lastCommitConfirmed` progress while writes continue. Compare `lastReceivedRemoteTime` with the expected source timeline and verify freshness with a sentinel or journey test. Timestamp differences alone do not prove convergence.
 
+   ```bash
+   for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+     echo "== $node"
+     harper cluster_status target="$node" json=true
+   done
+   ```
+
 6. **Correlate with the last change.** `list_deployments` for what shipped and when, and `get_configuration` read back against what you believe is configured. Remember that a configuration change applied without a restart leaves a node running something other than its stated configuration.
+
+   ```bash
+   for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+     echo "== $node"
+     harper list_deployments limit=5 target="$node" json=true
+     harper get_configuration target="$node" json=true
+   done
+   ```
 
 7. **Contain with the smallest reversible action.** Stop a ramp, drain one node, deactivate a feature, restore prior traffic weights, or isolate suspected data. Record the decision, who made it, and the next decision deadline.
 

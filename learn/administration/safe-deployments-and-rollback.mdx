@@ -30,7 +30,8 @@ This guide deploys a Harper application to a cluster, waits until every node run
 
 Set the cluster's Operations API URL in your project's `.env`:
 
-```dotenv
+```bash
+# .env
 HARPER_CLI_TARGET='https://my-cluster.example.com:9925'
 ```
 
@@ -87,7 +88,7 @@ cp .env deploy/.env
 (cd deploy && harper deploy project=my-app restart=true)
 ```
 
-Copy only the target-only `.env` described above. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
+The CLI reads `.env` from the directory it runs in, so the staged directory needs this copy to find the target. It holds only the target URL, so shipping it is harmless. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
 
 ### Deploy from GitHub Actions
 
@@ -229,9 +230,7 @@ harper list_deployments project=my-app status=success limit=5 json=true \
 Activate the release you want back:
 
 ```bash
-printf 'Deployment ID to restore: '
-read -r DEPLOYMENT_ID
-harper deploy project=my-app deployment_id="$DEPLOYMENT_ID" restart=true
+harper deploy project=my-app deployment_id=<deployment_id> restart=true
 ```
 
 Nothing is rebuilt or reinstalled. The command waits for every node to answer; check the serving version on every node afterwards. A node that no longer keeps the release refuses it: [`deployment.stagingRetention.maxCount`](/reference/v5/configuration/options#deployment) sets how many replaced releases each node keeps, defaulting to `5`. See [going back to a previous release](/reference/v5/operations-api/operations#going-back-to-a-previous-release) for which releases are kept.

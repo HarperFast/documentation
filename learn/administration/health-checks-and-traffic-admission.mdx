@@ -40,16 +40,13 @@ The availability flag lets an operator or automation control whether a node rece
 
 On **Fabric**, the status component is already installed. It reads the node's `availability` record in `system.hdb_status`. Use the CLI to change that record, as described in [Load Balancing and Node Availability](/fabric/load-balancing#taking-a-node-out-of-rotation). Fabric also writes it during maintenance. Do not install the npm package below on Fabric: it serves the same `/status` path but uses a different table.
 
+For CLI commands, log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
+
 On a **self-managed cluster**, [`@harperdb/status-check`](https://github.com/HarperFast/status-check) adds a `/status` route on the application port. Deploy it with:
 
-```json
-{
-	"operation": "deploy_component",
-	"project": "status-check",
-	"package": "@harperdb/status-check",
-	"replicated": false,
-	"restart": true
-}
+```bash
+harper deploy project=status-check package=@harperdb/status-check \
+  replicated=false restart=true target=https://node-1.example.com:9925
 ```
 
 Repeat on each node, or declare it in each node's root `harper-config.yaml`:
@@ -227,19 +224,52 @@ flowchart TD
 <Tabs>
   <TabItem value="drain" label="Draining">
 
-1. **Check peer capacity.** Confirm that the remaining nodes can carry the expected traffic within their capacity budget. If they cannot, postpone the change or add capacity. See [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx).
-2. **Declare it unavailable.** `DELETE /status` on the target node.
+1. **Check peer capacity.** Confirm that the remaining nodes can carry the expected traffic within their capacity budget. If they cannot, postpone the change or add capacity. See [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx). Check the remaining nodes against that budget:
+
+   ```bash
+   for node in https://node-2.example.com:9925 https://node-3.example.com:9925; do
+     echo "== $node"
+     harper system_information attributes='["cpu","memory","threads"]' target="$node" json=true
+   done
+   ```
+
+2. **Declare it unavailable.** Call the target node's application URL:
+
+   ```bash
+   curl -s -X DELETE https://node-1.example.com/status -u 'admin:password'
+   ```
+
 3. **Verify traffic actually stopped.** Watch request volume on the target fall to zero and rise on its peers. Do not trust the configured weight; check the measured request count from [analytics](/reference/v5/analytics/overview) or your traffic layer's own metrics. Health check intervals, DNS TTLs, and client-side connection reuse all add delay here, and the delay is yours to measure.
-4. **Watch the peers absorb it.** If they are going outside budget despite step 1, abort: `POST /status` to put this node back in rotation, and re-plan the change for a lower-traffic window or with added capacity.
+4. **Watch the peers absorb it.** Repeat step 1's checks. If they go outside budget, put this node back in rotation and re-plan for a lower-traffic window or with added capacity:
+
+   ```bash
+   curl -s -X POST https://node-1.example.com/status -u 'admin:password'
+   ```
+
 5. **Do the work.** Restart, upgrade, reconfigure, or investigate.
 
   </TabItem>
   <TabItem value="return" label="Returning">
 
-1. **Confirm the databases are current.** `cluster_status` should show the expected peer sockets connected for every database this node serves, and convergence should be complete rather than in progress.
-2. **Confirm readiness passes locally.** Call your `/Readiness` route directly against the node, bypassing the traffic layer.
+1. **Confirm the databases are current.** Check the expected peer sockets for every database this node serves and verify convergence. If the node was disconnected longer than its peers retain history, or you cannot show otherwise, `cluster_status` and a sentinel are not enough. Keep replication isolated before startup and do not return it until it has been rebuilt or reconciled under the [replication guide's policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). For a routine return with retained history:
+
+   ```bash
+   harper cluster_status target=https://node-1.example.com:9925 json=true
+   ```
+
+2. **Confirm readiness passes locally.** Call your `/Readiness` route directly against the node, bypassing the traffic layer:
+
+   ```bash
+   curl -s -w '\n%{http_code}\n' https://node-1.example.com/Readiness
+   ```
+
 3. **Run the journey synthetic against the node directly.** A real read, or a safe write, through the same path a user would take.
-4. **Declare it available.** `POST /status`.
+4. **Declare it available.**
+
+   ```bash
+   curl -s -X POST https://node-1.example.com/status -u 'admin:password'
+   ```
+
 5. **Hold before restoring full weight.** Give it a stability window at partial traffic and watch error rate and latency against its peers before treating it as fully back.
 
   </TabItem>
@@ -263,7 +293,7 @@ Record the third number as node re-entry time, including convergence and applica
 
 ## Operational notes
 
-- **A returning node is not the same as a new node.** A node whose databases have never synchronized downloads them in full. A node that was offline and comes back catches up on the transactions it missed. Both need to finish before traffic arrives, but they take very different amounts of time, so do not budget for the first when you are planning a routine restart.
+- **A returning node is not the same as a new node.** A node whose databases have never synchronized downloads them in full. A briefly offline node catches up from retained history; a long-absent node needs the rebuild or restore policy above. Both need to finish before traffic arrives, but they take very different amounts of time, so do not budget for the first when you are planning a routine restart.
 - **Set unavailable before recovery work, not after.** Any operation that touches data on a node, including a restore, should happen with the node out of rotation.
 - **Configuration changes need a restart to take effect**, so a node that has been reconfigured but not restarted is running the old configuration while reporting the new one. Sequence the restart into the same maintenance window.
 - **Fabric routes by its status component.** It does not automatically consume your readiness route. For application-driven availability, see [Taking an Unhealthy Node Out of Rotation](../developers/taking-a-node-out-of-rotation.mdx).
