@@ -3,7 +3,7 @@ id: api
 title: API
 ---
 
-<!-- Source: harper resources/models/Models.ts, resources/models/types.ts (v5.1) -->
+<!-- Source: harper resources/models/Models.ts, resources/models/types.ts (v5.1, updated through v5.4) -->
 
 <VersionBadge version="v5.1.0" />
 
@@ -36,7 +36,7 @@ const batch = await models.embed(['first document', 'second document']);
 
 <VersionBadge version="v5.4.0" />
 
-An input longer than the embedding model's context window fails by default on most providers. With `truncate: true`, each input is cut to what the model accepts. The cut keeps the start of the text, so any task prefix (such as `search_document: `) stays in. Each input still produces one vector, embedded from that start only; the rest of the text does not contribute to it. The full input is still sent to the provider, which does the cut, so the option does not reduce request size.
+An input longer than the embedding model's context window fails by default on most providers. With `truncate: true`, each input is cut to what the model accepts. The cut keeps the start of the text, so any task prefix (such as `search_document: `) stays in. Each input still produces one vector, embedded from that start only; the rest of the text does not contribute to it. Most backends send the full input and ask the provider to cut it, so the request is no smaller; for Bedrock Cohere embed v3, Harper itself first cuts each text to 2,048 characters (see the table below).
 
 `truncate: true` requires the backend's `truncate` capability, in the same way that declaring tools requires `tools`. [Routing](./routing#capability-routing) skips any backend in the group that cannot truncate, fallback entries included. If no candidate can, the call fails with a capability error (`ModelCapabilityError`) before any request is sent. A backend that can truncate can still fail after the request, like any other call.
 
@@ -44,14 +44,14 @@ An input longer than the embedding model's context window fails by default on mo
 
 When `truncate` is absent or `false`, Harper sends the same request as before v5.4.0, and the provider's own handling applies. `false` does not mean "never cut": a provider that cuts by default still does.
 
-| Backend                                               | `truncate: true`                                                                       | `truncate` absent or `false`                                                    |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `openai` with [`truncation: vllm`](./backends#openai) | Sends `truncate_prompt_tokens: -1` and `truncation_side: 'right'` (vLLM 0.18 or later) | vLLM rejects an over-long input                                                 |
-| `openai` without `truncation`                         | Not capable; skipped                                                                   | OpenAI rejects an over-long input                                               |
-| `ollama`                                              | Sends `truncate: true` on `/api/embed`                                                 | Ollama cuts to the loaded context by default                                    |
-| `bedrock`, Cohere embed v4                            | Sends `truncate: 'RIGHT'`                                                              | Bedrock's default for the model                                                 |
-| `bedrock`, Cohere embed v3                            | Cuts each text to 2,048 characters, then sends `truncate: 'END'`                       | Cohere cuts tokens by default, but Bedrock rejects a text over 2,048 characters |
-| `bedrock`, Titan                                      | Not capable; skipped                                                                   | Titan rejects an over-long input                                                |
+| Backend                                               | `truncate: true`                                                                       | `truncate` absent or `false`                                                                       |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `openai` with [`truncation: vllm`](./backends#openai) | Sends `truncate_prompt_tokens: -1` and `truncation_side: 'right'` (vLLM 0.18 or later) | vLLM rejects an over-long input                                                                    |
+| `openai` without `truncation`                         | Not capable; skipped                                                                   | api.openai.com rejects an over-long input; other OpenAI-compatible servers apply their own default |
+| `ollama`                                              | Sends `truncate: true` on `/api/embed`                                                 | Ollama cuts to the loaded context by default                                                       |
+| `bedrock`, Cohere embed v4                            | Sends `truncate: 'RIGHT'`                                                              | Bedrock's default for the model                                                                    |
+| `bedrock`, Cohere embed v3                            | Cuts each text to 2,048 characters, then sends `truncate: 'END'`                       | Cohere cuts tokens by default, but Bedrock rejects a text over 2,048 characters                    |
+| `bedrock`, Titan                                      | Not capable; skipped                                                                   | Titan rejects an over-long input                                                                   |
 
 See [Backends](./backends) for each backend's details, and [`defineBackend()`](./backends#definebackend) for declaring the capability on a custom backend.
 
@@ -63,14 +63,14 @@ models:
       backend: openai
       apiKey: ${VLLM_API_KEY}
       baseUrl: http://vllm.internal:8000/v1
-      model: nomic-ai/nomic-embed-text-v1.5
+      model: BAAI/bge-m3
       truncation: vllm
 ```
 
 ```javascript
 import { models } from 'harper';
 
-const [vector] = await models.embed(longText, { inputType: 'document', truncate: true });
+const [vector] = await models.embed(longText, { truncate: true });
 ```
 
 Turning truncation on does not re-embed records that are already stored. Vectors written earlier stay as they are, and an input whose embedding failed earlier is embedded only when it is written again.

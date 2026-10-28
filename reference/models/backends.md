@@ -101,7 +101,7 @@ models:
       backend: openai
       apiKey: ${VLLM_API_KEY}
       baseUrl: http://vllm.internal:8000/v1
-      model: nomic-ai/nomic-embed-text-v1.5
+      model: BAAI/bge-m3
       truncation: vllm
 ```
 
