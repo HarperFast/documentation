@@ -20,7 +20,7 @@ By default (without sharding), Harper replicates all data to all nodes.
 
 ## Schema-defined sharding
 
-In v5.4, use [`@sharded`](./residency.md) for a shared schema policy across all workers. `@sharded` hashes primary keys, `@sharded(by: "tenantId")` keeps a tenant together, and a compiled `slotFrom` expression plus a custom map places owners on regional shards. [Regional placement](./residency.md#regional-placement-and-attribute-slot-changes) also explains the projections, replicas, audit bodies and read transfers that can cross those regions. Slot counts belong to the database. See the [one-slot-per-value limitation](./residency.md#limitations).
+In v5.4, [`@sharded`](./residency.md) hashes primary keys to fixed slots on every worker. Slot counts and the installed slot map belong to the database. Attribute-derived policies and custom expressions are refused pending [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178).
 
 ## Older per-record mechanisms
 
@@ -129,8 +129,6 @@ On `@sharded` tables, `replicateTo` does not change placement; the database map 
 LMDB now waits for requested peer confirmation, as RocksDB does. This can add peer latency to existing LMDB applications that use `confirm` or `replicatedConfirmation`. Explicit confirmation still applies only to the first database written by the transaction.
 
 Confirmation can fail after local commit. An error carrying `replicationUnconfirmed: true` and `retryable: false` means the local writes committed but the requested confirmation was not obtained. It does not mean the writes rolled back. Inspect the records using application-selected keys and apply the application's concurrency controls before retrying a non-idempotent request. Pre-commit refusals do not carry that flag; its absence alone does not prove that no independent write committed.
-
-[Attribute-slot transitions](./residency.md#regional-placement-and-attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
 
 ## Static Sharding
 

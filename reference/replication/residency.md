@@ -8,7 +8,7 @@ Schema-defined sharding requires RocksDB. `@sharded` and `initialize_shard_map` 
 
 <VersionBadge version="v5.4.0" />
 
-`@sharded` fixes a table's placement policy in its schema. Every application, operations, and replication thread applies the same policy. A key or record selects a slot, the database's installed slot map selects a shard, and `replication.shard` identifies that shard's current nodes.
+`@sharded` fixes a table's placement policy in its schema. Every application, operations, and replication thread applies the same policy. The primary key selects a slot, the database's installed slot map selects a shard, and `replication.shard` identifies that shard's current nodes.
 
 Upgrade every schema and data writer before activation. Wire compatibility with earlier peers allows delivery and reads; it does not make an earlier writer enforce the policy. With an installed custom map, recovery-capable peers may omit `replication.shards` only when neither side configures a list. This configuration fallback does not waive the sharding-recovery capability requirement: an older peer can receive compatible records and serve reads, but its announcement holds sharded writes until it is upgraded or removed.
 
@@ -35,89 +35,27 @@ type Item @table @sharded {
 }
 ```
 
-| Argument   | Meaning                                                                                                                                                                                                                           |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slots`    | Optional database-wide integer from `1` through `65536`. Uses the installed map's count, or `1024` when no map exists. An explicit count must equal the database map's count.                                                     |
-| `by`       | Optional stored, declared attribute name; may be the primary key, but cannot be computed. Default placement hashes its non-null string or finite-number value. Requires a secondary index, including when naming the primary key. |
-| `slotFrom` | Optional deterministic JavaScript expression returning an integer in `[0, slots)`. Without `by`, it exposes `id`; with `by`, it also exposes `record` and its attribute names.                                                    |
+`slots` is the optional database-wide count, an integer from `1` through `65536`. It adopts the installed map's count, or defaults to `1024`. An explicit count must equal the installed map's count.
 
-Declarative tables require [per-table audit logging](../database/transaction.md#enabling-the-transaction-log-per-table) and table replication. Harper refuses activation with `@table(audit: false)`, effective `logging.auditLog: false`, or `@table(replicate: false)`, and refuses disabling these table settings later. The replication route must also reach an owner.
+The slot is the unsigned FNV-1a 32-bit hash of the primary key's ordered-binary encoding, modulo that count. The offset basis is `2166136261` and multiplier `16777619`. Numeric `-0` and `0` use the same encoding; numeric `5` and string `"5"` are distinct inputs. Updating other fields cannot change the slot.
 
-Without `slotFrom`, the slot is the unsigned FNV-1a 32-bit hash of the primary key's ordered-binary encoding, modulo the database slot count. With `by`, the same hash uses that attribute's value instead. Default hashing supports strings and finite numbers; a null or missing value, `NaN`, or infinity is refused. Numeric `-0` and `0` use the same encoding for placement. Numeric `5` and string `"5"` remain distinct typed hash inputs. Default `by` declarations must name a stored `ID`, `String`, `Int`, `Float`, `Long`, or `Any` field; other stored types require `slotFrom`, and relationship or computed fields cannot be used. The hash's offset basis is `2166136261` and its multiplier is `16777619`.
+Only primary-key hashing is supported. Schema declarations using `by` or `slotFrom` are refused. Attribute-derived placement and custom expressions await [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178).
 
-`@sharded(by: "tenantId")` keeps each tenant's records together:
+Declarative tables require [per-table audit logging](../database/transaction.md#enabling-the-transaction-log-per-table) and table replication. Harper refuses activation with `@table(audit: false)`, effective `logging.auditLog: false`, or `@table(replicate: false)`, and refuses disabling these table settings later. The replication route must reach an owner.
 
-```graphql
-type TenantItem @table(database: "tenant_data") @sharded(by: "tenantId") {
-	id: ID @primaryKey
-	tenantId: String @indexed
-	body: String
-}
-```
-
-Different record keys with the same `tenantId` select the same slot on every node. The database map then resolves that slot to its current shard.
-
-An explicit key policy can preserve an existing partition function:
-
-```graphql
-type Item @table @sharded(slots: 10, slotFrom: "Number(id.slice(-1))") {
-	id: ID @primaryKey
-	category: String @indexed
-	body: String
-}
-```
-
-Expressions must be self-contained, deterministic, and synchronous. They compile on every thread without application helpers. An expression that throws, returns a Promise, or produces a non-integer or out-of-range result refuses the write before commit. Invalid-result errors name the result and database slot count. The `by` value must still be non-null when an expression is supplied. The last-digit example assumes string keys, matching the existing function being converted. Schema expressions are trusted code, as with computed expressions; they are not a sandbox.
-
-The policy is immutable once activated, including changing `by`, changing or adding/removing `slotFrom`, and removing the directive. These changes could move existing records and are not a slot-migration operation. Redeploying the same policy is idempotent. Calling `setResidency` or `setResidencyById` on a declarative table fails; remove those calls when converting. Existing tables can adopt a key-derived policy with an equivalent custom map. Attribute policies must be declared on a new table because existing rows have no stored slots.
+The policy is immutable once activated; changing its count or removing the directive is refused. Redeploying the same policy is idempotent. `setResidency` and `setResidencyById` are refused on declarative tables. Existing tables can adopt primary-key hashing only with a map that preserves their placement.
 
 ## Ownership, reads, and writes
 
 Owners store full records. With secondary indexes, other nodes keep index projections and receive invalidations. Reads fetch the full body from an owner. A non-owner can cache a temporary replica. Replicas retain the canonical record identity and do not become owners or count toward owner confirmation.
 
-A key-policy table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas. Attribute policies require a secondary index so a non-owner can retain the stored slot. If an attribute record's slot is unknown locally, DELETE returns 503 with a message beginning `Attribute sharding slot is unknown`. This response does not distinguish a delayed projection from a never-created key or a purged tombstone; local absence cannot prove that the record is absent on its owners. If another node still has the slot metadata, send the deletion there. If no node has it, DELETE cannot succeed anywhere; retrying alone cannot fix that condition. Stop automatic retries and use application-level knowledge to establish whether the key ever existed. Local absence is not proof that it was deleted.
+A table without secondary indexes stores nothing on non-owners; reads resolve the owner from the key. Such tables do not cache replicas.
 
 `replicateTo` is ignored for placement on a declarative table; the installed slot map determines where full records are retained. A non-owner accepts a local write and sends the complete body through replication to the owners. On an indexed RocksDB table with positive `replicaExpiration`, it also retains the complete written body as a temporary local replica, allowing an immediate local read while delivery is pending. A newer invalidation replaces it, and the replica sweep expires it. With expiration zero, it retains only the index projection; an index-free key policy retains nothing. A replica is a cache, so crash recovery may restore a projection instead. Ingest-heavy non-owners should budget space for approximately their serialized bytes written per second multiplied by `replicaExpiration`, or set expiration to zero. File-backed audit bodies remain until audit retention permits reclamation, even after a replica expires; include that delivery history in the disk budget. Refetched cache files have their own replica lifetime. This requires a configured replication route to an owner. Cross-shard query fan-out and write forwarding are not provided by this directive. Application database branches do not support sharding because branches do not replicate.
 
-### Regional placement and attribute-slot changes
+Local-only writes succeed without replication confirmation. They do not deliver a local audit body to owners. The node retains a writer replica, index projection, or no row according to its replica and index settings.
 
-`@sharded(by: "region", slotFrom: ...)` with `initialize_shard_map` places full owned records on regional shards. The expression selects logical slots; the map assigns those slots to shards. The schema does not encode shard IDs or node names.
-
-Owner placement is not a boundary on every copy or transfer. Non-owners retain indexed projections, can cache full read/write replicas, and retain audit bodies for writes they accept. Reads can transfer the complete body across regions. Setting `@table(replicaExpiration: 0)` prevents new temporary replicas; it does not purge existing replicas or writer audit history. Account for indexed fields, request routing, caches and audit retention when planning regional data placement.
-
-Install this map before declaring the table. Configure Asia's nodes with `replication.shard: 0` and Europe's nodes with `replication.shard: 1`:
-
-```json
-{
-	"operation": "initialize_shard_map",
-	"database": "regional",
-	"slots": 3,
-	"ranges": [
-		{ "start": 0, "end": 2, "shard": 0 },
-		{ "start": 2, "end": 3, "shard": 1 }
-	]
-}
-```
-
-```graphql
-type RegionalItem @table(database: "regional") @sharded(by: "region", slotFrom: "region == 'asia' ? 1 : 2") {
-	id: ID @primaryKey
-	region: String @indexed
-	body: String
-}
-```
-
-The omitted count adopts the regional database's three slots. `asia` selects slot 1 on shard 0; other non-null region values select slot 2 on shard 1. Slot 0 remains available for other policies. The map contains slot ranges and shard IDs, never pinned attribute values.
-
-Changing `region` sends the complete canonical body to the new owners and invalidates old owners at the same version. This handoff uses full-record replacement ordering: an older concurrent patch does not merge into the replacement. Use application concurrency controls when writers can update a record while its slot changes. When the writer is outside the new owner set, success requires at least one new owner to confirm durable receipt. If no new owner has an active subscription and recent received activity within [`replication.pingTimeout`](../configuration/options.md#replication), the change is refused before commit. This can also refuse an owner whose base copy is not progressing.
-
-An application or operation write marked `localOnly` is refused before commit if its attribute change moves the record to a slot whose owners exclude the writer. The error names the table and record and explains that a local-only write cannot deliver the moved record to its new owners. Nothing is committed. Local-only updates that leave the slot unchanged, or move it to owners that still include the writer, succeed without replication confirmation. This refusal does not apply to replication receipt, snapshot copy-apply, or other internal apply paths. Replicable slot moves still require the new-owner acknowledgment described above.
-
-Ordinary local-only creates and same-slot updates keep the existing local placement: a non-owner can retain a writer replica, keep an indexed projection, or omit the row, depending on the table's replica and index settings. Its local-only audit body is not delivered to owners. The new refusal applies only to an attribute-slot transition away from the writer. Rollback covers the affected database's pending transaction; it does not undo earlier commits in another database.
-
-Automatic slot-move confirmation waits up to `replication.shardingConfirmationTimeout` (default `30000` ms). Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` instead (default `900000` ms, raised to `replication.blobTimeout` when the configuration key `replication.confirmationTimeout` is unset). Both settings are read when a confirmation starts. An explicit setting can lower that timeout independently of blob transfers. Slow transfers can therefore exceed the automatic timeout even on a healthy link.
-
-A connection can fail after admission. An error with `replicationUnconfirmed: true` after local commit means the outcome is uncertain; it does not mean the transaction rolled back. Inspect the record and retry with the application's concurrency controls. Audit retention bounds replay for disconnected peers; it is not an indefinite handoff queue.
+Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` (default `900000` ms, raised to `replication.blobTimeout` when unset). An error with `replicationUnconfirmed: true` after local commit means the requested confirmation was not obtained; it does not mean rollback. Inspect the record and apply the application's concurrency controls before retrying.
 
 ### Subscription filters
 
@@ -203,13 +141,9 @@ There is no operation to delete or reset an active map. If an accidentally initi
 
 ## Limitations
 
-For attribute-derived slots, a PATCH racing a slot-changing PUT returns a retryable 409 naming the table and record when its logged native retry has abort markers. Re-execute the application operation as a fresh attempt; Harper does not automatically re-run the callback. An invalid slot expression then receives the normal pre-log 400.
-
-This race is closed once abort markers are enabled (5.4 default, [rocksdb-js#970](https://github.com/HarperFast/rocksdb-js/pull/970)/[#973](https://github.com/HarperFast/rocksdb-js/pull/973); Harper enablement pending); without them, a logged retry commits at its admitted slot.
+Attribute-derived sharding and custom slot expressions are unavailable pending [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178). Slot migration is separate work in [#1053](https://github.com/HarperFast/harper-pro/issues/1053).
 
 Owner recovery requires the [sources described above](#recovery-sources). Arbitrary cross-shard owner recovery is deferred to [#1123](https://github.com/HarperFast/harper-pro/issues/1123).
-
-Every record with the same `by` value lands in one slot. One region or large tenant therefore cannot be split across shards merely by moving slots. A future `spread` argument (name open) is tracked in [#1122](https://github.com/HarperFast/harper-pro/issues/1122). It would distribute one value over a range using the primary-key hash, with `spread: 1` preserving today's behavior; moving those slots would be handled by #1053. This argument is not available in this release.
 
 ## Older per-record residency APIs
 
@@ -223,7 +157,7 @@ Back up the database and upgrade all writers. Keep the current `setResidencyById
 
 ### 2. Install the equivalent map
 
-Install a custom map that reproduces the function's numeric shard result exactly, from one designated node. Wait for the same snapshot on every participant before enabling the directive. On a newly joining node in a custom-map deployment, install or receive that snapshot before deploying its declarative application; otherwise first activation would initialize a default map from the local list.
+The existing function must agree with the supported primary-key hash and the proposed map for every stored record. Arbitrary legacy expressions cannot be adopted yet. Install the equivalent map from one designated node. Wait for the same snapshot on every participant before enabling the directive. On a newly joining node in a custom-map deployment, install or receive that snapshot before deploying its declarative application; otherwise first activation would initialize a default map from the local list.
 
 ### 3. Compare placement on every node
 
@@ -234,7 +168,7 @@ Run `verify_shard_map` on each node while its application worker still runs the 
 	"operation": "verify_shard_map",
 	"database": "data",
 	"table": "Item",
-	"policy": { "slots": 10, "slotFrom": "Number(id.slice(-1))" }
+	"policy": { "slots": 10 }
 }
 ```
 
@@ -302,5 +236,3 @@ await drainResidencyReplicas(tables.Item);
 5. Remove the maintenance code, restore the previous binary with the equivalent legacy schema and `setResidencyById` function, then resume traffic. Keep the installed slot map for a later upgrade. Local assertion receipts also survive restart and downgrade: their trust remains the operator's responsibility while the equivalent legacy placement is in use, not a new verification by Harper on re-upgrade.
 
 There is no built-in replica-drain operation. If you cannot run and verify this maintenance procedure, restore a preactivation backup instead of attempting an in-place downgrade.
-
-An attribute policy writes a new local primary/audit format. In-place downgrade to an earlier binary is unsupported. Restore a backup from before activation; writes since that backup may be lost. Protocol fallback does not make an earlier binary understand the new local storage format.
