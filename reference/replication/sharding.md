@@ -20,7 +20,7 @@ By default (without sharding), Harper replicates all data to all nodes.
 
 ## Schema-defined sharding
 
-In v5.4, use [`@sharded`](./residency.md) for a shared schema policy across all workers. `@sharded` hashes primary keys, `@sharded(by: "tenantId")` keeps a tenant together, and a compiled `slotFrom` expression plus a custom map places owners on regional shards. [Regional placement](./residency.md#regional-placement-and-attribute-slot-changes) also explains the projections, replicas, audit bodies and read transfers that can cross those regions. Slot counts belong to the database. See the [one-slot-per-value limitation](./residency.md#limitations).
+In v5.4, [`@sharded`](./residency.md) hashes primary keys to fixed slots on every worker. Slot counts and the installed slot map belong to the database. Attribute-derived policies and custom expressions are refused pending [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178).
 
 ## Older per-record mechanisms
 
@@ -161,8 +161,6 @@ The flag covers writes issued to the reported commit, not later application step
 Pre-commit refusals, including a confirmation count that cannot be met, do not carry this flag. Its absence does not establish that nothing was written: independent database commits can fail partially. A rejected commit ends its transaction scope; start a fresh transaction for subsequent writes.
 
 Confirmation currently applies to the first database a transaction writes to. This outcome flag covers the linked local commits; it does not enable confirmation for later databases.
-
-[Attribute-slot transitions](./residency.md#regional-placement-and-attribute-slot-changes) can require new-owner confirmation automatically even when the caller did not request an explicit confirmation count.
 
 ## Static Sharding
 

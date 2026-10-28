@@ -146,7 +146,7 @@ On a table whose records live on specific nodes (see [sharding](../replication/s
 - **`replicaExpiration`** — Seconds a replica is kept. A sweep runs every quarter of this time, with a minimum interval of one second, and reduces replicas past their lifetime back to their indexed stubs. A replica can still be served until the sweep reaches it; the next read after demotion fetches the record again. `0` disables new replica admissions and the sweep. A replica never outlives the record's own `expiration`, if it has one.
 - **`replicaRefreshFraction`** — A read of a replica after this fraction of `replicaExpiration` has passed renews the lifetime, so records that stay in use stay local. Must be greater than `0` and at most `1`; `1` gives every replica a fixed lifetime.
 
-[Schema-defined sharding](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for either key- or attribute-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
+[Schema-defined sharding](../replication/residency.md#ownership-reads-and-writes) tables with secondary indexes can retain replicas for key-derived slots. With positive `replicaExpiration`, a non-owner writer also keeps its complete write as a temporary replica under the same expiry and replacement rules. This local copy never counts as owner confirmation. Setting the lifetime to `0` does not drain existing replicas; see the [rollback procedure](../replication/residency.md#rollback).
 
 ```graphql
 # Keep fetched records for a day; a read after six hours renews them
@@ -244,7 +244,7 @@ See [REST Headers / Cache-Control](../rest/headers.md#cache-control) for the ful
 
 <VersionBadge version="v5.4.0" />
 
-Defines an immutable placement policy on a schema-defined RocksDB table. An LMDB declaration is refused within its database; legacy residency functions on LMDB are unchanged. `@sharded` hashes the primary key; `by: "tenantId"` hashes that attribute's non-null value with the same hash. `slotFrom` optionally chooses the integer logical slot with a compiled deterministic expression. `slots` is a database-wide value (`1` through `65536`): omit it to adopt the installed map's count, or `1024` if no map exists; an explicit different count is refused. Attribute policies require a secondary index. The database map resolves each slot to a deployment shard. See [Schema-defined sharding](../replication/residency.md) for tenant affinity, regional placement, configuration, conversion, limitations and rollback.
+Defines immutable primary-key placement on a schema-defined RocksDB table. LMDB declarations are refused; legacy residency functions are unchanged. `slots` is the database-wide count (`1` through `65536`), adopting the installed map's count or defaulting to `1024`. The key hash selects a slot and the installed database map selects its shard. `by` and `slotFrom` are not supported yet; see [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178) and [Schema-defined sharding](../replication/residency.md).
 
 ### `@export`
 
