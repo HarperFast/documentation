@@ -156,7 +156,7 @@ REST searches every source field in the index, so the caller must be allowed to 
 
 ## 5. Choose consistency behavior
 
-Most searches can use the default three-second lag tolerance. When the next request must find a record that was just written, use the JavaScript API and wait for current index coverage:
+Most searches can use the default three-second lag tolerance. When the next request must find a record already committed on the queried node, use the JavaScript API and wait for current index coverage. This wait does not wait for replication to deliver writes from another node:
 
 ```javascript
 for await (const product of databases.catalog.Product.search({
@@ -180,7 +180,7 @@ If the index does not reach current coverage within ten seconds, iteration throw
 
 ## 6. Operate the index
 
-Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; table traffic remains available, while full-text requests in `unknown`, `needs-rebuild`, or `rebuilding` state return `503` with `code: "INDEX_REBUILDING"` and `retryable: true`. Retry this code with backoff; do not treat every `503` as an index rebuild.
+Use `describe_table` to inspect readiness. Harper reuses compatible local index files after restart and replays changes after their checkpoint. A node rebuilds locally when the files are missing, incompatible, or corrupt; ordinary table reads remain available, while full-text requests in `unknown`, `needs-rebuild`, or `rebuilding` state return `503` with `code: "INDEX_REBUILDING"` and `retryable: true`. Retry this code with backoff; do not treat every `503` as an index rebuild. Writes can also receive retryable `DERIVED_INDEX_LAGGING` responses while replay catches up after a long rebuild; see [write backpressure](/reference/v5/full-text-search/overview#write-backpressure).
 
 The custom resource in step 3 streams its returned iterable. HTTP error statuses apply before response headers are sent; a failure after streaming starts is a terminal stream error and cannot change the HTTP status. Consumers must also handle that terminal error. See [freshness and streaming errors](/reference/v5/full-text-search/querying#freshness-controls).
 
