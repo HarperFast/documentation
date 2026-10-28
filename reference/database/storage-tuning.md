@@ -10,7 +10,7 @@ For a quick reference of every option, see [Configuration Options — `storage`]
 
 ## Durability vs. Throughput
 
-On RocksDB (the default storage engine), Harper does not call `fsync` or `fdatasync` when committing a transaction, and RocksDB's own Write-Ahead Log (WAL) is disabled for table stores. When the [transaction log](./transaction.md) is enabled (the default via [`logging.auditLog: true`](../logging/configuration.md) and [`@table(audit: true)`](./transaction.md#enabling-the-transaction-log-per-table)), each acknowledged commit is written to Harper's transaction log (`database/<db>/transaction_logs/`) using a standard write to the OS page cache. On startup, Harper replays the transaction log to recover any committed writes that had not yet been flushed from RocksDB's in-memory memtables to table files.
+On RocksDB (the default storage engine), Harper does not call `fsync` or `fdatasync` when committing a transaction, and RocksDB's own Write-Ahead Log (WAL) is disabled for table stores. When the [transaction log](./transaction.md) is enabled (the default via [`logging.auditLog: true`](../logging/configuration.md), inherited by tables unless [`@table(audit: false)`](./transaction.md#enabling-the-transaction-log-per-table)), each acknowledged commit is written to Harper's transaction log (`database/<db>/transaction_logs/`) using a standard write to the OS page cache. On startup, Harper replays the transaction log to recover any committed writes that had not yet been flushed from RocksDB's in-memory memtables to table files.
 
 What an acknowledged write survives on a single node:
 
@@ -23,7 +23,7 @@ To require confirmation from `<k>` peer nodes before a write returns, use [repli
 
 - **Operations API**: Set [`replicatedConfirmation: <k>`](../replication/sharding.md#replication-control-via-operations-api) in the operation payload. Omit `replicateTo` to use the database's configured replication (every node by default, unless [`replication.databases[].replicateTo`](../replication/sharding.md#replication-count) is set), or set `replicateTo` only when you also want to limit residency (dynamic sharding) to a fixed set of nodes.
 - **Resource API**: Set [`context.replicatedConfirmation = <k>`](../replication/sharding.md#programmatic-replication-control) in your resource method (leaving `context.replicateTo` unset to use the database's configured replication, unless you also want to restrict residency).
-- **REST**: Pass [`X-Replicate-To: *;confirm=<k>`](../replication/sharding.md#replication-control-via-rest-header) on the request to wait for `<k>` confirmations while keeping the database's configured replication (`*` leaves per-request residency unset; passing a number `<n>` or node list in `X-Replicate-To: <n>;confirm=<k>` pins the record's residency to `<n>` additional nodes from those present at write time).
+- **REST**: Pass [`X-Replicate-To: *;confirm=<k>`](../replication/sharding.md#replication-control-via-rest-header) on the request (requires `super_user` permissions; for non-superuser write paths, set `context.replicatedConfirmation` in a Resource method instead) to wait for `<k>` confirmations while keeping the database's configured replication (`*` leaves per-request residency unset; passing a number `<n>` or node list in `X-Replicate-To: <n>;confirm=<k>` pins the record's residency to `<n>` additional nodes from those present at write time).
 
 ### `storage.writeAsync`
 

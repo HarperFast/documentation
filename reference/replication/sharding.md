@@ -61,7 +61,7 @@ PUT /MyTable/3
 X-Replicate-To: node1,node2
 ```
 
-The `confirm` parameter can be combined with explicit node lists, or with `*` to require confirmation while keeping the cluster's default replication without pinning residency to a fixed node count:
+The `confirm` parameter can be combined with explicit node lists, or with `*` to require confirmation while keeping the cluster's default replication without pinning residency to a fixed node count (passing `X-Replicate-To` requires `super_user` permissions; non-superuser write paths can set [`context.replicatedConfirmation`](#programmatic-replication-control) in a Resource method):
 
 ```http
 PUT /MyTable/3

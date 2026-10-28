@@ -7,7 +7,7 @@ title: Storage Algorithm
 
 # Storage Algorithm
 
-Harper's storage algorithm is the foundation of all database functionality. It is built on top of [RocksDB](https://rocksdb.org/) (the default) or [LMDB](https://www.symas.com/lmdb) (legacy), both high-performance key-value stores, and extends them with automatic indexing, query-language-agnostic data access, and ACID compliance.
+Harper's storage algorithm is the foundation of all database functionality. It is built on top of [RocksDB](https://rocksdb.org/) (the default) or [LMDB](https://www.symas.com/lmdb) (legacy), both high-performance key-value stores, and extends them with automatic indexing, query-language-agnostic data access, and ACID transaction guarantees.
 
 RocksDB is the default storage engine for new installations. LMDB databases from prior versions are still supported and loaded automatically when detected.
 
@@ -22,7 +22,7 @@ Harper provides ACID transaction guarantees:
 - **Atomicity**: All writes in a transaction either fully commit or fully roll back
 - **Consistency**: Each transaction moves data from one valid state to another
 - **Isolation**: Reads use snapshots and do not block writes; writes do not block reads
-- **Durability**: On RocksDB, when the [transaction log](./transaction.md) is enabled (the default), committed writes are recorded in Harper's transaction log in the OS page cache (without `fsync`; RocksDB's own WAL is disabled) and replayed on startup, surviving Harper process crashes on the node (disabling the transaction log via `logging.auditLog: false` or `@table(audit: false)` also disables process-crash recovery for unflushed memtable writes). Durability across OS, power, or host failures is provided by [replication confirmation](../replication/sharding.md) across independent nodes (see [Storage Tuning — Durability vs. Throughput](./storage-tuning.md#durability-vs-throughput)). LMDB uses memory-mapped file writes (`fsync` on commit by default unless [`storage.writeAsync`](./storage-tuning.md#storagewriteasync) is enabled)
+- **Durability**: On RocksDB, when the [transaction log](./transaction.md) is enabled (the default), committed writes are recorded in Harper's transaction log in the OS page cache (without `fsync`; RocksDB's own WAL is disabled) and replayed on startup, surviving Harper process crashes on the node (disabling the transaction log via `logging.auditLog: false` or `@table(audit: false)` also disables process-crash recovery for unflushed memtable writes). Durability across OS, power, or host failures is provided in a Harper Pro cluster by per-write [replication confirmation](../replication/sharding.md) across nodes in separate failure domains (see [Storage Tuning — Durability vs. Throughput](./storage-tuning.md#durability-vs-throughput)). LMDB uses memory-mapped file writes (`fsync` on commit by default unless [`storage.writeAsync`](./storage-tuning.md#storagewriteasync) is enabled)
 
 Harper uses application-level locking to serialize schema changes and table creation, ensuring write ordering without deadlocks.
 
