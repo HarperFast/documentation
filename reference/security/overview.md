@@ -26,6 +26,8 @@ Harper supports three authentication methods:
 - [JWT Authentication](./jwt-authentication.md) — Token-based authentication using JSON Web Tokens. Clients authenticate once and receive short-lived operation tokens and longer-lived refresh tokens.
 - [mTLS Authentication](./mtls-authentication.md) — Mutual TLS certificate-based authentication.
 
+A component can also accept Bearer tokens Harper did not issue, such as access tokens from its own OAuth authorization server, by registering a [Bearer validator](../http/api.md#serverregisterbearervalidatorvalidator-options) that maps each token to a Harper user.
+
 ## Authentication and Route Ownership
 
 <VersionBadge type="changed" version="v5.3.0" />
