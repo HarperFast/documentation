@@ -216,7 +216,7 @@ The top-level `cluster_status.sharding` field is keyed by database and describes
 | `waitingOrigins`    | Origins waiting for a direct source or certified same-shard relay, with the missing source described.                                                                                                                                                            |
 | `errors`            | Reasons, such as differing peer lists, a local shard outside its list, a missing required list/map, or a refused peer map.                                                                                                                                       |
 
-A clear status is not proof that an owner is connected; write admission also checks the required replication route and, for an attribute-slot transition from a writer outside the new owner set, a connected new owner. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
+A clear status is not proof that an owner is connected; write admission also checks the required replication route. See [configuration agreement](./sharding.md#complete-shard-id-set) and [map recovery](./residency.md#installed-maps).
 
 ### Shard map operations
 

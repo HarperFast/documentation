@@ -287,7 +287,7 @@ replication:
 - `threads` — Worker threads dedicated to replication, which then own the replication port and every subscription and load no application code; requires `port` or `securePort`; see [Dedicated Replication Threads](../replication/overview.md#dedicated-replication-threads); _Default_: `0` (replication runs on the HTTP worker threads) (Added in: v5.4.0)
 - `enableRootCAs` — Verify against Node.js Mozilla CA store; _Default_: `true`
 - `pingInterval` — Interval between replication keep-alive pings (ms); _Default_: `30000`
-- `pingTimeout` — Time without received socket activity before a replication connection is considered dead (ms); _Default_: twice `pingInterval`. Automatic slot-move admission also requires a new owner with received activity inside this window.
+- `pingTimeout` — Time without received socket activity before a replication connection is considered dead (ms); _Default_: twice `pingInterval`.
 - `confirmationTimeout` — Timeout in milliseconds for explicit `replicatedConfirmation`, read when a waiter starts. _Default_: `900000`, or `blobTimeout` when greater. An explicitly configured value overrides that fallback, including a smaller value. Range: `1`–`2147483647`. (Added in: v5.4.0)
 - `blobTimeout` — Blob transfer timeout (ms); _Default_: `120000`
 - `blobGapReconnectMs` — Interval (ms) for the blob-gap watchdog: when a transient blob save failure pins a replication resume cursor, the connection is forced to reconnect on this cadence so the gapped blob is re-streamed and, during a bulk copy, the copy resumes from the last banked cursor. Lower values heal gaps faster at the cost of more reconnects on a link whose faults never heal; _Default_: the `blobTimeout` value
