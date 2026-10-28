@@ -312,6 +312,19 @@ storage:
 ```
 
 - `engine` — The database storage engine to use for new databases. Currently supported engines are `rocksdb` and `lmdb`. The default is `rocksdb`. Existing databases will use the engine that was used when they were created.
+- `fullText` <VersionBadge version="v5.4.0" /> — Full-text search work and native process limits. Sub-options:
+  - `maxRawHitsPerRequest` — Maximum fetched hits per request, including bounded prefix replay when traversal is needed; default `10000`.
+  - `maxResultsPerRequest` — Maximum retained offset plus limit. A request must also fit the separate raw-hit budget; default `10000`.
+  - `requestBudgetMilliseconds` — Execution budget across native batches, source checks and highlights, capped by the native execution limit; default `5000` ms. Reader acquisition and freshness waiting have separate bounds.
+  - `runtime.maxResidentIndexes` — Maximum resident native indexes; default `128`.
+  - `runtime.maxIndexingThreads` — Maximum aggregate indexing-thread reservations across resident native indexes; default `128`.
+  - `runtime.maxSearchThreads` — Maximum aggregate search-thread reservations across resident native indexes; default `256`.
+  - `runtime.maxWriterMemoryBytes` — Aggregate writer-memory reservations across resident native indexes; default `4294967296` (4 GiB).
+  - `runtime.maxQueuedBytes` — Aggregate queued-write reservations across resident native indexes; default `8589934592` (8 GiB).
+  - `runtime.maxExpensiveSearches` — Maximum concurrent expensive native searches; default `8`.
+
+  The runtime budgets apply together and are not hard bounds on total process memory. See [Set Configuration](./operations.md#set-configuration) for when request and native runtime changes take effect. Use the usual underscore-separated parameter names, such as `storage_fullText_maxRawHitsPerRequest`. See [full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging) for costs; see [readiness and recovery](../resources/query-optimization.md#readiness-and-recovery) for failures.
+
 - `writeAsync` — Disable disk sync for higher throughput (**disables durability guarantees**); _Default_: `false`
 - `caching` — In-memory record caching; _Default_: `true`
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
@@ -426,10 +439,11 @@ agent:
 - `enabled` — Enable the agent component; _Default_: `false`
 - `provider` — Recorded on the session but **not yet used to route the model call** — only `model` reaches the provider. Set the provider through the [`models`](../models/overview.md#configuration) configuration instead
 - `model` — Model id override, passed through to the model call; _Default_: the [`models`](../models/overview.md#configuration) generative default
-- `maxTurns` — Maximum tool-call iterations in a single run; _Default_: `50`
+- `maxTurns` — Maximum tool-call iterations in a single run; a positive integer, validated from v5.4.0. A bare `maxTurns:` with no value fails the agent's start like any other invalid value; _Default_: `50`
 - `maxTokens` <VersionBadge version="v5.4.0" /> — Output-token cap sent with every model request the agent makes. A reply cut off at this cap ends the run with status `error`, not `completed`, and `lastError` says it was cut off; raise the cap if replies keep hitting it. A cut-off reply can also mean the session's transcript filled the model's context window, which a higher cap does not fix; start a new session instead. Keep it within the model's own output limit: most providers reject a larger value on every request, and the run then ends `error` with the provider's message, so lower it for a model with a small output limit (some older models allow 4096 or 8192). Before v5.4.0 the agent sent no cap: Anthropic models, called directly or through Bedrock, then used 4096, and the other backends sent none; _Default_: `16384`
 - `maxToolResultBytes` <VersionBadge version="v5.4.0" /> — Largest tool result, in bytes of JSON, the agent adds to its conversation. A larger result is cut to this size, ending with a note that gives the original size and tells the model how to ask for less. The file-reading tools return pages of at most half this size, measured as JSON, so a page arrives whole unless the file's path alone takes up most of the cap. Lower it for a model with a small context window. It must be an integer from `1024` to `1048576`; at startup an invalid value is logged and the default is used. See [When a conversation outgrows the model's context window](../operations-api/operations.md#when-a-conversation-outgrows-the-models-context-window); _Default_: `65536`
-- `maxCostUsd` — Intended per-run cost ceiling. **Not enforced** — it is a stored setting only, and nothing checks spend against it; _Default_: `5.00`
+- `maxSessionTokens` <VersionBadge version="v5.4.0" /> — Per-session cap on prompt plus completion tokens, summed over every model call in the session that returns, a reply the agent rejects as cut off or empty included; a positive integer. See [Spend caps](#agent-spend-caps); _Default_: none
+- `maxCostUsd` <VersionBadge type="changed" version="v5.4.0" /> — Per-session cap in USD, priced from the [`pricing`](../models/overview.md#pricing) on the `models.generative` entry that served each call; a number of `0` or more, and `0` stops every session before its first call. See [Spend caps](#agent-spend-caps). Before v5.4.0 this setting was stored but never enforced, and defaulted to `5.00`; _Default_: none
 - `autoApprove` — Run without per-action approval gates; _Default_: `false`
 - `allowDestructive` — Include the tools marked destructive in the agent's toolset: `write_file`, the inspector's code-evaluation tools, and any operations tool carrying MCP's [`destructiveHint`](../mcp/tool-metadata.md) (`drop_table`, `delete`, `restart`, `set_configuration`, ...). When `false` they are removed entirely rather than gated. That hint comes from a curated set in core which does not cover every damaging operation, so this is not a complete safety boundary on its own — see [Agent operations](../operations-api/operations.md#agent); _Default_: `false`
 - `user` — Harper user the agent's **operations** tools run as; the filesystem, HTTP, schedule, and inspector tools always run at process privilege regardless. If it cannot be resolved and it is not the default, the agent fails closed and runs with no operations tools; _Default_: `hdb_agent`, which falls back to a `super_user` bootstrap identity
@@ -438,7 +452,7 @@ agent:
 - `httpFetch` <VersionBadge version="v5.4.0" /> — Whether the agent has its `http_fetch` tool, and which hosts it may reach: `true`, `false`, or `{ allow: [...] }`. Read at startup only. See [Restricting `http_fetch`](#restricting-http_fetch); _Default_: `true`
 - `systemPromptAppend` — Operator text appended to the agent's system prompt
 
-`enabled`, `provider`, `model`, `maxTurns`, `maxTokens`, `maxToolResultBytes`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only. `enabled` is the exception worth knowing: it cannot switch the agent on, because with the agent disabled at startup no agent operation is registered at all. `httpFetch`, `componentsScope`, and `configScope` are read at startup only, and `set_agent_config` rejects them.
+`enabled`, `provider`, `model`, `maxTurns`, `maxTokens`, `maxToolResultBytes`, `maxSessionTokens`, `maxCostUsd`, `autoApprove`, `allowDestructive`, and `systemPromptAppend` can also be changed at runtime with [`set_agent_config`](../operations-api/operations.md#set_agent_config), which applies in memory only. `enabled` is the exception worth knowing: it cannot switch the agent on, because with the agent disabled at startup no agent operation is registered at all. `httpFetch`, `componentsScope`, and `configScope` are read at startup only, and `set_agent_config` rejects them.
 
 ### Filesystem scopes
 
@@ -470,7 +484,49 @@ Whatever `componentsScope` and `configScope` say, every scope refuses:
 
 A key with neither a key file name nor PEM armor, such as a `.p12` bundle or raw DER, is not recognized outside the key directories.
 
-The config file can still hold secrets that are not PEM keys, such as a model `apiKey` or storage credentials, and the agent reads it. Setting `configScope` to `rootPath` also restores read access to the raw database files and backups.
+Setting `configScope` to `rootPath` also exposes the rest of `rootPath`, though a file over 256 KiB or not UTF-8, such as a database file or a backup, is refused (see [Masked credential values](#masked-credential-values)).
+
+### Masked credential values
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+The config file can hold plaintext credentials: a model `apiKey` passed through `HARPER_SET_CONFIG` is written there. Logs hold whatever a component logged. When the agent reads the `logs` or `config` scope, the value of every credential-named key comes back as `*`s:
+
+```yaml
+models:
+  generative:
+    default:
+      apiKey: **************
+      model: gpt-5
+```
+
+- **Which keys.** A key that ends in `key`, `token`, `cookie`, or `authorization`, or contains `secret`, `password`, `passwd`, `passphrase`, or `credential`, and `accessKeyId` in any spelling. The whole key must match, so settings such as `maxTokens` and `operationTokenTimeout` are shown. A value that is exactly an environment reference, such as `${OPENAI_API_KEY}`, is shown as written.
+- **Which forms.** `key: value` and `key=value`, with the key quoted or not, anywhere in a line: YAML, JSON (including JSON logged inside a JSON string), `Authorization: Bearer ...` headers, and `?api_key=...` query strings. A quoted value is masked up to its closing quote, even on a later line, and an unquoted one to the end of the line. A YAML value that continues on more-indented lines, such as a long folded value or a `|` block, is masked on every line, as are the `- ` items under a key with no value of its own. In the `config` scope each file is also parsed as YAML, so a key written with escapes, such as `"api\u004Bey"`, and a value reached through an alias are masked too. A config file that does not parse shows only its keys, with every value masked. A config file over 256 KiB or not UTF-8 is refused.
+- **Positional reads.** The mask keeps each value in place (in a config file, one `*` per byte), so a `read_file` `offset` into a value, the later parts of a long line, and the end of a line that `tail_file` returns are masked too. `size` and `nextOffset` still count the file's bytes, so a masked value's length is visible; its content is not.
+- **Searches.** `grep_files` searches the masked text, so a pattern that matches only a credential's value finds nothing.
+
+The agent's `read_log` tool is masked the same way, in every text field of each entry. An entry holding a PEM private key is replaced by a refusal. The tool refuses `read_log`'s `filter` argument, because `filter` matches the unmasked log. `read_log` called through the operations API or an MCP client returns the log unmasked.
+
+The `components` scope is not masked, so a file the agent reads and writes back is unchanged. A credential that is not the value of a credential-named key, such as a password inside a URL, is not masked.
+
+### Agent spend caps
+
+<VersionBadge version="v5.4.0" />
+
+`maxSessionTokens` and `maxCostUsd` bound a whole session, across every run in it. Approving a paused action or sending a follow-up prompt starts a new run, but does not reset a cap the way it resets `maxTurns`. Each assistant message records the usage of the model call that produced it, and [`get_agent_session`](../operations-api/operations.md#get_agent_session) reports the session's totals as `usage`.
+
+A cap is checked when a run starts, before it executes an approved action, and after every model call:
+
+- **At or over a cap**, the session makes no further model call and ends `error`, with `lastError` naming the cap, for example `agent.maxSessionTokens=200000 reached: this session used 201450 tokens`. Tool calls the model had just requested are answered with a `budget_exceeded` result rather than run, so the transcript stays valid if you continue the session. A final answer that crosses the cap is still delivered: the run ends `completed`, with `lastError` naming the cap.
+- **A cap that cannot be measured stops the session too.** `maxCostUsd` needs every call priced, and `maxSessionTokens` needs every call's token counts. A model with no `pricing`, or a provider that reports no usage, stops the session after its first call rather than letting it run uncapped: it ends `error`, or `completed` if that call was the final answer, with `lastError` saying why either way. The unmeasured call stays on the session, so the session's total stays unmeasured and later runs stop before making any call, and raising the cap or adding `pricing` does not clear it: start a new session, or clear the cap. `set_agent_config` with `null` clears it until the next restart; to clear it for good, remove the key from the configuration file. A session created before v5.4.0, whose earlier calls recorded no usage, is in the same state.
+- **Pending approvals are closed too.** A run stopped before it executes an approved action answers that action, and any approval still awaiting a decision, with `budget_exceeded`, so nothing is left pending. The action does not run later, even once the cap is raised; the model sees the refusal and can ask again.
+- **A capped session stays capped.** Raise the cap with `set_agent_config` or start a new session.
+
+A cap is a threshold checked after each call, not a guarantee: the call that reaches it can overshoot it. Every call that returns is counted, including a reply the agent rejects as cut off or empty: that reply stays out of the transcript, but its usage is kept on the session. A call that fails, for example on a timeout or a provider error and whether or not another model then serves it, is not counted, even if the provider billed it. The caps bound one session only: there is no cross-session or per-user budget, so a caller allowed to run `agent_prompt` can keep spending by starting new sessions.
+
+A cap, or a `maxTurns`, that is not a usable number fails the agent's start: Harper logs the error and registers no agent operation. Through `set_agent_config` the same value is rejected with a 400. A bare `maxSessionTokens:` or `maxCostUsd:` with no value leaves that cap unset, as `null` does through `set_agent_config`; a bare `maxTurns:` fails, because `maxTurns` cannot be unset.
+
+If you upgrade with `maxCostUsd` already set in your configuration, it starts being enforced, and needs `pricing` on the generative entry the agent uses.
 
 ### Restricting `http_fetch`
 
@@ -531,12 +587,16 @@ deployment:
   startupInstallTimeout: 600000
   payloadRetention:
     maxSize: 10485760
+    failedMaxAge: 7d
+    failedMaxCount: 2
   stagingRetention:
     maxCount: 5
 ```
 
 - `startupInstallTimeout` <VersionBadge version="v5.3.0" /> — Milliseconds. The longest startup waits for component installs before it opens listeners. While waiting, it logs every 60 seconds which ones remain outstanding — including throughout `0`'s unbounded wait — unless every install settles first, which always ends the wait before that first log, whatever the timeout; a failed install logs immediately regardless of the timeout. A component whose install is still running at the deadline keeps installing in the background, and the node serves the version already installed meanwhile, or nothing for a component that was never installed. When that install succeeds, the swap lands on disk immediately and Harper flags a restart as needed (`restartRequired` in [`get_status`](../operations-api/operations.md#set_status--get_status--clear_status) called with no `id`) — any one component's late success sets it, even while others are still installing. Code already loaded keeps running until that restart, but some component plugins apply an added or changed file on their own rather than waiting for one; content served straight from disk, such as static files, can also reflect the new version before the restart. Outside `harper dev`, which restarts automatically soon after any restart request, Harper does not restart on its own. An install that fails after the deadline does not set the flag; Harper only logs an error naming the component. `0` waits indefinitely, which was the behavior before v5.3.0. An empty value uses the default. A negative, non-finite, or otherwise unparseable value also falls back to it, with a warning in the log; _Default_: `600000` (10 minutes)
 - `payloadRetention.maxSize` <VersionBadge version="v5.1.15" /> — Bytes. After a successful deploy, a payload larger than this has its stored tarball (`payload_blob`) dropped from the `hdb_deployment` row; the row and its metadata stay. Set it very high to retain every payload; _Default_: `10485760` (10 MiB)
+- `payloadRetention.failedMaxAge` <VersionBadge version="v5.4.0" /> — A failed deploy keeps its payload, since that is what you retry or debug with. A failed payload older than this is dropped, as [`delete_deployment_payload`](../operations-api/operations.md#delete_deployment_payload) drops one, keeping the record; each project's newest failed payload is always kept. A number of seconds, or a number with a unit: `m`, `h`, `d`, `M` (30 days) or `y`. Any other value uses the default, and `0` turns the bound off; _Default_: `7d`
+- `payloadRetention.failedMaxCount` <VersionBadge version="v5.4.0" /> — How many failed payloads a project keeps, newest first, counting every node's deploys; older ones are dropped the same way. `0` turns the bound off. Both bounds apply after a deploy fails, for its project, and once at each startup. Each node drops only the payloads of deploys it received, so a deploy received by a node that has since left the cluster keeps its payload; _Default_: `2`
 - `stagingRetention.maxCount` <VersionBadge version="v5.3.0" /> — How many complete builds that are not live may remain per component under `<componentsRoot>/.deploy-staging`: builds staged with `activate: false`, and [releases replaced by a later deploy](../operations-api/operations.md#going-back-to-a-previous-release), which `deployment_id` can make live again. The newest survive; older ones are removed when that component next deploys and at startup. `drop_component` removes all of them. Each is a full installed copy of the component, `node_modules` included. `0` keeps none, and no replaced release is kept. This bounds dormant builds only, not a disk quota: staging directories that belong to an in-flight or unsettled deploy are never touched; _Default_: `5`
 
 ---

@@ -9,6 +9,9 @@ concurrency:
   group: validate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: ${{ matrix.check }}
@@ -40,3 +43,8 @@ jobs:
         run: npm ci
       - name: Run ${{ matrix.check }}
         run: npm run ${{ matrix.command }}
+      - name: Run example tests
+        if: matrix.command == 'lint'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run test:examples

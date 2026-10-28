@@ -16,7 +16,7 @@
 //   2. Hash-link anchors (<a class="hash-link">) are removed entirely.
 //      These are Docusaurus's "direct link to this heading" UI affordances
 //      and have no semantic value to an LLM. The default conversion emits
-//      noise like `[​](#anchor "Direct link to ...")` next to every heading.
+//      noise like `[\u200b](#anchor "Direct link to ...")` next to every heading.
 //
 //   3. Version badge spans (<span class="badge_*">Added in<!-- -->: ...</span>)
 //      are collapsed into clean italic text. The React render leaves empty
