@@ -80,7 +80,7 @@ Default per-profile rate-limit values for `application`: `perToolPerSecond: 25`,
 
 Per-session, per-tool token-bucket rate limits. A bucket exists per `(session, tool)` pair plus one per-session bucket across all tools. When either bucket is exhausted, `tools/call` returns `result.isError = true` with `kind: "rate_limited"` — **not** a JSON-RPC error — so the LLM can read the message and back off without the transport tearing down. The one exception is the [`initialize` limit](#mcpprofileratelimitinitializepersecond), which rejects the request with HTTP `429`.
 
-Every key accepts a quoted number in the config file (`"0.5"`) as well as a plain one.
+Every numeric key accepts a quoted number in the config file (`"0.5"`) as well as a plain one.
 
 ### `mcp.<profile>.rateLimit.perToolPerSecond`
 
@@ -146,7 +146,7 @@ Client identity is the socket IP, or the first value of [`identityHeader`](#mcpp
 - Any other IPv6 address counts as its `/64`, the block a single client is typically assigned.
 - A request with no identity (for example, a Unix-socket ingress with no `identityHeader`) shares one bucket per profile instead of going unthrottled. Past 100,000 tracked identities per profile and worker, new identities also share that bucket.
 
-The bucket is in memory per worker thread, like the others: it is not shared across workers and does not survive a restart. A client that opens fresh connections spread over the HTTP workers can get up to [`threads.count`](../configuration/options.md#threads) times the configured rate and burst; a client that reuses one connection stays on one worker and gets the configured figure.
+The bucket is in memory per thread, like the others: it is not shared across threads and does not survive a restart. On the application profile, a client that opens fresh connections spread over the HTTP workers can get up to [`threads.count`](../configuration/options.md#threads) times the configured rate and burst; a client that reuses one connection stays on one worker and gets the configured figure. The operations profile is served by the main thread only, so it admits the configured figure.
 
 A denied `initialize` gets HTTP `429` with a `Retry-After` header and a JSON-RPC error body, and no session is created:
 
@@ -158,7 +158,7 @@ A denied `initialize` gets HTTP `429` with a `Retry-After` header and a JSON-RPC
 }
 ```
 
-`Retry-After` is in whole seconds, `ceil(1 / initializePerSecond)` — the time that worker's bucket takes to refill one token. This is an HTTP-level error, not a tool result: there is no `kind: "rate_limited"` on an `initialize` denial.
+`Retry-After` is in whole seconds, `ceil(1 / initializePerSecond)` — the time the bucket takes to refill one token. This is an HTTP-level error, not a tool result: there is no `kind: "rate_limited"` on an `initialize` denial.
 
 ### `mcp.<profile>.rateLimit.initializeBurst`
 
@@ -166,7 +166,7 @@ Type: `number` (minimum 1)
 
 Default: `50`
 
-Burst capacity of the per-client `initialize` bucket — how many sessions one client identity can open back to back on one worker before the `initializePerSecond` refill applies.
+Burst capacity of the per-client `initialize` bucket — how many sessions one client identity can open back to back on one thread before the `initializePerSecond` refill applies.
 
 ### `mcp.<profile>.rateLimit.identityHeader`
 
