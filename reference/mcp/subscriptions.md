@@ -61,7 +61,7 @@ A successful subscribe returns an empty result:
 
 Two kinds of URI can be subscribed to:
 
-- **Row-backed application resources** — the `harper+rest://` URIs that mirror an exported `Resource` (the same ones `resources/list` advertises on the application profile). The URI's path is matched against the `Resources` registry, and the resource is subscribable only if its class implements `subscribe`.
+- **Row-backed application resources** — the `harper+rest://` URIs that mirror an exported `Resource` (the same ones `resources/list` advertises on the application profile). The URI's path is matched against the `Resources` registry. A table exported with [`@export`](../database/schema.md#export) is subscribable with no code of yours, and so is a class that extends one, such as `export class Product extends tables.Product`: both use the table's `subscribe`, which watches the audit-log change feed. A `Resource` class that does not extend a table sends notifications only if it implements `subscribe`; the base class's default returns a stream that stays empty.
 - **Custom resources that declare `subscribe`** (Added in: v5.4.0) — URIs published through a static `mcpResources` entry. The URI is matched exactly as `resources/read` matches it, and the entry's `subscribe` method supplies the changes. See [Subscribing to custom resources](./tools-and-resources.md#subscribing-to-custom-resources).
 
 Anything else returns `-32602`:
