@@ -1133,7 +1133,7 @@ A to-many relationship resolves to an array of records; depending on access patt
 
 :::note Pending release
 
-Targeted for v5.4.0; not released yet. See [Honor nested relationship filters and pagination](https://github.com/HarperFast/harper/pull/3279).
+Targeted for v5.4.0; not released yet. See [Honor nested relationship filters and pagination](https://github.com/HarperFast/harper/pull/3279) and [Fix wrong rows, unfiltered selects and ignored sorts in relationship queries](https://github.com/HarperFast/harper/pull/3775).
 
 :::
 
@@ -1253,7 +1253,7 @@ Product.search({
 
 Alternatively, pass `allowFullScan: true` to permit an unconditional ordered scan, or — if order doesn't matter — omit `sort` entirely and `search({})` will iterate without an index requirement.
 
-<VersionBadge version="v5.4.0" /> When `attribute` is a path array that traverses a to-many relationship, each parent's sort key is the list of its related records' values in relationship order (index order for a `@relationship(to: ...)` field, or foreign-key array order for a `@relationship(from: ...)` array). Lists compare element by element like an array-valued attribute (`['alpha']` < `['alpha', 'delta']` < `['bravo']`), `descending: true` reverses that order, and a parent with no related records has an empty list (`[]`). Paths with more hops such as `['departments', 'employees', 'tag']` work too. Unlike a nested `select` sort (`select: [{ name: 'children', sort: { attribute: 'sortKey' } }]`), which orders the children within each parent and not the parents, a top-level `sort` orders the parent records:
+<VersionBadge type="changed" version="v5.4.0" /> When `attribute` is a path array that traverses a to-many relationship, each parent's sort key is the list of its related records' values (`children.sortKey` for every child) in relationship order: the related records' primary-key order in the foreign-key index for a `@relationship(to: ...)` field (not sorted by the target attribute or reduced to a min/max), or the stored foreign-key array order for a `@relationship(from: ...)` array. Lists compare element by element like an array-valued attribute (`['alpha']` < `['alpha', 'delta']` < `['bravo']`), `descending: true` reverses that order, a parent with no related records has an empty list (`[]`), and a missing attribute or unresolved foreign-key entry contributes `undefined` (or `null`) at that position. Paths with more hops such as `['departments', 'employees', 'tag']` work too: each to-many hop produces a list in relationship order, so multiple to-many hops compare nested lists element by element at each level. The index-or-condition rule above checks `@indexed` on the target attribute at the end of the path; when the query filters by another condition, Harper filters first, loads the related records for the matched parents, and sorts the matched parents in memory. Unlike a nested `select` sort (`select: [{ name: 'children', sort: { attribute: 'sortKey' } }]`), which orders the children within each parent and not the parents, a top-level `sort` orders the parent records:
 
 ```javascript
 Parent.search({
