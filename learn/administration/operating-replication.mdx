@@ -105,7 +105,10 @@ There is one socket per database per peer, so the sockets present in the respons
 Measure incremental catch-up and full synchronization separately. Peers retain transaction history for [`logging.auditRetention`](/reference/v5/logging/configuration#loggingauditretention) (default `3d`), but purge it sooner under disk pressure. When a saved position predates a peer's oldest retained history, the peer logs `forcing a bounded base-copy resync` and sends its current rows as writes. Incremental replay resumes from the copy's start time. The copy never clears tables or deletes rows: purged tombstones are absent, and retained tombstones arrive as writes without values that the receiver skips. It also runs in reverse. The returning node sends its rows to peers, including writes only it took. A copied row wins where it is newer; where a peer has purged a deletion's tombstone, the deleted row can reappear.
 
 :::danger
-**A long-absent node must not reconnect with its existing data.** If it was disconnected longer than its peers retain history, or you cannot show otherwise, keep it out of rotation and isolate replication before Harper starts. Export any writes no peer has while it is isolated. If peers hold the authoritative data, [remove the node](/reference/v5/replication/clustering#remove-node), reinstall it with empty databases, and [add it as a new node](/reference/v5/replication/clustering#add-node). After synchronization, reapply exported writes through your application. If this node is authoritative, follow [restoring in a replicated cluster](./backup-and-recovery.mdx#restoring-in-a-replicated-cluster).
+**A long-absent node must not reconnect with its existing data.** If it was disconnected longer than its peers retain history, or you cannot show otherwise, keep it out of rotation and isolate replication before Harper starts. Then rebuild whichever side does not hold the authoritative data:
+
+- **Peers are authoritative.** Export any writes only this node has. [Remove the node](/reference/v5/replication/clustering#remove-node), reinstall it with empty databases, and [add it as a new node](/reference/v5/replication/clustering#add-node). After synchronization, reapply the exported writes through your application.
+- **This node is authoritative**, as when you [restored it](./backup-and-recovery.mdx#restoring-in-a-replicated-cluster) to undo a destructive write. Keep it isolated and export any writes only the peers have. Take each peer out of rotation, remove it, and reinstall it with empty databases. Once no peer holds its old data, lift this node's isolation and add each peer back as a new node, so it copies from this node. Verify convergence on each peer before returning it to rotation, then reapply the exported writes. This node serves alone until the first peer returns, so confirm it can carry the load before you take the peers out.
 
 There is no resync or reconcile operation. `remove_node` removes the registry entry; a later copy only adds or updates rows. `cluster_status`, a finished copy, and a sentinel write are not evidence of reconciliation: they show a connection, streamed rows, or working replay after the copy. Configured routes reconnect as soon as Harper starts.
 :::
@@ -264,7 +267,7 @@ On a non-production cluster under write load:
 - [ ] Alerts configured on missing peers, sustained latency growth, stalled commit progress during writes, and stale sentinel values
 - [ ] Non-commutative operations identified and given an owner, a serialization point, or an external coordinator
 - [ ] Replication certificate expiry dates tracked with an alert
-- [ ] Long-absent node policy decided in advance: isolate replication and rebuild from empty before reconnecting when peers are authoritative; otherwise follow the restore policy
+- [ ] Long-absent node policy decided in advance: isolate replication and rebuild this node from empty when peers are authoritative, or rebuild the peers from it when it is
 - [ ] Replication interruption and recovery exercise completed and dated
 
 ## Additional Resources

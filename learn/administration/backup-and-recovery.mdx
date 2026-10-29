@@ -198,7 +198,7 @@ For an in-place recovery:
    For an offline restore, use the [local CLI procedure](/reference/v5/backups/operations#running-backup-operations-from-the-cli). For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped and its process exited, including the blob roots.
 
 5. Verify data expectations locally before any peer sees the node.
-6. Reconnect replication under the policy you proved in an isolated multi-node drill. If that policy would reintroduce corruption from a peer, keep the affected peers isolated and reconcile their data first. Verify convergence, then complete the traffic-admission checks before restoring traffic.
+6. Reconnect replication under the policy you proved in an isolated multi-node drill. If peers still hold the data this restore was meant to undo, do not reconnect this node to them: rebuild them from it, as the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) describes for an authoritative node. Verify convergence, then complete the traffic-admission checks before restoring traffic.
 
 :::danger
 **Draining traffic does not stop replication.** A drained node continues exchanging transactions with peers. An offline restore stops that exchange while Harper is down, but configured routes can reconnect as soon as it starts. Keep replication isolated until validation is complete and you are ready to execute the re-entry policy.

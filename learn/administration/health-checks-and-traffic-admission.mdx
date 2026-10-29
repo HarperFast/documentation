@@ -278,12 +278,12 @@ flowchart TD
    curl -s -X POST https://node-1.example.com/status -u 'admin:password'
    ```
 
-5. **Do the work.** Restart, upgrade, reconfigure, or investigate.
+5. **Do the work.** Restart, upgrade, reconfigure, or investigate. If Harper may stay down longer than its peers retain history, or you cannot rule that out, [isolate replication](./backup-and-recovery.mdx#restoring-in-a-replicated-cluster) before Harper starts again and follow the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). Configured routes reconnect as soon as Harper starts, so a check after startup is too late.
 
   </TabItem>
   <TabItem value="return" label="Returning">
 
-1. **Confirm the databases are current.** Check the expected peer sockets for every database this node serves and verify convergence. If the node was disconnected longer than its peers retain history, or you cannot show otherwise, `cluster_status` and a sentinel are not enough. Keep replication isolated before startup and do not return it until it has been rebuilt or reconciled under the [replication guide's policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). For a routine return with retained history:
+1. **Confirm the databases are current.** Check the expected peer sockets for every database this node serves and verify convergence. If you isolated replication in Draining step 5, `cluster_status` and a sentinel are not enough: keep it isolated until this node or its peers have been rebuilt under the [replication guide's policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). For a routine return with retained history:
 
    ```bash
    harper cluster_status target=https://node-1.example.com:9925 json=true

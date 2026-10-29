@@ -74,7 +74,7 @@ From [Operating Replication](./operating-replication.mdx).
 - [ ] Alerts on missing peers, sustained latency growth, stalled commit progress during writes, and stale sentinel values
 - [ ] Non-commutative operations identified and given an owner, a serialization point, or an external coordinator
 - [ ] Replication certificate expiry tracked with an alert
-- [ ] Long-absent node policy decided in advance: isolate replication and rebuild from empty before reconnecting when peers are authoritative; otherwise follow the restore policy
+- [ ] Long-absent node policy decided in advance: isolate replication and rebuild this node from empty when peers are authoritative, or rebuild the peers from it when it is
 - [ ] Replication interruption and recovery exercise completed and dated
 
 ## Deployment and rollback

@@ -186,16 +186,17 @@ Neither mode takes a node out of rotation, drains its connections, or runs your 
 
 ### Wait for every node
 
-Before v5.4.0, or when `certification` is `unavailable`, a rolling deploy returns once the node you called has the release. Poll its `restartJobId` until `COMPLETE` or `ERROR`:
+Before v5.4.0, or when `certification` is `unavailable`, a rolling deploy returns once the node you called has the release. Log in to one node's own URL, deploy to it, and poll its `restartJobId` there until `COMPLETE` or `ERROR`:
 
 ```bash
-harper deploy project=my-app restart=rolling json=true > deploy.json
+harper login https://node-1.example.com:9925
+harper deploy project=my-app restart=rolling target=https://node-1.example.com:9925 json=true > deploy.json
 (
   JOB_ID=$(jq -r '.restartJobId // empty' deploy.json)
   [ -n "$JOB_ID" ] || { echo "The rolling deploy returned no restartJobId"; exit 1; }
   for attempt in $(seq 60); do
     sleep 10
-    harper get_job id="$JOB_ID" json=true > job.json || continue
+    harper get_job id="$JOB_ID" target=https://node-1.example.com:9925 json=true > job.json || continue
     case $(jq -r '.[0].status // "MISSING"' job.json) in
       COMPLETE) echo COMPLETE; exit 0 ;;
       ERROR) jq -r '.[0].message' job.json; exit 1 ;;
@@ -207,7 +208,7 @@ harper deploy project=my-app restart=rolling json=true > deploy.json
 )
 ```
 
-Jobs are not replicated, so deploy to and poll the same node's direct URL. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). Without certification, including before v5.4.0, a `COMPLETE` job can still leave a node it could not reach on the old release. Check the serving version on every node afterwards.
+Jobs are not replicated, so the script deploys to and polls one node rather than the load-balanced cluster URL in `.env`, where a poll can reach a node that never saw the job. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). Without certification, including before v5.4.0, a `COMPLETE` job can still leave a node it could not reach on the old release. Check the serving version on every node afterwards.
 
 Two deploy parameters control replication failures:
 
