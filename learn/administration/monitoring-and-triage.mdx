@@ -81,7 +81,7 @@ harper deploy project=prometheus-exporter package=@harperdb/prometheus-exporter 
   restart=rolling target=https://node-1.example.com:9925
 ```
 
-Once deployed, the scrape endpoint is `/<project>/metrics` on the application port, so the call above exposes it at `/prometheus-exporter/metrics`. The route is authorized, so give your scraper a credential rather than expecting it to be open.
+Once deployed, the scrape endpoint is `/prometheus_exporter/metrics` on the application port. The route comes from the package's exported name, `prometheus_exporter`, regardless of the `project` you deploy it as. The route is authorized, so give your scraper a credential rather than expecting it to be open.
 
 :::warning
 **The exporter does not cover every metric in the alert table above.** It translates the request and replication metrics, including `success`, `duration`, and `replication-latency`, but it does not currently export `main-thread-utilization` and its `taskQueueLatency` attribute, `transaction-commit-time`, `write-transaction-queue-depth`, `database-size`, `storage-volume`, or `table-size`. The `utilization` it does expose is a thread utilization figure drawn from `system_information`, which is not the same as the analytics `utilization` metric.

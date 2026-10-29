@@ -49,7 +49,39 @@ harper deploy project=status-check package=@harperdb/status-check \
   replicated=false restart=true target=https://node-1.example.com:9925
 ```
 
-Repeat on each node, or declare it in each node's root `harper-config.yaml`:
+:::warning
+`@harperdb/status-check` 1.0.2 deploys successfully but returns `500` for every `/status` request under Harper's default module loader on v5.1.0 and later. Its startup code uses `await` outside an async function before its first `export`, which the loader cannot parse.
+
+Download and extract the package:
+
+```bash
+npm pack @harperdb/status-check@1.0.2
+tar -xzf harperdb-status-check-1.0.2.tgz
+```
+
+In `package/resources.js`, replace the `if (server.workerIndex == 0)` startup block with:
+
+```javascript
+if (server.workerIndex == 0) {
+	(async () => {
+		let record = await hdb_status.get(1);
+		if (!record) {
+			await hdb_status.put({ id: 1, status: 200, message: DEFAULT_200_MSG });
+		}
+	})();
+}
+```
+
+Deploy the patched directory to each node:
+
+```bash
+(cd package && harper deploy project=status-check replicated=false restart=true target=https://node-1.example.com:9925)
+```
+
+The root `harper-config.yaml` declaration below loads the same broken release until a fixed one is published.
+:::
+
+You can also declare the package in each node's root `harper-config.yaml`, subject to the warning above:
 
 ```yaml
 status-check:

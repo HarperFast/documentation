@@ -101,8 +101,12 @@ harper get_backup database=data target=https://node-2.example.com:9925 out=./dat
 
 **If the database has no file-backed blobs,** the archive extracts into a directory that opens directly as a RocksDB database. Stop Harper, replace the database's directory under the storage path with the extracted archive, and start Harper again:
 
+`harper stop` returns before Harper finishes closing databases, so the procedures below capture its PID and wait for the process to exit before changing files.
+
 ```bash
+HARPER_PID=$(cat ~/hdb/hdb.pid)
 harper stop
+while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
 mv ~/hdb/database/data ~/hdb/database/data.old # optional: keep a copy of the previous database
 mkdir -p ~/hdb/database/data
 tar -xzf data.tar.gz -C ~/hdb/database/data
@@ -112,7 +116,9 @@ harper start
 **If the database has file-backed blobs,** the RocksDB files and the `blobs/` tree restore to different locations: the RocksDB files into the database directory, and each `blobs/<rootIndex>/...` tree into its blob root (by default `<rootPath>/blobs/<database>`, or the paths configured in [`storage.blobPaths`](../configuration/options.md#storage); the archive's `blobs/README.md` lists the index-to-path mapping). Extracting the whole archive into the database directory would bury the blobs where the engine can't find them, silently losing blob data. Restore the two parts separately:
 
 ```bash
+HARPER_PID=$(cat ~/hdb/hdb.pid)
 harper stop
+while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
 # 1. RocksDB files -> database directory (exclude the blobs tree)
 mv ~/hdb/database/data ~/hdb/database/data.old # optional: keep a copy of the previous database
 mkdir -p ~/hdb/database/data
@@ -142,7 +148,9 @@ harper get_backup database=data target=https://node-2.example.com:9925 out=./dat
 To restore it, stop Harper, replace the database's `.mdb` file under the storage path (`<storage.path>/<database>.mdb`) with the downloaded file, and start Harper again:
 
 ```bash
+HARPER_PID=$(cat ~/hdb/hdb.pid)
 harper stop
+while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
 mv ~/hdb/database/data.mdb ~/hdb/database/data.mdb.old # optional: keep a copy of the previous database
 cp data.mdb ~/hdb/database/data.mdb
 harper start

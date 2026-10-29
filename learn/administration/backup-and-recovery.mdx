@@ -116,7 +116,7 @@ harper get_backup database=data target=https://operations.node-2.example.com out
 
 `target=` only changes which node the snapshot is read from. It writes a file and nothing else: it does not restore, import, or clone that node's database onto the local one.
 
-`restore_backup` accepts only a managed `backup_id` from the node's own repository; it cannot read a `get_backup` file. Follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped. For RocksDB, extract the engine files excluding `blobs/` into the database directory, then extract each `blobs/<rootIndex>/` tree into its configured blob root. Extracting the whole archive into the database directory loses blob data; `exclude_blobs=true` archives contain none. For LMDB, replace `<storage.path>/<database>.mdb`; recover external blobs from a coordinated filesystem or volume backup.
+`restore_backup` accepts only a managed `backup_id` from the node's own repository; it cannot read a `get_backup` file. Follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped and its process exited. For RocksDB, extract the engine files excluding `blobs/` into the database directory, then extract each `blobs/<rootIndex>/` tree into its configured blob root. Extracting the whole archive into the database directory loses blob data; `exclude_blobs=true` archives contain none. For LMDB, replace `<storage.path>/<database>.mdb`; recover external blobs from a coordinated filesystem or volume backup.
 
 Note also that `get_backup` always streams the current state. It cannot download a historical managed backup, so it is a way to take a fresh off-host copy, not a way to export your retention history.
 
@@ -195,7 +195,7 @@ For an in-place recovery:
    harper restore_backup database=data backup_id=1 target=https://node-1.example.com:9925 json=true
    ```
 
-   For an offline restore, use the [local CLI procedure](/reference/v5/backups/operations#running-backup-operations-from-the-cli). For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped, including the blob roots.
+   For an offline restore, use the [local CLI procedure](/reference/v5/backups/operations#running-backup-operations-from-the-cli). For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped and its process exited, including the blob roots.
 
 5. Verify data expectations locally before any peer sees the node.
 6. Reconnect replication under the policy you proved in an isolated multi-node drill. If that policy would reintroduce corruption from a peer, keep the affected peers isolated and reconcile their data first. Verify convergence, then complete the traffic-admission checks before restoring traffic.

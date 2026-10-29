@@ -35,7 +35,7 @@ Set the cluster's Operations API URL in your project's `.env`:
 HARPER_CLI_TARGET='https://my-cluster.example.com:9925'
 ```
 
-`npm create harper@latest` asks for your cluster URL and writes it here, normalized to `https://<host>:9925`. If you skipped the prompt, replace the placeholder. From the project directory, log in:
+`npm create harper@latest` asks for your cluster URL and writes it here, adding `https://` if you omit the scheme and port `9925` if you omit the port. If you skipped the prompt, replace the placeholder. From the project directory, log in:
 
 ```bash
 harper login
@@ -235,13 +235,15 @@ harper deploy project=my-app deployment_id=<deployment_id> restart=true
 
 Nothing is rebuilt or reinstalled. The command waits for every node to answer; check the serving version on every node afterwards. A node that no longer keeps the release refuses it: [`deployment.stagingRetention.maxCount`](/reference/v5/configuration/options#deployment) sets how many replaced releases each node keeps, defaulting to `5`. See [going back to a previous release](/reference/v5/operations-api/operations#going-back-to-a-previous-release) for which releases are kept.
 
-Before v5.3.0, or when no node keeps the release, deploy the previous release again: check out its commit and repeat the deploy, or pass the previous version as `package`.
+A kept release that loaded a component through a `package:` entry, such as the templates' `@harperfast/schema-codegen`, cannot be activated: the deploy fails with HTTP `409` and a message saying a `node_modules/.../node_modules/harper` link "links outside the build". Releases without `package:` entries, such as the built-once frontend above, activate normally.
+
+Before v5.3.0, when no node keeps the release, or when a `package:` component prevents activation, deploy the previous release again: check out its commit and repeat the deploy, or pass the previous version as `package`.
 
 ### From Studio
 
 <VersionBadge version="v5.3.0" />
 
-In [Harper Studio](/reference/v5/studio/overview), open the cluster and go to **Config > Deployments**. Open the release you want back and choose **Roll back to this release**. Studio activates it on every node, one at a time, and shows the rollout's progress. Check the serving version on every node afterwards.
+In [Harper Studio](/reference/v5/studio/overview), open the cluster and go to **Config > Deployments**. Open the release you want back and choose **Roll back to this release**. Studio activates the same kept release on every node, one at a time, and shows the rollout's progress; the same `package:` component limit applies. Check the serving version on every node afterwards.
 
 ## Limit a release's first traffic
 

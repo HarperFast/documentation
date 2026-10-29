@@ -329,6 +329,15 @@ Stop a running Harper instance.
 harper stop
 ```
 
+`harper stop` signals Harper and returns without waiting for it to exit. Harper removes [`hdb.pid`](./overview.md#process-id-file) from `<rootPath>` as it begins shutting down, so `harper status` can report `stopped` while it is still closing databases. Before touching database or backup files, capture the PID before stopping Harper and wait for the process itself to exit:
+
+```bash
+# For rootPath ~/hdb
+HARPER_PID=$(cat ~/hdb/hdb.pid)
+harper stop
+while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
+```
+
 ## Installation Commands
 
 ### `harper install`
