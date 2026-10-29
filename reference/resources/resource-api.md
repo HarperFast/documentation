@@ -1253,6 +1253,15 @@ Product.search({
 
 Alternatively, pass `allowFullScan: true` to permit an unconditional ordered scan, or — if order doesn't matter — omit `sort` entirely and `search({})` will iterate without an index requirement.
 
+<VersionBadge version="v5.4.0" /> When `attribute` is a path array that traverses a to-many relationship, each parent's sort key is the list of its related records' values in relationship order (index order for a `@relationship(to: ...)` field, or foreign-key array order for a `@relationship(from: ...)` array). Lists compare element by element like an array-valued attribute (`['alpha']` < `['alpha', 'delta']` < `['bravo']`), `descending: true` reverses that order, and a parent with no related records has an empty list (`[]`). Paths with more hops such as `['departments', 'employees', 'tag']` work too. Unlike a nested `select` sort (`select: [{ name: 'children', sort: { attribute: 'sortKey' } }]`), which orders the children within each parent and not the parents, a top-level `sort` orders the parent records:
+
+```javascript
+Parent.search({
+	conditions: [{ attribute: 'group', value: 'sort-grp' }],
+	sort: { attribute: ['children', 'sortKey'] },
+});
+```
+
 ### `explain`
 
 If `true`, returns conditions reordered as Harper will execute them (for debugging and optimization).
