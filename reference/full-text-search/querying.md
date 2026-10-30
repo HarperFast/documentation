@@ -21,14 +21,14 @@ Results are ordered by BM25 relevance. The `FullText` field, not one of its sour
 
 ## Match modes
 
-| Comparator             | Behavior                                                              | Required index option |
-| ---------------------- | --------------------------------------------------------------------- | --------------------- |
-| `matches`              | Matches any analyzed query term.                                      | —                     |
-| `matches_all`          | Requires every analyzed query term.                                   | —                     |
-| `matches_phrase`       | Matches analyzed terms in order as a phrase.                          | `positions: true`     |
-| `matches_prefix`       | Matches records whose analyzed terms start with the final query term. | `surfaceTerms: true`  |
-| `matches_fuzzy`        | Matches terms with configurable edits and transpositions.             | —                     |
-| `matches_fuzzy_prefix` | Combines configurable fuzzy matching with a final-term prefix.        | `surfaceTerms: true`  |
+| Comparator                       | Behavior                                                              | Required index option |
+| -------------------------------- | --------------------------------------------------------------------- | --------------------- |
+| `matches`                        | Matches any analyzed query term.                                      | —                     |
+| `matches_all`                    | Requires every analyzed query term.                                   | —                     |
+| `matches_phrase`                 | Matches analyzed terms in order as a phrase.                          | `positions: true`     |
+| `matches_prefix`                 | Matches records whose analyzed terms start with the final query term. | `surfaceTerms: true`  |
+| `matches_fuzzy`                  | Matches terms with configurable edits and transpositions.             | —                     |
+| `matches_fuzzy_prefix` (preview) | Combines configurable fuzzy matching with a final-term prefix.        | `surfaceTerms: true`  |
 
 Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix`.
 
@@ -74,7 +74,9 @@ const products = Product.search({
 
 Retrieval, additional batches and highlights use the same controls. Other match modes reject them, even when their values equal the defaults. Supply numbers and booleans, not strings such as `"1"` or `"false"`. Put controls on each text condition, not on a Boolean group. REST query-string comparators keep their defaults; use a permission-checked application resource or the Operations API for structured controls.
 
-Distance two is preview and requires operator opt-in through `storage.fullText.query.maxFuzzyDistance: 2`; the default maximum is one. Fuzzy-prefix is also preview. Qualify the actual corpus and concurrency before exposing these options: queue admission and cooperative deadlines do not impose a hard process-memory bound. Phrase slop is not exposed.
+Fuzzy edits apply only to eligible analyzed surface terms: at least four characters, alphabetic content, and no numeric characters, hyphens, underscores or slashes. Other terms receive no fuzzy expansion; fuzzy controls do not override native eligibility or the normal final-term prefix behavior.
+
+Distance two is preview and requires operator opt-in through `storage.fullText.query.maxFuzzyDistance: 2`; the default maximum is one. Fuzzy-prefix is also preview. Qualify the actual corpus and concurrency before exposing these options: queue admission and cooperative deadlines do not impose a hard process-memory bound.
 
 ## Restricting source fields
 
@@ -236,13 +238,13 @@ For example, `offset: 100` and `limit: 10` skip the first 100 eligible records a
 
 `storage.fullText.maxRawHitsPerRequest`, `storage.fullText.maxResultsPerRequest` and `storage.fullText.requestBudgetMilliseconds` bound fetched work, retained results and execution time. Replayed or rejected hits consume raw work; a request can exhaust that budget before reaching its result target. The execution budget is not a hard response-time guarantee; reader acquisition and some native work can take additional time. See [storage configuration](../configuration/options.md#storage) for the controls and [REST paging and counts](../rest/querying.md#pagination-and-total-count) for URL syntax and count behavior.
 
+Each offset request runs a new query and revisits earlier matches, so deeper offsets increase fetched work and source reads. Prefer narrower filters and a bounded maximum offset over repeatedly raising budgets. Each query can see changed records, permissions or index contents. Pages can therefore repeat or omit records during concurrent changes. There are no continuation tokens, close operations or retained searches across requests.
+
 ### Host query capacity
 
 The default native policy allows 64 analyzed terms per text condition and 256 compiled clauses per query. Operators can configure `storage.fullText.query.maxQueryTerms` (1-1,024) and `maxQueryClauses` (1-4,096), within the loaded native runtime's ceilings. Boolean groups, NOT and field expansion also consume clause capacity. Raising fetched-hit or retained-result budgets does not raise these limits.
 
 The host policy is captured once for the full Harper process, inherited by workers and applied to reader handles, including reopened readers. A full process restart is required; a worker-only restart does not apply changes. Requests cannot raise the policy. Overflow returns an explicit `400`, never a truncated query. Other depth, byte, phrase/fuzzy construction, queue, response and deadline safeguards continue to apply. Native deadlines are cooperative; they cannot interrupt every construction step immediately. See [storage configuration](../configuration/options.md#storage).
-
-Each offset request runs a new query and revisits earlier matches, so deeper offsets increase fetched work and source reads. Prefer narrower filters and a bounded maximum offset over repeatedly raising budgets. Each query can see changed records, permissions or index contents. Pages can therefore repeat or omit records during concurrent changes. There are no continuation tokens, close operations or retained searches across requests.
 
 ## REST
 

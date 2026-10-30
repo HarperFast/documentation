@@ -26,7 +26,7 @@ Full-text request work limits (`storage.fullText.maxRawHitsPerRequest`, `storage
 
 Additional properties correspond to configuration keys in underscore-separated format (e.g. `logging_level` for `logging.level`, `clustering_enabled` for `clustering.enabled`).
 
-For full-text settings, use individual parameter names such as `storage_fullText_maxRawHitsPerRequest` `storage_fullText_runtime_maxSearchThreads` or `storage_fullText_query_maxQueryTerms`. `set_configuration` does not accept a whole `storage_fullText` object; use `storage.fullText` as the section name only in the YAML configuration file.
+For full-text settings, use individual parameter names such as `storage_fullText_maxRawHitsPerRequest`, `storage_fullText_runtime_maxSearchThreads` or `storage_fullText_query_maxQueryTerms`. `set_configuration` does not accept a whole `storage_fullText` object; use `storage.fullText` as the section name only in the YAML configuration file.
 
 :::warning Replicate cluster-appropriate parameters only
 A replicated call sends the exact same values to every node. Do not include node-local parameters — ports, `node.hostname`, `rootPath`, storage/log file paths, TLS certificate or key paths, or `replication.hostname`/`url`/`routes` — as they would overwrite each peer's local values.

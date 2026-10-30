@@ -61,7 +61,7 @@ Use `describe_table` to inspect each index's declaration and readiness. See [Ins
 
 Harper 5.3.1–5.3.4 ship `@harperfast/fulltext` 0.5.0. Upgrading their current field-based indexes to the 0.8.0 engine in Harper v5.4 requires a full local rebuild. Harper 5.3.0 ships fulltext 0.3.0 and is outside this qualified procedure; plan and validate that migration separately. Prerelease installations using fulltext 0.6 also require rebuilding. This procedure applies to the current field-based declarations; earlier beta declarations and indexes have no supported migration path. Harper initiates the rebuild automatically when the wrapper refuses the old persisted identity; no manual rebuild command or file editing is needed.
 
-Existing text-only indexes written by fulltext 0.7.0 are reusable with 0.8.0; query policy and fuzzy controls do not change their storage identity. Stop all processes sharing the local index before switching versions. Remove new `storage.fullText.query` settings before returning to an older Harper version whose configuration validator does not recognize them. Bounded checkpoint reuse tests are not an operator rollback qualification.
+For prerelease installations using fulltext 0.7.0, Harper's indexes store text fields without native structured-filter metadata and remain reusable with 0.8.0. Query policy and fuzzy controls do not change that storage identity. Stop all processes sharing a local index before switching versions. Remove new `storage.fullText.query` settings before returning to an older Harper whose configuration validator does not recognize them. This compatibility does not establish a qualified operator rollback procedure. Statement applies only to Harper's existing index declarations.
 
 ### Matching and ranking changes
 
@@ -113,7 +113,3 @@ See [Querying](./querying.md) for exact condition rules and [Configuration](./co
 The local index stores tokenized terms, posting lists, optional positions and surface terms, and checkpoint metadata. It does not store an authoritative copy of each record. Harper always loads current table records before returning results, and it can discard and rebuild this derived state from committed data.
 
 Protect the index directory with the same filesystem controls as Harper data. Deleted source terms can remain in obsolete Tantivy segment files until normal merge and reclamation removes them; removal from query results does not imply immediate physical erasure.
-
-## Features outside this upgrade
-
-Installing fulltext 0.8.0 does not expose native metadata sorting, structured-filter pushdown, candidate-ID pushdown, facets or nested aggregations in Harper. Ordinary structured conditions still use Harper's secondary indexes and current-record predicates. Those features require separate schema, authorization, index-freshness and workload qualification; post-filtering individual hits cannot repair counts or facets already collected over an ineligible match set.
