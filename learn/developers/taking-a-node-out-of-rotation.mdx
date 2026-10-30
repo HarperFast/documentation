@@ -587,9 +587,13 @@ tail -f root/log/hdb.log | grep availability
 5. **A restart.** With the node out and the dependency back up, restart Harper, in the terminal where you exported the variables:
 
    ```bash
+   HARPER_PID=$(cat "$ROOTPATH/hdb.pid")
    npx harper stop
+   while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
    npx harper start
    ```
+
+   `harper stop` returns before Harper exits, so the loop waits for the old process before starting a new one.
 
    The record is still `Unavailable` after the restart. The loop finds its marker, and puts the node back about 60 seconds after Harper starts.
 
