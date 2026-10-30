@@ -1,0 +1,353 @@
+---
+title: Health Checks and Traffic Admission
+sidebar_position: 2
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+An HTTP response proves that a Harper node is running. Before sending user traffic to it, also check that its data is current and the application can serve the requested journey.
+
+This guide explains the checks to use and the order for draining a node, changing it, and returning it to service.
+
+## What You Will Learn
+
+- Why liveness, availability, readiness, and journey verification are four signals rather than one, and which layer consumes each
+- How to control node availability on Fabric or with `@harperdb/status-check` on a self-managed cluster
+- How to write an application readiness route that checks only what the routed journey needs
+- The order of operations for draining a node and returning it to service
+- What makes a readiness endpoint safe under load, and what makes one dangerous
+
+## Prerequisites
+
+- A Harper cluster with at least two nodes, so draining one leaves a service behind ([Fabric](/fabric) or self-managed)
+- A `super_user` credential for the Operations API
+- A traffic layer you can configure health checks on: a load balancer, a CDN origin group, or a service mesh
+- [How Harper Runs in Production](./how-harper-runs-in-production.mdx), and your ports written down
+
+## Four signals, not one
+
+| Signal                     | Where it lives                                 | What it proves                                        | Who consumes it                    |
+| -------------------------- | ---------------------------------------------- | ----------------------------------------------------- | ---------------------------------- |
+| Process liveness           | A trivial response on the node's HTTP endpoint | Harper is running                                     | Process supervisor, restart policy |
+| Node availability flag     | `GET /status` on the application URL           | An operator or automation says this node should serve | Traffic layer health check         |
+| Application readiness      | A component route on the application URL       | This node passes its admission checks                 | Operator or admission controller   |
+| Critical-journey synthetic | A real request through the public route        | Users are actually being served                       | Your SLO and alerting              |
+
+The availability flag lets an operator or automation control whether a node receives new traffic. Use it as the routing signal, and use readiness, replication checks, and journey tests to decide when to set it.
+
+## Install the availability flag
+
+On **Fabric**, the status component is already installed. It reads the node's `availability` record in `system.hdb_status`. Use the CLI to change that record, as described in [Load Balancing and Node Availability](/fabric/load-balancing#taking-a-node-out-of-rotation). Fabric also writes it during maintenance. Do not install the npm package below on Fabric: it serves the same `/status` path but uses a different table.
+
+For CLI commands, log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
+
+On a **self-managed cluster**, [`@harperdb/status-check`](https://github.com/HarperFast/status-check) adds a `/status` route on the application port. Deploy it with:
+
+```bash
+harper deploy project=status-check package=@harperdb/status-check \
+  replicated=false restart=true target=https://node-1.example.com:9925
+```
+
+:::warning
+`@harperdb/status-check` 1.0.2 deploys successfully but returns `500` for every `/status` request under Harper's default module loader on v5.1.0 and later. Its startup code uses `await` outside an async function before its first `export`, which the loader cannot parse.
+
+Download and extract the package:
+
+```bash
+npm pack @harperdb/status-check@1.0.2
+tar -xzf harperdb-status-check-1.0.2.tgz
+```
+
+In `package/resources.js`, replace the `if (server.workerIndex == 0)` startup block with:
+
+```javascript
+if (server.workerIndex == 0) {
+	(async () => {
+		let record = await hdb_status.get(1);
+		if (!record) {
+			await hdb_status.put({ id: 1, status: 200, message: DEFAULT_200_MSG });
+		}
+	})();
+}
+```
+
+Deploy the patched directory to each node:
+
+```bash
+(cd package && harper deploy project=status-check replicated=false restart=true target=https://node-1.example.com:9925)
+```
+
+The root `harper-config.yaml` declaration below loads the same broken release until a fixed one is published.
+:::
+
+You can also declare the package in each node's root `harper-config.yaml`, subject to the warning above:
+
+```yaml
+status-check:
+  package: '@harperdb/status-check'
+```
+
+:::note
+This entry belongs in the root `harper-config.yaml` under the Harper `rootPath`, typically `~/hdb`. An application's `config.yaml` configures its plugins and replaces the default plugin configuration. See [applications](/reference/v5/components/applications).
+:::
+
+The self-managed component provides these routes:
+
+- `GET /status` returns `200` when the node is available, `404` when it is not
+- `POST /status` marks the node available (authenticated)
+- `DELETE /status` marks the node unavailable (authenticated)
+
+Use the target node's application URL. The examples assume HTTPS is configured on that URL; a default local installation uses `http://localhost:9926`.
+
+<Tabs>
+  <TabItem value="curl" label="curl">
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://my-node.example.com/status
+
+curl -s -X DELETE https://my-node.example.com/status -u 'admin:password'
+
+curl -s -X POST https://my-node.example.com/status -u 'admin:password'
+```
+
+  </TabItem>
+  <TabItem value="fetch" label="fetch">
+
+```javascript
+const base = 'https://my-node.example.com/status';
+const auth = { Authorization: 'Basic ' + btoa('admin:password') };
+
+const res = await fetch(base);
+console.log(res.status);
+
+await fetch(base, { method: 'DELETE', headers: auth });
+await fetch(base, { method: 'POST', headers: auth });
+```
+
+  </TabItem>
+</Tabs>
+
+Point the traffic layer's health check at `GET /status` on each node's application URL. A `404` should stop new traffic reaching that node. Existing connections may remain open, so measure the drain before restarting it.
+
+:::note
+Both implementations keep the flag node-local with `replicate: false`. Preserve that setting if you fork a component or store the flag elsewhere. A replicated flag could take every peer out of rotation when you drain one node.
+:::
+
+### A note on `set_status`
+
+The Operations API also offers [`set_status`, `get_status`, and `clear_status`](/reference/v5/operations-api/operations#set_status--get_status--clear_status) for application-defined status values, with types for primary, maintenance, and availability.
+
+On Fabric, `set_status` with `id=availability` controls the record its status component reads. The self-managed npm package uses its own `data.hdb_status` table, so `set_status` does not control that package. Use its `POST /status` and `DELETE /status` routes instead. Neither flag measures application health by itself.
+
+## Write an application readiness route
+
+Liveness and the availability flag both answer questions about the node. Readiness answers a question about the journey: if traffic arrives for this route right now, will it succeed?
+
+Use readiness to gate admission, not as the load balancer's direct routing signal. Keep node-local failures separate from shared dependency failures: taking every node out during a shared outage removes capacity without fixing the dependency. Report shared failures as degradation and use journey tests to measure their user impact.
+
+Add a node-local probe table to your application's schema. Keep the `graphqlSchema` and `rest` plugins enabled so the authenticated seeding request below can reach the table:
+
+```graphql
+type ReadinessProbe @table(replicate: false) @export {
+	id: ID @primaryKey
+	description: String
+}
+```
+
+Add a resource to your application's `resources.js`:
+
+```javascript
+import { Resource, tables } from 'harper';
+
+let cachedChecks;
+let cacheUntil = 0;
+let inFlight;
+
+async function checkReadiness() {
+	const checks = {};
+
+	// Use a fresh server-side context for this fixed, non-sensitive read.
+	try {
+		const sentinel = await tables.ReadinessProbe.get('readiness-probe-sentinel', {});
+		checks.data = sentinel ? 'ok' : 'failed';
+	} catch (error) {
+		checks.data = 'failed';
+	}
+
+	// A shared dependency outage is degradation, not a reason to drain every node.
+	try {
+		const res = await fetch('https://pricing.internal.example.com/health', {
+			signal: AbortSignal.timeout(500),
+		});
+		checks.pricing = res.ok ? 'ok' : 'degraded';
+	} catch (error) {
+		checks.pricing = 'degraded';
+	}
+	return checks;
+}
+
+function getChecks() {
+	if (Date.now() < cacheUntil) return Promise.resolve(cachedChecks);
+	return (inFlight ??= checkReadiness()
+		.then((checks) => {
+			cachedChecks = checks;
+			cacheUntil = Date.now() + 2000;
+			return checks;
+		})
+		.finally(() => {
+			inFlight = undefined;
+		}));
+}
+
+export class Readiness extends Resource {
+	static async get() {
+		const checks = await getChecks();
+		const ready = checks.data === 'ok';
+		return new Response(JSON.stringify({ ready, checks, version: process.env.APP_VERSION }), {
+			status: ready ? 200 : 503,
+			headers: { 'Content-Type': 'application/json' },
+		});
+	}
+}
+```
+
+The `jsResource` plugin loads the exported class. Keep it enabled if your application has an explicit `config.yaml`. At the default application mount, the route is `/Readiness`; adjust the probe URL if you configured `urlPath` or `host` routing. See [resource routing](/reference/v5/resources/overview#exporting-resources-as-endpoints) for the path rules.
+
+:::note
+Because the handler is a `static` method, it replaces Harper's built-in dispatch along with its authorization check, so `GET /Readiness` is unauthenticated. Keep the response to check names and outcomes, never connection strings, credentials, or internal hostnames. The shared in-flight check and two-second cache bound repeated reads and outbound requests per worker; also restrict probe access or rate-limit it at your traffic boundary.
+
+If you rewrite this as an instance `get()` instead, authorization comes back and defaults to `super_user` only. Configure explicit authorization for your probe caller rather than assuming that the route remains public.
+:::
+
+Create the sentinel record on each node before enabling the probe. The example assumes `ReadinessProbe` is exported at the server root:
+
+```bash
+curl -s -X PUT https://my-node.example.com/ReadinessProbe/readiness-probe-sentinel \
+  -H 'Content-Type: application/json' \
+  -u 'admin:password' \
+  -d '{"description":"readiness probe sentinel - do not delete"}'
+```
+
+Keep the probe table node-local and exclude it from application cleanup jobs. A shared pricing failure reports `degraded` but does not make every node unavailable. A `200` therefore establishes node-local readiness, not that every journey dependency is healthy; check the response and the journey synthetic as well.
+
+Bound downstream checks with a timeout. Set `APP_VERSION` in your deployment so the response identifies the component build answering during a rollout.
+
+## Drain a node and bring it back
+
+Keep the node unavailable until all return checks pass. On Fabric, set `availability` through the CLI as linked above; the `DELETE /status` and `POST /status` calls below are the self-managed package's controls.
+
+```mermaid
+flowchart TD
+    Serving --> Unavailable[Declare unavailable]
+    Unavailable --> Drained[Measured user traffic is zero]
+    Drained --> Change[Change or restart]
+    Change --> Live{Process live?}
+    Live -->|Yes| Synced{Replication converged?}
+    Synced -->|Yes| Ready{Readiness and journey test pass?}
+    Ready -->|Yes| Available[Declare available]
+    Available --> Restored[Restore traffic progressively]
+    Live -->|No| Hold[Hold unavailable and investigate]
+    Synced -->|No| Hold
+    Ready -->|No| Hold
+    Hold --> Live
+```
+
+<Tabs>
+  <TabItem value="drain" label="Draining">
+
+1. **Check peer capacity.** Confirm that the remaining nodes can carry the expected traffic within their capacity budget. If they cannot, postpone the change or add capacity. See [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx). Check the remaining nodes against that budget:
+
+   ```bash
+   for node in https://node-2.example.com:9925 https://node-3.example.com:9925; do
+     echo "== $node"
+     harper system_information attributes='["cpu","memory","threads"]' target="$node" json=true
+   done
+   ```
+
+2. **Declare it unavailable.** Call the target node's application URL:
+
+   ```bash
+   curl -s -X DELETE https://node-1.example.com/status -u 'admin:password'
+   ```
+
+3. **Verify traffic actually stopped.** Watch request volume on the target fall to zero and rise on its peers. Do not trust the configured weight; check the measured request count from [analytics](/reference/v5/analytics/overview) or your traffic layer's own metrics. Health check intervals, DNS TTLs, and client-side connection reuse all add delay here, and the delay is yours to measure.
+4. **Watch the peers absorb it.** Repeat step 1's checks. If they go outside budget, put this node back in rotation and re-plan for a lower-traffic window or with added capacity:
+
+   ```bash
+   curl -s -X POST https://node-1.example.com/status -u 'admin:password'
+   ```
+
+5. **Do the work.** Restart, upgrade, reconfigure, or investigate. If Harper may stay down longer than its peers retain history, or you cannot rule that out, [isolate replication](./backup-and-recovery.mdx#restoring-in-a-replicated-cluster) before Harper starts again and follow the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). Configured routes reconnect as soon as Harper starts, so a check after startup is too late.
+
+  </TabItem>
+  <TabItem value="return" label="Returning">
+
+1. **Confirm the databases are current.** Check the expected peer sockets for every database this node serves and verify convergence. If you isolated replication in Draining step 5, `cluster_status` and a sentinel are not enough: keep it isolated until this node or its peers have been rebuilt under the [replication guide's policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not). For a routine return with retained history:
+
+   ```bash
+   harper cluster_status target=https://node-1.example.com:9925 json=true
+   ```
+
+2. **Confirm readiness passes locally.** Call your `/Readiness` route directly against the node, bypassing the traffic layer:
+
+   ```bash
+   curl -s -w '\n%{http_code}\n' https://node-1.example.com/Readiness
+   ```
+
+3. **Run the journey synthetic against the node directly.** A real read, or a safe write, through the same path a user would take.
+4. **Declare it available.**
+
+   ```bash
+   curl -s -X POST https://node-1.example.com/status -u 'admin:password'
+   ```
+
+5. **Hold before restoring full weight.** Give it a stability window at partial traffic and watch error rate and latency against its peers before treating it as fully back.
+
+  </TabItem>
+</Tabs>
+
+Set the initial traffic weight before declaring the node available, where your traffic layer supports it. Increase it only while error rate and latency remain acceptable. If a return check fails, leave the node unavailable and investigate.
+
+## Readiness hygiene
+
+- **Keep the response cheap and bounded.** A readiness check that performs a broad scan or writes data will amplify an incident, because it runs at probe frequency across every node at exactly the moment the system is already struggling.
+- **Never make it the only routing signal.** Liveness plus availability plus readiness, consumed at the right layers.
+- **Probe from more than one location** where your traffic layer supports it. A single probe point cannot distinguish a network path problem from a node problem.
+- **Make it observable.** Record response code, latency, the reason for a failure, and the node and component version. A readiness check whose failures you cannot explain after the fact is a check you will end up ignoring.
+- **Version the contract.** If you change what readiness means, that is a change to the traffic admission policy, and it deserves the same care as a code release.
+
+### Prove it
+
+On a non-production cluster, restart one node under representative read and write load, using the full drain and return sequence above. Record three numbers: how long from `DELETE /status` until measured traffic on that node reaches zero, whether any user-visible errors occurred during the transition, and how long from process start until the node legitimately passed all three return gates.
+
+Record the third number as node re-entry time, including convergence and application validation.
+
+## Operational notes
+
+- **A returning node is not the same as a new node.** A node whose databases have never synchronized downloads them in full. A briefly offline node catches up from retained history; a long-absent node needs the rebuild or restore policy above. Both need to finish before traffic arrives, but they take very different amounts of time, so do not budget for the first when you are planning a routine restart.
+- **Set unavailable before recovery work, not after.** Any operation that touches data on a node, including a restore, should happen with the node out of rotation.
+- **Configuration changes need a restart to take effect**, so a node that has been reconfigured but not restarted is running the old configuration while reporting the new one. Sequence the restart into the same maintenance window.
+- **Fabric routes by its status component.** It does not automatically consume your readiness route. For application-driven availability, see [Taking an Unhealthy Node Out of Rotation](../developers/taking-a-node-out-of-rotation.mdx).
+
+## Readiness checklist
+
+- [ ] Fabric's existing status component retained, or `@harperdb/status-check` configured on each self-managed node
+- [ ] Traffic layer health check points at `GET /status` on each node's application URL
+- [ ] Availability flag storage still declares `replicate: false`, if you forked the component or persist it yourself
+- [ ] An application readiness route exists, scoped to one journey's dependencies
+- [ ] Every downstream call in the readiness route has a timeout
+- [ ] Readiness response includes the component version
+- [ ] A critical-journey synthetic runs against the public route, separately from the liveness probe
+- [ ] Drain sequence documented, with measured time-to-zero-traffic
+- [ ] Return sequence documented, with a stability window before full weight
+- [ ] Measured node re-entry time recorded, including convergence
+
+## Additional Resources
+
+- [`@harperdb/status-check`](https://github.com/HarperFast/status-check) component source and options
+- [Operations API operations](/reference/v5/operations-api/operations) for `cluster_status`, `system_information`, and the status operations
+- [Components overview](/reference/v5/components/overview) for the full list of Harper-maintained components, including the Prometheus exporter
+- [Analytics overview](/reference/v5/analytics/overview) for per-node request and latency data
+- [Harper Applications in Depth](../developers/harper-applications-in-depth.mdx) for custom resources and the `jsResource` plugin
+- [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for whether your peers can absorb a drained node

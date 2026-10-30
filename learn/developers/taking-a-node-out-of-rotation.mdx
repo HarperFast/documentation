@@ -1,0 +1,628 @@
+---
+title: Taking an Unhealthy Node Out of Rotation
+---
+
+Harper Fabric's load balancer sends traffic to every node of a cluster whose `GET /status` answers `200`. That answer comes from a per-node record that Fabric maintains, so a node keeps receiving traffic while it is running, even when your application on that node cannot serve it. This guide shows how an application can write that record too, from its own health: a node that keeps failing takes itself out of rotation while another node serves, and puts itself back once it recovers, leaving alone what Fabric or an operator has set, outside the narrow windows described under [Caveats](#caveats).
+
+## What You Will Learn
+
+- How Fabric's load balancing uses the `status-check` component and the node's `availability` record
+- When an application should take its node out of rotation, and when it should not
+- The rules that keep an automated loop from fighting Fabric, flapping, or taking the last node out
+- A small, generic component that implements those rules
+- How to test it locally against a throwaway Harper with the real `status-check` component loaded
+
+## Prerequisites
+
+- A Harper Fabric cluster with at least two nodes, and a [Harper application](./harper-applications-in-depth.mdx) deployed to it
+- Each node's own hostname, which only that node answers, as opposed to the cluster hostname
+- For local testing: Node.js, and npm to install a throwaway copy of Harper
+
+## How Fabric decides where traffic goes
+
+Fabric deploys a component named `status-check` to every node. It serves `GET /status`, unauthenticated, and answers `200` when the node's `availability` record is `Available`, and `404` when the record is `Unavailable` or missing. The load balancer only sends new connections to nodes that answer `200`. See [Load Balancing and Node Availability](/fabric/load-balancing) for the component's routes.
+
+The `availability` record is read and written with the [`get_status` and `set_status`](/reference/v5/operations-api/operations#set_status--get_status--clear_status) operations. Three properties of it shape everything below:
+
+- **Each node has its own.** Harper stores it in `system.hdb_status`, which does not replicate, so a write on one node changes only that node.
+- **It holds nothing but a status.** `set_status` stores the `status` value and drops any other field, so the record cannot also record who wrote it. `get_status` returns `__updatedtime__`, the time of the last write, which every write moves.
+- **Fabric writes it too.** Fabric takes a node out while it upgrades it and puts it back afterwards. Operators can do the same with the Harper CLI, from their own machine or from a CI workflow; see [Taking a node out of rotation](/fabric/load-balancing#taking-a-node-out-of-rotation).
+
+## When to do this
+
+Take a node out when it fails in a way that is local to that node and that the load balancer cannot see, because `/status` keeps answering `200`. For example:
+
+- A dependency only this node reaches, such as a regional service, is unreachable from it.
+- Something the application loads per node, such as a cache, a model, or a data file, failed to load here.
+- This node has fallen behind on data that its requests need to be current.
+
+Do not use it for:
+
+- **Failures every node shares**, such as a central origin being down. Taking nodes out does not help, and the rule against taking the last node out stops it anyway. Leave shared dependencies out of the health check, or give them their own handling.
+- **A node that is down altogether.** If Harper is not running, the loop is not either, but the node's `/status` does not answer, so the load balancer already leaves it out.
+- **Planned maintenance.** Set the record yourself, or let Fabric do it.
+
+## The rules
+
+A loop that writes the `availability` record shares it with Fabric and with operators, and its mistakes take capacity out of the cluster. These rules keep it safe. Each one is in the [sample code](#build-it).
+
+### Wait before acting, longer before coming back
+
+The loop looks every 5 seconds. It takes the node out only after the health check has failed on every look for 30 seconds, and puts it back only after the check has passed on every look for 60 seconds. One look the other way restarts the count.
+
+**Why:** a node fails its health check for a few seconds while it starts, for example when a deploy restarts it. Waiting longer than that means a deploy never takes a node out. Requiring longer to come back than to go out keeps a node whose health check is flaky from flapping in and out of rotation.
+
+### Never undo someone else's write
+
+The loop only puts back a node it took out itself, and only while the record is still the one it wrote. Before it writes `Unavailable`, it stores a marker in a small table of its own. After the write, it adds the record's `__updatedtime__` to the marker. While the node is out, the record still having that `__updatedtime__` proves nobody has written it since. If anybody has (Fabric, or an operator putting the node back by hand), the loop leaves the record as they set it. It replaces its marker with a note that the record is theirs, and does not take the node out again until its health check has passed for the full 60 seconds. The note persists, so a restart, such as the one an upgrade brings, does not clear it. `set_status` has no compare-and-swap, so these checks leave small windows; [Caveats](#caveats) lists them.
+
+It never touches a node that is `Unavailable` without its marker, or a node that has no `availability` record. Asking the other nodes can take a few seconds, so the loop reads the record again just before each write, and leaves the write to its next look if anyone has written the record in between.
+
+**Why:** Fabric and operators have reasons the application cannot see. A loop that put back a node Fabric had taken out for an upgrade would send traffic to a node in the middle of one. The marker has to live outside the record, because `set_status` keeps only the status.
+
+When someone puts a node in while it is failing, the 30 seconds count from that write, not from when the failing began. Otherwise a node Fabric has just put back after an upgrade would be taken straight out again.
+
+### Never take the last node out
+
+Before it goes out, the loop asks every other node whether it is serving: its health check passes, and its `/status` answers `200`. It asks each one at that node's own hostname. If no other node is serving, it stays in and logs a warning.
+
+While it is out, it keeps asking. If no other node has served for 30 seconds, it comes back even though it is failing.
+
+**Why:** a node that fails some requests is better than no node at all. The question has to go to each node's own hostname: through the cluster hostname, the load balancer might send it to the node that is asking.
+
+### Look again straight after going out
+
+The loop looks again 1.5 seconds after it goes out. If no other node is serving at that look, or at any look in its first 10 seconds out, it comes straight back, and does not go out again until it restarts.
+
+**Why:** two nodes that start failing together can each see the other serving, and go out at the same moment. This catches that, and anything else that takes the other nodes out together with this one, such as a status record that replicates when it should not.
+
+### Survive a restart
+
+The marker table persists, so a loop that restarts while its node is out still knows the node is its to put back, and one that restarts while it leaves someone else's write in place still knows to leave it. The loop writes the marker before the record, and deletes it if the write fails. If the process stops between the two writes, the next look finds a marker without an `__updatedtime__`, and claims the record only if it went `Unavailable` within 5 seconds of the marker.
+
+**Why:** the `availability` record also persists. A node the loop took out stays out across a restart, and without the marker nothing would ever put it back.
+
+### Say what it does, and keep a switch
+
+Every write the loop makes is logged at `warn` with the reason, and so is every time it holds back for one of the rules above: staying in because no other node is serving, or leaving someone else's write in place. One environment variable turns the loop off.
+
+**Why:** a node leaving rotation changes where users' traffic goes. Whoever investigates later needs to find out why from the log, and needs a way to stop the loop without a code change.
+
+## Build it
+
+The sample is an application component with four parts:
+
+- `config.yaml`
+- a marker table in `schema.graphql`
+- a health check and a `/Health` endpoint in `resources.js`
+- the loop in `availability.js`
+
+Replace the health check with your own. The rest is generic.
+
+### Configuration
+
+```yaml
+# config.yaml
+loadEnv:
+  files: '.env'
+rest: true
+graphqlSchema:
+  files: 'schema.graphql'
+jsResource:
+  files: 'resources.js'
+```
+
+The loop reads its settings from the environment. [`loadEnv`](/reference/v5/environment-variables/overview) has to come first, so the variables are set before `resources.js` loads.
+
+```bash
+# .env
+# Every node's own base URL, this node's included, separated by commas.
+AVAILABILITY_NODES=https://node-1.example.com,https://node-2.example.com
+# Set to "off" to stop the loop.
+AVAILABILITY_LOOP=on
+# Used by this sample's health check; replace it with your own.
+HEALTH_DEPENDENCY_URL=https://dependency.example.com/health
+```
+
+### The marker table
+
+```graphql
+# schema.graphql
+# What this application has done to this node's availability record, so that a
+# restart doesn't forget it. Never replicated: like the record, it describes one node.
+type RotationMark @table(replicate: false) {
+	id: ID @primaryKey
+	outAt: Float # when the application took the node out (ms since epoch)
+	statusAt: Float # the availability record's __updatedtime__ after that write
+	reason: String
+	asideAt: Float # when it found someone else had written the record since
+}
+```
+
+[`replicate: false`](/reference/v5/replication/overview) keeps each node's marker on that node, so every node uses the same row id, `this-node`. A row with `outAt` means the loop has the node out; a row with `asideAt` means it is leaving someone else's write in place. The table has no `@export`, so it is not reachable over REST.
+
+### The health check and `/Health`
+
+```javascript
+// resources.js
+import { Resource, server } from 'harper';
+import { startAvailabilityLoop } from './availability.js';
+
+// What "this node can serve" means for your application. Check what can fail
+// on this node alone; this example asks a dependency the node reaches.
+const DEPENDENCY_URL = process.env.HEALTH_DEPENDENCY_URL;
+
+async function checkDependency() {
+	if (!DEPENDENCY_URL) return { ok: true };
+	try {
+		const response = await fetch(DEPENDENCY_URL, {
+			signal: AbortSignal.timeout(2000),
+		});
+		return response.ok ? { ok: true } : { ok: false, reason: `dependency answered ${response.status}` };
+	} catch {
+		// Fetch errors can include credentials from the URL. Keep them out of logs and markers.
+		return { ok: false, reason: 'dependency unreachable' };
+	}
+}
+
+// At most one check every HEALTH_CACHE_MS, its answer shared, so traffic to the
+// unauthenticated /Health can't multiply the requests this node makes.
+const HEALTH_CACHE_MS = 2000;
+let latest;
+function checkHealth() {
+	if (!latest || Date.now() - latest.at >= HEALTH_CACHE_MS) {
+		latest = { at: Date.now(), result: checkDependency() };
+	}
+	return latest.result;
+}
+
+// GET /Health: unauthenticated, so the other nodes can ask it. `node` lets the
+// availability loop recognize this node's own address in its list of nodes. The
+// failure reason stays in the loop's log: anyone can read this response.
+export class Health extends Resource {
+	static async get() {
+		const { ok } = await checkHealth();
+		return {
+			status: ok ? 200 : 503,
+			headers: { 'Cache-Control': 'no-store' },
+			data: { ok, node: server.hostname },
+		};
+	}
+}
+
+startAvailabilityLoop(checkHealth);
+```
+
+Keep the check fast and bounded by a timeout: the loop runs it every 5 seconds, and the other nodes call `/Health` before they go out. The sample shares one answer for 2 seconds, so requests to `/Health` can't multiply the checks. `/Health` answers anyone, so it returns only whether the node is healthy and its name; the reason stays in the loop's log.
+
+### The loop
+
+```javascript
+// availability.js
+import { server, tables } from 'harper';
+
+const RECORD = 'availability';
+const ROW = 'this-node'; // RotationMark doesn't replicate, so each node has this one row
+const TICK_MS = 5_000;
+const RECHECK_MS = 1_500;
+const OUT_AFTER_MS = 30_000;
+const BACK_AFTER_MS = 60_000;
+const ALONE_MS = 30_000;
+const JUST_OUT_MS = 10_000;
+const WRITE_MS = 5_000; // the loop's own Unavailable lands this soon after its row
+const HEALTH_MS = 5_000;
+const ASK_MS = 3_000;
+
+const log = logger.withTag('availability');
+const { RotationMark } = tables;
+
+// With authorization off (the default), a component can call these without a user.
+const getStatus = () => server.operation({ operation: 'get_status', id: RECORD });
+const setStatus = (status) => server.operation({ operation: 'set_status', id: RECORD, status });
+const writtenAt = (record) => Number(record?.__updatedtime__) || 0;
+const secs = (ms) => `${Math.round(ms / 1000)} s`;
+const messageOf = (error) => error?.message ?? String(error);
+
+// The health check, bounded: one that throws or doesn't answer counts as failing.
+function healthNow(checkHealth) {
+	let timer;
+	const timeout = new Promise((resolve) => {
+		timer = setTimeout(resolve, HEALTH_MS, {
+			ok: false,
+			reason: 'health check timed out',
+		});
+	});
+	return Promise.race([Promise.resolve().then(checkHealth), timeout])
+		.catch((error) => ({
+			ok: false,
+			reason: `health check threw: ${messageOf(error)}`,
+		}))
+		.finally(() => clearTimeout(timer));
+}
+
+async function ask(base, path) {
+	try {
+		const response = await fetch(new URL(path, base), {
+			signal: AbortSignal.timeout(ASK_MS),
+		});
+		return {
+			status: response.status,
+			body: await response.json().catch(() => null),
+		};
+	} catch (error) {
+		return { status: 0, error: messageOf(error) };
+	}
+}
+
+async function otherNodesServing(nodes, me) {
+	const answers = await Promise.all(
+		nodes.map(async (base) => {
+			if (URL.canParse(base) && new URL(base).hostname === me) return null; // this node
+			const health = await ask(base, '/Health');
+			if (health.body?.node === me) return null; // this node, under another name
+			if (health.status !== 200) return { base, why: `/Health ${health.status || health.error}` };
+			const status = await ask(base, '/status');
+			if (status.status !== 200) return { base, why: `/status ${status.status || status.error}` };
+			return { base, serving: true };
+		})
+	);
+	const others = answers.filter(Boolean);
+	return {
+		serving: others.filter((node) => node.serving).map((node) => node.base),
+		why:
+			others
+				.filter((node) => !node.serving)
+				.map((node) => `${node.base} ${node.why}`)
+				.join('; ') || 'no other node listed',
+	};
+}
+
+export function startAvailabilityLoop(checkHealth) {
+	if (server.workerIndex !== 0) return;
+	// Every node's own base URL, this one's included. Never the cluster's shared
+	// hostname: the load balancer could route the question back to this node.
+	const nodes = (process.env.AVAILABILITY_NODES ?? '')
+		.split(',')
+		.map((url) => url.trim())
+		.filter(Boolean);
+	if (process.env.AVAILABILITY_LOOP === 'off' || nodes.length < 2) {
+		log.notify?.('loop off');
+		return;
+	}
+	const me = server.hostname;
+	let failingSince = null;
+	let passingSince = null;
+	let aloneSince = null;
+	let stopped = false; // the others stopped serving as this node went out
+	let warnedAlone = false;
+
+	async function goBack(record, why) {
+		// Leave it to the next look if someone has written the record since this one read it.
+		if (writtenAt(await getStatus()) !== writtenAt(record)) return;
+		await setStatus('Available');
+		log.warn?.(`Available, back in rotation: ${why}`);
+		await RotationMark.delete(ROW);
+		aloneSince = null;
+		warnedAlone = false;
+	}
+
+	async function tick() {
+		const now = Date.now();
+		const health = await healthNow(checkHealth);
+		if (health.ok) {
+			failingSince = null;
+			passingSince ??= now;
+			warnedAlone = false;
+		} else {
+			passingSince = null;
+			failingSince ??= now;
+		}
+		const passedFor = passingSince === null ? 0 : now - passingSince;
+
+		const record = await getStatus();
+		const row = await RotationMark.get(ROW);
+
+		if (row?.asideAt) {
+			// Someone else wrote the record after this loop took the node out. It is
+			// theirs until the health check has passed for BACK_AFTER_MS.
+			if (passedFor >= BACK_AFTER_MS) await RotationMark.delete(ROW);
+			return;
+		}
+
+		if (row?.outAt) {
+			// Out by this loop's write, unless someone has written the record since.
+			// statusAt is 0 if the process stopped between the loop's two writes; the
+			// record is then the loop's only if it went Unavailable right after the row
+			// was written (Harper's clock can trail Date.now() slightly).
+			const unavailable = record?.status === 'Unavailable';
+			const at = writtenAt(record);
+			const ours =
+				unavailable && (row.statusAt ? at === row.statusAt : at >= row.outAt - 1_000 && at <= row.outAt + WRITE_MS);
+			if (!ours) {
+				if (!unavailable && !row.statusAt && writtenAt(record) < row.outAt) {
+					await RotationMark.delete(ROW); // the loop's write never happened
+					return;
+				}
+				await RotationMark.put({ id: ROW, asideAt: now });
+				log.warn?.(
+					`${record?.status ?? 'no record'}, written by someone else after this node took itself out: leaving it`
+				);
+				return;
+			}
+			if (!row.statusAt) {
+				await RotationMark.put({
+					id: ROW,
+					outAt: row.outAt,
+					statusAt: writtenAt(record),
+					reason: row.reason,
+				});
+			}
+			if (passedFor >= BACK_AFTER_MS) return goBack(record, `health has passed for ${secs(passedFor)}`);
+			const others = await otherNodesServing(nodes, me);
+			if (others.serving.length) {
+				aloneSince = null;
+				return;
+			}
+			if (now - row.outAt < JUST_OUT_MS) {
+				stopped = true; // as if they went out with it: stay in until this node restarts
+				return goBack(
+					record,
+					`no other node is serving just after this one went out (${others.why}); not going out again until Harper restarts`
+				);
+			}
+			aloneSince ??= now;
+			if (now - aloneSince >= ALONE_MS) {
+				return goBack(record, `no other node has served for ${secs(now - aloneSince)} (${others.why})`);
+			}
+			return;
+		}
+
+		if (health.ok || stopped) return;
+		if (record?.status !== 'Available') return; // out by someone else, or never put in
+		// Count from when failing began or from the record's last write, whichever
+		// is later: a node someone has just put in gets the full time again.
+		if (now - Math.max(failingSince, writtenAt(record)) < OUT_AFTER_MS) return;
+		const others = await otherNodesServing(nodes, me);
+		if (!others.serving.length) {
+			if (!warnedAlone)
+				log.warn?.(`health failing (${health.reason}), but no other node is serving (${others.why}): staying in`);
+			warnedAlone = true;
+			return;
+		}
+		// Leave it to the next look if someone wrote the record while the others were asked.
+		if (writtenAt(await getStatus()) !== writtenAt(record)) return;
+		// The row first: if the process stops between the two writes, the next
+		// look still knows whether the Unavailable record is this loop's.
+		const outAt = Date.now();
+		await RotationMark.put({
+			id: ROW,
+			outAt,
+			statusAt: 0,
+			reason: health.reason,
+		});
+		try {
+			await setStatus('Unavailable');
+		} catch (error) {
+			await RotationMark.delete(ROW);
+			throw error;
+		}
+		log.warn?.(
+			`Unavailable, out of rotation: health has failed for ${secs(now - failingSince)} (${health.reason}); serving: ${others.serving.join(', ')}`
+		);
+		await RotationMark.put({
+			id: ROW,
+			outAt,
+			statusAt: writtenAt(await getStatus()),
+			reason: health.reason,
+		});
+		return 'out';
+	}
+
+	let errorLoggedAt = 0;
+	async function loop() {
+		let next = TICK_MS;
+		try {
+			if ((await tick()) === 'out') next = RECHECK_MS;
+		} catch (error) {
+			if (Date.now() - errorLoggedAt > 60_000) {
+				errorLoggedAt = Date.now();
+				log.warn?.(`could not check: ${messageOf(error)}`);
+			}
+		} finally {
+			setTimeout(loop, next).unref();
+		}
+	}
+	setTimeout(loop, TICK_MS).unref();
+	log.notify?.(`loop on; asks ${nodes.join(' ')}`);
+}
+```
+
+A few details:
+
+- **One loop per node.** Every worker thread loads the component, so the loop starts only where `server.workerIndex` is `0`. A worker restart can briefly overlap two; see [Caveats](#caveats). An [isolated application](/reference/v5/components/applications#isolated-applications) runs in one worker, whose index is `0`.
+- **A health check that throws, or does not answer within 5 seconds, counts as failing.** Either way the loop goes on looking.
+- **No user needed.** [`server.operation()`](/reference/v5/http/api#serveroperationoperation-context-authorize) applies no authorization unless you pass `authorize: true`, so the loop can call `set_status` without a user or a role. The `status-check` component calls it the same way.
+- **Recognizing itself.** `AVAILABILITY_NODES` lists every node, so the same `.env` works on all of them. The loop skips the address whose `/Health` reports this node's [`server.hostname`](/reference/v5/http/api#serverhostname).
+- **The numbers are a starting point.** 30 seconds out and 60 seconds back suit a node that restarts in a few seconds. If your nodes take longer to start, raise `OUT_AFTER_MS` above that time.
+
+## Test it locally
+
+Run the loop against a throwaway Harper with Fabric's real `status-check` component, a stand-in for a second node, and a stand-in for the dependency. Use scratch values for the home directory, root path, credentials, and ports, so the test touches nothing of an existing Harper install.
+
+### Start a throwaway Harper
+
+In an empty directory:
+
+```bash
+npm install harper@5.3.2
+export HOME="$PWD/home" ROOTPATH="$PWD/root" TC_AGREEMENT=yes \
+  HDB_ADMIN_USERNAME=admin HDB_ADMIN_PASSWORD=scratch-password \
+  OPERATIONSAPI_NETWORK_PORT=9965 HTTP_PORT=9966
+mkdir -p "$HOME"
+npx harper install
+```
+
+`npx harper` runs the copy you just installed. The scratch `HOME` keeps `harper install` from finding an existing installation in your own home directory, and `harper login` from touching your own saved credentials.
+
+Point the application at the stand-ins. Variables already set in Harper's environment take precedence over the application's `.env`, because `loadEnv` does not override them by default. Then start Harper:
+
+```bash
+export AVAILABILITY_NODES=http://127.0.0.1:9966,http://127.0.0.1:9967 \
+  HEALTH_DEPENDENCY_URL=http://127.0.0.1:9968/
+npx harper start
+```
+
+[Log in](/reference/v5/cli/authentication#method-1-persistent-login-recommended-for-local-development) with the admin username and password you chose. The CLI keeps the token, and the commands below use it:
+
+```bash
+npx harper login http://127.0.0.1:9965
+```
+
+### Start the stand-ins
+
+The application's health check and its list of nodes point at two stand-ins. Save this as `stand-ins.mjs` and run it with `node stand-ins.mjs` in a second terminal. It answers as another node on port 9967 and as the dependency on port 9968, and you change their answers with `POST` requests:
+
+```javascript
+// Stand-ins for a local test: another node on 9967, and the dependency on 9968.
+// Flip them with POSTs: /Health/503 or /status/404 on the node, /down or /up on the dependency.
+import http from 'node:http';
+
+const node = { Health: 200, status: 200 };
+let dependencyUp = true;
+
+http
+	.createServer((request, response) => {
+		const [, path, code] = request.url.split('/');
+		if (request.method === 'POST' && path in node) node[path] = Number(code);
+		const body = path === 'Health' ? { ok: node.Health === 200, node: 'other-node.localhost' } : null;
+		response.writeHead(node[path] ?? 404, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+	})
+	.listen(9967, '127.0.0.1');
+
+http
+	.createServer((request, response) => {
+		if (request.method === 'POST') dependencyUp = request.url === '/up';
+		response.writeHead(dependencyUp ? 200 : 503).end();
+	})
+	.listen(9968, '127.0.0.1');
+```
+
+### Deploy `status-check` and the application
+
+Deploy Fabric's `status-check` component from its public repository, then the application from its directory:
+
+```bash
+npx harper deploy project=status-check package=HarperFast/status-check-fabric restart=true
+cd my-app && npx harper deploy restart=true && cd ..
+```
+
+A fresh install has no `availability` record, so `/status` answers `404`, and the loop leaves the node alone. Put the node in, as Fabric would:
+
+```bash
+npx harper set_status id=availability status=Available
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9966/status
+```
+
+That prints `200`. Harper's log, `root/log/hdb.log`, shows that the loop is on. The log lines in this guide omit each line's timestamp and thread:
+
+```
+[notify] [availability]: loop on; asks http://127.0.0.1:9966 http://127.0.0.1:9967
+```
+
+### Run the drill
+
+Follow the loop in the log while you work through the steps below:
+
+```bash
+tail -f root/log/hdb.log | grep availability
+```
+
+1. **Out.** Make the health check fail:
+
+   ```bash
+   curl -X POST http://127.0.0.1:9968/down
+   ```
+
+   About 30 seconds later, `/status` answers `404`, `npx harper get_status id=availability` reports `Unavailable`, and the log says why:
+
+   ```
+   [warn] [availability]: Unavailable, out of rotation: health has failed for 30 s (dependency answered 503); serving: http://127.0.0.1:9967
+   ```
+
+2. **Back.** Let it recover with `curl -X POST http://127.0.0.1:9968/up`. About 60 seconds later, `/status` answers `200` again:
+
+   ```
+   [warn] [availability]: Available, back in rotation: health has passed for 60 s
+   ```
+
+3. **Never the last node.** Take the other node out, then fail the health check:
+
+   ```bash
+   curl -X POST http://127.0.0.1:9967/status/404
+   curl -X POST http://127.0.0.1:9968/down
+   ```
+
+   The node stays in, and warns once:
+
+   ```
+   [warn] [availability]: health failing (dependency answered 503), but no other node is serving (http://127.0.0.1:9967 /status 404): staying in
+   ```
+
+   Put the other node back with `curl -X POST http://127.0.0.1:9967/status/200`, and this one goes out at its next look.
+
+4. **Someone else's write.** While the loop has the node out, put it back by hand, as an operator would:
+
+   ```bash
+   npx harper set_status id=availability status=Available
+   ```
+
+   The loop leaves it in, even though the health check still fails and even if Harper restarts, until the check has passed for 60 seconds:
+
+   ```
+   [warn] [availability]: Available, written by someone else after this node took itself out: leaving it
+   ```
+
+   The same happens when Fabric takes the node out itself. Write `status=Unavailable` while the loop has the node out, then let the dependency recover: the node stays out.
+
+5. **A restart.** With the node out and the dependency back up, restart Harper, in the terminal where you exported the variables:
+
+   ```bash
+   HARPER_PID=$(cat "$ROOTPATH/hdb.pid")
+   npx harper stop
+   while kill -0 "$HARPER_PID" 2>/dev/null; do sleep 1; done
+   npx harper start
+   ```
+
+   `harper stop` returns before Harper exits, so the loop waits for the old process before starting a new one.
+
+   The record is still `Unavailable` after the restart. The loop finds its marker, and puts the node back about 60 seconds after Harper starts.
+
+6. **Straight back.** Fail the health check and wait for the node to go out, then within five seconds take the other node out with `curl -X POST http://127.0.0.1:9967/status/404`. At its next look, the loop comes back, and it does not go out again until Harper restarts:
+
+   ```
+   [warn] [availability]: Available, back in rotation: no other node is serving just after this one went out (http://127.0.0.1:9967 /status 404); not going out again until Harper restarts
+   ```
+
+When you are done, stop Harper with `npx harper stop`, stop the stand-ins, and delete the directory.
+
+## Caveats
+
+- **Open connections stay.** The load balancer only decides where new connections go. Clients already connected to a node that goes out, including WebSocket and MQTT clients, stay on it until they disconnect.
+- **Turning the loop off leaves its node as it is.** The `availability` record persists, so a node the loop had taken out stays out after you set `AVAILABILITY_LOOP=off` or remove the application. Before you do either, check each node's `/status`, and put back, with `harper set_status`, any node whose `RotationMark` row has an `outAt`.
+- **The health check decides.** A check that fails when the node could serve takes capacity out for nothing. A check that depends on something every node shares makes every node fail together, and then the loop keeps them all in.
+- **A node that cannot be asked counts as not serving.** If one node cannot reach another at its own hostname, or that node's `/Health` needs credentials, the loop treats it as not serving and keeps its own node in. The loop errs toward keeping nodes in, never toward taking them out.
+- **Someone else's write pauses the loop.** After Fabric or an operator puts back a node the loop took out, the loop leaves that node alone until its health check has passed for 60 seconds, however long the node keeps failing.
+- **"Serving" is what this node sees.** A node that answers at its own hostname counts as serving even if the load balancer cannot reach it, and so does a node that is still running but no longer in the cluster. Keep `AVAILABILITY_NODES` current.
+- **The ownership check has small gaps.** The loop reads the record again just before each write, and after a failed or interrupted write it only claims an `Unavailable` written within 5 seconds of its marker. So someone else's write can be taken for the loop's if it lands a few milliseconds after the loop's own write, or within those 5 seconds when a restart interrupted the loop. Coming back has the same kind of gap: a write landing between the loop's last read and its own `Available` is overwritten. The reverse can happen too: if the loop's own write took longer than 5 seconds and a restart interrupted it, the loop leaves the node out and logs the write as someone else's. After a restart that hit a node mid-write, check its `/status`.
+- **A worker restart can briefly run two loops.** On Linux, including Fabric, Harper starts a replacement worker before it stops the one it replaces, so the old worker `0` and its replacement both run the loop until the old one exits. That can take up to `replication.blobSendDrainTimeout` while it finishes sending blobs. Each loop has its own timers and can write in that window, with the same ownership gaps as above. A worker restart, such as a deploy with `restart`, also ends "not going out again until Harper restarts". After a deploy or restart, check each node's `/status`.
+- **Operation logging.** At log level `info` or more verbose, Harper logs every operation call, including the loop's `get_status` every 5 seconds.
+
+## Additional Resources
+
+- [Load Balancing and Node Availability](/fabric/load-balancing) - the `status-check` component's routes and authorization
+- [`set_status`, `get_status`, and `clear_status`](/reference/v5/operations-api/operations#set_status--get_status--clear_status) - the operations behind the `availability` record
+- [`server.operation()`](/reference/v5/http/api#serveroperationoperation-context-authorize) - calling operations from a component
+- [Replication: excluding a table](/reference/v5/replication/overview) - `@table(replicate: false)`
+- [Environment Variables](/reference/v5/environment-variables/overview) - `loadEnv`
+- [Logging API](/reference/v5/logging/api) - `logger` and tagged loggers
+- [HarperFast/status-check-fabric](https://github.com/HarperFast/status-check-fabric) - the `status-check` component's source

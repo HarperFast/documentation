@@ -158,12 +158,12 @@ jobs:
     env:
       HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
       - run: npm install --global harper@^5.3
       - name: Deploy the tagged commit
         run: harper deploy project=my-app by_ref=true restart=rolling json=true > deploy.json
@@ -193,11 +193,11 @@ For a private repository, add `credential=true` to the deploy command. It attach
 A few details worth noting:
 
 - **No secrets.** `HARPER_CLI_TARGET` is the only thing the workflow is given. `id-token: write` lets the CLI request an identity token, and `environment: production` puts the `environment` claim the trust policy requires into it. Any other step in the job could request one too, so the job runs none of the repository's code. The CLI prints which policy authenticated it, and as whom, to stderr.
-- **`persist-credentials: false`** keeps the job's `GITHUB_TOKEN` out of `.git/config`, where `actions/checkout` otherwise leaves it for every later step to read.
+- **`persist-credentials: false`** stops `actions/checkout` from saving the job's `GITHUB_TOKEN` for every later step to read. From v6 it saves the token in a file under `$RUNNER_TEMP` rather than in `.git/config`, which `harper deploy` uploads with the checkout, but later steps can still read it.
 - **`harper@^5.3`** pins the CLI's major version. 5.3 is the first CLI that authenticates with the identity token, and rerunning an old tag after a new major release still installs a 5.x CLI.
 - **`by_ref=true`** deploys `git+https://github.com/<owner>/<repo>.git#<sha>`, where the SHA is the commit the tag points to (`GITHUB_SHA`). Every node clones that exact commit, even if the tag is moved later. Pass `ref=<sha>`, with the full commit SHA, to deploy a different commit. In a private repository, a tag resolves only if the checkout fetched it, as `fetch-depth: 0` does: the CLI looks up anything else with `git ls-remote`, which has no credential once `persist-credentials: false` keeps the token out of `.git/config`.
 - **`replicated` isn't needed.** On Harper Fabric and Harper Pro, a deploy goes to every node in the cluster unless you pass `replicated=false`. Each node fetches and installs the package itself, resolving the credential from the replicated secrets store. Harper core on its own does not replicate.
-- **`restart=rolling`** restarts nodes one at a time so the cluster keeps serving throughout. Use `restart=true` for a single-node or dev instance. The [preview recipe](#per-pr-previews-with-shared-databases) also uses inline restarts on clusters, with an explicit allowance for concurrent initial restarts. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
+- **`restart=rolling`** restarts nodes one at a time, so they never all restart at once. Each node stays in rotation while it restarts. `restart=true` deploys to every node at once; each node replaces its workers a few at a time while the others keep serving. [Choose a restart mode](../administration/safe-deployments-and-rollback.mdx#choose-a-restart-mode) compares the two. The [preview recipe](#per-pr-previews-with-shared-databases) also uses inline restarts on clusters, with an explicit allowance for concurrent initial restarts. On Harper core alone, a rolling job that only restarts — before v5.4.0, or when `certification` is `unavailable` — fails with `Replication not implemented`, which fails the wait step.
 - **`json=true`** prints the deploy's result as JSON on stdout. Progress and authentication messages go to stderr, so `deploy.json` holds only the result. A deploy that fails exits non-zero, which fails the step.
 - **Waiting for every node** <VersionBadge type="changed" version="v5.4.0" />. With `restart=rolling` on v5.4.0 and later, unless the deploy's `certification` is `unavailable`, the other nodes take the release in a job, one at a time, and `harper deploy` [waits for them](/reference/v5/cli/commands#waiting-for-a-rolling-deploy) on the deployment record before it exits: the deploy step fails, naming each node that did not take the release, or passes once every node has. Its result then carries `rollout`, and the wait step does nothing. Otherwise, as before v5.4.0, `harper deploy` exits `0` once the node you called has taken the release and started the rolling job: every node has installed the release, and the job only restarts them; on v5.4.0 and later, a node that did not restart fails the job, and its `result.replicated` says which (see [how a rolling restart reports each node](/reference/v5/operations-api/operations#restart_service-replicated)). The wait step then polls the job's `restartJobId` with `get_job` until it ends `COMPLETE` or `ERROR`, and retries a poll that fails, such as one that reaches a node while it restarts. Each `harper get_job` authenticates through the trust policy the same way. It gives up after 60 polls, about ten minutes. Nodes restart one after another, so on a cluster with many nodes raise the count. With `restart=true` there is no job, and the deploy step itself fails when a node rejects the release, unless you pass `ignore_replication_errors=true`.
 - **The job lives on one node.** The deployment record that `harper deploy` waits on replicates, so its wait works through a load-balanced cluster URL. Harper does not replicate jobs, so only the node that received the deploy knows the rolling job, and the wait step's `get_job` polls have that limit. Any other node answers `get_job` with an empty list, which the wait step treats as not finished and polls again. So through a load-balanced cluster URL, at least one poll has to reach the node that received the deploy. Routing that keeps the runner on one node sends its polls where the deploy went, and routing that spreads requests across nodes reaches it within a few polls. Routing that sends the polls to a different node than the deploy never does: the step fails, saying the job was not on the node that answered and its outcome is unknown, even when the rollout succeeded. If your load balancer routes that way, use one node's own URL for both the deploy and the wait, and as the trust policy's `audience`.
@@ -237,12 +237,12 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           registry-url: https://npm.pkg.github.com
           scope: '@my-org'
       - run: npm ci
@@ -264,9 +264,9 @@ jobs:
     env:
       HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
       - run: npm install --global harper@^5.3
       - name: Deploy the published version
         run: |
@@ -415,9 +415,9 @@ jobs:
       PREVIEW_NODE_TARGETS: ${{ vars.HARPER_PREVIEW_NODE_TARGETS }}
       PR_NUMBER: ${{ github.event.number }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
       - run: npm install --global harper@^5.3
       - name: Update or remove the preview
         env:

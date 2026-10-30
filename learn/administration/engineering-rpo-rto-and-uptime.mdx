@@ -1,0 +1,176 @@
+---
+title: Engineering RPO, RTO, and Uptime
+sidebar_position: 8
+---
+
+Define recovery time objective (RTO) and availability per critical journey, and recovery point objective (RPO) per database. Map failures to recovery mechanisms and validate the targets with measured results.
+
+When measured results miss a target, improve the recovery mechanism or revise the target before committing to it.
+
+## What You Will Learn
+
+- How to state recovery point, recovery time, and availability so they are testable rather than aspirational
+- A scenario-to-mechanism map, with what has to be proven for each to count
+- How to convert an availability target into a monthly budget, and what each tier demands of your automation
+- How to reconcile stated targets against the numbers measured in earlier guides
+- Why one storage setting can silently invalidate your stated recovery point
+- Why declaring your degraded modes is as important as declaring your targets
+
+## Prerequisites
+
+- Measured numbers from the earlier guides: per-node capacity, convergence time, node re-entry time, release reversal time, and restore time
+- [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for the capacity model
+- [Backup and Recovery](./backup-and-recovery.mdx) for the recovery mechanisms
+- A named owner who can approve or reject a target, because this exercise produces decisions rather than data
+
+## State objectives for each journey and its data
+
+| Term                     | The question it answers              | How to state it so it is testable                                                                  |
+| ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Recovery point objective | How much recent data may be lost     | Per database, in units of time, measured against your backup timestamp                             |
+| Recovery time objective  | How long until service is restored   | Per journey, measured from the moment the journey starts failing, not from the moment someone acts |
+| Availability target      | How much unavailability is permitted | Per journey, as minutes per month, with the measurement boundary named                             |
+
+For each target, record the affected journey, when measurement starts, and where you measure it.
+
+Scope availability and recovery time to each journey, and record the recovery point for every database it depends on. Catalog browsing and order submission can have different targets even when they share a cluster.
+
+**Include detection in recovery time.** Measure from the start of the failure to verified service restoration. Starting at the alert or the operator's decision leaves out time when users were already affected.
+
+**Name the measurement boundary.** Availability measured at your CDN edge and availability measured at a Harper node are different quantities, and the difference is exactly the part of the stack you may not control. Whichever you choose, say so in the same sentence as the number.
+
+### One storage setting can override your recovery point
+
+Your recovery point objective is a statement about how much acknowledged data you can afford to lose. One configuration option can quietly make that statement false.
+
+[`storage.writeAsync`](/reference/v5/database/storage-tuning#storagewriteasync) defaults to `false`. Set it to `true` and Harper stops calling `fsync` on commit, so a write returns as soon as it is queued to the operating system's page cache. Throughput on write-heavy workloads improves substantially. The cost is that a power loss or OS crash between the commit and the flush to disk loses the most recent transactions, even though your application was told they succeeded. The database stays structurally consistent; only the newest writes are gone.
+
+Read each node's configuration and inspect `storage.writeAsync`. The CLI saves a login per URL. Log in once to each node's direct Operations API URL, for example `harper login https://node-1.example.com:9925`. Replace the example URLs with your own; a load-balanced URL answers from an arbitrary node.
+
+```bash
+for node in https://node-1.example.com:9925 https://node-2.example.com:9925 https://node-3.example.com:9925; do
+  echo "== $node"
+  harper get_configuration target="$node" json=true
+done
+```
+
+Healthy replication and recent backups do not prove that every acknowledged write has reached durable storage. Include the possible loss of unflushed writes in your RPO.
+
+Leave `writeAsync` off unless you can accept the loss of unflushed writes, for example because the data can be reproduced from an upstream source or a bulk ingest can be rerun. Asynchronous replication does not guarantee a durable peer copy before the client receives success. If you enable it, record the affected databases and the accepted loss window beside their recovery objectives.
+
+## Map scenarios to mechanisms
+
+For each scenario, choose a recovery mechanism and record the evidence that it meets your target.
+
+| Scenario                              | Primary mechanism                                         | What must be proven                                                                                                                                                                                |
+| ------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single node loss                      | Peer capacity plus traffic removal                        | [`N - F` capacity](./sizing-a-harper-cluster.mdx#size-for-the-failure-state) under load (`N` nodes, `F` tolerated failures), measured time to remove traffic, no user-visible errors in transition |
+| Node returns after a restart          | Incremental catch-up plus an admission gate               | Measured convergence time, and an admission gate that does not admit before convergence completes                                                                                                  |
+| Node replacement or scale-out         | Full database synchronization to the new node             | Measured full-sync duration at your data volume, and the load it puts on the source node                                                                                                           |
+| Failure domain loss                   | Topology spread across independent domains                | No shared power or network fault, and surviving capacity inside the budget                                                                                                                         |
+| Region loss                           | Multi-region topology plus route change                   | Data authority per region, route propagation time, and declared degraded behavior                                                                                                                  |
+| Bad release, no data change           | Release reversal                                          | Measured release reversal time, and the previous artifact still addressable                                                                                                                        |
+| Bad release that changed data meaning | Forward repair, not restore                               | A written repair or replay procedure, rehearsed on representative data                                                                                                                             |
+| Accidental destructive operation      | Restore from backup                                       | Measured restore time and actual data loss, from a real drill                                                                                                                                      |
+| Storage loss on one node              | Off-host backup copy                                      | A restorable off-host copy, taken by the correct procedure for your mechanism                                                                                                                      |
+| Corruption propagated by replication  | Restore the last good backup, plus a replication decision | A rehearsed sequence that includes what happens to peers                                                                                                                                           |
+| Replication certificate expiry        | Certificate lifecycle management                          | Expiry dates tracked, with an alert far enough ahead to act                                                                                                                                        |
+| Downstream dependency outage          | Declared degraded mode                                    | The journey's behavior when the dependency is down, verified rather than assumed                                                                                                                   |
+
+Measure node replacement separately from a restart: full synchronization can take much longer than incremental catch-up. Also test how each journey behaves when a downstream dependency is unavailable.
+
+## Convert availability into a budget
+
+An availability target is a quantity of unavailability you may spend per month.
+
+| Monthly target | Approximate maximum unavailability | What the tier demands                                                                                                                   |
+| -------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 99.9%          | 43 min 50 sec                      | A human can be paged, diagnose, and act within some incidents. One untested maintenance window can consume the month                    |
+| 99.95%         | 21 min 55 sec                      | Automated traffic removal and a rehearsed release reversal become necessary rather than nice                                            |
+| 99.99%         | 4 min 23 sec                       | Node failure has to be close to transparent. Detection, traffic removal, and validation must be automated, since no human response fits |
+
+Figures assume a 30.44 day month. Your contractual definition, exclusions, and measurement boundary may differ.
+
+Use the availability budget to decide how quickly detection, traffic removal, and recovery must happen. Additional nodes provide capacity, but those procedures still need to fit within the budget.
+
+Define when a depleted error budget should pause discretionary changes, who makes that decision, and what must improve before changes resume.
+
+## Reconcile targets against measurements
+
+Fill in both columns and investigate any measurement that misses its target.
+
+| Commitment                  | Measured from                                                                            | Your target | Your measurement |
+| --------------------------- | ---------------------------------------------------------------------------------------- | ----------- | ---------------- |
+| Surviving capacity          | The peak-load drain drill in [Sizing](./sizing-a-harper-cluster.mdx)                     |             |                  |
+| Time to remove traffic      | The drain sequence in [Health Checks](./health-checks-and-traffic-admission.mdx)         |             |                  |
+| Node re-entry time          | The same drill, including convergence                                                    |             |                  |
+| Convergence time under load | The sentinel measurement in [Operating Replication](./operating-replication.mdx)         |             |                  |
+| Full synchronization time   | A node replacement at your data volume                                                   |             |                  |
+| Release reversal time       | The stopped-rollout rehearsal in [Safe Deployments](./safe-deployments-and-rollback.mdx) |             |                  |
+| Restore time                | The restore drill in [Backup and Recovery](./backup-and-recovery.mdx)                    |             |                  |
+| Actual data loss on restore | The same drill, against the backup timestamp                                             |             |                  |
+| Time to detection           | The fault injection drill in [Monitoring and Triage](./monitoring-and-triage.mdx)        |             |                  |
+
+Three reconciliations catch most problems:
+
+- **Backup cadence against recovery point.** If you back up every six hours, your recovery point cannot be one hour, no matter what the document says.
+- **Restore time plus detection time against recovery time.** Recovery time includes noticing. A twenty minute restore behind a forty minute detection gap is a one hour recovery.
+- **Convergence time against your admission gate.** Keep a returning node out of traffic until its data meets the journey's freshness requirements.
+
+For each missed target, improve the mechanism, revise the target, or record an accepted gap with an owner and a review date.
+
+## Declare your degraded modes
+
+Define which reduced-service behaviors are acceptable during each failure.
+
+For each critical journey, write down what happens when a dependency is unavailable, when a node is behind on replication, and when the cluster is below its capacity budget. Reads served from slightly stale data may be entirely acceptable for a catalog and entirely unacceptable for a balance check, and the right answer differs by journey rather than by system.
+
+Name who can invoke each mode and whether the transition is manual or automatic.
+
+### Prove it
+
+Two passes, and both are needed.
+
+**Tabletop the whole scenario table.** For each row, walk through who detects it, what they do, what mechanism carries the recovery, and what evidence confirms success. Rows where the group cannot answer without speculating are the gaps, and finding them costs an hour rather than an outage.
+
+**Then run one real drill per scenario class**, spread over a quarter rather than attempted in a day. The classes are: node loss, node return, node replacement, release reversal, restore, and dependency failure. Record the date, the measured numbers, what surprised you, and what you changed as a result.
+
+Use unexpected results to update the runbook, monitoring, or recovery mechanism before repeating the drill.
+
+## Operational notes
+
+- **Recovery numbers expire.** Every measurement here is a property of a Harper version, a data volume, a topology, and a set of components. Re-measure after version upgrades and significant data growth, and date every number you record.
+- **Uptime and recovery targets belong in the same document as the mechanism.** A target stored separately from its supporting evidence drifts from reality within a quarter.
+- **Do not let a single incident rewrite your targets.** Adjust targets from measurement and business need, not from the last thing that went wrong.
+- **Exclusions matter as much as the number.** Planned maintenance, third-party dependency failures, and client-side problems are usually excluded from an availability calculation. Whether yours excludes them changes the number substantially, so it belongs in writing.
+- **A target you cannot measure is not a target.** If nothing in your monitoring produces the number in your commitment, the first investment is measurement, not more nodes.
+
+## Readiness checklist
+
+- [ ] Recovery point stated per database, in time units
+- [ ] Recovery time stated per journey, measured from the start of failure and including detection time
+- [ ] Availability stated per journey, with the measurement boundary named
+- [ ] Exclusions documented
+- [ ] Every scenario in the map has a named mechanism
+- [ ] Every mechanism has its "what must be proven" satisfied or explicitly outstanding
+- [ ] Availability target converted to minutes per month
+- [ ] Error budget policy states what changes when the budget runs low
+- [ ] Backup cadence reconciled against recovery point
+- [ ] `storage.writeAsync` confirmed off, or the databases it is on for recorded alongside their recovery point
+- [ ] Restore time plus detection time reconciled against recovery time
+- [ ] Convergence time reconciled against the traffic admission gate
+- [ ] Every unreconciled gap has an owner and a date
+- [ ] Degraded modes declared per journey, with authority to invoke them
+- [ ] Tabletop completed and dated
+- [ ] At least one real drill per scenario class completed and dated
+
+## Additional Resources
+
+- [Sizing a Harper Cluster](./sizing-a-harper-cluster.mdx) for the capacity invariant behind the surviving-capacity commitment
+- [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx) for drain, admission, and failback timing
+- [Operating Replication](./operating-replication.mdx) for convergence measurement
+- [Safe Deployments and Rollback](./safe-deployments-and-rollback.mdx) for release reversal timing
+- [Backup and Recovery](./backup-and-recovery.mdx) for restore timing and mechanism limits
+- [Monitoring and Triage](./monitoring-and-triage.mdx) for time to detection
+- [Production Readiness Checklist](./production-readiness-checklist.mdx) for the gate this feeds
+- [Reliability Plan Template](./reliability-plan-template.mdx) for where to record the results
