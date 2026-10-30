@@ -30,7 +30,7 @@ Results are ordered by BM25 relevance. The `FullText` field, not one of its sour
 | `matches_fuzzy`                  | Matches terms with configurable edits and transpositions.             | —                     |
 | `matches_fuzzy_prefix` (preview) | Combines configurable fuzzy matching with a final-term prefix.        | `surfaceTerms: true`  |
 
-Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix`.
+Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix` (preview).
 
 An empty string is invalid and returns `400`. Whitespace-only text or text reduced to no terms by the analyzer, such as a query containing only enabled stop words, returns an exact empty result.
 
@@ -240,11 +240,13 @@ For example, `offset: 100` and `limit: 10` skip the first 100 eligible records a
 
 Each offset request runs a new query and revisits earlier matches, so deeper offsets increase fetched work and source reads. Prefer narrower filters and a bounded maximum offset over repeatedly raising budgets. Each query can see changed records, permissions or index contents. Pages can therefore repeat or omit records during concurrent changes. There are no continuation tokens, close operations or retained searches across requests.
 
-### Host query capacity
+## Host query capacity
 
-The default native policy allows 64 analyzed terms per text condition and 256 compiled clauses per query. Operators can configure `storage.fullText.query.maxQueryTerms` (1-1,024) and `maxQueryClauses` (1-4,096), within the loaded native runtime's ceilings. Boolean groups, NOT and field expansion also consume clause capacity. Raising fetched-hit or retained-result budgets does not raise these limits.
+<VersionBadge version="v5.4.0" />
 
-The host policy is captured once for the full Harper process, inherited by workers and applied to reader handles, including reopened readers. A full process restart is required; a worker-only restart does not apply changes. Requests cannot raise the policy. Overflow returns an explicit `400`, never a truncated query. Other depth, byte, phrase/fuzzy construction, queue, response and deadline safeguards continue to apply. Native deadlines are cooperative; they cannot interrupt every construction step immediately. See [storage configuration](../configuration/options.md#storage).
+The default native policy allows 64 analyzed terms per text condition and 256 compiled clauses per query. Operators can configure `storage.fullText.query.maxQueryTerms` (1-1,024) and `storage.fullText.query.maxQueryClauses` (1-4,096), within the loaded native runtime's ceilings. Boolean groups, NOT, field expansion, fuzzy branches and prefix expansion also consume clause capacity. Raising fetched-hit or retained-result budgets does not raise these limits.
+
+The host policy is captured once for the full Harper process, inherited by workers and applied to reader handles, including reopened readers. A full process restart is required; a worker-only restart does not apply changes. Requests cannot raise the policy. Overflow returns an explicit `400`, never a truncated query. Other depth, byte, phrase/fuzzy construction, queue, response and deadline safeguards continue to apply. Native deadlines are cooperative; they cannot interrupt every construction step immediately. Fuzzy queries still have fixed native limits of 16 eligible terms and 256 construction-work units; distance two costs four times as much construction work per term and field as distance one. Raising term or clause policy does not raise those limits. Raised-policy handles also route non-ASCII text and larger ASCII queries through expensive-search admission, which can increase busy rejections under concurrency. See [storage configuration](../configuration/options.md#storage) and the [native limits](https://github.com/HarperFast/fulltext/blob/v0.8.0/docs/limits.md#query-capacity-policy).
 
 ## REST
 
@@ -264,7 +266,7 @@ Repeat the index parameter to combine the required positive and negated conditio
 GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather&limit(20)
 ```
 
-REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, or freshness controls.
+REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, fuzzy controls (v5.4.0), or freshness controls.
 
 ## Operations API
 

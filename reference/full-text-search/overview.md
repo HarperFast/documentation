@@ -8,7 +8,7 @@ title: Overview
 
 Harper can build a BM25-ranked full-text index from one or more fields on a table. The index is declared in the table schema, updated from committed record changes, and queried through the same `Table.search()` and REST interfaces used for other Harper queries.
 
-Use full-text search when users need relevance-ranked matching across product names, descriptions, tags, articles, or other natural-language fields. It supports term, all-term, phrase, prefix, fuzzy, and fuzzy-prefix matching.
+Use full-text search when users need relevance-ranked matching across product names, descriptions, tags, articles, or other natural-language fields. It supports term, all-term, phrase, prefix, fuzzy, and preview fuzzy-prefix matching.
 
 <VersionBadge type="changed" version="v5.4.0" /> Starting in Harper v5.4, the native engine is **`@harperfast/fulltext` 0.8.0, embedding Tantivy 0.27.0**. Existing fulltext 0.5.0 and prerelease 0.6 indexes require rebuilding. See [Upgrading existing indexes](#upgrading-existing-indexes) before upgrading a node.
 
@@ -61,7 +61,7 @@ Use `describe_table` to inspect each index's declaration and readiness. See [Ins
 
 Harper 5.3.1–5.3.4 ship `@harperfast/fulltext` 0.5.0. Upgrading their current field-based indexes to the 0.8.0 engine in Harper v5.4 requires a full local rebuild. Harper 5.3.0 ships fulltext 0.3.0 and is outside this qualified procedure; plan and validate that migration separately. Prerelease installations using fulltext 0.6 also require rebuilding. This procedure applies to the current field-based declarations; earlier beta declarations and indexes have no supported migration path. Harper initiates the rebuild automatically when the wrapper refuses the old persisted identity; no manual rebuild command or file editing is needed.
 
-For prerelease installations using fulltext 0.7.0, Harper's indexes store text fields without native structured-filter metadata and remain reusable with 0.8.0. Query policy and fuzzy controls do not change that storage identity. Stop all processes sharing a local index before switching versions. Remove new `storage.fullText.query` settings before returning to an older Harper whose configuration validator does not recognize them. This compatibility does not establish a qualified operator rollback procedure. Statement applies only to Harper's existing index declarations.
+For prerelease installations using fulltext 0.7.0, Harper's indexes store text fields without native structured-filter metadata and remain reusable with 0.8.0. Query policy and fuzzy controls do not change that storage identity. Stop all processes sharing a local index before switching versions. Returning to a fulltext 0.7.0 prerelease after 0.8.0 has written to an index is not a qualified operator rollback procedure. Older Harper configuration validators also reject the new `storage.fullText.query` settings.
 
 ### Matching and ranking changes
 
