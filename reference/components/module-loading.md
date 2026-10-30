@@ -67,7 +67,7 @@ Applications in the same worker share its global object. An [isolated applicatio
 
 The VM module loader running in a separate context per application, with its own intrinsics and a custom global object.
 
-This is stronger isolation, but the separate intrinsics are a common source of subtle incompatibilities: cross-context `instanceof` returning `false`, frozen-prototype mismatches, and similar. Choose it only if you specifically need per-application intrinsics.
+This is stronger isolation, but the separate intrinsics are a common source of subtle incompatibilities: cross-context `instanceof` returning `false`, locked-prototype mismatches, and similar. Choose it only if you specifically need per-application intrinsics.
 
 ### `native`
 
@@ -113,6 +113,8 @@ The default is a deliberate compromise: packages that depend on `harper` want ap
 | `freeze`                                                      | Freezing                                                                     | Before any application code loads | Blocked                  | Blocked                                 |
 | `ses`                                                         | Full SES lockdown via the [`ses`](https://www.npmjs.com/package/ses) package | Before any application code loads | Blocked                  | Blocked                                 |
 | `none`                                                        | Nothing                                                                      | -                                 | Allowed                  | Allowed                                 |
+
+The table describes the locked intrinsics. The freeze modes leave `Function.prototype` extensible; see [What is locked](#what-is-locked).
 
 `ses` is the strictest mode, and the most likely to break packages that change built-ins. Any other mode name, including a misspelled one, behaves like `freeze`.
 
@@ -216,7 +218,7 @@ The check has three limits:
 For most applications the default is the right choice, and the settings on this page are worth changing only in response to a concrete problem.
 
 - **A package breaks under the VM loader.** Try `dependencyLoader: native` first — it keeps application context for your own source. Fall back to `moduleLoader: native` only if the problem is in first-party code.
-- **A dependency changes an intrinsic and now throws.** Under the default `seal-after-load`, a change throws only if it happens after components have loaded and adds or deletes a property, or reconfigures one with `Object.defineProperty` (for example, passing `configurable: true`); assigning to an existing writable property works at any time. Under the freeze modes, assigning to an existing property throws too. `lockdown: none` is the temporary workaround; the durable fix is in the dependency.
+- **A dependency changes an intrinsic and now throws.** Under the default `seal-after-load`, a change throws only if it happens after components have loaded and adds or deletes a property, or reconfigures one with `Object.defineProperty` (for example, passing `configurable: true`); assigning to an existing writable property works at any time. Under the freeze modes, assigning to an existing property throws too. Assignments and deletions in sloppy-mode code are silently ignored instead; see [Changes while components load](#changes-while-components-load). `lockdown: none` is the temporary workaround; the durable fix is in the dependency.
 - **`instanceof` fails on a value that crossed the Harper boundary.** You are on `vm`. Move to `vm-current-context`.
 - **You need per-application intrinsics or a custom global.** `vm` is the mode that provides them; accept the compatibility cost.
 - **You need to spawn a sidecar process.** Stay on a VM loader and keep the spawning code in component source, reached with `import`. See [Child Processes](./javascript-environment.md#child-processes).
