@@ -281,6 +281,7 @@ replication:
 - `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This instance's hostname within the cluster. Subject to the same bare hostname or IP literal requirement as [`node.hostname`](#node) — a URL, `host:port`, or non-string value fails startup. When both are set, `node.hostname` wins.
 - `url` — WebSocket URL peers use to connect to this instance
 - `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name` and `sharded`
+- `recordLocks` <VersionBadge version="v5.3.0" /> - Boolean enabling cluster record locks in Harper Pro on RocksDB; _Default_: `false`. Set the YAML boolean `true`, not a quoted string, and restart for the change to take effect. An agreed home map is also required; the flag alone does not establish cluster protection. See [native record locks](../database/concurrency.md#native-record-locks) for setup and limits.
 - `routes` — Peer nodes; URL strings or `{hostname, port, startTime, revokedCertificates}` objects
 - `port` — Replication port
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
