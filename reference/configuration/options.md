@@ -316,6 +316,9 @@ storage:
   - `maxRawHitsPerRequest` — Maximum fetched hits per request, including bounded prefix replay when traversal is needed; default `10000`.
   - `maxResultsPerRequest` — Maximum retained offset plus limit. A request must also fit the separate raw-hit budget; default `10000`.
   - `requestBudgetMilliseconds` — Execution budget across native batches, source checks and highlights, capped by the native execution limit; default `5000` ms. Reader acquisition and freshness waiting have separate bounds.
+  - `query.maxQueryTerms` — Maximum analyzed terms per text condition; default `64`, range `1` to `1024` within the loaded native runtime's ceiling.
+  - `query.maxQueryClauses` — Maximum compiled query clauses, including Boolean structure, NOT and field expansion; default `256`, range `1` to `4096` within the native ceiling.
+  - `query.maxFuzzyDistance` — Maximum caller-selected fuzzy distance; default `1`, range `0` to `2`. Distance two is preview and needs workload qualification. With zero, fuzzy conditions must explicitly request distance zero.
   - `runtime.maxResidentIndexes` — Maximum resident native indexes; default `128`.
   - `runtime.maxIndexingThreads` — Maximum aggregate indexing-thread reservations across resident native indexes; default `128`.
   - `runtime.maxSearchThreads` — Maximum aggregate search-thread reservations across resident native indexes; default `256`.
@@ -323,7 +326,7 @@ storage:
   - `runtime.maxQueuedBytes` — Aggregate queued-write reservations across resident native indexes; default `8589934592` (8 GiB).
   - `runtime.maxExpensiveSearches` — Maximum concurrent expensive native searches; default `8`.
 
-  The runtime budgets apply together and are not hard bounds on total process memory. See [Set Configuration](./operations.md#set-configuration) for when request and native runtime changes take effect. Use the usual underscore-separated parameter names, such as `storage_fullText_maxRawHitsPerRequest`. See [full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging) for costs; see [readiness and recovery](../resources/query-optimization.md#readiness-and-recovery) for failures.
+  The `query` policy is captured for reader handles and inherited by all workers. Changing it requires a full Harper process restart, does not change writer limits, and does not rebuild indexes. Requests cannot raise it. The runtime budgets apply together and are not hard bounds on total process memory. See [Set Configuration](./operations.md#set-configuration) for when request and native runtime changes take effect. Use the usual underscore-separated parameter names, such as `storage_fullText_maxRawHitsPerRequest`. See [full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging) for costs; see [readiness and recovery](../resources/query-optimization.md#readiness-and-recovery) for failures.
 
 - `writeAsync` — Disable disk sync for higher throughput (**disables durability guarantees**); _Default_: `false`
 - `caching` — In-memory record caching; _Default_: `true`

@@ -27,8 +27,8 @@ Results are ordered by BM25 relevance. The `FullText` field, not one of its sour
 | `matches_all`          | Requires every analyzed query term.                                   | —                     |
 | `matches_phrase`       | Matches analyzed terms in order as a phrase.                          | `positions: true`     |
 | `matches_prefix`       | Matches records whose analyzed terms start with the final query term. | `surfaceTerms: true`  |
-| `matches_fuzzy`        | Matches terms within one edit, including a transposition.             | —                     |
-| `matches_fuzzy_prefix` | Combines one-edit fuzzy matching with a final-term prefix.            | `surfaceTerms: true`  |
+| `matches_fuzzy`        | Matches terms with configurable edits and transpositions.             | —                     |
+| `matches_fuzzy_prefix` | Combines configurable fuzzy matching with a final-term prefix.        | `surfaceTerms: true`  |
 
 Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix`.
 
@@ -45,6 +45,36 @@ const products = Product.search({
 	],
 });
 ```
+
+## Fuzzy controls in v5.4
+
+<VersionBadge version="v5.4.0" />
+
+Structured conditions in `Table.search()` and Operations API `search_by_conditions` accept two options on `matches_fuzzy`, `matches_fuzzy_prefix` and their negated forms:
+
+| Option                | Default | Accepted values                                                                            |
+| --------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `fuzzyDistance`       | `1`     | Integer `0` to `2`, within the host's configured maximum. Zero uses exact native matching. |
+| `fuzzyTranspositions` | `true`  | Boolean. When enabled, an adjacent character swap counts as one edit.                      |
+
+```javascript
+const products = Product.search({
+	conditions: [
+		{
+			attribute: 'catalogSearch',
+			comparator: 'matches_fuzzy',
+			value: 'catlaog',
+			fuzzyDistance: 1,
+			fuzzyTranspositions: true,
+		},
+	],
+	limit: 20,
+});
+```
+
+Retrieval, additional batches and highlights use the same controls. Other match modes reject them, even when their values equal the defaults. Supply numbers and booleans, not strings such as `"1"` or `"false"`. Put controls on each text condition, not on a Boolean group. REST query-string comparators keep their defaults; use a permission-checked application resource or the Operations API for structured controls.
+
+Distance two is preview and requires operator opt-in through `storage.fullText.query.maxFuzzyDistance: 2`; the default maximum is one. Fuzzy-prefix is also preview. Qualify the actual corpus and concurrency before exposing these options: queue admission and cooperative deadlines do not impose a hard process-memory bound. Phrase slop is not exposed.
 
 ## Restricting source fields
 
@@ -205,6 +235,12 @@ Full-text and autocomplete searches use Harper's existing `limit` and `offset`. 
 For example, `offset: 100` and `limit: 10` skip the first 100 eligible records and return up to the next 10, even for prefix matching. A short or empty page means matches were exhausted. Exhausting the fetched-hit or retained-result budget returns `400`; narrow the query, reduce offset or limit, or raise the named budget. Exhausting the execution budget returns `503`; narrow the query or adjust the execution budget rather than retrying it unchanged. These budget errors carry no readiness-specific `code` or `retryable` flag. If a response has already started streaming, a later error terminates that stream instead of changing its HTTP status. An unbounded query can still fail when it exceeds the native window or configured limits. Native response-envelope overflow can return `413`, including an oversized ordinary batch even when each hit would fit. Other native failures can return `500`. A `503` without a readiness code is not a signal to wait for an index rebuild; inspect its message and adjust the work or concurrency that caused it.
 
 `storage.fullText.maxRawHitsPerRequest`, `storage.fullText.maxResultsPerRequest` and `storage.fullText.requestBudgetMilliseconds` bound fetched work, retained results and execution time. Replayed or rejected hits consume raw work; a request can exhaust that budget before reaching its result target. The execution budget is not a hard response-time guarantee; reader acquisition and some native work can take additional time. See [storage configuration](../configuration/options.md#storage) for the controls and [REST paging and counts](../rest/querying.md#pagination-and-total-count) for URL syntax and count behavior.
+
+### Host query capacity
+
+The default native policy allows 64 analyzed terms per text condition and 256 compiled clauses per query. Operators can configure `storage.fullText.query.maxQueryTerms` (1-1,024) and `maxQueryClauses` (1-4,096), within the loaded native runtime's ceilings. Boolean groups, NOT and field expansion also consume clause capacity. Raising fetched-hit or retained-result budgets does not raise these limits.
+
+The host policy is captured once for the full Harper process, inherited by workers and applied to reader handles, including reopened readers. A full process restart is required; a worker-only restart does not apply changes. Requests cannot raise the policy. Overflow returns an explicit `400`, never a truncated query. Other depth, byte, phrase/fuzzy construction, queue, response and deadline safeguards continue to apply. Native deadlines are cooperative; they cannot interrupt every construction step immediately. See [storage configuration](../configuration/options.md#storage).
 
 Each offset request runs a new query and revisits earlier matches, so deeper offsets increase fetched work and source reads. Prefer narrower filters and a bounded maximum offset over repeatedly raising budgets. Each query can see changed records, permissions or index contents. Pages can therefore repeat or omit records during concurrent changes. There are no continuation tokens, close operations or retained searches across requests.
 
