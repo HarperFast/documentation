@@ -19,7 +19,7 @@ The WAF is available in Harper Pro.
 
 The WAF middleware runs before authentication on Harper's worker HTTP surfaces. This includes HTTP applications and REST traffic handled by the worker ports.
 
-The WAF does not filter the main-thread Operations API port. Protect that administrative surface with authentication, role permissions, TLS, and network access controls.
+The WAF does not filter the main-thread Operations API port. Protect that administrative surface with authentication, role permissions, TLS, and network access controls such as a [source allowlist](../operations-api/operations.md#network-access).
 
 The client IP used for matching is the request's socket peer address. In the standard Symphony-over-Unix-domain-socket topology, Harper recovers the original client IP from the PROXY protocol. The WAF does not trust `X-Forwarded-For`.
 
