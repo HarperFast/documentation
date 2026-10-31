@@ -17,7 +17,7 @@ const products = Product.search({
 
 `Table.search()` returns an async iterable. Consume it with `for await...of`, or return it directly from a custom Resource to stream the results.
 
-Results are ordered by BM25 relevance. The `FullText` field, not one of its source fields, identifies the search target.
+Results are ordered by relevance: BM25 with any supplied [query-time boosts and optional-clause contributions](#query-time-relevance-controls). The `FullText` field, not one of its source fields, identifies the search target.
 
 ## Match modes
 
@@ -69,7 +69,7 @@ Direct calls through `tables` or `databases` run in a trusted server-side contex
 
 ## Score and ordering
 
-Select `$score` to include the BM25 score:
+Select `$score` to include the relevance score. Without query-time controls, this is the BM25 score; [boosts and optional clauses](#query-time-relevance-controls) adjust it when supplied:
 
 ```javascript
 const products = Product.search({
@@ -116,11 +116,11 @@ const products = Product.search(target);
 
 A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
 
-Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, and the supported fuzzy controls. It searches the parent index: omit `attribute`. The list must be nonempty. Nested `should` lists, negated optional descriptors and scoring controls on condition groups, the query target, negated conditions or ordinary record conditions are rejected.
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. It searches the parent index: omit `attribute`. The list must be nonempty. Nested `should` lists, negated optional descriptors and scoring controls on condition groups, the query target, negated conditions or ordinary record conditions are rejected.
 
 Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. Values round to float32 and must then be finite between 0 and 100 inclusive. Negative zero is rejected. Zero preserves matching while contributing zero score.
 
-Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. Existing query capacity, fuzzy policy, deadline and result limits also apply to optional clauses. Requested highlights include matching positive required and optional clauses.
+Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. Server-configured full-text query limits, including clause limits, permitted fuzzy modes and edit distances, execution deadlines and result limits, also apply to optional clauses. Requested highlights include matching positive required and optional clauses.
 
 Use the same structured target through HTTP `QUERY`:
 
@@ -277,11 +277,11 @@ Repeat the index parameter to combine the required positive and negated conditio
 GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather&limit(20)
 ```
 
-REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, or freshness controls.
+REST can return configured highlights by selecting `$highlights`. Use [HTTP `QUERY`](../rest/overview.md#tables-and-their-automatic-endpoints), `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, freshness controls, or [query-time relevance controls](#query-time-relevance-controls).
 
 ## Operations API
 
-`search_by_conditions` uses the same condition shape:
+`search_by_conditions` uses the same condition shape, including the pending-release [`should` and `boost` controls](#query-time-relevance-controls):
 
 ```json
 {
