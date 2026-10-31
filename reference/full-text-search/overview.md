@@ -89,7 +89,7 @@ Retry rejected writes with backoff rather than immediately adding more load. Ins
 
 ## Ranking and result loading
 
-The native index ranks matching documents with BM25. Harper then loads the authoritative table records for the matching IDs and discards stale or deleted candidates. Selecting `$score` includes the relevance score in each result.
+The native index ranks matching documents with BM25, adjusted by any supplied [query-time boosts and optional-clause contributions](./querying.md#query-time-relevance-controls) when those pending-release controls are available. Harper then loads the authoritative table records for the matching IDs and discards stale or deleted candidates. Selecting `$score` includes the relevance score in each result.
 
 Full-text search can be combined with structured filters. Harper checks conditions against current source records before returning them. In v5.4, additional ranked batches can fill a filtered page within request budgets; exhausting a budget returns an error rather than a budget-truncated page.
 
