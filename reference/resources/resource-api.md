@@ -1100,7 +1100,7 @@ Special properties:
 
 Full-text queries add two special properties:
 
-- `$score`: When a query uses a full-text index, returns its relevance score, including any [query-time boosts and optional-clause contributions](../full-text-search/querying.md#query-time-relevance-controls).
+- `$score`: When a query uses a full-text index, returns its BM25 relevance score. When the pending [query-time boosts and optional clauses](../full-text-search/querying.md#query-time-relevance-controls) are available, their contributions are included.
 - `$highlights`: Enables and returns full-text fragments and matching spans when the index has highlighting configured. See [Highlights](../full-text-search/querying.md#highlights).
 
 #### Selecting related records

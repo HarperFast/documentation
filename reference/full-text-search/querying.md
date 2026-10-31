@@ -17,18 +17,18 @@ const products = Product.search({
 
 `Table.search()` returns an async iterable. Consume it with `for await...of`, or return it directly from a custom Resource to stream the results.
 
-Results are ordered by relevance: BM25 with any supplied [query-time boosts and optional-clause contributions](#query-time-relevance-controls). The `FullText` field, not one of its source fields, identifies the search target.
+Results are ordered by BM25 relevance. When the pending [query-time relevance controls](#query-time-relevance-controls) are available, supplied boosts and optional clauses adjust that ranking. The `FullText` field, not one of its source fields, identifies the search target.
 
 ## Match modes
 
-| Comparator             | Behavior                                                              | Required index option |
-| ---------------------- | --------------------------------------------------------------------- | --------------------- |
-| `matches`              | Matches any analyzed query term.                                      | —                     |
-| `matches_all`          | Requires every analyzed query term.                                   | —                     |
-| `matches_phrase`       | Matches analyzed terms in order as a phrase.                          | `positions: true`     |
-| `matches_prefix`       | Matches records whose analyzed terms start with the final query term. | `surfaceTerms: true`  |
-| `matches_fuzzy`        | Matches terms within one edit, including a transposition.             | —                     |
-| `matches_fuzzy_prefix` | Combines one-edit fuzzy matching with a final-term prefix.            | `surfaceTerms: true`  |
+| Comparator             | Behavior                                                               | Required index option |
+| ---------------------- | ---------------------------------------------------------------------- | --------------------- |
+| `matches`              | Matches any analyzed query term.                                       | —                     |
+| `matches_all`          | Requires every analyzed query term.                                    | —                     |
+| `matches_phrase`       | Matches analyzed terms in order as a phrase.                           | `positions: true`     |
+| `matches_prefix`       | Matches records whose analyzed terms start with the final query term.  | `surfaceTerms: true`  |
+| `matches_fuzzy`        | By default, matches terms within one edit, including a transposition.  | —                     |
+| `matches_fuzzy_prefix` | By default, combines one-edit fuzzy matching with a final-term prefix. | `surfaceTerms: true`  |
 
 Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix`.
 
@@ -69,7 +69,7 @@ Direct calls through `tables` or `databases` run in a trusted server-side contex
 
 ## Score and ordering
 
-Select `$score` to include the relevance score. Without query-time controls, this is the BM25 score; [boosts and optional clauses](#query-time-relevance-controls) adjust it when supplied:
+Select `$score` to include the relevance score. Without query-time controls, this is the BM25 score. When the pending [boosts and optional clauses](#query-time-relevance-controls) are available, they adjust it when supplied:
 
 ```javascript
 const products = Product.search({
@@ -118,7 +118,11 @@ const products = Product.search(target);
 
 A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
 
-Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances. Distance `2` requires that setting to be `2`. Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`.
+
+In this pending structured contract, `fuzzyDistance` and `fuzzyTranspositions` can be set on the required positive condition as well as on each optional descriptor. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances. Distance `2` requires that setting to be `2` and remains preview. Fuzzy-prefix is also preview. Qualify the workload before enabling preview fuzzy options. See [full-text configuration](../configuration/options.md#storage) for the surrounding request budgets.
+
+Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
 
 - `should` inside an optional descriptor;
 - a `not_*` comparator inside `should`;
@@ -289,7 +293,7 @@ REST can return configured highlights by selecting `$highlights`. Use `Table.sea
 
 ## Operations API
 
-`search_by_conditions` uses the same condition shape, including the pending-release [`should` and `boost` controls](#query-time-relevance-controls):
+`search_by_conditions` uses the same condition shape:
 
 ```json
 {
@@ -307,6 +311,34 @@ REST can return configured highlights by selecting `$highlights`. Use `Table.sea
 			"includeHighlights": true,
 			"maxIndexLagMilliseconds": 0,
 			"waitForIndexMilliseconds": 10000
+		}
+	]
+}
+```
+
+For the pending [query-time relevance controls](#query-time-relevance-controls), use the following shape only with a compatible Harper build and bundled wrapper:
+
+```json
+{
+	"operation": "search_by_conditions",
+	"database": "catalog",
+	"table": "Product",
+	"limit": 20,
+	"get_attributes": ["id", "name", "$score"],
+	"conditions": [
+		{
+			"attribute": "catalogSearch",
+			"comparator": "matches_all",
+			"value": "waterproof boots",
+			"boost": 0.5,
+			"should": [
+				{
+					"comparator": "matches_phrase",
+					"value": "waterproof boots",
+					"fields": ["name"],
+					"boost": 3
+				}
+			]
 		}
 	]
 }
