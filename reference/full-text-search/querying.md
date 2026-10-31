@@ -85,9 +85,7 @@ Full-text queries cannot provide an exact total after authorization, structured 
 
 ## Query-time relevance controls
 
-<VersionBadge version="v5.4.0" />
-
-Availability: pending release. These controls require a Harper build with query-scoring support and a matching fulltext package. Published fulltext 0.8.0 does not provide them.
+Availability: pending release; see [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). These controls require a Harper build with query-scoring support and a compatible fulltext wrapper. The currently published wrapper does not support them. A Harper build with this validation rejects scoring requests with HTTP 400 when the installed wrapper lacks the required query capability.
 
 Use `should` to reward additional text matches while retaining the parent condition's required matches:
 
@@ -116,23 +114,23 @@ const products = Product.search(target);
 
 A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
 
-Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. It searches the parent index: omit `attribute`. The list must be nonempty. Nested `should` lists, negated optional descriptors and scoring controls on condition groups, the query target, negated conditions or ordinary record conditions are rejected.
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. Each descriptor searches the parent index; an `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The group object itself cannot. Nested `should` lists, negated optional descriptors and scoring controls on the query target, negated conditions or ordinary record conditions are rejected with HTTP 400.
 
-Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. Values round to float32 and must then be finite between 0 and 100 inclusive. Negative zero is rejected. Zero preserves matching while contributing zero score.
+Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. `boost` is a number and defaults to `1` when omitted. Values round to float32 and must then be finite between 0 and 100 inclusive; invalid values, including negative zero, return HTTP 400. Zero preserves matching while contributing zero score. For a standalone required condition without optional clauses, a positive uniform boost rescales scores without changing relative ranking, apart from floating-point ties; zero makes those scores tie.
 
 Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. Server-configured full-text query limits, including clause limits, permitted fuzzy modes and edit distances, execution deadlines and result limits, also apply to optional clauses. Requested highlights include matching positive required and optional clauses.
 
 Use the same structured target through HTTP `QUERY`:
 
 ```javascript
-const response = await fetch('/Product/', {
+const response = await fetch('http://localhost:9926/Product/', {
 	method: 'QUERY',
 	headers: { 'Content-Type': 'application/json' },
 	body: JSON.stringify(target),
 });
 ```
 
-Include the application's normal authentication credentials. Operations `search_by_conditions` accepts the same `conditions` with its usual `schema`, `table` and `get_attributes` properties. These controls add no FIQL syntax.
+Include the application's normal authentication credentials. Operations `search_by_conditions` accepts the same `conditions` with its usual `database`, `table` and `get_attributes` properties. These controls add no FIQL syntax.
 
 ## Highlights
 
