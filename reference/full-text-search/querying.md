@@ -120,9 +120,13 @@ A product that matches the required text remains eligible without the optional p
 
 Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`.
 
-In this pending structured contract, `fuzzyDistance` and `fuzzyTranspositions` can be set on the required positive condition as well as on each optional descriptor. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances. Distance `2` requires that setting to be `2` and remains preview. Fuzzy-prefix is also preview. Qualify the workload before enabling preview fuzzy options. See [full-text configuration](../configuration/options.md#storage) for the surrounding request budgets.
+In this pending structured contract, `fuzzyDistance` and `fuzzyTranspositions` can be set on the required positive condition as well as on each optional descriptor. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. Supplying them on another match mode returns HTTP 400. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively.
 
-Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
+The server setting `storage.fullText.query.maxFuzzyDistance` accepts integers from `0` to `2`, defaults to `1`, and caps accepted distances. With a cap of `0`, a fuzzy condition must explicitly set `fuzzyDistance: 0`. Omitting it still defaults to `1` and returns HTTP 400. Distance `2` requires a cap of `2`.
+
+Qualify the selected fuzzy distance and fuzzy-prefix workload against the actual corpus and concurrency before exposing them to callers. See [full-text configuration](../configuration/options.md#storage) for the surrounding request budgets.
+
+Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty and contain at most `storage.fullText.query.maxQueryClauses` descriptors (default `256`). This is a coarse host precheck: native compilation also counts required clauses, Boolean structure, boosts, analyzed terms and field expansion, so a smaller list can still exceed the compiled-clause budget and return HTTP 400. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
 
 - `should` inside an optional descriptor;
 - a `not_*` comparator inside `should`;
