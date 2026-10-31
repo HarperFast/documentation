@@ -85,7 +85,11 @@ Full-text queries cannot provide an exact total after authorization, structured 
 
 ## Query-time relevance controls
 
-Availability: pending release; see [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). These controls require a Harper build with query-scoring support and a compatible fulltext wrapper. The currently published wrapper does not support them. A Harper build with this validation rejects scoring requests with HTTP 400 when the installed wrapper lacks the required query capability.
+:::note Pending release
+
+These controls describe the pending implementation tracked by [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). Use them only with a Harper build and bundled fulltext wrapper that implement query scoring. Do not send these keys to other builds: a successful request alone does not prove scoring was applied. In the pending implementation, an incompatible wrapper returns HTTP 400.
+
+:::
 
 Use `should` to reward additional text matches while retaining the parent condition's required matches:
 
@@ -114,11 +118,17 @@ const products = Product.search(target);
 
 A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
 
-Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. Each descriptor searches the parent index; an `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The group object itself cannot. Nested `should` lists, negated optional descriptors and scoring controls on the query target, negated conditions or ordinary record conditions are rejected with HTTP 400.
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances; distance `2` requires that setting to be `2`. Each descriptor searches the parent index; an `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
+
+- `should` inside an optional descriptor;
+- a `not_*` comparator inside `should`;
+- `boost` or `should` on the query target, a group object, a negated full-text condition, or an ordinary record condition.
+
+A positive full-text condition with scoring controls can still combine with negated full-text conditions on the same index and ordinary record filters under `and`. Full-text `or` groups cannot mix full-text and ordinary record conditions.
 
 Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. `boost` is a number and defaults to `1` when omitted. Values round to float32 and must then be finite between 0 and 100 inclusive; invalid values, including negative zero, return HTTP 400. Zero preserves matching while contributing zero score. For a standalone required condition without optional clauses, a positive uniform boost rescales scores without changing relative ranking, apart from floating-point ties; zero makes those scores tie.
 
-Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. Server-configured full-text query limits, including clause limits, permitted fuzzy modes and edit distances, execution deadlines and result limits, also apply to optional clauses. Requested highlights include matching positive required and optional clauses.
+Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. The same server query limits and result limits apply to optional clauses. Requested highlights include matching positive required and optional clauses.
 
 Use the same structured target through HTTP `QUERY`:
 
@@ -275,7 +285,7 @@ Repeat the index parameter to combine the required positive and negated conditio
 GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather&limit(20)
 ```
 
-REST can return configured highlights by selecting `$highlights`. Use [HTTP `QUERY`](../rest/overview.md#tables-and-their-automatic-endpoints), `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, freshness controls, or [query-time relevance controls](#query-time-relevance-controls).
+REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, or freshness controls. For pending [query-time relevance controls](#query-time-relevance-controls), use HTTP `QUERY`, `Table.search()` or `search_by_conditions`.
 
 ## Operations API
 
