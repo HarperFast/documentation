@@ -87,7 +87,7 @@ Full-text queries cannot provide an exact total after authorization, structured 
 
 :::note Pending release
 
-These controls describe the pending implementation tracked by [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). Use them only with a Harper build and bundled fulltext wrapper that implement query scoring. Do not send these keys to other builds: a successful request alone does not prove scoring was applied. In the pending implementation, an incompatible wrapper returns HTTP 400.
+These controls describe the pending implementation tracked by [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). Use them only with a Harper build and bundled fulltext wrapper that implement query scoring. Do not send these keys to other builds. A successful request alone does not prove scoring was applied. In the pending implementation, an incompatible wrapper returns HTTP 400.
 
 :::
 
@@ -118,7 +118,7 @@ const products = Product.search(target);
 
 A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
 
-Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`: `fuzzyDistance` must be an integer from 0 to 2, and `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances; distance `2` requires that setting to be `2`. Each descriptor searches the parent index; an `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively. The server setting `storage.fullText.query.maxFuzzyDistance` defaults to `1` and caps accepted distances. Distance `2` requires that setting to be `2`. Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
 
 - `should` inside an optional descriptor;
 - a `not_*` comparator inside `should`;
@@ -126,7 +126,7 @@ Each optional descriptor accepts a positive full-text `comparator`, a nonempty s
 
 A positive full-text condition with scoring controls can still combine with negated full-text conditions on the same index and ordinary record filters under `and`. Full-text `or` groups cannot mix full-text and ordinary record conditions.
 
-Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. `boost` is a number and defaults to `1` when omitted. Values round to float32 and must then be finite between 0 and 100 inclusive; invalid values, including negative zero, return HTTP 400. Zero preserves matching while contributing zero score. For a standalone required condition without optional clauses, a positive uniform boost rescales scores without changing relative ranking, apart from floating-point ties; zero makes those scores tie.
+Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. `boost` is a number and defaults to `1` when omitted. Values round to float32 and must then be finite between 0 and 100 inclusive. Invalid values, including negative zero, return HTTP 400. Zero preserves matching while contributing zero score. For a standalone required condition without optional clauses, a positive uniform boost rescales scores without changing relative ranking, apart from floating-point ties. Zero makes those scores tie.
 
 Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. The same server query limits and result limits apply to optional clauses. Requested highlights include matching positive required and optional clauses.
 
