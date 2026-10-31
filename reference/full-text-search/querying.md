@@ -83,6 +83,57 @@ Full-text results use descending relevance order. The only explicit full-text so
 
 Full-text queries cannot provide an exact total after authorization, structured filtering, and current-record validation. On a REST interface with `exactCount` enabled, `Prefer: count=exact` reports an unavailable total; otherwise it is downgraded to an estimated count. See [pagination and total count](../rest/querying.md#pagination-and-total-count). `Table.getRecordCount()` counts table records, not matches for a full-text query.
 
+## Query-time relevance controls
+
+<VersionBadge version="v5.4.0" />
+
+Availability: pending release. These controls require a Harper build with query-scoring support and a matching fulltext package. Published fulltext 0.8.0 does not provide them.
+
+Use `should` to reward additional text matches while retaining the parent condition's required matches:
+
+```javascript
+const target = {
+	conditions: [
+		{
+			attribute: 'catalogSearch',
+			comparator: 'matches_all',
+			value: 'waterproof boots',
+			should: [
+				{
+					comparator: 'matches_phrase',
+					value: 'waterproof boots',
+					fields: ['name'],
+					boost: 3,
+				},
+			],
+		},
+	],
+	select: ['id', 'name', '$score'],
+	limit: 20,
+};
+const products = Product.search(target);
+```
+
+A product that matches the required text remains eligible without the optional phrase. A product that matches only an optional clause is excluded. Optional scores add to the required score; they do not change which records match.
+
+Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, and the supported fuzzy controls. It searches the parent index: omit `attribute`. The list must be nonempty. Nested `should` lists, negated optional descriptors and scoring controls on condition groups, the query target, negated conditions or ordinary record conditions are rejected.
+
+Set `boost` on the parent condition to multiply its required text score, or on an optional descriptor to multiply that bonus. Boosts multiply existing configured source-field weights; they do not replace those weights or require an index rebuild. Values round to float32 and must then be finite between 0 and 100 inclusive. Negative zero is rejected. Zero preserves matching while contributing zero score.
+
+Every referenced source must be readable, including optional fields used only for ranking. Omitting `fields` searches all sources and requires permission for all of them. Existing query capacity, fuzzy policy, deadline and result limits also apply to optional clauses. Requested highlights include matching positive required and optional clauses.
+
+Use the same structured target through HTTP `QUERY`:
+
+```javascript
+const response = await fetch('/Product/', {
+	method: 'QUERY',
+	headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify(target),
+});
+```
+
+Include the application's normal authentication credentials. Operations `search_by_conditions` accepts the same `conditions` with its usual `schema`, `table` and `get_attributes` properties. These controls add no FIQL syntax.
+
 ## Highlights
 
 Highlighting returns source-field fragments and matching character spans. The index must configure highlighting and mark at least one source with `highlight: true`. A query can also search sources without that option; those sources can affect matching and ranking but are omitted from `$highlights`.
