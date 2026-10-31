@@ -55,7 +55,7 @@ Harper uses [FIQL](https://datatracker.ietf.org/doc/html/draft-nottingham-atompu
 | `=`, `===`           | Strict equality (no type conversion)   |
 | `!==`                | Strict inequality (no type conversion) |
 
-Full-text indexes support `=matches=`, `=matches_all=`, `=matches_phrase=`, `=matches_prefix=`, `=matches_fuzzy=`, and `=matches_fuzzy_prefix=`. Each has a negated form: `=not_matches=`, `=not_matches_all=`, `=not_matches_phrase=`, `=not_matches_prefix=`, `=not_matches_fuzzy=`, and `=not_matches_fuzzy_prefix=`. Combine a negated condition with a positive full-text condition on the same index; a structured filter alone does not qualify. These use the full-text index rather than ordinary string comparisons. See [Full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging).
+Full-text indexes support `=matches=`, `=matches_all=`, `=matches_phrase=`, `=matches_prefix=`, `=matches_fuzzy=`, and `=matches_fuzzy_prefix=` (preview). Each has a negated form: `=not_matches=`, `=not_matches_all=`, `=not_matches_phrase=`, `=not_matches_prefix=`, `=not_matches_fuzzy=`, and `=not_matches_fuzzy_prefix=` (preview). Combine a negated condition with a positive full-text condition on the same index; a structured filter alone does not qualify. These use the full-text index rather than ordinary string comparisons. See [Full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging).
 
 **Examples**:
 
@@ -84,7 +84,7 @@ GET /Product/?catalogSearch=matches_phrase=trail%20running
 GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&limit(10)
 ```
 
-REST supports `matches`, `matches_all`, `matches_phrase`, `matches_prefix`, `matches_fuzzy`, and `matches_fuzzy_prefix`, plus a `not_` form of each. A negated full-text condition requires a non-negated condition on the same index. Repeat the parameter to provide both conditions:
+REST supports `matches`, `matches_all`, `matches_phrase`, `matches_prefix`, `matches_fuzzy`, and `matches_fuzzy_prefix` (preview), plus a `not_` form of each. A negated full-text condition requires a non-negated condition on the same index. Repeat the parameter to provide both conditions:
 
 ```http
 GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather
@@ -96,7 +96,7 @@ REST's `limit(start,end)` uses an exclusive end. In v5.4, this prefix query skip
 GET /Product/?catalogSearch=matches_prefix=waterproof%20tra&limit(100,110)
 ```
 
-Use `Table.search()` or `search_by_conditions` when conditions need source-field selection, condition-level highlighting, or freshness controls. See [Querying Full-Text Indexes](../full-text-search/querying.md) for ranking, highlights, query combinations, and freshness controls.
+Use `Table.search()` or `search_by_conditions` when conditions need source-field selection, fuzzy controls (v5.4.0), condition-level highlighting, or freshness controls. See [Querying Full-Text Indexes](../full-text-search/querying.md) for ranking, highlights, query combinations, and freshness controls.
 
 The REST URL syntax searches every source field in the index, so the caller must be allowed to read every source field. Before v5.4, prefix and fuzzy-prefix queries restrict `offset + limit` to 100. In v5.4, bounded full-text and autocomplete queries can pass that native window within request budgets; source-version checks and filters run before records count toward the offset and limit. Each page is a new query and can see concurrent changes. See [paging and prefix result windows](../full-text-search/querying.md#paging-and-prefix-result-windows). Full-text queries cannot provide an exact total count. On a REST interface with `exactCount: true`, a `Prefer: count=exact` request returns an unavailable total (`Content-Range: items <range>/*`). Without that opt-in, Harper applies `count=estimated` instead and can return an estimate.
 
