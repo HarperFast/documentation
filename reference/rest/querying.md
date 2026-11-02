@@ -309,7 +309,38 @@ GET /Product/?brand.name=Microsoft&select(name,brand{name})
 GET /Product/?name=Keyboard&select(name,brand{name,id})
 ```
 
-Selecting a relationship without an outer dot-syntax filter on it behaves as a LEFT JOIN: parents remain present even when there are no related records. For a singular foreign key that is null or references a missing record, the relationship property is omitted. An outer filter such as `products.price=ge=number:30` instead removes parents without a qualifying product and also narrows the selected products. A filter inside `select(...,products[...])` only narrows the projected products; it does not remove a parent. See the [worked scenarios](#filtering-and-paging-each-relationship) below.
+Selecting a relationship without an outer dot-syntax filter on it behaves as a LEFT JOIN: parents remain present even when there are no related records. For a singular foreign key that is null or references a missing record, the relationship property is omitted. An outer filter joined with `&`, such as `products.price=ge=number:30`, instead removes parents without a qualifying product and also narrows the selected products. Inside an OR, an outer filter only [decides which parents match](#relationship-conditions-inside-an-or-decide-parents-only). A filter inside `select(...,products[...])` only narrows the projected products; it does not remove a parent. See the [worked scenarios](#filtering-and-paging-each-relationship) below.
+
+#### Conditions on one relationship match one related record
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+Outer filters joined with `&`, including those in nested `&` groups, that traverse the same to-many relationship must all be met by one related record. In the [sample data](#filtering-and-paging-each-relationship) below, Acme sells a Cable for 10, a Keyboard for 35, and a Dock for 60:
+
+```http
+GET /Brand/?name=Acme&products.name=Cable&products.price=ge=number:30
+GET /Brand/?name=Acme&products.name=Keyboard&products.price=ge=number:30&select(id,name,products{name,price})
+```
+
+The first request returns `[]`: Acme has a Cable and has products costing at least 30, but no Cable costing at least 30. A collection `DELETE` with those conditions deletes nothing. The second request returns Acme with only its Keyboard. Filters that no single related record can meet, such as `products.name=Keyboard&products.name=Mouse`, match no parent. A filter inside an OR is matched separately, as the next section shows. A to-one relationship has at most one related record, so the rule matters only for to-many relationships.
+
+Before v5.4.0, different related records could meet these filters. In v5.3.5, the first request returned Acme, a collection `DELETE` with its conditions deleted Acme, and the second request also selected the Dock.
+
+#### Relationship conditions inside an OR decide parents only
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+A relationship filter inside an OR (`|`) decides which parents match. It does not narrow which related records `select()` returns:
+
+```http
+GET /Brand/?(products.name=Cable|id=44)&select(id,products{name})
+```
+
+This returns Acme with all three of its products (Cable, Keyboard, Dock) and Studio Gear with Stand and Monitor. Without the OR, `products.name=Cable&select(id,products{name})` returns Acme with only its Cable.
+
+A filter joined with `&` outside the OR still narrows the selection, and a different related record can meet the filter inside the OR: `products.price=ge=number:30&(products.name=Cable|id=44)&select(id,products{name})` returns Acme with Keyboard and Dock (its Cable meets the OR) and Studio Gear with Stand and Monitor.
+
+Before v5.4.0, a relationship filter inside an OR also narrowed the selection. In v5.3.5, the request above returned Acme with only its Cable, and Studio Gear with an empty `products` array.
 
 ### Filtering and Paging Each Relationship
 
@@ -321,7 +352,7 @@ Targeted for v5.4.0; not released yet. See [Honor nested relationship filters an
 
 Use square brackets inside `select()` to apply conditions, sort, and pagination to each parent's related records.
 
-**An outer relationship filter also narrows that relationship's nested results.** For example, `products.price=ge=number:30` selects brands with a qualifying product and restricts their selected products to those costing at least 30. **You do not need to repeat that price filter inside `products[...]`.** Add a nested condition only when you want to narrow the already-eligible products further without removing their parents.
+**An outer relationship filter joined with `&` also narrows that relationship's nested results.** A filter inside an OR [does not](#relationship-conditions-inside-an-or-decide-parents-only). For example, `products.price=ge=number:30` selects brands with a qualifying product and restricts their selected products to those costing at least 30. **You do not need to repeat that price filter inside `products[...]`.** Add a nested condition only when you want to narrow the already-eligible products further without removing their parents.
 
 The following scenarios use this self-contained schema, including string product IDs and an indexed price field. In a fresh application, use this schema instead of the earlier Brand/Product example; do not combine the two definitions:
 

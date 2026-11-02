@@ -1127,7 +1127,47 @@ When a field is defined as a [relationship](../database/schema.md#relationships)
 
 A to-many relationship resolves to an array of records; depending on access pattern you may need to `await` the property before iterating it.
 
-**Join behavior:** selecting a relationship without an outer condition on it behaves as a **LEFT JOIN**: parents with no related row remain present, with the relationship omitted or empty. A top-level `conditions` entry on a related attribute (for example, `attribute: ['author', 'name']`) behaves as an **INNER JOIN**: it removes parents without a matching related row and restricts the selected related records. A `conditions` array inside a nested `select` object only filters the displayed children; it does not remove a parent.
+**Join behavior:** selecting a relationship without an outer condition on it behaves as a **LEFT JOIN**: parents with no related row remain present, with the relationship omitted or empty. A top-level `conditions` entry on a related attribute (for example, `attribute: ['author', 'name']`) joined with `and` behaves as an **INNER JOIN**: it removes parents without a matching related row and restricts the selected related records. Inside an `or` group, the same entry only decides which parents match (see below). A `conditions` array inside a nested `select` object only filters the displayed children; it does not remove a parent.
+
+**AND conditions on one relationship match one related record.** <VersionBadge type="changed" version="v5.4.0" /> Top-level conditions joined with `and`, including those in nested `and` groups, that traverse the same to-many relationship must all be met by the same related record. In the [sample brand and product data](../rest/querying.md#filtering-and-paging-each-relationship), Acme sells a Cable for 10, a Keyboard for 35, and a Dock for 60. This search finds no brand, because no Acme product is a Cable that costs at least 30:
+
+```javascript
+const brands = [];
+for await (const brand of Brand.search({
+	conditions: [
+		{ attribute: 'name', value: 'Acme' },
+		{ attribute: ['products', 'name'], value: 'Cable' },
+		{ attribute: ['products', 'price'], comparator: 'greater_than_equal', value: 30 },
+	],
+	select: ['id', 'name'],
+})) {
+	brands.push(brand);
+}
+```
+
+With `'Keyboard'` in place of `'Cable'`, the search returns Acme, and selecting `products` returns only the Keyboard. A condition inside an `or` group is matched separately (see below). A to-one relationship has at most one related record, so the rule matters only for to-many relationships. Before v5.4.0, different related records could meet these conditions; in v5.3.5, this search returned Acme.
+
+**A relationship condition inside `or` decides parents only.** <VersionBadge type="changed" version="v5.4.0" /> It does not restrict which related records `select` returns for a matching parent. The same applies to a top-level `operator: 'or'`:
+
+```javascript
+const brands = [];
+for await (const brand of Brand.search({
+	conditions: [
+		{
+			operator: 'or',
+			conditions: [
+				{ attribute: ['products', 'name'], value: 'Cable' },
+				{ attribute: 'id', value: 44 },
+			],
+		},
+	],
+	select: ['id', { name: 'products', select: ['name'] }],
+})) {
+	brands.push(brand);
+}
+```
+
+`brands` contains Acme with all three of its products and Studio Gear with Stand and Monitor. Without the `or` group, the Cable condition would restrict Acme's `products` to the Cable. An `and` condition beside the `or` group still restricts the selection, and a different related record can meet the `or` group's condition: adding `{ attribute: ['products', 'price'], comparator: 'greater_than_equal', value: 30 }` to the top-level `conditions` returns Acme with Keyboard and Dock (its Cable meets the `or` group) and Studio Gear with Stand and Monitor. Before v5.4.0, the `or` condition also restricted the selection; in v5.3.5, this search returned Acme with only its Cable and Studio Gear with an empty `products` array.
 
 #### Constraining related records
 
@@ -1170,7 +1210,7 @@ The single-record example returns:
 }
 ```
 
-**Outer relationship conditions also restrict nested results.** You do not need to repeat an outer product-price condition inside the `products` selection. For example, this returns only brands with products costing at least 30, and includes their cheapest qualifying product:
+**Outer relationship conditions joined with `and` also restrict nested results.** You do not need to repeat an outer product-price condition inside the `products` selection. For example, this returns only brands with products costing at least 30, and includes their cheapest qualifying product:
 
 ```javascript
 const brands = [];
@@ -1217,7 +1257,7 @@ Add a nested `conditions` array only to narrow these inherited candidates furthe
 
 For production collections, also set a top-level `limit` to bound parents. Use a unique final sort key for both parent and child order, and remember that a small child limit does not bound sorting work. See [parent pagination and stable sorting](../rest/querying.md#bound-parent-pages-and-use-stable-sorting) for an example and performance guidance.
 
-These options apply independently to each parent's children in both single-record `get()` and collection queries. `limit` is a count; `offset` is the number of eligible children to skip. These nested options do not remove parents: a parent with no matching children remains present with an empty to-many array. Nested conditions qualify immediate children; descendant filtering requires a selection on that descendant. Top-level `conditions` on that relationship still restrict the child candidates available to the nested selection, so an identical condition need not be repeated.
+These options apply independently to each parent's children in both single-record `get()` and collection queries. `limit` is a count; `offset` is the number of eligible children to skip. These nested options do not remove parents: a parent with no matching children remains present with an empty to-many array. Nested conditions qualify immediate children; descendant filtering requires a selection on that descendant. Top-level `conditions` on that relationship joined with `and` still restrict the child candidates available to the nested selection, so an identical condition need not be repeated; one inside an `or` group does not.
 
 See [Filtering and Paging Each Relationship](../rest/querying.md#filtering-and-paging-each-relationship) for missing-value behavior, authorization, cache-local eligibility and ordering, scan costs, and unsupported constraints.
 
@@ -1253,7 +1293,7 @@ Product.search({
 
 Alternatively, pass `allowFullScan: true` to permit an unconditional ordered scan, or — if order doesn't matter — omit `sort` entirely and `search({})` will iterate without an index requirement.
 
-<VersionBadge type="changed" version="v5.4.0" /> When `attribute` is a path array that traverses a to-many relationship, each parent's sort key is the list of its related records' values in relationship order: the related records' primary-key order in the foreign-key index for a `@relationship(to: ...)` field (not sorted by the target attribute or reduced to a min/max), or the stored foreign-key array order for a `@relationship(from: ...)` array. Top-level `conditions` on a relationship restrict which parents match and which children `select` returns, but do not narrow the related records loaded into each parent's sort key. Lists compare element by element (`['alpha']` < `['alpha', 'delta']` < `['bravo']`), and `descending: true` reverses that order. A parent with no related records has an empty list (`[]`), a related record that omits the sort attribute (or an unresolved ID in a `@relationship(from: ...)` array without `filterMissing`) produces `undefined` at that position, and an explicit `null` attribute produces `null`: both `null` and `undefined` sort before booleans, numbers, and strings (`[]` and `[undefined]` compare as equal because reading past the end of a shorter array yields `undefined`). Across multiple to-many hops, each hop produces a list in relationship order, so two to-many hops compare a nested list of lists per parent (`[]` < `[[], ['a']]` < `[['b']]`). The index-or-condition rule above checks `@indexed` on the target attribute at the end of the path. List-per-parent sorting runs in memory when the target attribute is not `@indexed` (with a condition or `allowFullScan: true`), when a more selective condition on another attribute leads the query, or when `enforceExecutionOrder: true` is set, loading the related records for every matched parent; if the target attribute is `@indexed` and no more selective condition on another attribute leads the query, Harper instead drives the scan from the related table's index join (yielding each parent at its first matching index entry and, when unconditional, omitting parents with no related records). Note that, unlike a nested `select` sort (`select: [{ name: 'products', sort: { attribute: 'price' } }]`), which checks read permissions on the child sort attribute and orders children within each parent, a top-level `sort` orders the parent records and does not currently enforce `attribute_permissions` on the related sort attribute, so restricting read access to a child attribute does not prevent ordering parent records by it:
+<VersionBadge type="changed" version="v5.4.0" /> When `attribute` is a path array that traverses a to-many relationship, each parent's sort key is the list of its related records' values in relationship order: the related records' primary-key order in the foreign-key index for a `@relationship(to: ...)` field (not sorted by the target attribute or reduced to a min/max), or the stored foreign-key array order for a `@relationship(from: ...)` array. Top-level `conditions` on a relationship restrict which parents match and (when joined with `and`) which children `select` returns, but do not narrow the related records loaded into each parent's sort key. Lists compare element by element (`['alpha']` < `['alpha', 'delta']` < `['bravo']`), and `descending: true` reverses that order. A parent with no related records has an empty list (`[]`), a related record that omits the sort attribute (or an unresolved ID in a `@relationship(from: ...)` array without `filterMissing`) produces `undefined` at that position, and an explicit `null` attribute produces `null`: both `null` and `undefined` sort before booleans, numbers, and strings (`[]` and `[undefined]` compare as equal because reading past the end of a shorter array yields `undefined`). Across multiple to-many hops, each hop produces a list in relationship order, so two to-many hops compare a nested list of lists per parent (`[]` < `[[], ['a']]` < `[['b']]`). The index-or-condition rule above checks `@indexed` on the target attribute at the end of the path. List-per-parent sorting runs in memory when the target attribute is not `@indexed` (with a condition or `allowFullScan: true`), when a more selective condition on another attribute leads the query, or when `enforceExecutionOrder: true` is set, loading the related records for every matched parent; if the target attribute is `@indexed` and no more selective condition on another attribute leads the query, Harper instead drives the scan from the related table's index join (yielding each parent at its first matching index entry and, when unconditional, omitting parents with no related records). Note that, unlike a nested `select` sort (`select: [{ name: 'products', sort: { attribute: 'price' } }]`), which checks read permissions on the child sort attribute and orders children within each parent, a top-level `sort` orders the parent records and does not currently enforce `attribute_permissions` on the related sort attribute, so restricting read access to a child attribute does not prevent ordering parent records by it:
 
 ```javascript
 // On the Brand/Product sample in REST Querying, orders qualifying brands by
