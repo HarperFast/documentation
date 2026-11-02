@@ -136,7 +136,7 @@ Two details matter outside a request context:
 
 ### Replication confirmation
 
-Set `replicatedConfirmation` on a fresh context before calling `transaction()` to request confirmation for its writes. Pass the callback's `txn` argument to table methods to bind them explicitly. Reusing a context with an active transaction does not change that transaction's confirmation settings. See the [independent-transaction example](../replication/sharding.md#programmatic-replication-control) and [uncertain-outcome behavior](../replication/sharding.md#confirmation-outcomes).
+Set `replicatedConfirmation` on a fresh context before calling `transaction()` to request confirmation for its writes. Pass the callback's `txn` argument to table methods to bind them explicitly. Reusing a context with an active transaction does not change that transaction's confirmation settings. See the [independent-transaction example](../replication/sharding.md#programmatic-replication-control), [uncertain-outcome behavior](../replication/sharding.md#confirmation-failure-after-a-local-commit), and [LMDB confirmation behavior](../replication/sharding.md#confirmation-outcomes).
 
 For `@sharded` tables, confirmation counts other owners in each affected owner set of the first written database; a temporary replica cannot satisfy it. `replicateTo` does not change those owners. See [declarative ownership](../replication/residency.md#ownership-reads-and-writes).
 

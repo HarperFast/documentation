@@ -55,7 +55,7 @@ A table without secondary indexes stores nothing on non-owners; reads resolve th
 
 Local-only writes succeed without replication confirmation. They do not deliver a local audit body to owners. The node retains a writer replica, index projection, or no row according to its replica and index settings.
 
-Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` (when the configuration key is unset, the greater of `900000` ms and `replication.blobTimeout`). An error with `replicationUnconfirmed: true` after local commit means the requested confirmation was not obtained; it does not mean rollback. Inspect the record and apply the application's concurrency controls before retrying.
+Explicit `replicatedConfirmation` uses `replication.confirmationTimeout` (when the configuration key is unset, the greater of `900000` ms and `replication.blobTimeout`). A failure after the local commit does not roll the write back; see [Confirmation Failure After a Local Commit](./sharding.md#confirmation-failure-after-a-local-commit).
 
 ### Subscription filters
 
