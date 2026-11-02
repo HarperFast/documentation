@@ -319,7 +319,7 @@ Type: `boolean`
 
 Default: `true`
 
-Applies only when `storage.engine` is `rocksdb`. Harper writes a transaction's entry to the [transaction log](./transaction.md) before the transaction commits. With this setting on, when a transaction fails after that point, its entry is marked aborted, and every reader of the log skips it: replication, subscriptions, [`read_audit_log`](./transaction.md#read_audit_log), and replay after a crash. A transaction interrupted by a crash before it commits or is marked is still replayed on restart.
+Applies only when `storage.engine` is `rocksdb`. Harper writes a transaction's entry to the [transaction log](./transaction.md) before the transaction commits. With this setting on, when a transaction fails after that point, its entry is marked aborted, and every reader of the log skips it: replication, subscriptions, [`read_audit_log`](./transaction.md#read_audit_log), and replay after a crash. A transaction interrupted by a crash before it commits or is marked, or one whose marker could not be written because of a disk error, is still replayed on restart.
 
 It also bounds a write that keeps conflicting with other writes. The write fails with HTTP `500` after 40 retries, or with HTTP `503` and code `TRANSACTION_COMMIT_CONFLICT_TIMEOUT` once it has been in conflict for longer than [`storage.maxTransactionQueueTime`](#storagemaxtransactionqueuetime). A `503` that carries `retryable: false` may have been partly applied, so do not resend that request as is. Writes applied from replication or a caching source, and a transaction part of which has already committed, still retry until they commit. With the setting off, a write whose log entry was already written retries without limit.
 
