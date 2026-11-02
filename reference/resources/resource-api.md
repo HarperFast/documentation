@@ -250,7 +250,7 @@ All properties are optional:
 | `rowFilter`          | Synchronous JavaScript predicate applied to row payloads; sharded non-owner invalidations contain only indexed projections.                                                                     |
 | `eventFilter`        | Synchronous JavaScript predicate for events that may not carry an authoritative row.                                                                                                            |
 
-On a sharded non-owner, `rowFilter` sees indexed fields from the invalidation payload even when a full replica is cached locally. Use indexed fields in these predicates: missing unindexed fields can suppress matching updates or satisfy a negated predicate. Do not use such a predicate to decide whether a subscriber may learn an unindexed value. See [subscription filters](../replication/residency.md#subscription-filters).
+On a sharded non-owner, `rowFilter` sees indexed fields from the invalidation payload even when a full replica is cached locally. Use indexed fields in these predicates: missing unindexed fields can suppress matching updates or satisfy a negated predicate. Do not use such a predicate to decide whether a subscriber may learn a record's id or indexed fields. See [subscription filters](../replication/residency.md#subscription-filters).
 
 #### Superseded record updates
 
