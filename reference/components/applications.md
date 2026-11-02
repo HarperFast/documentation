@@ -468,13 +468,14 @@ The forks stay, and the response message says why, when:
 
 - the drop sets `keepBranches: true`;
 - the shared workers run the application and the drop has no `restart`, so they still have it loaded;
-- the restart did not finish replacing every worker.
+- the restart did not finish replacing every worker;
+- the main thread serves the application as the node's only worker.
 
-Dropping the application again, once nothing has the forks open, removes them. That second drop restarts nothing, since the application is no longer on the node. Until then, deploying an application under the same name picks up the old fork, with its data.
+Except with `keepBranches`, the drop records the removal as owed before it changes anything, in a `` `removal-pending` `` file in the application's `` `branches`/<application> `` directory, and Harper finishes it without another drop: once no worker has the forks loaded, such as after the shared workers next restart, or, when the main thread serves the application, at Harper's next start. A `keepBranches` drop cancels a removal an earlier drop left owed. Until the forks are removed, deploying an application under the same name picks up the old fork, with its data, and the fork is then removed at that application's next drop.
 
 `keepBranches: true` cannot be combined with `restart: true`; that request is refused with `400`. A node running a version before v5.4.0 ignores `keepBranches`, and with `restart: true` it would remove its forks. To keep the forks of an application the shared workers run, drop it with `keepBranches: true`, then restart with [`restart_service`](../operations-api/operations.md#restart_service).
 
-If a fork cannot be removed, the drop fails with an error saying the storage was left in place; drop it again to retry. The exception is a drop that a worker thread handles and then stops: an isolated application dropping itself, or a drop handled in a shared worker that `restart=true` restarts. That node answers before the worker stops, with `branchesRemoved: null`, and a removal failure after that is only logged ([harper#3091](https://github.com/HarperFast/harper/issues/3091)); [harper#3463](https://github.com/HarperFast/harper/issues/3463) tracks reporting it. When a node reports `branchesRemoved: null`, check its fork directory, or drop the application again. A drop sent to the Operations API waits for every step, since the Operations API runs on the main thread.
+If a fork cannot be removed, the drop fails with an error saying the storage was left in place, and Harper retries the removal until it succeeds: after each later drop, at its next start, and on a timer that starts at one minute and doubles up to an hour. A drop that a worker thread handles and then stops answers before the worker stops, with `branchesRemoved: null`: an isolated application dropping itself, or a drop handled in a shared worker that `restart=true` restarts ([harper#3091](https://github.com/HarperFast/harper/issues/3091)). A removal failure after that answer is logged and retried the same way ([harper#3600](https://github.com/HarperFast/harper/pull/3600)). A drop sent to the Operations API waits for every step, since the Operations API runs on the main thread. To confirm that a fork is gone, check its directory on each node.
 
 Before v5.4.0, only a drop with `restart=true` removes the forks, once its restart has completed. Without `restart`, they stay, and the message says to drop again with `restart: true`.
 
