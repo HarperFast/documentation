@@ -146,7 +146,7 @@ The flag covers writes issued to the reported commit, not later application step
 
 Pre-commit refusals, including a confirmation count that cannot be met, do not carry this flag. Its absence does not establish that nothing was written: independent database commits can fail partially. A rejected commit ends its transaction scope; start a fresh transaction for subsequent writes.
 
-Confirmation currently applies to the first database a transaction writes to, and only when it uses RocksDB. This outcome flag covers the linked local commits; it does not enable confirmation for later databases or the LMDB storage engine.
+Confirmation currently applies to the first database a transaction writes to. This outcome flag covers the linked local commits; it does not enable confirmation for later databases.
 
 ## Static Sharding
 
