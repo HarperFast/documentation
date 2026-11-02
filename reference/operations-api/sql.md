@@ -111,7 +111,7 @@ Use `IS NULL` and `IS NOT NULL` to test for `NULL`. REST and Resource API condit
 
 ## Query Performance
 
-Harper 5.2's SQL engine maps SQL clauses onto Harper's native indexed storage. When a query can be planned against an index, it runs as a streaming, index-driven operation with memory bounded by the size of the result — not the size of the table. When it can't, the engine falls back to the legacy path, which fetches candidate rows and evaluates the query in memory, with cost and memory growing with the number of rows scanned.
+Harper 5.2's SQL engine maps SQL clauses onto Harper's native indexed storage. When a query can be planned against an index, it runs as a streaming, index-driven operation with memory bounded by the size of the result — not the size of the table. When it can't, the engine falls back to the legacy path, which fetches candidate rows and evaluates the query in memory, with cost and memory growing with the number of rows scanned. This section describes the default `auto` mode; see [The fallback contract](#the-fallback-contract) for `sql.engine: new` and `sql.allowFullScan`.
 
 On any non-trivial table the difference between these two paths is large.
 
@@ -139,7 +139,7 @@ These map directly to indexed storage operations:
 
 ### Queries that fall back to a full scan (avoid on large tables)
 
-These can't be served from an index. Under the default `auto` mode with `sql.allowFullScan` off, the engine falls back to the legacy full-scan path, so cost and memory grow with table size. Under `sql.engine: new` they are rejected with a 400 error instead, and with `sql.allowFullScan: true` the new engine scans the table itself (see [The fallback contract](#the-fallback-contract)):
+These can't be served from an index. Under the default `auto` mode with `sql.allowFullScan` off, the engine falls back to the legacy full-scan path, so cost and memory grow with table size. Under `sql.engine: new`, a statement the new engine can't plan is rejected with a 400 error instead, and `sql.allowFullScan: true` lets the new engine scan the table for a filter it can't serve from an index (see [The fallback contract](#the-fallback-contract)):
 
 - **Filters on un-indexed attributes** — any equality, range, or `IN` on an attribute with no index, _when it's the only predicate_. Combined via `AND` with an indexed predicate, it's applied as a cheap residual filter after the index narrows the scan, and the query stays index-served overall — it's only a standalone un-indexed filter (or one joined by `OR`) that forces a full scan.
 - **`OR` where a branch isn't index-driving** — e.g. `WHERE a = 1 OR b = 2` when `b` is un-indexed, or `WHERE a = 1 OR name LIKE '%x%'`. A single un-indexed (or non-index-comparator) branch taints the whole disjunction and forces a scan. When **every** branch is an indexed, index-driving predicate, the `OR` stays on the fast path (see above).
@@ -447,7 +447,7 @@ SELECT * FROM dev.addr WHERE ip LIKE 't0!!%' ESCAPE '!'         -- starts with "
 
 Without `ESCAPE`, a pattern has no escape character: `ip LIKE 't0!%'` matches `t0!` followed by anything. `ESCAPE` works in `SELECT`, `UPDATE` and `DELETE`, on both engines.
 
-These are rejected with a 400 error, and no rows are changed. Under `auto` and `new`, a pattern written in the statement is checked before any row is read. Under `sql.engine: legacy`, it is checked when a row is tested against it, so a statement that tests no rows does not fail.
+These are rejected with a 400 error, and no rows are changed. When the new engine plans the statement, a pattern written in it is checked before any row is read. When the legacy engine runs it, the pattern is checked when a row is tested against it, so a statement that tests no rows does not fail.
 
 - A pattern that ends in the escape character, such as `'t0!' ESCAPE '!'`.
 - An `ESCAPE` value that is empty (`''`) or longer than one character (`'!!'`, or a character such as an emoji that takes two UTF-16 code units).
@@ -471,7 +471,7 @@ Under the default `sql.engine: auto`, the same pattern can be either, and the wh
 
 This applies to `UPDATE` and `DELETE` as well: adding an index on `note` moves `DELETE FROM dev.addr WHERE note LIKE 't0%'` to the new engine, and it stops deleting `T0b`. A statement that falls back is logged, which tells you which engine ran it (see [The fallback contract](#the-fallback-contract)).
 
-To match regardless of case on both engines, lower-case the value: `LOWER(note) LIKE 't0%'`. `LOWER()` uses JavaScript's lower-casing, which treats a few non-ASCII characters differently from the legacy engine's case-insensitive matching. The index can't serve an expression, so combine it with an indexed condition using `AND`. Otherwise it is a full scan, which `auto` runs on the legacy engine and `sql.engine: new` rejects unless `sql.allowFullScan` is `true`. To keep a case-insensitive prefix search on the index, store a lower-cased copy of the value in its own indexed attribute and query that.
+To match regardless of case on both engines, lower-case the value: `LOWER(note) LIKE 't0%'`. `LOWER()` uses JavaScript's lower-casing, which treats a few non-ASCII characters differently from the legacy engine's case-insensitive matching. The index can't serve an expression, so combine it with an indexed condition using `AND`. Otherwise the statement is a full scan of the table. To keep a case-insensitive prefix search on the index, store a lower-cased copy of the value in its own indexed attribute and query that.
 
 ### Character Classes on the Legacy Engine
 
@@ -489,7 +489,7 @@ The new engine has no character classes: `[` and `]` match themselves. Under `au
 
 <VersionBadge type="changed" version="v5.4.0" /> Testing one value takes time at most proportional to the value's length times the pattern's length, for any mix of `%` and `_`. Before v5.4.0, a short pattern such as `'%_%_%_%_%_%_%_%_%_%_%_%_%_%_Z'` against a long value could block a thread. Both lengths still multiply, so a pattern thousands of characters long tested against values millions of characters long is slow; limit pattern length if users supply patterns.
 
-The total cost of a `LIKE` is still the number of rows it tests. On an indexed attribute, the index serves a prefix pattern, which is literal text followed by one `%` (`'abc%'`, or `'50!%%' ESCAPE '!'` for values starting with `50%`), and a pattern with no wildcards, which is an equality test. Any other `LIKE` filters the rows that the rest of the query selects, so with no indexed condition it tests every row in the table. Under `auto` with `sql.allowFullScan` off, such a query usually runs on the legacy engine (an `ORDER BY` on the primary key keeps it on the new engine). Under `sql.engine: new` with `sql.allowFullScan` off (the default), it is rejected with a 400 error instead of scanning. See [Query Performance](#query-performance).
+The total cost of a `LIKE` is still the number of rows it tests. On an indexed attribute, the index serves a prefix pattern, which is literal text followed by one `%` (`'abc%'`, or `'50!%%' ESCAPE '!'` for values starting with `50%`), and a pattern with no wildcards, which is an equality test. Any other `LIKE` filters the rows that the rest of the query selects, so with no indexed condition it tests every row in the table. Whether such a statement falls back to the legacy engine, scans on the new engine, or is rejected with a 400 error depends on `sql.engine`, `sql.allowFullScan` and the rest of the statement; see [The fallback contract](#the-fallback-contract) and [Query Performance](#query-performance).
 
 ---
 
