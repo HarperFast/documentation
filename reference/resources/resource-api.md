@@ -222,7 +222,7 @@ product.save();
 
 Only the properties you assign or change are written. Reading a property, including a sub-object or an array element, is not a write: nothing is saved for it, nothing is added to the audit history, and on a [write-through caching](#write-through-caching) table nothing is sent to the source's `patch`. A sub-object or array you change is written as its whole new value.
 
-A `Date` or `Bytes` (`Buffer` / `Uint8Array`) property must be reassigned to be saved. Reading one returns a copy, so changing it in place, such as `product.when.setTime(...)` or `product.bytes[0] = 9`, is not saved. Build a new value and assign it:
+A `Date`, `Bytes` (`Buffer` / `Uint8Array`), or other value that is not a plain object or array (such as a `Map`) must be reassigned to be saved. Reading a `Date` or `Bytes` property returns a copy, so changing it in place, such as `product.when.setTime(...)` or `product.bytes[0] = 9`, is not saved. Build a new value and assign it:
 
 ```javascript
 product.when = new Date(product.when.getTime() + 60_000);
