@@ -111,7 +111,7 @@ export async function syncExchangeRates(context) {
 }
 ```
 
-**Handlers should be idempotent.** Harper's clustering has no distributed lock, so leadership failover and daylight-saving fall-back can occasionally deliver the same logical occurrence twice. Design handlers so that running twice for one occurrence is harmless.
+**Handlers should be idempotent.** Scheduler delivery does not acquire a distributed lock for each occurrence, so leadership failover and daylight-saving fall-back can occasionally deliver the same logical occurrence twice. Design handlers so that running twice for one occurrence is harmless. Harper's [native record locks](../database/concurrency.md#native-record-locks) can protect participating record updates within their supported scope; they do not make scheduler delivery or external side effects exactly once.
 
 **A failed run is not retried.** If a handler throws (or its outbound request times out), the run is recorded with `lastStatus: error` and the occurrence is not made up - the job simply fires again at its next scheduled time. Handlers that need delivery guarantees should implement their own bounded retry/backoff inside the handler.
 

@@ -1780,16 +1780,17 @@ Operations for configuring and managing Harper cluster replication.
 
 Detailed documentation: [Replication & Clustering](../replication/clustering.md)
 
-| Operation               | Description                                                     | Role Required |
-| ----------------------- | --------------------------------------------------------------- | ------------- |
-| `add_node`              | Adds a Harper instance to the cluster                           | super_user    |
-| `update_node`           | Modifies an existing node's subscriptions                       | super_user    |
-| `remove_node`           | Removes a node from the cluster                                 | super_user    |
-| `cluster_status`        | Returns current cluster connection status                       | super_user    |
-| `configure_cluster`     | Bulk-creates/resets cluster subscriptions across multiple nodes | super_user    |
-| `cluster_set_routes`    | Adds routes to the replication routes config (PATCH/upsert)     | super_user    |
-| `cluster_get_routes`    | Returns the current replication routes config                   | super_user    |
-| `cluster_delete_routes` | Removes routes from the replication routes config               | super_user    |
+| Operation                 | Description                                                                                                                                | Role Required |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| `add_node`                | Adds a Harper instance to the cluster                                                                                                      | super_user    |
+| `update_node`             | Modifies an existing node's subscriptions                                                                                                  | super_user    |
+| `remove_node`             | Removes a node from the cluster                                                                                                            | super_user    |
+| `cluster_status`          | Returns current cluster connection status                                                                                                  | super_user    |
+| `configure_cluster`       | Bulk-creates/resets cluster subscriptions across multiple nodes                                                                            | super_user    |
+| `cluster_set_routes`      | Adds routes to the replication routes config (PATCH/upsert)                                                                                | super_user    |
+| `cluster_get_routes`      | Returns the current replication routes config                                                                                              | super_user    |
+| `cluster_delete_routes`   | Removes routes from the replication routes config                                                                                          | super_user    |
+| `record_lock_apply_homes` | Applies an agreed record-lock home map in Harper Pro on RocksDB; see [native record locks](../database/concurrency.md#native-record-locks) | super_user    |
 
 ### `add_node`
 
