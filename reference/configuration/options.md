@@ -69,7 +69,7 @@ threads:
 - `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load via Node's `--import` before any Harper or application module on each worker thread. Intended for instrumentation and APM agents. Worker threads only (not under Bun).
 - `preloadRequire` <VersionBadge version="v5.2.0" /> — The same, but via Node's `--require` (CommonJS). Worker threads only (not under Bun).
 - `v8Flags` <VersionBadge version="v5.4.0" /> — V8 flag, or list of V8 flags, applied to the whole Harper process before its first worker thread starts. Each entry must start with `--`. Takes effect on process start. Not applied under Bun. See [Applying V8 flags](#applying-v8-flags)
-- `shutdownTimeout` <VersionBadge version="v5.4.0" /> — Longest time (ms) Harper spends shutting down after SIGTERM, SIGINT or SIGQUIT before it exits anyway; _Default_: `8000` (`30000` under `harper dev`). `0` exits as soon as the signal arrives. See [Shutting down on a termination signal](#shutting-down-on-a-termination-signal)
+- `shutdownTimeout` <VersionBadge version="v5.4.0" /> — Longest time (ms) Harper spends shutting down after SIGTERM, SIGINT or SIGQUIT before it exits anyway; _Default_: `8000` (`30000` under `harper dev`). `0` exits as soon as the signal arrives. Takes effect when Harper restarts. See [Shutting down on a termination signal](#shutting-down-on-a-termination-signal)
 
 ### Preloading an instrumentation agent
 
@@ -133,7 +133,7 @@ When the Harper process receives SIGTERM, SIGINT (Ctrl+C) or SIGQUIT, it shuts d
 
 1. Harper stops accepting new connections.
 2. Requests already in flight get a few seconds to finish (see the first note below).
-3. Component scopes close. Their [`'close'` listeners](../components/plugin-api.md#cleanup-on-shutdown) run after connections have drained.
+3. Component scopes close. Their [`'close'` listeners](../components/plugin-api.md#cleanup-on-shutdown) run once connections have drained or been closed.
 4. The process exits with code `0`.
 
 `threads.shutdownTimeout` bounds this sequence. If it has not finished in time, Harper logs `Shutdown did not finish within <n> ms (threads.shutdownTimeout)` and exits anyway. A second signal during the shutdown makes Harper exit at once; running `harper stop` again sends one. Harper exits with code `0` in all three cases, so a `0` exit status does not mean every `'close'` listener finished.

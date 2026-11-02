@@ -460,4 +460,4 @@ export function handleApplication(scope) {
 - **v4.6.0** — Plugin API introduced (experimental)
 - **v4.7.0** — Further improvements to the Plugin API
 - **v5.1.3** — Shutdown awaits promises returned by `'close'` listeners; earlier releases emitted `'close'` without waiting, so async cleanup could be cut off by the worker exiting
-- **v5.4.0** — SIGTERM, SIGINT and SIGQUIT close scopes after connections drain, bounded by `threads.shutdownTimeout`; earlier releases exited on these signals without closing scopes
+- **v5.4.0** — SIGTERM, SIGINT and SIGQUIT close scopes once connections have drained or been closed, bounded by `threads.shutdownTimeout`; earlier releases exited on these signals without closing scopes

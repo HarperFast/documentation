@@ -449,6 +449,8 @@ Shows:
 - Clustering network status
 - Replication statuses
 
+From v5.4.0, `harper status` reports Harper as running until the process exits, including while it [shuts down](../configuration/options.md#shutting-down-on-a-termination-signal) after `harper stop`. <VersionBadge type="changed" version="v5.4.0" />
+
 In Harper versions where NATS is supported, this command also shows the clustering hub and leaf processes too.
 
 ### `harper help`
