@@ -1145,7 +1145,7 @@ for await (const brand of Brand.search({
 }
 ```
 
-With `'Keyboard'` in place of `'Cable'`, the search returns Acme, and selecting `products` returns only the Keyboard. A condition inside an `or` group is matched separately (see below). A to-one relationship has at most one related record, so the rule matters only for to-many relationships. Before v5.4.0, different related records could meet these conditions; in v5.3.5, this search returned Acme.
+With `'Keyboard'` in place of `'Cable'`, the search returns Acme, and selecting `products` returns only the Keyboard. A condition inside an `or` group is matched separately (see below). A collection `DELETE` follows the same rule; see the [REST example](../rest/querying.md#conditions-on-one-relationship-match-one-related-record). A to-one relationship has at most one related record, so the rule matters only for to-many relationships. Before v5.4.0, different related records could meet these conditions; in v5.3.5, this search returned Acme.
 
 **A relationship condition inside `or` decides parents only.** <VersionBadge type="changed" version="v5.4.0" /> It does not restrict which related records `select` returns for a matching parent. The same applies to a top-level `operator: 'or'`:
 
@@ -1173,7 +1173,7 @@ for await (const brand of Brand.search({
 
 :::note Pending release
 
-Targeted for v5.4.0; not released yet. See [Honor nested relationship filters and pagination](https://github.com/HarperFast/harper/pull/3279) and [Fix wrong rows, unfiltered selects and ignored sorts in relationship queries](https://github.com/HarperFast/harper/pull/3775).
+Targeted for v5.4.0; not released yet. See [Honor nested relationship filters and pagination](https://github.com/HarperFast/harper/pull/3279), [Fix wrong rows, unfiltered selects and ignored sorts in relationship queries](https://github.com/HarperFast/harper/pull/3775), and [Keep an AND group's estimate finite when a sibling condition is filter-only](https://github.com/HarperFast/harper/pull/3724).
 
 :::
 
