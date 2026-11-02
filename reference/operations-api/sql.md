@@ -447,11 +447,13 @@ SELECT * FROM dev.addr WHERE ip LIKE 't0!!%' ESCAPE '!'         -- starts with "
 
 Without `ESCAPE`, a pattern has no escape character: `ip LIKE 't0!%'` matches `t0!` followed by anything. `ESCAPE` works in `SELECT`, `UPDATE` and `DELETE`, on both engines.
 
-These are rejected with a 400 error, and no rows are changed. When the new engine plans the statement, a pattern written in it is checked before any row is read. When the legacy engine runs it, the pattern is checked when a row is tested against it, so a statement that tests no rows does not fail.
+These are rejected with a 400 error, and no rows are changed:
 
 - A pattern that ends in the escape character, such as `'t0!' ESCAPE '!'`.
 - An `ESCAPE` value that is empty (`''`) or longer than one character (`'!!'`, or a character such as an emoji that takes two UTF-16 code units).
 - An `ESCAPE` value that is not a string, such as `ESCAPE 1`.
+
+When the new engine plans the statement, a pattern written in it is checked before any row is read. When the legacy engine runs it, the pattern is checked when a row is tested against it, so a statement that tests no rows does not fail.
 
 Before v5.4.0, `ESCAPE` was ignored, so `ip LIKE 't0!%' ESCAPE '!'` matched every value starting with `t0!`, and an `UPDATE` or `DELETE` using it changed those rows.
 
@@ -487,7 +489,7 @@ The new engine has no character classes: `[` and `]` match themselves. Under `au
 
 ### Matching Cost
 
-<VersionBadge type="changed" version="v5.4.0" /> Testing one value takes time at most proportional to the value's length times the pattern's length, for any mix of `%` and `_`. Before v5.4.0, a short pattern such as `'%_%_%_%_%_%_%_%_%_%_%_%_%_%_Z'` against a long value could block a thread. Both lengths still multiply, so a pattern thousands of characters long tested against values millions of characters long is slow; limit pattern length if users supply patterns.
+<VersionBadge type="changed" version="v5.4.0" /> Testing one value takes time at most proportional to the value's length times the pattern's length, for any mix of `%` and `_`. Before v5.4.0, a short pattern such as `'%_%_%_%_%_%_%_%_%_%_%_%_%_%_Z'` against a long value could block a thread. Both lengths still multiply, so a pattern thousands of characters long tested against values millions of characters long is slow. If users supply patterns, limit their length.
 
 The total cost of a `LIKE` is still the number of rows it tests. On an indexed attribute, the index serves a prefix pattern, which is literal text followed by one `%` (`'abc%'`, or `'50!%%' ESCAPE '!'` for values starting with `50%`), and a pattern with no wildcards, which is an equality test. Any other `LIKE` filters the rows that the rest of the query selects, so with no indexed condition it tests every row in the table. Whether such a statement falls back to the legacy engine, scans on the new engine, or is rejected with a 400 error depends on `sql.engine`, `sql.allowFullScan` and the rest of the statement; see [The fallback contract](#the-fallback-contract) and [Query Performance](#query-performance).
 
