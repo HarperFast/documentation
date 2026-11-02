@@ -384,15 +384,12 @@ Retains the pre-compaction backup files after `compactOnStart` runs. Recommended
 
 **Write-heavy ingest, durability via replication:**
 
-On RocksDB (the default), commits already avoid local disk `fsync`; pair a higher queue-time threshold in `harper-config.yaml` with per-write [replication confirmation](../replication/sharding.md) (`replicatedConfirmation` in the Operations or Resource API, or `X-Replicate-To: *;confirm=<k>` over REST) when writes must be confirmed by peer nodes before returning (on legacy LMDB databases, also add `writeAsync: true`):
+On RocksDB (the default), commits already avoid local disk `fsync`; pair a higher queue-time threshold in `harper-config.yaml` with per-write [replication confirmation](../replication/sharding.md) (`replicatedConfirmation` in the Operations or Resource API, or `X-Replicate-To: *;confirm=<k>` over REST — set on each write operation or request, not in `harper-config.yaml`) when writes must be confirmed by peer nodes before returning (on legacy LMDB databases, also add `writeAsync: true`):
 
 ```yaml
 storage:
   prefetchWrites: true
   maxTransactionQueueTime: 60s
-  # Per-write replication confirmation is set on the operation/request
-  # (e.g. replicatedConfirmation: 1 or X-Replicate-To: *;confirm=1),
-  # not in harper-config.yaml.
 ```
 
 **Read-heavy cache layer with large blobs:**
