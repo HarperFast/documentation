@@ -29,7 +29,7 @@ GET /Product/?category=software&inStock=true
 
 <VersionBadge version="v4.3.0" />
 
-Query for null values or non-null values:
+Query for records that store `null`, or for records whose value is present and not `null`:
 
 ```http
 GET /Product/?discount=null
@@ -268,7 +268,7 @@ GET /Product/?rating=gt=3&sort(+name)
 GET /Product/?sort(+rating,-price)
 ```
 
-<VersionBadge type="changed" version="v5.4.0" /> A sort also applies when a condition on the sort attribute cannot read that attribute's index, as with an unindexed attribute or `ne` with a non-null value (`?discount=ne=5&sort(discount)`). Harper then collects and sorts every matching record in memory before applying `limit()`, so a small page does not reduce the work. Before v5.4.0, such a query could return records in primary-key order. See [Sorting](../resources/query-optimization.md#sorting) for performance guidance.
+<VersionBadge type="changed" version="v5.4.0" /> A sort also applies when a condition on the sort attribute cannot read that attribute's index, as with an unindexed attribute, or `ne` with a non-null value on an attribute other than the primary key (`?discount=ne=5&sort(discount)`). Harper then collects and sorts every matching record in memory before applying `limit()`, so a small page does not reduce the work. Before v5.4.0, such a query could return records in primary-key order. See [Sorting](../resources/query-optimization.md#sorting) for performance guidance.
 
 ## Pagination and Total Count
 

@@ -36,15 +36,15 @@ When a query is executed, conditions are evaluated against the database. Indexed
 
 ### Index Performance Characteristics
 
-| Operator                                                             | Uses index         | Notes                                                                                                                |
-| -------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `equals`                                                             | Yes                | Fast lookup in sorted index                                                                                          |
-| `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal` | Yes                | Range scan in sorted index; narrower range = faster                                                                  |
-| `starts_with`                                                        | Yes                | Prefix search in sorted index                                                                                        |
-| `not_equal` with a non-null value                                    | No                 | Full scan required (unless combined with selective indexed condition); a `sort` on the same attribute runs in memory |
-| `contains`                                                           | No                 | Full scan required                                                                                                   |
-| `ends_with`                                                          | No                 | Full scan required                                                                                                   |
-| `!= null`                                                            | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields                                             |
+| Operator                                                             | Uses index         | Notes                                                                                                                                           |
+| -------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `equals`                                                             | Yes                | Fast lookup in sorted index                                                                                                                     |
+| `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal` | Yes                | Range scan in sorted index; narrower range = faster                                                                                             |
+| `starts_with`                                                        | Yes                | Prefix search in sorted index                                                                                                                   |
+| `not_equal` with a non-null value                                    | No                 | Full scan required (unless combined with selective indexed condition); a `sort` on the same attribute runs in memory, except on the primary key |
+| `contains`                                                           | No                 | Full scan required                                                                                                                              |
+| `ends_with`                                                          | No                 | Full scan required                                                                                                                              |
+| `!= null`                                                            | Yes (special case) | Can use indexes to find non-null records; only helpful for sparse fields                                                                        |
 
 **Rule of thumb**: Use `equals`, range operators, and `starts_with` on indexed fields. Avoid `contains`, `ends_with`, and `not_equal` as the sole or first condition in large datasets.
 
