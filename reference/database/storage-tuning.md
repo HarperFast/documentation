@@ -341,7 +341,7 @@ Type: `boolean`
 
 Default: `false`
 
-When `true`, a commit that would conflict with a write from an older transaction that is still open is refused before it writes its transaction-log entry. It then waits for that transaction to commit or abort, and retries. A refused attempt does not count toward the 40-conflict limit of [`transactionLogAbortMarkers`](#storagerockstransactionlogabortmarkers).
+When `true`, a commit that would conflict with a write from an older transaction that is still open is refused before it writes its transaction-log entry, or before it commits if an earlier attempt already wrote that entry. It then waits for that transaction to commit or abort, and retries. A refused attempt does not count toward the 40-conflict limit of [`transactionLogAbortMarkers`](#storagerockstransactionlogabortmarkers).
 
 This shortens the longest waits when many transactions write the same records at once. It adds retries and lowers throughput when transactions are large or contention is low, so leave it off unless overlapping writes to the same records see long commit delays.
 
