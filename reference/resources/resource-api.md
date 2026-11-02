@@ -222,7 +222,7 @@ product.save();
 
 Only the properties you assign or change are written. Reading a property, including a sub-object or an array element, is not a write: nothing is saved for it, nothing is added to the audit history, and on a [write-through caching](#write-through-caching) table nothing is sent to the source's `patch`. A sub-object or array you change is written as its whole new value.
 
-A `Date` or `Bytes` (`Buffer` / `Uint8Array`) value must be reassigned to be saved. Changing it in place, such as `product.when.setTime(...)` or `product.bytes[0] = 9`, is not tracked. Build a new value and assign it:
+A `Date` or `Bytes` (`Buffer` / `Uint8Array`) property must be reassigned to be saved. Reading one returns a copy, so changing it in place, such as `product.when.setTime(...)` or `product.bytes[0] = 9`, is not saved. Build a new value and assign it:
 
 ```javascript
 product.when = new Date(product.when.getTime() + 60_000);
@@ -230,6 +230,8 @@ const bytes = Buffer.from(product.bytes);
 bytes[0] = 9;
 product.bytes = bytes;
 ```
+
+Elements of an array property are the exception: changing one in place, such as `product.dates[0].setTime(...)`, saves the array.
 
 On a table that is not [`@sealed`](../database/schema.md#sealed), assigning a property the schema does not declare (`product.extra = 'x'`) saves it, even when nothing else changed.
 
@@ -888,11 +890,13 @@ As of v5.4.0, calls on the same property in one transaction combine:
 - A delta after an assignment adds to the assigned value. `record.n = 100; record.addTo('n', 7)` stores 107. The write is still an assignment, so it replaces a concurrent writer's change instead of merging with it.
 - An assignment after `addTo` replaces the pending delta.
 
+As of v5.4.0, on a property declared `Int`, `Long`, `Float` or `Number`, a BigInt `value` is converted to a number. One beyond 2^53 in magnitude is rejected with a 400 error.
+
 ### `subtractFrom(property: string, value: number | bigint)` {#subtractfromproperty-string-value-number}
 
 Subtracts `value` from `property` using CRDT incrementation. It combines with other calls in the transaction the same way as [`addTo`](#addtoproperty-string-value-number).
 
-As of v5.4.0, `value` can be a BigInt, like `addTo`: `record.subtractFrom('total', 35n)`.
+As of v5.4.0, `value` can be a BigInt, like `addTo`: `record.subtractFrom('total', 35n)`. The conversion rule for number-typed properties in [`addTo`](#addtoproperty-string-value-number) applies.
 
 ### `set(property: string, value: any): void`
 
