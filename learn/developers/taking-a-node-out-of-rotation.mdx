@@ -593,7 +593,7 @@ tail -f root/log/hdb.log | grep availability
    npx harper start
    ```
 
-   `harper stop` returns before Harper exits, so the loop waits for the old process before starting a new one.
+   Before v5.4.0, `harper stop` returns before Harper exits, so the loop waits for the old process before starting a new one. From v5.4.0, [`harper stop`](/reference/v5/cli/commands#harper-stop) waits for the exit itself, and the loop ends at once.
 
    The record is still `Unavailable` after the restart. The loop finds its marker, and puts the node back about 60 seconds after Harper starts.
 
