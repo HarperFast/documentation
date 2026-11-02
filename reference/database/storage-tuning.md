@@ -333,6 +333,26 @@ storage:
     transactionLogAbortMarkers: false
 ```
 
+### `storage.rocks.transactionLogWriteIntents`
+
+<VersionBadge version="v5.4.0" /> <EngineBadge engines="RocksDB" />
+
+Type: `boolean`
+
+Default: `false`
+
+When `true`, a commit that would conflict with a write from an older transaction that is still open is refused before it writes its transaction-log entry. It then waits for that transaction to commit or abort, and retries. A refused attempt does not count toward the 40-conflict limit of [`transactionLogAbortMarkers`](#storagerockstransactionlogabortmarkers).
+
+This shortens the longest waits when many transactions write the same records at once. It adds retries and lowers throughput when transactions are large or contention is low, so leave it off unless overlapping writes to the same records see long commit delays.
+
+It has no effect when `transactionLogAbortMarkers` is `false`. Like that setting, it is read once per process: a change takes effect after a [`restart`](../operations-api/operations.md#restart) of each node, not [`restart_service`](../operations-api/operations.md#restart_service).
+
+```yaml
+storage:
+  rocks:
+    transactionLogWriteIntents: true
+```
+
 ## Storage Reclamation
 
 `storage.reclamation` controls how Harper evicts data from caching tables (tables with [`sourcedFrom`](../resources/resource-api.md#sourcedfromresource-options)) when disk usage runs high. Reclamation does **not** affect non-caching tables — those rely on explicit deletion, TTL expiration, or [compaction](./compaction.md).
