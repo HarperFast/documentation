@@ -313,7 +313,7 @@ This option is the only `WriteBufferManager` setting that can be changed at runt
 
 ### `storage.rocks.transactionLogAbortMarkers`
 
-<VersionBadge version="v5.4.0" />
+<VersionBadge version="v5.4.0" /> <EngineBadge engines="RocksDB" />
 
 Type: `boolean`
 
@@ -321,9 +321,9 @@ Default: `true`
 
 Applies only when `storage.engine` is `rocksdb`. Harper writes a transaction's entry to the [transaction log](./transaction.md) before the transaction commits. With this setting on, when a transaction fails after that point, its entry is marked aborted, and every reader of the log skips it: replication, subscriptions, [`read_audit_log`](./transaction.md#read_audit_log), and replay after a crash. A transaction is still replayed on restart if the process crashes before it commits or is marked, including when a disk error delays its marker.
 
-It also bounds a write that keeps conflicting with other writes. The write fails with HTTP `500` after 40 commit conflicts, or with HTTP `503` and code `TRANSACTION_COMMIT_CONFLICT_TIMEOUT` once it has been in conflict for longer than [`storage.maxTransactionQueueTime`](#storagemaxtransactionqueuetime), whichever comes first. A `503` that carries `retryable: false` may have been partly applied, so do not resend that request as is. Writes applied from replication or a caching source, and a transaction part of which has already committed, still retry until they commit. With the setting off, a write whose log entry was already written retries without limit.
+It also bounds a write that keeps conflicting with other writes. The write fails with HTTP `500` after 40 commit conflicts, or with HTTP `503` and code `TRANSACTION_COMMIT_CONFLICT_TIMEOUT` once it has been in conflict for longer than [`storage.maxTransactionQueueTime`](#storagemaxtransactionqueuetime), whichever comes first. A `503` that carries `retryable: false` may have been partly applied, so do not resend that request as is. Writes applied from replication or a caching source, and a transaction part of which has already committed, still retry until they commit.
 
-Set it to `false` to keep the 5.3 behavior. Any value other than `false`, `0`, `no` or `off` leaves it on. Harper reads the setting once per process, so a change takes effect after a [`restart`](../operations-api/operations.md#restart) of each node, or a process or container restart. [`restart_service`](../operations-api/operations.md#restart_service) restarts only worker threads and does not apply it.
+Set it to `false` to keep the 5.3 behavior, where a write whose log entry was already written retries without limit. Any value other than `false`, `0`, `no` or `off` leaves it on. Harper reads the setting once per process, so a change takes effect after a [`restart`](../operations-api/operations.md#restart) of each node, or a process or container restart. [`restart_service`](../operations-api/operations.md#restart_service) restarts only worker threads and does not apply it.
 
 **Downgrades:** Harper 5.3.4 and earlier cannot read abort markers and would treat a marked transaction as committed. Do not run them on a node's database files, or a backup of them, after the node has run 5.4 with this setting on. Harper 5.3.5 and later read the markers. Setting it to `false` later stops new markers but does not remove ones already written.
 
