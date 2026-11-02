@@ -140,12 +140,12 @@ When the Harper process receives SIGTERM, SIGINT (Ctrl+C) or SIGQUIT, it shuts d
 
 ```yaml
 threads:
-  shutdownTimeout: 25000 # for Kubernetes' default 30-second grace period
+  shutdownTimeout: 25000 # Kubernetes' default 30-second grace period, no preStop hook
 ```
 
 The environment variable is `THREADS_SHUTDOWNTIMEOUT`. Like other settings, a changed value takes effect when Harper restarts; `harper stop` reads the configuration file, so its wait uses the new value right away. `0` restores the behavior from before v5.4.0: Harper exits when the signal arrives, without draining requests or closing scopes.
 
-- **Requests get a few seconds, not the whole timeout.** A request still running a few seconds after Harper stops accepting connections (about 2.5 seconds on Node.js) has its connection closed before it finishes, however high `threads.shutdownTimeout` is set, and its handler can still be running when `'close'` listeners start. The rest of the timeout is for component cleanup.
+- **Requests get a few seconds, not the whole timeout.** After it stops accepting connections, Harper waits a few seconds for requests in flight (about 2.5 seconds on Node.js, 5 on Bun), however high `threads.shutdownTimeout` is set. A request still running then may not finish: on Node.js its connection is closed, and its handler can still be running when `'close'` listeners start. The rest of the timeout is for component cleanup.
 - **Fit it inside your orchestrator's grace period.** A container platform or service manager sends SIGTERM, waits for its grace period, then kills the process. After the shutdown above, Harper closes its databases as the process exits, and `threads.shutdownTimeout` does not limit that step. Set `threads.shutdownTimeout` a few seconds below the grace period to leave time for it. The default of 8 seconds fits Docker's default. On Kubernetes, the grace period also covers a `preStop` hook, which runs before SIGTERM, so subtract its time too.
 
 | Platform               | Grace period setting            | Default    |
