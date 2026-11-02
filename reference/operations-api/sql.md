@@ -147,7 +147,7 @@ These can't be served from an index. Under the default `auto` mode with `sql.all
 - **`!=` / `<>` and `NOT` negations** — matching "everything except" a value can't use an index.
 - **`ORDER BY` with no indexed filter to drive it** — a table-wide ordered scan on an un-indexed sort key.
 - **`SEARCH_JSON`** — evaluates JSONata over each candidate row's nested JSON; it is not index-backed. Narrow the candidate set with an indexed `WHERE` condition first.
-- **`RIGHT`/`FULL OUTER JOIN`, no-`WHERE` `UPDATE`/`DELETE`, `COUNT(DISTINCT ...)`** — the new engine doesn't plan these yet, so they run on the legacy engine (correct results, legacy cost).
+- **`RIGHT`/`FULL OUTER JOIN`, no-`WHERE` `UPDATE`/`DELETE`, `COUNT(DISTINCT ...)`** — the new engine doesn't plan these yet, so they run on the legacy engine (legacy results and cost).
 
 Note that `UNION`, sub-`SELECT`, and `INSERT … SELECT` are not supported by either engine — see the [Features Matrix](#features-matrix).
 
@@ -161,7 +161,7 @@ The `sql.engine` setting in the [configuration file](../configuration/overview.m
 - `new` — runs every statement on the new engine. A statement the new engine can't plan is rejected with a 400 error instead of falling back.
 - `legacy` — runs every statement on the legacy engine.
 
-By default (`sql.allowFullScan: false`), the new engine does not run a query that has no index-driving condition, which is one reason `auto` falls back. With `sql.allowFullScan: true`, the new engine runs such a query as a full scan instead of falling back (under `auto`) or rejecting it (under `new`). A full scan on the new engine is not a fallback, so it is not logged.
+By default (`sql.allowFullScan: false`), the new engine does not run a query that has neither an index-driving condition nor an `ORDER BY` on the primary key, which is one reason `auto` falls back. With `sql.allowFullScan: true`, the new engine runs such a query as a full scan instead of falling back (under `auto`) or rejecting it (under `new`). A full scan on the new engine is not a fallback, so it is not logged.
 
 ### Behavior changes from the legacy engine
 
