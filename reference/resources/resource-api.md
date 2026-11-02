@@ -1093,7 +1093,7 @@ Product.search({ conditions: [{ attribute: 'discount', comparator: 'between', va
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Each condition whose path traverses a to-many relationship is met by some related record, which can differ from the one that meets another condition. To require one related record to meet several conditions, use a relationship group <VersionBadge version="v5.4.0" />: a condition whose `attribute` names the relationship (or a path ending in one), with a `conditions` array on the related table and no `comparator` or `value`. Its `operator` defaults to `and`; with `or`, one related record must meet at least one of the conditions.
+Each condition whose path traverses a to-many relationship is met by some related record, which can differ from the one that meets another condition. To require one related record to meet several conditions, use a relationship group (Added in: v5.4.0): a condition whose `attribute` names the relationship (or a path ending in one), with a `conditions` array on the related table and no `comparator` or `value`. Its `operator` defaults to `and`; with `or`, one related record must meet at least one of the conditions.
 
 ```javascript
 const brands = [];
