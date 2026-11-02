@@ -649,13 +649,13 @@ Acme's matching products sort to Dock ($60), then Cable ($10), so `limit(1,2)` r
 
 #### Nested option reference
 
-| Nested option      | Behavior                                                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------------- |
-| Conditions         | Qualify children of the selected relationship; combine with `&` (AND), `\|` (OR), and [groups](#grouping). |
-| `sort(price)`      | Order that parent's eligible children before pagination.                                                   |
-| `limit(end)`       | Return at most `end` children per parent.                                                                  |
-| `limit(start,end)` | Skip `start` eligible children and return at most `end - start`.                                           |
-| `select(id,price)` | Project fields from returned children; omit it to return whole child records.                              |
+| Nested option      | Behavior                                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Conditions         | Qualify children of the selected relationship; combine with `&` (AND), `\|` (OR), and [groups](#grouping). Conditions through a further relationship follow the [top-level rules](#conditions-on-a-to-many-relationship). |
+| `sort(price)`      | Order that parent's eligible children before pagination.                                                                                                                                                                  |
+| `limit(end)`       | Return at most `end` children per parent.                                                                                                                                                                                 |
+| `limit(start,end)` | Skip `start` eligible children and return at most `end - start`.                                                                                                                                                          |
+| `select(id,price)` | Project fields from returned children; omit it to return whole child records.                                                                                                                                             |
 
 Use a non-negative safe-integer window; invalid bounds such as negative or fractional values return HTTP 400; `limit(0)` returns no children without reading them; an absent foreign key keeps its missing-value shape. A missing singular relationship remains absent. For array-valued foreign keys, pagination alone preserves missing target positions; adding conditions or a sort drops missing targets. Child conditions and sort fields remain subject to read permissions.
 

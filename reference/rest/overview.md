@@ -213,6 +213,8 @@ DELETE /MyTable/?status=archived
 
 Deletes all records matching `status=archived`.
 
+<VersionBadge type="changed" version="v5.4.0" /> Separate conditions through a to-many relationship may each be met by a different related record. When one related record must meet all of them, put them in brackets, as in `DELETE /Brand/?products[name=Cable&price=ge=30]`. See [Conditions on a To-Many Relationship](./querying.md#conditions-on-a-to-many-relationship).
+
 ## Content Types
 
 Harper supports multiple content types for both request bodies and responses. Use the `Content-Type` header for request bodies and the `Accept` header to request a specific response format.
