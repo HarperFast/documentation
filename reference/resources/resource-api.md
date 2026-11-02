@@ -231,7 +231,7 @@ bytes[0] = 9;
 product.bytes = bytes;
 ```
 
-Elements of an array property are the exception: changing one in place, such as `product.dates[0].setTime(...)`, saves the array.
+`Date` and `Bytes` elements of an array property are the exception: changing one in place, such as `product.dates[0].setTime(...)`, saves the array.
 
 On a table that is not [`@sealed`](../database/schema.md#sealed), assigning a property the schema does not declare (`product.extra = 'x'`) saves it, even when nothing else changed.
 
