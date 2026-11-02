@@ -12,7 +12,7 @@ title: SQL
 <!-- Source: versioned_docs/version-4.7/developers/operations-api/sql-operations.md -->
 
 :::info Harper 5.2 introduces a new SQL engine
-As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the same results but with the older full-scan cost — each fallback is logged (`SQL engine v2 fallback: ...`) with the reason, so you have direct visibility into which queries aren't being planned. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
+As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the legacy engine's results with the older full-scan cost — each fallback is logged at the `info` level (`SQL engine v2 fallback: ...`) with the reason, so you have direct visibility into which queries aren't being planned. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
 
 For your most performance-critical production read paths, the [REST interface](../rest/overview.md) remains the recommended choice — it provides a stable, cacheable, index-driven contract. SQL is well suited to ad-hoc investigation, administrative queries, joins, and reporting.
 :::
@@ -131,7 +131,7 @@ These map directly to indexed storage operations:
 - **Equality and `IN` on an indexed attribute** — `WHERE status = 'active'`, `WHERE breed_id IN (1, 2, 3)`.
 - **Range predicates on an indexed attribute** — `<`, `<=`, `>`, `>=`, and `BETWEEN` (compiled to a bounded index range).
 - **`OR` of indexed predicates** — `WHERE a = 1 OR b = 2` is served as a union of index scans, provided **every** branch is an index-driving predicate on an indexed attribute.
-- **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan.
+- **Prefix `LIKE`** — `WHERE name LIKE 'Har%'` compiles to an indexed `starts_with` scan. The new engine matches it case-sensitively; see [LIKE Pattern Matching](#like-pattern-matching).
 - **`ORDER BY` on an indexed attribute, combined with an indexed `WHERE`** — served directly from index order, with no separate in-memory sort; `LIMIT`/`OFFSET` push into the scan so only the rows you return are read. Without an index-driving `WHERE` condition, an `ORDER BY` on a _secondary_ indexed attribute runs on the legacy path — except when sorting on the table's **primary key**, which drives the scan from the primary key's natural index order even with no `WHERE` clause.
 - **`GROUP BY` on an indexed attribute, combined with an indexed `WHERE`** — aggregates stream group-by-group with O(1) memory per group (memory is bounded by the group count; every matching row is still read). Without an index-driving `WHERE` condition, a `GROUP BY` currently runs on the legacy path.
 - **`INNER`/`LEFT JOIN` on an indexed join key** — executed as an index-nested-loop join (stream the outer table, probe the inner by index). Keep the join key indexed on the inner (probed) table.
@@ -153,7 +153,15 @@ Note that `UNION`, sub-`SELECT`, and `INSERT … SELECT` are not supported by ei
 
 ### The fallback contract
 
-The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't. A query that falls back returns exactly what the legacy engine would — **its results don't change, only its performance profile.** Fallbacks are logged (`SQL engine v2 fallback: ...`) with the reason, which is a useful signal for finding queries worth an added index or a reshape. (For queries the new engine _does_ plan, it corrects a few long-standing legacy quirks — see [Behavior changes from the legacy engine](#behavior-changes-from-the-legacy-engine).)
+The engine runs in `auto` mode by default: it executes every query it can plan on the new engine and transparently falls back to the legacy engine for anything it can't. A query that falls back returns exactly what the legacy engine would, at the legacy engine's cost. Fallbacks are logged (`SQL engine v2 fallback: ...`) with the reason, which is a useful signal for finding queries worth an added index or a reshape. They are logged at the `info` level, below the default `warn`, so set [`logging.level`](../logging/configuration.md#logginglevel) to `info` to see them. (Where the two engines differ, which engine runs a statement decides its results: for queries the new engine _does_ plan, it corrects a few long-standing legacy quirks, and `LIKE` matches differently — see [Behavior changes from the legacy engine](#behavior-changes-from-the-legacy-engine).)
+
+The `sql.engine` setting in the [configuration file](../configuration/overview.md) selects the mode, and the `HARPER_SQL_ENGINE` environment variable overrides it:
+
+- `auto` (default) — runs each statement on the new engine when it can, and on the legacy engine otherwise.
+- `new` — runs every statement on the new engine. A statement the new engine can't plan is rejected with a 400 error instead of falling back.
+- `legacy` — runs every statement on the legacy engine.
+
+By default (`sql.allowFullScan: false`), the new engine does not run a query that has no index-driving condition, which is one reason `auto` falls back. With `sql.allowFullScan: true`, the new engine runs such a query as a full scan instead of falling back (under `auto`) or rejecting it (under `new`). A full scan on the new engine is not a fallback, so it is not logged.
 
 ### Behavior changes from the legacy engine
 
@@ -163,6 +171,7 @@ For queries the new engine plans (the default under `auto`), a handful of non-st
 - **`MIN`/`MAX` over text columns** return the lexicographically smallest/largest value. The legacy engine produced no result for string `MIN`/`MAX`.
 - **`NULL` never equals `NULL` in a join key.** Rows whose join key is `NULL` on either side no longer match each other (three-valued logic). The legacy engine incorrectly joined `NULL` to `NULL`.
 - **`OFFSET` past the end of a result returns no rows.** The legacy engine could still return rows when the `OFFSET` exceeded the number of matches.
+- **`LIKE` is case-sensitive, and `[...]` in a pattern is literal text.** The legacy engine matches case-insensitively and reads `[...]` as a character class. Under `auto`, adding or removing an index, or changing the other conditions in a statement, can move it between engines, which changes the rows a `LIKE` matches, including the rows an `UPDATE` or `DELETE` changes. See [LIKE Pattern Matching](#like-pattern-matching).
 - **A `NULL`-valued expression result is returned as an explicit `null`** rather than omitted from the row. A computed column or `COALESCE` that evaluates to `NULL` — or `UPPER(<null>)` — now yields `null` (the legacy engine dropped the key, and `UPPER` of a `NULL` returned the literal string `"NULL"`).
 
 These are deliberate corrections toward standard SQL, applied when the new engine serves the query — not fallbacks. If your application depended on a legacy quirk, adjust for the standard behavior. For how `WHERE` compares `NULL` and omitted values, including the v5.4.0 change to ranges compared with `NULL`, see [NULL and Omitted Values](#null-and-omitted-values).
@@ -399,11 +408,87 @@ Geospatial data must be stored using the [GeoJSON standard](https://geojson.org/
 
 ## Logical Operators
 
-| Keyword   | Description                                      |
-| --------- | ------------------------------------------------ |
-| `BETWEEN` | Returns values within a given range (inclusive). |
-| `IN`      | Specifies multiple values in a WHERE clause.     |
-| `LIKE`    | Searches for a pattern.                          |
+| Keyword   | Description                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `BETWEEN` | Returns values within a given range (inclusive).                                                                                 |
+| `IN`      | Specifies multiple values in a WHERE clause.                                                                                     |
+| `LIKE`    | Matches a string against a pattern. Case sensitivity depends on the engine; see [LIKE Pattern Matching](#like-pattern-matching). |
+
+---
+
+## LIKE Pattern Matching
+
+`value LIKE pattern` is true when the whole value matches the pattern, and `NOT LIKE` negates it. The value is matched as a string. The pattern can contain these elements:
+
+| Pattern element            | Matches                                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `%`                        | Any run of characters, including none, and including line breaks.                                                                       |
+| `_`                        | Exactly one character other than a line break (`\n`, `\r`, U+2028, U+2029).                                                             |
+| `[abc]`, `[a-z]`, `[^abc]` | Legacy engine only: one character in the set or range, or with `^`, one character not in it. See the list below.                        |
+| Any other character        | Itself. `*`, `\`, `^`, `$`, `.`, `?` and `+` have no special meaning on either engine. <VersionBadge type="changed" version="v5.4.0" /> |
+
+`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`.
+
+```sql
+SELECT * FROM dev.dog WHERE dog_name LIKE 'Pen%'    -- starts with "Pen"
+SELECT * FROM dev.dog WHERE dog_name LIKE '%y'      -- ends with "y"
+SELECT * FROM dev.dog WHERE dog_name LIKE '_ack'    -- "Jack", "Mack", ...
+```
+
+### Matching `%` and `_` Literally With ESCAPE
+
+<VersionBadge type="changed" version="v5.4.0" /> Add `ESCAPE 'c'` to name an escape character. In the pattern, the escape character makes the character after it literal, and writing it twice matches the escape character itself:
+
+```sql
+SELECT * FROM dev.addr WHERE ip LIKE 't0!%' ESCAPE '!'          -- exactly "t0%"
+SELECT * FROM dev.product WHERE label LIKE '50!%%' ESCAPE '!'   -- starts with "50%"
+SELECT * FROM dev.addr WHERE ip LIKE 't0!!%' ESCAPE '!'         -- starts with "t0!"
+```
+
+Without `ESCAPE`, a pattern has no escape character: `ip LIKE 't0!%'` matches `t0!` followed by anything. `ESCAPE` works in `SELECT`, `UPDATE` and `DELETE`, on both engines.
+
+These are rejected with a 400 error, and no rows are changed:
+
+- A pattern that ends in the escape character, such as `'t0!' ESCAPE '!'`.
+- An `ESCAPE` value that is empty (`''`) or longer than one character (`'!!'`, or a character such as an emoji that takes two UTF-16 code units).
+- An `ESCAPE` value that is not a string, such as `ESCAPE 1`.
+
+Before v5.4.0, `ESCAPE` was ignored, so `ip LIKE 't0!%' ESCAPE '!'` matched every value starting with `t0!`, and an `UPDATE` or `DELETE` using it changed those rows.
+
+### Case Sensitivity Depends on the Engine
+
+| Engine that runs the statement                                                                          | `LIKE` is                                     |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| New engine: `sql.engine: new`, and statements that `auto` runs on the new engine                        | Case-sensitive: `'t0%'` does not match `T0b`. |
+| Legacy engine: `sql.engine: legacy`, and statements that `auto` [falls back](#the-fallback-contract) on | Case-insensitive: `'t0%'` matches `T0b`.      |
+
+Under the default `sql.engine: auto`, the same pattern can be either. For example, with `ip` indexed and `note` not indexed, and no other condition in the query:
+
+- `ip LIKE 't0%'` is a prefix pattern on an indexed attribute, so the new engine serves it from the index, and it is case-sensitive.
+- `ip LIKE '%T0B'` is not a prefix pattern, so the index can't drive it. `auto` runs it on the legacy engine, and it matches `T0b`.
+- `note LIKE 't0%'` has no index to drive it, so `auto` runs it on the legacy engine, and it is case-insensitive. With `sql.allowFullScan: true`, the new engine runs it as a full scan instead, and it is case-sensitive.
+
+This applies to `UPDATE` and `DELETE` as well: adding an index on `note` moves `DELETE FROM dev.addr WHERE note LIKE 't0%'` to the new engine, and it stops deleting `T0b`. A statement that falls back is logged, which tells you which engine ran it (see [The fallback contract](#the-fallback-contract)).
+
+To match regardless of case on both engines, lower-case the value: `LOWER(note) LIKE 't0%'`. `LOWER()` uses JavaScript's lower-casing, which treats a few non-ASCII characters differently from the legacy engine's case-insensitive matching. The index can't serve an expression, so combine it with an indexed condition using `AND`. Otherwise `auto` runs it on the legacy engine as a full scan, and `sql.engine: new` rejects it unless `sql.allowFullScan` is `true`. To keep a case-insensitive prefix search on the index, store a lower-cased copy of the value in its own indexed attribute and query that.
+
+### Character Classes on the Legacy Engine
+
+The legacy engine also reads `[...]` in a pattern as a character class, matched without regard to case like the rest of the pattern:
+
+- `[abc]` matches one of `a`, `b` or `c`.
+- `[a-z]` matches one character in the range.
+- `[^abc]` matches one character that is not in the set.
+- A range written backwards, such as `[z-a]`, is rejected with a 400 error.
+- A `[` with no closing `]` is a literal.
+
+The new engine has no character classes: `[` and `]` match themselves. Under `auto`, a pattern such as `'[a]%'` is a class on the legacy engine and literal text on the new engine, so avoid `[` in patterns unless you know which engine runs the statement.
+
+### Matching Cost
+
+<VersionBadge type="changed" version="v5.4.0" /> Testing one value takes time at most proportional to the value's length times the pattern's length, for any mix of `%` and `_`. No pattern makes a single value expensive to test. Before v5.4.0, a pattern such as `'%_%_%_%_%_%_%_%_%_%_%_%_%_%_Z'` against a long value could block a thread.
+
+The total cost of a `LIKE` is still the number of rows it tests. On an indexed attribute, the index serves a prefix pattern, which is literal text followed by one `%` (`'abc%'`, or `'50!%%' ESCAPE '!'` for values starting with `50%`), and a pattern with no wildcards, which is an equality test. Any other `LIKE` filters the rows that the rest of the query selects, so with no indexed condition it tests every row in the table. Under `auto`, that query runs on the legacy engine. Under `sql.engine: new` with `sql.allowFullScan` off (the default), it is rejected with a 400 error instead of scanning. See [Query Performance](#query-performance).
 
 ---
 
