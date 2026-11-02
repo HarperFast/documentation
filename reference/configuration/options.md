@@ -132,7 +132,7 @@ The value can also be set from the environment, for example `HARPER_SET_CONFIG='
 When the Harper process receives SIGTERM, SIGINT (Ctrl+C) or SIGQUIT, it shuts down in order instead of exiting at once. These are the signals [`harper stop`](../cli/commands.md#harper-stop), `docker stop`, Kubernetes and systemd send.
 
 1. Harper stops accepting new connections.
-2. Requests already in flight finish.
+2. Requests already in flight get a few seconds to finish (see the first note below).
 3. Component scopes close. Their [`'close'` listeners](../components/plugin-api.md#cleanup-on-shutdown) run after connections have drained.
 4. The process exits with code `0`.
 
@@ -140,13 +140,13 @@ When the Harper process receives SIGTERM, SIGINT (Ctrl+C) or SIGQUIT, it shuts d
 
 ```yaml
 threads:
-  shutdownTimeout: 20000
+  shutdownTimeout: 25000 # for Kubernetes' default 30-second grace period
 ```
 
-The environment variable is `THREADS_SHUTDOWNTIMEOUT`. `0` restores the behavior from before v5.4.0: Harper exits when the signal arrives, without draining requests or closing scopes.
+The environment variable is `THREADS_SHUTDOWNTIMEOUT`. Like other settings, a changed value takes effect when Harper restarts; `harper stop` reads the configuration file, so its wait uses the new value right away. `0` restores the behavior from before v5.4.0: Harper exits when the signal arrives, without draining requests or closing scopes.
 
-- **Requests get a few seconds, not the whole timeout.** A request still running a few seconds after Harper stops accepting connections (about 2.5 seconds on Node.js) is closed before it finishes, however high `threads.shutdownTimeout` is set. The rest of the timeout is for component cleanup.
-- **Fit it inside your orchestrator's grace period.** A container platform or service manager sends SIGTERM, waits for its grace period, then kills the process. After the shutdown above, Harper closes its databases as the process exits, and `threads.shutdownTimeout` does not limit that step. Set `threads.shutdownTimeout` a few seconds below the grace period to leave time for it. The default of 8 seconds fits Docker's default.
+- **Requests get a few seconds, not the whole timeout.** A request still running a few seconds after Harper stops accepting connections (about 2.5 seconds on Node.js) has its connection closed before it finishes, however high `threads.shutdownTimeout` is set, and its handler can still be running when `'close'` listeners start. The rest of the timeout is for component cleanup.
+- **Fit it inside your orchestrator's grace period.** A container platform or service manager sends SIGTERM, waits for its grace period, then kills the process. After the shutdown above, Harper closes its databases as the process exits, and `threads.shutdownTimeout` does not limit that step. Set `threads.shutdownTimeout` a few seconds below the grace period to leave time for it. The default of 8 seconds fits Docker's default. On Kubernetes, the grace period also covers a `preStop` hook, which runs before SIGTERM, so subtract its time too.
 
 | Platform               | Grace period setting            | Default    |
 | ---------------------- | ------------------------------- | ---------- |
