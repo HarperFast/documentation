@@ -170,7 +170,7 @@ type Brand @table {
 Sorting can significantly impact query performance.
 
 - **Aligned sort and index**: If the sort attribute is the same indexed field used in the primary condition, and that condition reads the field's index (such as `equals`, a range, or `starts_with`), Harper can use the index to retrieve results already in order — very fast.
-- **Unaligned sort**: If the sort is on a different field than the condition, the sort field is not indexed, or the condition on it cannot read its index (such as `not_equal` with a non-null value), Harper must retrieve and sort all matching records. For large result sets this can be slow, and it also **defeats streaming** (see below). A `limit` does not reduce this work: Harper sorts every match before returning the page.
+- **Unaligned sort**: If the sort is on a different field than the condition, the sort field is not indexed, or the condition on it cannot read its index (such as `not_equal` with a non-null value on an attribute other than the primary key), Harper must retrieve and sort all matching records. For large result sets this can be slow, and it also **defeats streaming** (see below). A `limit` does not reduce this work: Harper sorts every match before returning the page.
 
 <VersionBadge type="changed" version="v5.4.0" /> Before v5.4.0, a sort on the same attribute as an unindexed condition or a `not_equal` condition could return records in primary-key order; Harper now sorts them. This change is pending release; see [Null and Omitted Values](../rest/querying.md#null-and-omitted-values).
 

@@ -1078,7 +1078,7 @@ Targeted for v5.4.0; not released yet. See [Match null and omitted values the sa
 
 :::
 
-Conditions treat a stored `null` and an omitted attribute the same way, except `equals` with a `null` value, which matches a stored `null` only. `not_equal` with a non-null value matches null and omitted values, `not_equal` with `null` matches values that are present and not `null`, no range comparator matches them, and a `null` lower bound means no lower bound. On an array attribute, `not_equal` matches a record when at least one element differs. These rules hold whether or not the attribute is indexed, and whichever condition runs first. See [Null and Omitted Values](../rest/querying.md#null-and-omitted-values) for the full rules and the sample data used here:
+Conditions treat a stored `null` and an omitted attribute the same way, except `equals` with a `null` value, which matches a stored `null` only. `not_equal` with a non-null value matches null and omitted values, and `not_equal` with `null` matches values that are present and not `null`. No range comparator matches a null or omitted value, and a `null` lower bound means no lower bound. On an array attribute, `not_equal` matches a record when at least one element differs. These rules hold whether or not the attribute is indexed, and whichever condition runs first. See [Null and Omitted Values](../rest/querying.md#null-and-omitted-values) for the full rules and the sample data used here:
 
 ```javascript
 // ids 2, 3, 4, 5 and 6: the null and omitted discounts match

@@ -103,7 +103,7 @@ ORDER BY d.dog_name
 
 - `IS NULL` matches records that store `null` and records that omit the attribute. `IS NOT NULL` matches the rest.
 - `<>` and `NOT IN` with non-null values exclude `NULL` and omitted values.
-- <VersionBadge type="changed" version="v5.4.0" /> A range (`<`, `<=`, `>`, `>=`, `BETWEEN`) compared with a `NULL` literal matches no rows. Before v5.4.0, it could fail with an `Invalid value for attribute` error, and `BETWEEN NULL AND x` could return rows whose value is `NULL`. This change is pending release; see [Match null and omitted values the same way whether a condition leads the scan or filters](https://github.com/HarperFast/harper/pull/3925).
+- <VersionBadge type="changed" version="v5.4.0" /> With the default `auto` engine, a range (`<`, `<=`, `>`, `>=`, `BETWEEN`) compared with a `NULL` literal matches no rows. Before v5.4.0, it could fail with an `Invalid value for attribute` error, and `BETWEEN NULL AND x` could return rows whose value is `NULL`. This change is pending release; see [Match null and omitted values the same way whether a condition leads the scan or filters](https://github.com/HarperFast/harper/pull/3925).
 
 Use `IS NULL` and `IS NOT NULL` to test for `NULL`. REST and Resource API conditions follow different rules: `ne` with a non-null value matches null and omitted values, and a `null` lower bound means no lower bound. See [Null and Omitted Values](../rest/querying.md#null-and-omitted-values).
 

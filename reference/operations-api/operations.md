@@ -2425,7 +2425,7 @@ Detailed documentation: [Analytics Operations](../analytics/operations.md)
 
 ### `get_analytics`
 
-Retrieves analytics data. Supports `start_time`/`end_time` (Unix ms), `get_attributes`, and `conditions` (same format as `search_by_conditions`).
+Retrieves analytics data. Supports `start_time`/`end_time` (Unix ms), `get_attributes`, and `conditions` (same format as `search_by_conditions`, including its [null and omitted value rules](../rest/querying.md#null-and-omitted-values)).
 
 ```json
 {
