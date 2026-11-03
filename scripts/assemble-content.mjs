@@ -30,13 +30,13 @@
  *
  * Usage:
  *   node scripts/assemble-content.mjs           assemble once (predev/prebuild)
- *   node scripts/assemble-content.mjs --watch   re-assemble when a local source changes, reusing the
- *                                               fetched checkouts (npm run dev runs it beside the server)
+ *   node scripts/assemble-content.mjs --watch   start `docusaurus start` and re-assemble when a local
+ *                                               source changes, reusing the fetched checkouts (npm run dev)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import yaml from 'js-yaml';
 
 const siteRoot = path.join(import.meta.dirname, '..');
@@ -138,7 +138,6 @@ function assembleReference(resolved, manifest) {
 function assembleReleaseNotes(resolved, manifest) {
 	const outRoot = path.join(siteRoot, 'release-notes');
 	const files = new Map();
-	// `${codename}/${minor}` → { index, fragments }
 	const minors = new Map();
 	for (const source of resolved) {
 		const srcRoot = path.join(source.docsDir, 'release-notes');
@@ -208,6 +207,16 @@ function assemble(resolved) {
 	);
 }
 
+// A checkout that still tracks reference/ (an older branch, or a rebase of a PR that edited it)
+// would have those edits overwritten by the assembly.
+const tracked = git(siteRoot, 'ls-files', '--', 'reference', ':(glob)release-notes/**/*.generated.md');
+if (tracked) {
+	throw new Error(
+		'reference/ is tracked in this checkout, and assembling would overwrite it. Its v5 pages now live in docs/ of HarperFast/harper and HarperFast/harper-pro; move these edits there:\n' +
+			tracked
+	);
+}
+
 const watch = process.argv.includes('--watch');
 const resolved = sources.map((source) => resolveSource(source, !watch));
 if (!watch) {
@@ -221,10 +230,16 @@ if (!watch) {
 				try {
 					assemble(resolved);
 				} catch (error) {
+					// Keep serving the last good assembly while the source is mid-edit.
 					console.error(error.message);
 				}
 			}, 200);
 		});
 		console.log(`Watching ${docsDir}`);
 	}
+	const server = spawn('docusaurus', ['start', ...process.argv.slice(process.argv.indexOf('--watch') + 1)], {
+		stdio: 'inherit',
+		shell: process.platform === 'win32',
+	});
+	server.on('exit', (code) => process.exit(code ?? 1));
 }

@@ -1,7 +1,7 @@
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { redirects, createRedirects } from './redirects';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -31,8 +31,18 @@ const url = process.env.DOCUSAURUS_URL || 'https://docs.harper.fast';
 console.log('Docusaurus URL config:', { url, baseUrl, routeBasePath });
 
 // Written by scripts/assemble-content.mjs (the prebuild/predev step): which repo each assembled
-// reference page and release-notes page came from, and the redirects those repos declare.
-const content = JSON.parse(readFileSync('.content/manifest.json', 'utf8'));
+// reference page and release-notes page came from, and the redirects those repos declare. Read
+// per lookup, because the dev server's assembler rewrites it as pages are added; absent when
+// `docusaurus serve` serves a downloaded build.
+type ContentManifest = {
+	reference: Record<string, { repo: string }>;
+	releaseNotes: Record<string, { repo: string }>;
+	redirects: { from: string | string[]; to: string }[];
+};
+const readContent = (): ContentManifest =>
+	existsSync('.content/manifest.json')
+		? JSON.parse(readFileSync('.content/manifest.json', 'utf8'))
+		: { reference: {}, releaseNotes: {}, redirects: [] };
 const contentEditUrl = (repo: string, path: string) => `https://github.com/HarperFast/${repo}/blob/main/docs/${path}`;
 
 const config: Config = {
@@ -97,7 +107,7 @@ const config: Config = {
 					if (versionDocsDirPath.startsWith('reference_versioned_docs')) {
 						return `https://github.com/HarperFast/documentation/blob/main/${versionDocsDirPath}/${docPath}`;
 					}
-					return contentEditUrl(content.reference[docPath].repo, `reference/${docPath}`);
+					return contentEditUrl(readContent().reference[docPath].repo, `reference/${docPath}`);
 				},
 				lastVersion: 'current',
 				includeCurrentVersion: false,
@@ -119,7 +129,7 @@ const config: Config = {
 				routeBasePath: 'release-notes',
 				sidebarPath: './sidebarsReleaseNotes.ts',
 				editUrl: ({ docPath }) => {
-					const assembled = content.releaseNotes[docPath.replace(/\.generated\.md$/, '')];
+					const assembled = readContent().releaseNotes[docPath.replace(/\.generated\.md$/, '')];
 					if (assembled) {
 						return contentEditUrl(assembled.repo, `release-notes/${docPath.replace(/\.generated\.md$/, '/_index.md')}`);
 					}
@@ -180,7 +190,7 @@ const config: Config = {
 		[
 			'@docusaurus/plugin-client-redirects',
 			{
-				redirects: [...redirects, ...content.redirects],
+				redirects: [...redirects, ...readContent().redirects],
 				createRedirects,
 			},
 		],

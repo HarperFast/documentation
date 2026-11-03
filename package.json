@@ -7,7 +7,7 @@
 		"prestart": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
 		"start": "docusaurus start",
 		"predev": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
-		"dev": "node scripts/assemble-content.mjs --watch & docusaurus start",
+		"dev": "node scripts/assemble-content.mjs --watch",
 		"prebuild": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
 		"build": "docusaurus build",
 		"version": "docusaurus docs:version",
