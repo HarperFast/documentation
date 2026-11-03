@@ -298,7 +298,7 @@ storage:
 
 Type: `boolean`
 
-Default: `false` (`true` before v5.3.0 and v5.2.9)
+Default: `false` (`true` in v5.2.8 and earlier)
 
 Controls behavior when memtable memory reaches `writeBufferManagerSize`:
 
@@ -360,7 +360,7 @@ storage:
     arenaBlockSize: 131072 # 128 KiB
 ```
 
-The size is applied when a database is opened, so a change takes effect after a restart. Invalid values (non-integers, negatives, strings) are ignored and the default is used.
+The size is read when a database is opened, so a full [`restart`](../operations-api/operations.md#restart) is what reliably applies a change. Invalid values (non-integers, negatives, strings) are ignored and the default is used.
 
 ## RocksDB Transaction Log
 
