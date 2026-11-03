@@ -10,7 +10,7 @@ Harper can build a BM25-ranked full-text index from one or more fields on a tabl
 
 Use full-text search when users need relevance-ranked matching across product names, descriptions, tags, articles, or other natural-language fields. It supports term, all-term, phrase, prefix, fuzzy, and fuzzy-prefix matching.
 
-<VersionBadge type="changed" version="v5.4.0" /> Starting in Harper v5.4, the native engine is **`@harperfast/fulltext` 0.7.0, embedding Tantivy 0.27.0**. Existing fulltext 0.5.0 and prerelease 0.6 indexes require rebuilding. See [Upgrading existing indexes](#upgrading-existing-indexes) before upgrading a node.
+<VersionBadge type="changed" version="v5.4.0" /> Starting in Harper v5.4, the native engine is **`@harperfast/fulltext` 0.9.0, embedding Tantivy 0.27.0**. Existing fulltext 0.5.0 and prerelease 0.6 indexes require rebuilding. See [Upgrading existing indexes](#upgrading-existing-indexes) before upgrading a node.
 
 ## Requirements
 
@@ -59,11 +59,17 @@ Use `describe_table` to inspect each index's declaration and readiness. See [Ins
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Harper 5.3.1–5.3.4 ship `@harperfast/fulltext` 0.5.0. Upgrading their current field-based indexes to the 0.7.0 engine in Harper v5.4 requires a full local rebuild. Harper 5.3.0 ships fulltext 0.3.0 and is outside this qualified procedure; plan and validate that migration separately. Prerelease installations using fulltext 0.6 also require rebuilding. This procedure applies to the current field-based declarations; earlier beta declarations and indexes have no supported migration path. Harper initiates the rebuild automatically when the wrapper refuses the old persisted identity; no manual rebuild command or file editing is needed.
+Harper 5.3.1–5.3.4 ship `@harperfast/fulltext` 0.5.0. Upgrading their current field-based indexes to the 0.9.0 engine in Harper v5.4 requires a full local rebuild. Harper 5.3.0 ships fulltext 0.3.0 and is outside this qualified procedure; plan and validate that migration separately. Prerelease installations using fulltext 0.6 also require rebuilding. This procedure applies to the current field-based declarations; earlier beta declarations and indexes have no supported migration path. Harper initiates the rebuild automatically when the wrapper refuses the old persisted identity; no manual rebuild command or file editing is needed.
+
+### Upgrading from fulltext 0.7.0 or 0.8.0
+
+Current text-only indexes written by fulltext 0.7.0 or 0.8.0 remain compatible with 0.9.0 and can resume from their saved checkpoint without rebuilding. This upgrade adds query controls without changing those indexes' stored identity or adding native filter metadata. Stop all processes sharing a local index before switching versions; do not mix facade/native package versions or run different engines against one live directory. Check readiness, current coverage and representative searches before restoring traffic, as described in the checklist below.
+
+Returning to fulltext 0.7.0 or 0.8.0 after 0.9.0 has written to the index is not a qualified operator rollback procedure. If returning to Harper 5.4.0-alpha.1 or alpha.2, remove an explicitly configured `storage.fullText.query` block: those versions reject it. Removing that configuration alone does not qualify a downgrade.
 
 ### Matching and ranking changes
 
-Tantivy 0.27 changes English stemming even though the schema analyzer remains `english@2`. For example, `added` now stems to `add` instead of `ad`. Queries can match different records or rank them differently after rebuilding. Review representative searches and domain vocabulary before restoring production traffic; the upgrade does not add new Harper query modes or change the declared field options.
+Tantivy 0.27 changes English stemming even though the schema analyzer remains `english@2`. For example, `added` now stems to `add` instead of `ad`. Queries can match different records or rank them differently after rebuilding. Review representative searches and domain vocabulary before restoring production traffic; the engine migration does not change the declared field options. Query-time relevance controls are described separately in [Querying](./querying.md#query-time-relevance-controls).
 
 ### Upgrade checklist
 
@@ -79,7 +85,7 @@ See [freshness controls](./querying.md#freshness-controls) for the condition fie
 
 Keep full-text traffic drained, preserve authoritative data and logs, and correct the reported package, storage or coordination failure before restarting the same v5.4 Harper version. An interrupted rebuild can recover from authoritative records. Do not force readiness or edit, move or delete native index files by hand.
 
-**Direct downgrade to fulltext 0.5.x is unsupported.** That engine refuses both opening and resetting a 0.7 index identity. If an older version has already been started, stop it and restore the 0.7.0-based Harper version before checking readiness and catch-up again. This is recovery with the current engine, not a supported operator downgrade procedure. If recovery also fails, keep traffic drained and investigate the readiness reason and node logs.
+**Direct downgrade to fulltext 0.5.x is unsupported.** That engine refuses both opening and resetting the current Tantivy 0.27 index identity. If an older version has already been started, stop it and restore the 0.9.0-based Harper version before checking readiness and catch-up again. This is recovery with the current engine, not a supported operator downgrade procedure. If recovery also fails, keep traffic drained and investigate the readiness reason and node logs.
 
 ## Write backpressure
 
