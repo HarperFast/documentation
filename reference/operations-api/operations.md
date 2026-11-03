@@ -317,7 +317,7 @@ Returns records matching one or more conditions. Supports `operator` (`and`/`or`
 
 Full-text conditions (Added in: v5.3.0):
 
-Conditions can query a declared full-text index with the `matches`, `matches_all`, `matches_phrase`, `matches_prefix`, `matches_fuzzy`, and `matches_fuzzy_prefix` comparators and their `not_` forms. A negated full-text condition requires a non-negated condition on the same full-text index. The Operations API preserves advanced condition options such as source `fields`, `includeHighlights`, `maxIndexLagMilliseconds`, and `waitForIndexMilliseconds`. It preserves the [v5.4 fuzzy controls](../full-text-search/querying.md#fuzzy-controls-in-v54), `fuzzyDistance` and `fuzzyTranspositions`, and the pending-release [`should` and `boost` relevance controls](../full-text-search/querying.md#query-time-relevance-controls). See [Querying Full-Text Indexes](../full-text-search/querying.md#operations-api).
+Conditions can query a declared full-text index with the `matches`, `matches_all`, `matches_phrase`, `matches_prefix`, `matches_fuzzy`, and `matches_fuzzy_prefix` comparators and their `not_` forms. A negated full-text condition requires a non-negated condition on the same full-text index. The Operations API preserves advanced condition options such as source `fields`, `includeHighlights`, `maxIndexLagMilliseconds`, and `waitForIndexMilliseconds`. It preserves the [v5.4 fuzzy controls](../full-text-search/querying.md#fuzzy-controls-in-v54), `fuzzyDistance` and `fuzzyTranspositions`, and the v5.4 [`should` and `boost` relevance controls](../full-text-search/querying.md#query-time-relevance-controls). See [Querying Full-Text Indexes](../full-text-search/querying.md#operations-api).
 
 ---
 

@@ -17,7 +17,7 @@ const products = Product.search({
 
 `Table.search()` returns an async iterable. Consume it with `for await...of`, or return it directly from a custom Resource to stream the results.
 
-Results are ordered by BM25 relevance. When the pending [query-time relevance controls](#query-time-relevance-controls) are available, supplied boosts and optional clauses adjust that ranking. The `FullText` field, not one of its source fields, identifies the search target.
+Results are ordered by BM25 relevance. In v5.4, supplied [query-time boosts and optional clauses](#query-time-relevance-controls) adjust that ranking. The `FullText` field, not one of its source fields, identifies the search target.
 
 ## Match modes
 
@@ -69,7 +69,7 @@ Direct calls through `tables` or `databases` run in a trusted server-side contex
 
 ## Score and ordering
 
-Select `$score` to include the relevance score. Without query-time controls, this is the BM25 score. When the pending [boosts and optional clauses](#query-time-relevance-controls) are available, they adjust it when supplied:
+Select `$score` to include the relevance score. Without query-time controls, this is the BM25 score. In v5.4, [boosts and optional clauses](#query-time-relevance-controls) adjust it when supplied:
 
 ```javascript
 const products = Product.search({
@@ -95,11 +95,9 @@ Qualify the selected fuzzy distance and fuzzy-prefix workload against the actual
 
 ## Query-time relevance controls
 
-:::note Pending release
+<VersionBadge version="v5.4.0" />
 
-These controls describe the pending implementation tracked by [Expose full-text query boosts and optional scoring clauses through Table.search and REST (#3843)](https://github.com/HarperFast/harper/issues/3843). Use them only with a Harper build and bundled fulltext wrapper that implement query scoring. Do not send these keys to other builds. A successful request alone does not prove scoring was applied. In the pending implementation, an incompatible wrapper returns HTTP 400.
-
-:::
+These controls are available in Harper 5.4 with its bundled fulltext wrapper. Earlier 5.4 prerelease builds may not include them. Do not send these keys to builds without query-scoring support: a successful request alone does not prove scoring was applied. A scoring-capable Harper build with an incompatible wrapper returns HTTP 400.
 
 Use `should` to reward additional text matches while retaining the parent condition's required matches:
 
@@ -132,7 +130,7 @@ Each optional descriptor accepts a positive full-text `comparator`, a nonempty s
 
 Optional descriptors use the same [fuzzy controls](#fuzzy-controls-in-v54) as required fuzzy conditions, including their configured distance cap. Optional descriptors remain positive-only.
 
-`boost` and `should` are reserved query-object keys on all tables when these pending controls are available. Misplaced controls return HTTP 400 even without a full-text index; applications that previously passed ignored custom keys must rename them. An attribute named `boost` or `should` can still be queried through the `attribute` property.
+`boost` and `should` are reserved query-object keys on all tables in v5.4. Misplaced controls return HTTP 400 even without a full-text index; applications that previously passed ignored custom keys must rename them. An attribute named `boost` or `should` can still be queried through the `attribute` property.
 
 Each descriptor searches the parent index. An `attribute` property is rejected even if it repeats the parent index name. The list must be nonempty and contain at most `storage.fullText.query.maxQueryClauses` descriptors (default `256`). This is a coarse host precheck: native compilation also counts required clauses, Boolean structure, boosts, analyzed terms and field expansion, so a smaller list can still exceed the compiled-clause budget and return HTTP 400. A positive full-text leaf condition inside an `and` or `or` group can use these controls. The following shapes return HTTP 400:
 
@@ -301,7 +299,7 @@ Repeat the index parameter to combine the required positive and negated conditio
 GET /Product/?catalogSearch=matches=waterproof&catalogSearch=not_matches=leather&limit(20)
 ```
 
-REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, or freshness controls. For pending [query-time relevance controls](#query-time-relevance-controls), use HTTP `QUERY`, `Table.search()` or `search_by_conditions`.
+REST can return configured highlights by selecting `$highlights`. Use `Table.search()` or `search_by_conditions` for explicit `fields`, condition-level `includeHighlights`, or freshness controls. For v5.4 [query-time relevance controls](#query-time-relevance-controls), use HTTP `QUERY`, `Table.search()` or `search_by_conditions`.
 
 ## Operations API
 
@@ -328,7 +326,7 @@ REST can return configured highlights by selecting `$highlights`. Use `Table.sea
 }
 ```
 
-For the pending [query-time relevance controls](#query-time-relevance-controls), use the following shape only with a compatible Harper build and bundled wrapper:
+For v5.4 [query-time relevance controls](#query-time-relevance-controls), use the following shape:
 
 ```json
 {
