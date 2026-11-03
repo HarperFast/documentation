@@ -204,7 +204,7 @@ While a database is taking its initial full copy, these timing fields hold the l
 
 <VersionBadge version="v5.4.0" />
 
-A `database_sockets` entry has a `stuckCopy` object while a [base copy](./overview.md#initial-synchronization-and-resynchronization) of that database from that peer is not finishing. Otherwise the field is absent. The node receiving the copy reports it, on its socket to the source, so look on the node that is catching up.
+A `database_sockets` entry has a `stuckCopy` object while a [base copy](./overview.md#initial-synchronization-and-resynchronization) of that database from that peer is not finishing. Otherwise the field is absent. The node receiving the copy reports it, on its socket to the source. Copies also run in reverse, so that can be a peer of the node that came back rather than the node itself. Run `cluster_status` on every node.
 
 ```json
 {
@@ -234,7 +234,7 @@ The states:
 
 - **`retrying`**: a copy from this peer has started at least twice from the same position, with no durable progress in between. Reconnects follow the normal schedule.
 - **`held`**: the session that made the fifth start from one position has closed. This node stops reconnecting that database to that peer for a while. Nothing in that database replicates from the peer during the hold, and the peer's copy stops too. The first hold lasts 60 seconds. After that, each reconnect makes one attempt. If it fails from the same position, the next hold is a random time between 60 seconds and a limit that doubles each time (2, 4, 8 minutes), up to 15 minutes.
-- **`refused`**: this node refused the copy because of its [sharding](./residency.md#recovery-sources) ownership. With the reason `Owned sharding slots require a complete co-owner or backup restore`, this node owns slots and the peer cannot supply them. Typically the peer is not a complete co-owner, so make one reachable or restore a complete backup. Reconnects are held on the same schedule as `held`. With the reason `a sharded origin requires its origin or a complete co-owner`, the copy carried rows from a sharded origin that only that origin or a complete co-owner may send. Reconnects follow the normal schedule, because this usually follows a sharding map change.
+- **`refused`**: this node refused the copy under its [sharding](./residency.md#recovery-sources) rules. With the reason `Owned sharding slots require a complete co-owner or backup restore`, this node owns slots and the peer cannot supply them. Typically the peer is not a complete co-owner, so make one reachable or restore a complete backup. Reconnects are held on the same schedule as `held`. With the reason `a sharded origin requires its origin or a complete co-owner`, the copy carried rows from a sharded origin that only that origin or a complete co-owner may send. Reconnects follow the normal schedule, because this usually follows a sharding map change.
 
 The attempt limit, the hold bounds and the 60-second quiet period below are fixed. No setting changes them.
 
@@ -246,7 +246,7 @@ The attempt limit, the hold bounds and the 60-second quiet period below are fixe
 
 A missing `stuckCopy` does not show that a copy finished or that the two nodes hold the same data.
 
-Each change of state logs one line beginning `Replication of <database> from <node>:`. The level is `error` when the socket is held, `warn` when it starts retrying or is refused, and `info` when the report clears, such as `copy is progressing again`. A held socket logs, for example, `copy stopped after 5 attempts from one position; retrying in 60s: the copy made no durable progress from its start position`. Further attempts or holds in the same state log nothing more.
+Each change of state, or of the refusal reason, logs one line beginning `Replication of <database> from <node>:`. The level is `error` when the socket is held, `warn` when it starts retrying or is refused, and `info` when the report clears, such as `copy is progressing again`. A held socket logs, for example, `copy stopped after 5 attempts from one position; retrying in 60s: the copy made no durable progress from its start position`. Further attempts or holds in the same state log nothing more.
 
 ---
 
