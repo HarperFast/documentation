@@ -325,7 +325,7 @@ Record the third number as node re-entry time, including convergence and applica
 
 ## Operational notes
 
-- **A returning node is not the same as a new node.** A node whose databases have never synchronized downloads them in full. A briefly offline node catches up from retained history; a long-absent node needs the rebuild or restore policy above. Both need to finish before traffic arrives, but they take very different amounts of time, so do not budget for the first when you are planning a routine restart.
+- **A returning node is not the same as a new node.** A node whose databases have never synchronized downloads them in full. A briefly offline node usually catches up from retained history ([when it gets a full copy instead](/reference/v5/replication/overview#when-a-peer-forces-a-base-copy)); a long-absent node needs the rebuild or restore policy above. Both need to finish before traffic arrives, but they take very different amounts of time, so do not budget for the first when you are planning a routine restart.
 - **Set unavailable before recovery work, not after.** Any operation that touches data on a node, including a restore, should happen with the node out of rotation.
 - **Configuration changes need a restart to take effect**, so a node that has been reconfigured but not restarted is running the old configuration while reporting the new one. Sequence the restart into the same maintenance window.
 - **Fabric routes by its status component.** It does not automatically consume your readiness route. For application-driven availability, see [Taking an Unhealthy Node Out of Rotation](../developers/taking-a-node-out-of-rotation.mdx).
