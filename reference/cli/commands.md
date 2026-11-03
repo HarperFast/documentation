@@ -317,7 +317,7 @@ Enables previews of one application on the cluster, and sets up the GitHub side.
 harper preview setup app=my-app target=https://my-cluster.example.com:9925
 ```
 
-It checks everything it can before it changes anything, and a refusal before step 6 ends with `Nothing was changed.`
+It checks everything it can before it changes anything, so a refusal before step 6 leaves the cluster and the repository as they were.
 
 1. Takes the GitHub repository from the checkout's `origin` remote, or `repo=<owner>/<name>`, and looks it up with the `gh` CLI or GitHub's public API for its numeric id, its default branch, and the spelling of its name that GitHub uses in the token. When neither answers, pass `repository_id=<id>`.
 2. Reads the preview workflow, `.github/workflows/preview.yaml`, from the checkout. It refuses a workflow the trust policies could never match, and one that may give the preview identity to a fork or to a PR's own code: see [What setup checks in the workflow](#what-setup-checks-in-the-workflow). If the file doesn't exist, it offers to write the starter workflow (`write_workflow=true` without a prompt). When it can neither check nor write the workflow, such as when it is not run from a checkout of the repository, it stops unless you pass `allow_unverified=true`.

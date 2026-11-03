@@ -499,7 +499,7 @@ jobs:
 - **It never checks out the PR.** `by_ref=true ref="$SHA"` tells the cluster to fetch the PR's head commit itself, so no step of a job holding the identity token runs the PR's code. The `HARPER_PREVIEW_TARGET` variable becomes `HARPER_CLI_TARGET`, and every `harper` command authenticates through the trust policy, with no stored credential.
 - **Fork PRs are skipped.** Each job runs only when the PR's head repository is this repository.
 - **A deploy that waited goes ahead only while it is still current.** The job deploys only while the PR is open at the commit the event named, since an approval on `preview` can hold it for a while. If the PR closes while it deploys, it drops what it deployed. The concurrency group runs one deploy per PR at a time.
-- **Cleanup runs in its own environment**, with a token that can only drop, so it never waits for the `preview` environment's reviewers. While a deploy of the same PR is still activating, the drop answers `409`, so the job retries for two minutes. A reopened PR keeps its preview.
+- **Cleanup runs in its own environment**, with a token that can only drop, so it never waits for the `preview` environment's reviewers. While a deploy of the same PR is still activating, the drop answers `409`, so the job retries it for about two minutes. A reopened PR keeps its preview.
 - **`harper@^5.4`** installs a 5.x CLI that is v5.4.0 or later.
 
 Setup checks the workflow only when it runs, so keep its rules when you edit the file later: no checkout or fetch of the PR's code in a job with `id-token: write`, and the same-repository condition on every job that holds the token. The cluster still enforces the role's limits, whatever the workflow does.
