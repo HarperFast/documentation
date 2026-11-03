@@ -120,7 +120,7 @@ A product that matches the required text remains eligible without the optional p
 
 Each optional descriptor accepts a positive full-text `comparator`, a nonempty string `value`, optional `fields`, `boost`, `fuzzyDistance`, and `fuzzyTranspositions`.
 
-In this pending structured contract, `fuzzyDistance` and `fuzzyTranspositions` can be set on the required positive condition as well as on each optional descriptor. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. Supplying them on another match mode returns HTTP 400. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively.
+In this pending structured contract, `fuzzyDistance` and `fuzzyTranspositions` can be set on the required positive condition as well as on each optional descriptor. The fuzzy controls apply only to `matches_fuzzy` and `matches_fuzzy_prefix`. Supplying them on another match mode or a condition group returns HTTP 400. Values with the wrong type also return HTTP 400. `fuzzyDistance` must be an integer from 0 to 2. `fuzzyTranspositions` must be a boolean. Omitted values default to `1` and `true`, respectively.
 
 The server setting `storage.fullText.query.maxFuzzyDistance` accepts integers from `0` to `2`, defaults to `1`, and caps accepted distances. With a cap of `0`, a fuzzy condition must explicitly set `fuzzyDistance: 0`. Omitting it still defaults to `1` and returns HTTP 400. Distance `2` requires a cap of `2`.
 
