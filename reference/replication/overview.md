@@ -385,7 +385,7 @@ The peer that would send the catch-up decides, per database, when the returning 
 From v5.4, a peer records how far each prune of its transaction logs reached. It forces a copy when the returning node's position, for a log it would replay, is below that point. A position that is old only because the peer wrote nothing to that database since, such as an idle or never-written transaction log, no longer forces a copy. A copy can still be forced although nothing was missed, in these cases:
 
 - The peer has no trustworthy record of what it pruned. It then uses the pre-v5.4 rule.
-- After [`delete_transaction_logs_before`](../database/transaction.md#delete_transaction_logs_before), a node whose position is older than the timestamp it was given gets a base copy, even if the peer wrote nothing to that database after that position.
+- After [`delete_transaction_logs_before`](../database/transaction.md#delete_transaction_logs_before), a node whose position is below the point that purge reached (at most the timestamp it was given) gets a base copy, even if the peer wrote nothing to that database after that position.
 - The peer has no record of what was removed from a transaction log that was already purged empty before it ran v5.4. After the upgrade, such a log can force one more base copy of that database for each node returning with a position older than that purge.
 - On RocksDB, the storage engine also purges transaction logs on its own after three days. If the peer itself was stopped for longer than that, a node whose position is older than three days gets one base copy of the database from it.
 
