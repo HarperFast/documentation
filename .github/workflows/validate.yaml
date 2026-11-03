@@ -33,7 +33,7 @@ jobs:
             command: format:check
           - check: Workflow Tests
             command: test:workflows
-          # Assembles the reference from harper and harper-pro main and fails on broken links.
+          # Assembles the reference from harper and harper-pro (see scripts/assemble-content.mjs) and fails on broken links.
           - check: Site Build
             command: build
     steps:

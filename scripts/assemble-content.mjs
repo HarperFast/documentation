@@ -210,7 +210,7 @@ function assembleReleaseNotes(resolved, manifest) {
 		delete pageData.sections;
 		const frontMatter = yaml.dump(pageData);
 		const page = `---\n${frontMatter}---\n\n${index.body.trim()}\n\n${sections.join('\n\n')}\n`;
-		files.set(path.join(codename, `${minorVersion}.generated.md`), Buffer.from(page));
+		files.set(`${codename}/${minorVersion}.generated.md`, Buffer.from(page));
 		manifest.releaseNotes[`${codename}/${minorVersion}`] = { repo: index.source.repo };
 	}
 	return files;

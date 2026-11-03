@@ -63,8 +63,8 @@ const config: Config = {
 	// Remove trailing slashes - GitHub Pages handles this fine and makes relative paths intuitive
 	trailingSlash: false,
 
-	// .content/public holds content-sources.json, which the deploy workflow compares to decide
-	// whether harper or harper-pro docs changed since the last deploy.
+	// .content/public holds content-sources.json, which the content-check workflow compares to
+	// decide whether harper or harper-pro docs changed since the last deploy.
 	staticDirectories: ['static', '.content/public'],
 
 	// GitHub pages deployment config.
@@ -107,7 +107,9 @@ const config: Config = {
 					if (versionDocsDirPath.startsWith('reference_versioned_docs')) {
 						return `https://github.com/HarperFast/documentation/blob/main/${versionDocsDirPath}/${docPath}`;
 					}
-					return contentEditUrl(readContent().reference[docPath].repo, `reference/${docPath}`);
+					// A page added during `npm run dev` can render before the manifest naming it is written.
+					const owner = readContent().reference[docPath];
+					return owner && contentEditUrl(owner.repo, `reference/${docPath}`);
 				},
 				lastVersion: 'current',
 				includeCurrentVersion: false,

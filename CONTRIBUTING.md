@@ -135,7 +135,7 @@ Fabric is non-versioned. It documents the managed cloud platform independently o
 
 The v5 reference and the open minor's release notes are written in the code repos, next to the code they describe: `docs/` in [HarperFast/harper](https://github.com/HarperFast/harper/tree/main/docs) and [HarperFast/harper-pro](https://github.com/HarperFast/harper-pro/tree/main/docs). [`scripts/assemble-content.mjs`](scripts/assemble-content.mjs) builds `reference/` and `release-notes/<codename>/<minor>.generated.md` from them before every build (both are git-ignored here). The section structure, version annotations and writing conventions are in [harper's docs/README.md](https://github.com/HarperFast/harper/blob/main/docs/README.md).
 
-The site publishes the latest stable release: the highest `vX.Y.Z` tag of harper-pro, and the same tag of harper. Docs merged with unreleased code appear when that code ships; a correction to released docs appears with the next patch release of that line (milestone the PR to it, so it is cherry-picked there). Until a release contains `docs/`, the site publishes `main`.
+The site publishes the latest stable release: the highest `vX.Y.Z` tag of harper-pro, and the same tag of harper. Docs merged with unreleased code appear when that code ships; a correction to the published docs appears with the next patch release (milestone the PR to the latest release line, so it is cherry-picked there). The site shows only the latest release, so corrections that land only on older release lines do not publish. Until a release contains `docs/`, the site publishes `main`.
 
 To preview a local checkout, point the build at it; a repo without a path is fetched at the latest release, or at the ref in `HARPER_DOCS_REF` / `HARPER_PRO_DOCS_REF`:
 
