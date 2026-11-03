@@ -29,12 +29,12 @@ jobs:
           # Until a running deploy publishes, the live manifest still names the old trees; dispatching
           # again would cancel it (deploy.yaml cancels in progress) and could never let one finish.
           for workflow in deploy.yaml deploy-fabric.yaml; do
-            for status in queued in_progress; do
-              if [ -n "$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --status "$status" --json databaseId --jq '.[].databaseId')" ]; then
-                echo "$workflow has a $status run; checking again next tick"
-                exit 0
-              fi
-            done
+            unfinished=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 \
+              --json status --jq '[.[] | select(.status != "completed")] | length')
+            if [ "$unfinished" != 0 ]; then
+              echo "$workflow has $unfinished unfinished run(s); checking again next tick"
+              exit 0
+            fi
           done
           # The query string bypasses the Pages CDN cache, so a deploy that just finished is seen.
           deployed=$(curl -fsS "${SITE_URL%/}/content-sources.json?t=$(date +%s)" || echo '{}')

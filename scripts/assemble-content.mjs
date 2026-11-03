@@ -226,6 +226,11 @@ const resolved = sources.map((source) => resolveSource(source, !watch));
 if (!watch) {
 	assemble(resolved);
 } else {
+	const server = spawn('docusaurus', ['start', ...process.argv.slice(process.argv.indexOf('--watch') + 1)], {
+		stdio: 'inherit',
+		shell: process.platform === 'win32',
+	});
+	server.on('exit', (code) => process.exit(code ?? 1));
 	let timer;
 	for (const { docsDir } of resolved.filter((source) => source.local)) {
 		const watcher = fs.watch(docsDir, { recursive: true }, () => {
@@ -239,12 +244,11 @@ if (!watch) {
 				}
 			}, 200);
 		});
-		watcher.on('error', (error) => console.error(`Stopped watching ${docsDir}: ${error.message}`));
+		// A server that no longer reflects edits is worse than none.
+		watcher.on('error', (error) => {
+			console.error(`Stopped watching ${docsDir}: ${error.message}`);
+			server.kill();
+		});
 		console.log(`Watching ${docsDir}`);
 	}
-	const server = spawn('docusaurus', ['start', ...process.argv.slice(process.argv.indexOf('--watch') + 1)], {
-		stdio: 'inherit',
-		shell: process.platform === 'win32',
-	});
-	server.on('exit', (code) => process.exit(code ?? 1));
 }
