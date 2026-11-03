@@ -357,7 +357,7 @@ Setting `read: false` on an attribute prevents the **value** from appearing in r
 | `package_component`  |            X             |
 | `deploy_component`   |            X             |
 
-A [component deploy grant](#component-deploy-grants) <VersionBadge version="v5.4.0" /> lets a role that is not `super_user` deploy, drop and read the components it names.
+A [component deploy grant](#component-deploy-grants) (Added in: v5.4.0) lets a role that is not `super_user` deploy, drop and read the components it names.
 
 ### Registration
 

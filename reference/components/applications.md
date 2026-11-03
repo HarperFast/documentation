@@ -365,7 +365,7 @@ Isolation is about the thread, not the data. The application still reads and wri
 
 #### Reaching an isolated application
 
-The dedicated worker does not listen on Harper's HTTP or MQTT ports. A request to those ports never reaches the application, even one addressed to its `host`. <VersionBadge type="changed" version="v5.4.0" /> The shared workers answer a request for the `host` of an isolated application with `503`, `Retry-After: 5`, and `Service unavailable: <host> is served by an isolated application whose worker is not running`, and close a WebSocket for it with `1013` (try again later), rather than with another application's routes. The operations API port is not affected. Before v5.4.0 they answered it like any other request. The worker listens only on Unix domain sockets of its own, one for each secure port:
+The dedicated worker does not listen on Harper's HTTP or MQTT ports. A request to those ports never reaches the application, even one addressed to its `host`. (Changed in: v5.4.0) The shared workers answer a request for the `host` of an isolated application with `503`, `Retry-After: 5`, and `Service unavailable: <host> is served by an isolated application whose worker is not running`, and close a WebSocket for it with `1013` (try again later), rather than with another application's routes. The operations API port is not affected. Before v5.4.0 they answered it like any other request. The worker listens only on Unix domain sockets of its own, one for each secure port:
 
 ```
 <rootPath>/sockets/app-<application>-<port>.sock
@@ -468,7 +468,7 @@ Without `restart`, the forks stay, and the response says so: `Successfully dropp
 
 ## Operations API
 
-Component operations require `super_user`, unless a role's [`operations` allowlist](../users-and-roles/overview.md#operation-permissions) lists them, which is how a deploy-only CI role gets `deploy_component`. A role's [`component_deploy` grant](../users-and-roles/overview.md#component-deploy-grants) <VersionBadge version="v5.4.0" /> limits `deploy_component`, `drop_component` and `get_components` to the components it names. A few cannot be granted that way, such as `get_deployment_payload`, and a deploy that passes a literal `token` in `credentials` still needs `super_user`.
+Component operations require `super_user`, unless a role's [`operations` allowlist](../users-and-roles/overview.md#operation-permissions) lists them, which is how a deploy-only CI role gets `deploy_component`. A role's [`component_deploy` grant](../users-and-roles/overview.md#component-deploy-grants) limits `deploy_component`, `drop_component` and `get_components` to the components it names (Added in: v5.4.0). A few cannot be granted that way, such as `get_deployment_payload`, and a deploy that passes a literal `token` in `credentials` still needs `super_user`.
 
 ### `add_component`
 
