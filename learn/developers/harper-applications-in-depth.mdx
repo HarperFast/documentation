@@ -326,7 +326,7 @@ In previous guides we demonstrated how to use the `harper` and `harper dev` comm
 
 - `harper run <path>` is an alias for the default `harper` command. These commands run Harper in the current process
 - `harper start` will start Harper in a background process
-- `harper stop` command will gracefully shutdown Harper
+- `harper stop` stops Harper. From v5.4.0 it shuts down gracefully, giving requests in flight a few seconds to finish and closing components, and waits for the process to exit; see [`harper stop`](/reference/v5/cli/commands#harper-stop)
 - `harper restart` will restart the main process and all threads (different than the thread-only restart from the `dev` command)
 - `harper status` displays the status of the process including the PID
 
