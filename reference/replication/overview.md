@@ -364,7 +364,7 @@ See [Clustering Operations](./clustering.md#cluster-status) for the full respons
 
 Initial synchronization is decided per peer and per database. A new node can request a full copy from each in-scope peer for which it has no resume cursor, so a join can load several peers at once. [`add_node` with `isLeader: true`](./clustering.md#add-node) identifies a bootstrap source; it does not prevent full-copy requests to other cursorless peers. After synchronization, replication continues incrementally.
 
-If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions. If its saved position predates a peer's oldest retained history, it receives a base copy instead; [`logging.auditRetention`](../logging/configuration.md#loggingauditretention) defaults to `3d`, but disk pressure can purge history sooner. A base copy sends current rows as writes without clearing tables or deleting rows, so rows deleted elsewhere remain on the receiver. Copies also run in reverse: rows from the returning node can reappear on peers whose deletion tombstones have been purged. There is no resync or reconcile operation, and neither copy completion nor subsequent replay proves that the data matches. Keep a long-absent node isolated from replication before startup, then [remove it](./clustering.md#remove-node), rebuild it with empty databases, and [add it as a new node](./clustering.md#add-node) when peers are authoritative. When it is authoritative, keep it isolated, stop every peer before rebuilding any, rebuild each peer the same way, and only then lift the isolation one peer at a time, so each copies from it. [Operating Replication](/learn/administration/operating-replication#what-moves-automatically-and-what-does-not) gives the full order.
+If a node goes offline and comes back, it resynchronizes automatically to catch up on missed transactions. If a peer has purged history the node would need to replay, it receives a base copy instead ([when a peer forces one](#when-a-peer-forces-a-base-copy)); [`logging.auditRetention`](../logging/configuration.md#loggingauditretention) defaults to `3d`, but disk pressure can purge history sooner. A base copy sends current rows as writes without clearing tables or deleting rows, so rows deleted elsewhere remain on the receiver. Copies also run in reverse: rows from the returning node can reappear on peers whose deletion tombstones have been purged. There is no resync or reconcile operation, and neither copy completion nor subsequent replay proves that the data matches. Keep a long-absent node isolated from replication before startup, then [remove it](./clustering.md#remove-node), rebuild it with empty databases, and [add it as a new node](./clustering.md#add-node) when peers are authoritative. When it is authoritative, keep it isolated, stop every peer before rebuilding any, rebuild each peer the same way, and only then lift the isolation one peer at a time, so each copies from it. [Operating Replication](/learn/administration/operating-replication#what-moves-automatically-and-what-does-not) gives the full order.
 
 You can also specify a `start_time` in the `add_node` operation to limit the initial download to data since a given point in time:
 
@@ -375,6 +375,30 @@ You can also specify a `start_time` in the `add_node` operation to limit the ini
 	"start_time": "2024-01-01T00:00:00.000Z"
 }
 ```
+
+### When a Peer Forces a Base Copy
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+The peer that would send the catch-up decides, per database, when the returning node subscribes. It logs `forcing a bounded base-copy resync` when it forces a copy. Before v5.4, a peer forced one whenever the returning node's position was older than `logging.auditRetention` or than the peer's oldest retained entry. A peer that had written nothing to a database since then therefore forced a full copy even though nothing was missed.
+
+From v5.4, a peer records how far each prune of its transaction logs reached. It forces a copy when the returning node's position, for a log it would replay, is below that point. A position that is old only because the peer wrote nothing to that database since, such as an idle or never-written transaction log, no longer forces a copy. A copy can still be forced although nothing was missed, in these cases:
+
+- The peer has no trustworthy record of what it pruned. It then uses the pre-v5.4 rule.
+- The peer has no record of what was removed from a transaction log that was already purged empty before it ran v5.4. After the upgrade, such a log can force one more base copy of that database for each node returning with a position older than that purge.
+- On RocksDB, the storage engine also purges transaction logs on its own after three days. If the peer itself was stopped for longer than that, a node whose position is older than three days gets one base copy of the database from it.
+
+A copy that keeps failing is reported as [`stuckCopy`](./clustering.md#stuck-copies) in `cluster_status`, and its reconnects are held back instead of retried indefinitely.
+
+### Rows From Unnamed Origins
+
+<VersionBadge version="v5.4.0" />
+
+Each replicated row records its origin, the node that wrote it, as a numeric id that each node maps to a node name. A node can hold rows whose origin id has no name on that node, for example data migrated from v4, or rows from a node whose name mapping no longer exists. Before v5.4, a peer receiving such a row could not translate its origin, so a base copy that included it failed and restarted from the same position indefinitely.
+
+From v5.4, the sending node names that origin `unnamed-origin-<id>@<node name>`, where `<id>` is its origin id on the sending node and `<node name>` is the sending node's own name. Receivers treat it like any other origin. A v5.4 node receiving from an older node derives the same name itself and logs a warning: `<node name> sent <database> records from origin id <id>, which has no name there; applying them as origin unnamed-origin-<id>@<node name>`. It derives at most 64 new names per connection; past that, the connection closes and reconnects.
+
+In `<node name>`, each character other than ASCII letters, digits, `.` and `-` becomes `_` followed by its four-digit lowercase hexadecimal code, so `:` becomes `_003a` and `_` becomes `_005f`. These names identify where rows came from; no node by that name exists. They can appear in log lines on any node that receives or relays those rows.
 
 ## Replicated Transactions
 
