@@ -100,7 +100,7 @@ In the first guide, we introduced you to the `/health` endpoint. This is provide
 
 The **Operations API** provides a full set of capabilities for configuring, deploying, administering, and controlling Harper. It is configured on port `9925` by default, and primarily functions through JSON-based, POST requests to the root path `/`. It has some additional functionalities too such as the `/health` endpoint and an OpenAPI endpoint `/api/openapi/rest`.
 
-The operations API root path POST requests must be authenticated. Harper provides an `authentication.authorizeLocal` configuration option for automatically authorizing any requests from the loopback IP address as the superuser (the one created during Harper installation). This option is enabled automatically when Harper is installed using the `dev` default config (as was instructed in the getting started guide). Thus, local installation users may make unauthenticated requests. Container based installation users must use `--network host` when running the container in order to make use of this option. Fabric or any other remote host installations generally must authenticate all requests.
+The operations API root path POST requests must be authenticated. Harper provides an `authentication.authorizeLocal` configuration option for automatically authorizing any requests from the loopback IP address as a super user. From v5.4.0, these requests run as the built-in [`local` user](/reference/v5/security/configuration#local-request-identity); earlier versions used a stored user whose role was named `super_user`. This option is enabled automatically when Harper is installed using the `dev` default config (as was instructed in the getting started guide). Thus, local installation users may make unauthenticated requests. Container based installation users must use `--network host` when running the container in order to make use of this option. Fabric or any other remote host installations generally must authenticate all requests.
 
 :::note
 The `authentication.authorizeLocal` option should be disabled for any Harper servers that may be accessed by untrusted users from the same instance. For example, it should be disabled if you are using a local proxy, or for general server hardening.
@@ -326,7 +326,7 @@ In previous guides we demonstrated how to use the `harper` and `harper dev` comm
 
 - `harper run <path>` is an alias for the default `harper` command. These commands run Harper in the current process
 - `harper start` will start Harper in a background process
-- `harper stop` command will gracefully shutdown Harper
+- `harper stop` stops Harper. From v5.4.0 it shuts down gracefully, giving requests in flight a few seconds to finish and closing components, and waits for the process to exit; see [`harper stop`](/reference/v5/cli/commands#harper-stop)
 - `harper restart` will restart the main process and all threads (different than the thread-only restart from the `dev` command)
 - `harper status` displays the status of the process including the PID
 

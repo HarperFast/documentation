@@ -359,7 +359,7 @@ harper deploy project=my-app by_ref=true \
 
 Keep the workflow's wait step when using `restart=rolling`. For a single-node instance, use `restart=true` instead. Changing isolation makes canary certification unavailable on v5.4.0 and later; see [Canary certification](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker).
 
-Creating an isolated application, or turning isolation on or off, also restarts the shared workers. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
+Turning isolation off also restarts the shared workers, as does turning it on for an application they had loaded, or, before v5.4.0, creating an isolated application. From v5.4.0, a new isolated application's first `restart=true` deploy starts only its own worker. Later redeploys that keep the application isolated restart only its worker, except an activation retry whose release is already live. A package redeploy that omits `isolated` preserves it; pass `isolated=false` to return the application to the shared pool.
 
 ## Per-PR previews
 
@@ -656,7 +656,7 @@ With `dataMode=shared`, previews read and write the cluster's databases, the one
 
 ### Previews on v5.3
 
-None of the above exists before v5.4.0. On v5.3, a preview needs a role, user, trust policy and workflow written by hand, and that role can deploy and drop any component on the cluster. On Fabric each preview host is a custom domain to add, verify and bind; a payload deploy cannot be isolated or branched; and cleanup has to call every node itself. The v5.3 recipe is in [the previous version of this guide](https://github.com/HarperFast/documentation/blob/3d562271/learn/developers/deploying-from-ci.mdx#per-pr-previews-with-shared-databases). Run v5.3 previews on a cluster for previews alone, or behind required reviewers when they share a cluster with production.
+None of the above exists before v5.4.0. On v5.3, a preview needs a role, user, trust policy and workflow written by hand, and that role can deploy and drop any component on the cluster. On Fabric each preview host is a custom domain to add, verify and bind; a payload deploy cannot be isolated or branched; and cleanup has to call every node itself. The v5.3 recipe is in [the previous version of this guide](https://github.com/HarperFast/documentation/blob/62139d54/learn/developers/deploying-from-ci.mdx#per-pr-previews-with-shared-databases). Run v5.3 previews on a cluster for previews alone, or behind required reviewers when they share a cluster with production.
 
 ## Other CI systems
 
