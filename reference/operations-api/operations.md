@@ -552,7 +552,7 @@ Returns all users.
 
 ### `user_info`
 
-Returns data for the currently authenticated user.
+Returns data for the currently authenticated user. From v5.4.0, [locally trusted requests](../security/configuration.md#local-request-identity) report `username: "local"` for the built-in super user.
 
 ```json
 { "operation": "user_info" }
