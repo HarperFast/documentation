@@ -226,29 +226,35 @@ const resolved = sources.map((source) => resolveSource(source, !watch));
 if (!watch) {
 	assemble(resolved);
 } else {
+	let timer;
+	// Watchers first: one that cannot start fails the command before a server exists.
+	const watchers = resolved
+		.filter((source) => source.local)
+		.map(({ docsDir }) => {
+			const watcher = fs.watch(docsDir, { recursive: true }, () => {
+				clearTimeout(timer);
+				timer = setTimeout(() => {
+					try {
+						assemble(resolved);
+					} catch (error) {
+						// Keep serving the last good assembly while the source is mid-edit.
+						console.error(error.message);
+					}
+				}, 200);
+			});
+			console.log(`Watching ${docsDir}`);
+			return { docsDir, watcher };
+		});
 	const server = spawn('docusaurus', ['start', ...process.argv.slice(process.argv.indexOf('--watch') + 1)], {
 		stdio: 'inherit',
 		shell: process.platform === 'win32',
 	});
 	server.on('exit', (code) => process.exit(code ?? 1));
-	let timer;
-	for (const { docsDir } of resolved.filter((source) => source.local)) {
-		const watcher = fs.watch(docsDir, { recursive: true }, () => {
-			clearTimeout(timer);
-			timer = setTimeout(() => {
-				try {
-					assemble(resolved);
-				} catch (error) {
-					// Keep serving the last good assembly while the source is mid-edit.
-					console.error(error.message);
-				}
-			}, 200);
-		});
-		// A server that no longer reflects edits is worse than none.
+	// A server that no longer reflects edits is worse than none.
+	for (const { docsDir, watcher } of watchers) {
 		watcher.on('error', (error) => {
 			console.error(`Stopped watching ${docsDir}: ${error.message}`);
 			server.kill();
 		});
-		console.log(`Watching ${docsDir}`);
 	}
 }
