@@ -372,7 +372,7 @@ Calls [`disable_previews`](../operations-api/operations.md#disable_previews): it
 
 #### `harper preview deploy`
 
-Deploys or updates the preview of one PR. This is what the starter workflow runs, as the preview user:
+Deploys or updates the preview of one PR. This is what [`HarperFast/deploy-action`](https://github.com/HarperFast/deploy-action) and the starter workflow run, as the preview user:
 
 ```bash
 harper preview deploy app=my-app pr=42 branch=fix/cart by_ref=true ref=<head commit>

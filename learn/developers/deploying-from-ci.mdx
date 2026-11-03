@@ -20,7 +20,7 @@ Both work with private sources: `deploy_component` accepts a [`credentials`](/re
 - A GitHub Actions workflow that builds, publishes to GitHub Packages, and deploys the published artifact
 - How to wait until every node has taken the release, and how to go back to a previous one
 - How to deploy isolated applications
-- How to give each pull request its own preview, on its own branch of the data, with one setup command and a starter workflow
+- How to give each pull request its own preview, on its own branch of the data, with one setup command and the `HarperFast/deploy-action` GitHub Action
 
 ## Prerequisites
 
@@ -191,6 +191,23 @@ jobs:
 
 For a private repository, add `credential=true` to the deploy command. It attaches the `deploy.my-app.git.github.com` reference you created with `harper deploy setup=true`.
 
+:::tip
+
+On a v5.4.0 cluster, the [`HarperFast/deploy-action`](https://github.com/HarperFast/deploy-action) GitHub Action can replace the job's steps, the wait included, since a v5.4.0 `harper deploy restart=rolling` waits for every node itself:
+
+```yaml
+steps:
+  - uses: HarperFast/deploy-action@v1
+    with:
+      target: ${{ vars.HARPER_CLI_TARGET }}
+      app: my-app
+      by_ref: true
+```
+
+It installs the CLI, deploys with `restart=rolling` unless you set `restart`, and authenticates with the job's OIDC token alone. A private repository also needs `credential: true`. The job still needs `environment: production` and `id-token: write` for the trust policy; it needs no checkout.
+
+:::
+
 A few details worth noting:
 
 - **No secrets.** `HARPER_CLI_TARGET` is the only thing the workflow is given. `id-token: write` lets the CLI request an identity token, and `environment: production` puts the `environment` claim the trust policy requires into it. Any other step in the job could request one too, so the job runs none of the repository's code. The CLI prints which policy authenticated it, and as whom, to stderr.
@@ -350,21 +367,16 @@ Creating an isolated application, or turning isolation on or off, also restarts 
 
 A preview runs a pull request's code at its own URL, beside production, so a reviewer can try the change before it merges. PR `42`, from the branch `fix/cart`, deploys as `my-app-pr-42`, an [isolated application](/reference/v5/components/applications#isolated-applications) served at `https://fix-cart.app.<cluster host>/`. Each push to the PR updates it. Closing or merging the PR drops it, and the cluster drops it on its own seven days after its last deploy, so a missed close event leaves nothing behind for long. By default, each preview runs on its own [branch of the cluster's databases](/reference/v5/components/applications#branched-databases), so what it writes stays out of production's data.
 
-It takes one command and one workflow file, and stores no secret in GitHub:
+It takes one workflow file and one command, and stores no secret in GitHub:
 
-- [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) enables previews of the application on the cluster. It creates a user whose role can deploy and drop only that application's previews, and trust policies that let one workflow file act as that user.
-- The workflow, `.github/workflows/preview.yaml`, runs on `pull_request_target` from your default branch. It runs `harper preview deploy` when a PR opens or changes, and `harper preview drop` when it closes.
+- The workflow, `.github/workflows/preview.yaml`, runs the [`HarperFast/deploy-action`](https://github.com/HarperFast/deploy-action) GitHub Action on `pull_request_target`, from your default branch. When a PR opens or changes, the action deploys its head commit as the PR's preview and keeps one comment on the PR with the preview's URL. When the PR closes, it drops the preview.
+- [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) checks that workflow and enables previews of the application on the cluster. It creates a user whose role can deploy and drop only that application's previews, and trust policies that let that one workflow file act as that user.
 
 Read [How previews stay safe](#how-previews-stay-safe) before you turn previews on for a cluster that also serves production.
 
 :::note Coming soon
 
-Two more ways to run the same previews are on the way, and neither is released yet:
-
-- **Harper Studio's Previews panel** turns previews of an application on and off, and shows its limits, from the browser.
-- **[`HarperFast/deploy-action`](https://github.com/HarperFast/deploy-action)** is a GitHub Action that runs the same preview lifecycle as a workflow step, and also comments each preview's URL on its PR.
-
-Both use the cluster-side setup described here. Until they are released, use the steps below.
+Harper Studio's Previews panel, not released yet, will turn previews of an application on and off and show its limits from the browser, using the same cluster-side setup as `harper preview setup`.
 
 :::
 
@@ -373,12 +385,65 @@ Both use the cluster-side setup described here. Until they are released, use the
 - **Every node runs v5.4.0 or later.** [On v5.3](#previews-on-v53) has what differs before that.
 - **The cluster can run isolated applications**: a nonzero `threads.count`, `http.securePort`, and `tls.unixDomainSockets: true`. Each running preview takes a slot of [`threads.maxIsolated`](/reference/v5/configuration/options#threads), `8` by default, on each node, and a worker thread with its memory. See [Requirements and refusals](/reference/v5/components/applications#requirements-and-refusals).
 - **Branched data needs RocksDB storage**, and a module loader other than `native`. On a cluster that cannot branch, or for previews that should use the cluster's own data, set previews up with `dataMode=shared`, and read [Shared or branched data](#shared-or-branched-data) first.
-- **Preview hosts reach the cluster.** Every Colocated and Dedicated cluster on Harper Fabric serves `*.app.<cluster host>` with no setup. A cluster created before preview hosts gains them one instance at a time, as each instance's certificate renews, within about seven weeks, and until every instance has renewed, a preview answers only some of the time. See [Preview Hosts](/fabric/cluster-creation-management#preview-hosts). On a self-managed cluster, point a wildcard DNS record and certificate for a preview domain at a proxy that routes each host to its application's socket, as in [Reaching an isolated application](/reference/v5/components/applications#reaching-an-isolated-application), and pass that domain to setup with `domain=`.
+- **Preview hosts reach the cluster.** Every Colocated and Dedicated cluster on Harper Fabric serves `*.app.<cluster host>` with no setup. A cluster created before preview hosts gains them one instance at a time, as each instance's certificate renews, within about seven weeks, and until every instance has renewed, a preview answers only some of the time. See [Preview Hosts](/fabric/cluster-creation-management#preview-hosts). On a self-managed cluster, point a wildcard DNS record and certificate for a preview domain at a proxy that routes each host to its application's socket, as in [Reaching an isolated application](/reference/v5/components/applications#reaching-an-isolated-application), and pass that domain to setup with `domain=` and to the action with `domain:`.
 - **On your machine:** the Harper CLI, `super_user` access to the cluster, and the [`gh` CLI](https://cli.github.com/) signed in to an account that can manage the repository's Actions variables.
+
+### Add the preview workflow
+
+In a checkout of the repository, on its default branch, add `.github/workflows/preview.yaml`, with your application's component name as `app` and your default branch under `branches`:
+
+```yaml
+name: Preview
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed]
+    branches: [main]
+permissions: {}
+jobs:
+  deploy:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: preview
+    permissions:
+      id-token: write
+      pull-requests: write
+      deployments: write
+    concurrency:
+      group: harper-preview-${{ github.event.pull_request.number }}
+    steps:
+      - uses: HarperFast/deploy-action@v1
+        with:
+          target: ${{ vars.HARPER_PREVIEW_TARGET }}
+          app: my-app
+          preview: true
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: preview-cleanup
+    permissions:
+      id-token: write
+      pull-requests: write
+      deployments: write
+    steps:
+      - uses: HarperFast/deploy-action@v1
+        with:
+          target: ${{ vars.HARPER_PREVIEW_TARGET }}
+          app: my-app
+          preview: true
+```
+
+- **It never checks out the PR.** The action has the cluster fetch the PR's head commit itself, by reference, so no step of a job holding the identity token runs the PR's code. It authenticates with the job's OIDC token alone, against the `HARPER_PREVIEW_TARGET` variable setup sets, and refuses any other Harper credential in its environment.
+- **Fork PRs are skipped.** Each job runs only when the PR's head repository is this repository, and the action skips a fork's PR itself too.
+- **Only PRs into the default branch get a preview**, and retargeting a PR is not one of the events the workflow runs on. A PR retargeted to the default branch gets its preview at its next push. One retargeted away keeps the preview it had, unchanged, and closing it does not drop it: it lasts until it expires, a [sweep](#sweeping-missed-previews) drops it, or you run `harper preview drop`.
+- **A deploy that waited goes ahead only while it is still current.** The action deploys only while the PR is open at the commit the event named, since an approval on `preview` can hold the job for a while. If the PR closes while it deploys, it drops what it deployed. The concurrency group runs one deploy per PR at a time.
+- **The PR shows the preview.** The action keeps one comment on the PR with the preview's URL, updated in place, and records each preview as a GitHub Deployment in the `my-app-preview` environment, kept apart from the `preview` environment that gates the job. Both need the `pull-requests: write` and `deployments: write` permissions, and the deploy still counts if either fails. Turn them off with `comment: false` and `github_deployment: false`.
+- **Cleanup runs in its own environment**, with a token that can only drop, so it never waits for the `preview` environment's reviewers. While a deploy of the same PR is still activating, the drop answers `409`, so the action retries it for about two minutes. A PR reopened before cleanup drops keeps its preview. One reopened in the moment between cleanup's check and its drop can lose the preview its reopen just deployed; push again, or rerun the deploy job, to bring it back.
+
+The [action's README](https://github.com/HarperFast/deploy-action#inputs) lists every input. Keep the workflow's rules when you edit it later, since `harper preview setup` checks the file only when it runs: no checkout or fetch of the PR's code in a job with `id-token: write`, and the same-repository condition on every job that holds the token. The cluster still enforces the role's limits, whatever the workflow does.
 
 ### Enable previews
 
-From a checkout of the repository, on its default branch, logged in to the cluster as a `super_user`:
+From that checkout, logged in to the cluster as a `super_user`:
 
 ```bash
 harper login https://my-cluster.example.com:9925
@@ -388,22 +453,24 @@ harper preview setup app=my-app
 `app` is the application's component name: the `project` it deploys as. Setup checks the GitHub side, then enables previews on the cluster, then writes the GitHub side:
 
 1. It looks the repository up for its id and default branch.
-2. It offers to write the starter workflow to `.github/workflows/preview.yaml`, or, if that file exists, checks it and refuses one that could give the preview identity to a fork or to a PR's code.
+2. It reads `.github/workflows/preview.yaml` from the checkout, and refuses a workflow that could give the preview identity to a fork or to a PR's code. If the file doesn't exist, it offers to write [a starter workflow of its own](#the-workflow-setup-writes).
 3. It calls [`enable_previews`](/reference/v5/operations-api/operations#enable_previews) on the cluster, which creates:
    - the role and user `my-app-ci-preview`, whose role can deploy, drop and read only `my-app-pr-<n>` previews, and run the version check `harper` makes before it deploys;
    - the trust policy `github-actions-my-app-preview`, for jobs in the `preview` environment;
    - the trust policy `github-actions-my-app-preview-cleanup`, for jobs in the `preview-cleanup` environment, whose token can only drop.
-4. It writes the workflow, if you said to, and sets the repository variable `HARPER_PREVIEW_TARGET` to the cluster's URL.
+4. It sets the repository variable `HARPER_PREVIEW_TARGET` to the cluster's URL.
 
 Commit the workflow to the default branch. GitHub runs a `pull_request_target` workflow from there, not from the PR.
 
-A few options change what setup enables. [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) lists them all:
+A few options change what setup enables. [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) lists them all, and three need the matching action input in both jobs:
 
-- **`credential=true`**, for a private repository, which setup offers when it sees one. It seals a GitHub token for the cluster to fetch each PR's commit with. See [Private repositories](#private-repositories).
-- **`maxPreviews=<n>`** caps how many previews of the application each node keeps live. A deploy past the cap is refused, so close PRs you are done with.
-- **`maxTtlDays=<days>`** is the longest a preview lives after its last deploy, `7` by default.
-- **`dataMode=shared`** lets previews use the cluster's databases rather than requiring a branch of them.
-- **`domain=<domain>`** sets the preview domain, for a self-managed cluster or one you reach through a custom domain.
+| `harper preview setup` | What it does                                                                                                                                                                        | Action input                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `credential=true`      | Seals a GitHub token for the cluster to fetch each PR's commit with, for a private repository; setup offers it when it sees one. See [Private repositories](#private-repositories). | `credential: true`          |
+| `dataMode=shared`      | Lets previews use the cluster's databases rather than requiring a branch of them.                                                                                                   | `branched_databases: false` |
+| `domain=<domain>`      | Sets the preview domain, for a self-managed cluster or one you reach through a custom domain.                                                                                       | `domain: <domain>`          |
+| `maxPreviews=<n>`      | Caps how many previews of the application each node keeps live. A deploy past the cap is refused, so close PRs you are done with.                                                   | none                        |
+| `maxTtlDays=<days>`    | The longest a preview lives after its last deploy, `7` by default.                                                                                                                  | none                        |
 
 The cluster holds these limits in the preview role, and enforces them on every deploy, so a change to the workflow cannot raise them.
 
@@ -426,9 +493,12 @@ In a public repository, allow the event for the preview workflow alone. In **Set
 
 An organization or enterprise policy can still block the event. See [Control workflow execution](https://docs.github.com/en/actions/how-tos/administer/control-workflow-execution).
 
-### The preview workflow
+### The workflow setup writes
 
-This is the workflow setup writes for `app=my-app`, on a repository whose default branch is `main`:
+When `.github/workflows/preview.yaml` doesn't exist, `harper preview setup` offers to write one, which runs the same lifecycle with `harper preview` commands instead of the action. It posts no PR comment and records no GitHub Deployment. For `app=my-app` and the default branch `main`:
+
+<details>
+<summary>The starter workflow</summary>
 
 ```yaml
 # Written by `harper preview setup`.
@@ -496,14 +566,9 @@ jobs:
           exit 1
 ```
 
-- **It never checks out the PR.** `by_ref=true ref="$SHA"` tells the cluster to fetch the PR's head commit itself, so no step of a job holding the identity token runs the PR's code. The `HARPER_PREVIEW_TARGET` variable becomes `HARPER_CLI_TARGET`, and every `harper` command authenticates through the trust policy, with no stored credential.
-- **Fork PRs are skipped.** Each job runs only when the PR's head repository is this repository.
-- **Only PRs into the default branch get a preview**, and retargeting a PR is not one of the events the workflow runs on. A PR retargeted to the default branch gets its preview at its next push. One retargeted away keeps the preview it had, unchanged, and closing it does not drop it: it lasts until it expires, or until you run `harper preview drop`.
-- **A deploy that waited goes ahead only while it is still current.** The job deploys only while the PR is open at the commit the event named, since an approval on `preview` can hold it for a while. If the PR closes while it deploys, it drops what it deployed. The concurrency group runs one deploy per PR at a time.
-- **Cleanup runs in its own environment**, with a token that can only drop, so it never waits for the `preview` environment's reviewers. While a deploy of the same PR is still activating, the drop answers `409`, so the job retries it for about two minutes. A PR reopened before cleanup drops keeps its preview. One reopened in the moment between cleanup's check and its drop can lose the preview its reopen just deployed; push again, or rerun the deploy job, to bring it back.
-- **`harper@^5.4`** installs a 5.x CLI that is v5.4.0 or later.
+</details>
 
-Setup checks the workflow only when it runs, so keep its rules when you edit the file later: no checkout or fetch of the PR's code in a job with `id-token: write`, and the same-repository condition on every job that holds the token. The cluster still enforces the role's limits, whatever the workflow does.
+It reads the PR's state and head commit with `gh` before it deploys, and again afterward, and passes `ref="$SHA"` with `by_ref=true`: without it, `by_ref` deploys `GITHUB_SHA`, which for `pull_request_target` is the base branch's commit. With `credential=true`, `dataMode=shared` or a `domain=` other than the default, setup adds the matching `harper preview deploy` argument. The rules in [Add the preview workflow](#add-the-preview-workflow) apply to it too.
 
 ### Managing previews
 
@@ -519,17 +584,57 @@ harper preview drop app=my-app pr=42
 - **A failed preview.** A preview that fails to load in its [canary worker](/reference/v5/operations-api/operations#certifying-a-release-in-a-canary-worker) fails the deploy, and the job's log says why.
 - **Turning previews off.** `harper preview teardown app=my-app` revokes the identity, drops every preview of the application on every node, and removes the user, role and trust policies. It leaves the workflow file and the repository variable for you to remove.
 
+#### Sweeping missed previews
+
+The cluster expires every preview on its own, so a missed close event already costs no more than the preview's remaining days. A scheduled sweep removes those previews sooner: the action, run on `schedule` or `workflow_dispatch`, drops each of this repository's previews whose PR has closed. The trust policies setup writes match only `pull_request_target`, and the sweep has to list what is deployed, so it needs its own workflow file and its own policy. Commit `.github/workflows/preview-sweep.yaml`:
+
+```yaml
+name: Preview sweep
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    environment: preview-cleanup
+    permissions:
+      id-token: write
+      pull-requests: write
+      deployments: write
+    steps:
+      - uses: HarperFast/deploy-action@v1
+        with:
+          target: ${{ vars.HARPER_PREVIEW_TARGET }}
+          app: my-app
+          preview: true
+```
+
+Then, as a `super_user`, add its policy, with your repository's id and name, your default branch, and the cluster's URL:
+
+```bash
+harper add_oidc_trust id=github-actions-my-app-preview-sweep \
+  issuer=https://token.actions.githubusercontent.com \
+  audience=https://my-cluster.example.com:9925/ \
+  user=my-app-ci-preview \
+  operations='["get_components","drop_component"]' \
+  claims='{"repository_id":"67890","workflow_ref":"my-org/my-app/.github/workflows/preview-sweep.yaml@refs/heads/main","event_name":["schedule","workflow_dispatch"],"environment":"preview-cleanup"}'
+```
+
+`harper preview teardown` doesn't know about this policy, so drop it yourself when you turn previews off: `harper drop_oidc_trust id=github-actions-my-app-preview-sweep`.
+
 ### Private repositories
 
-The cluster fetches each PR's commit itself, so for a private repository it needs a GitHub token that lasts longer than the workflow run. `harper preview setup credential=true` asks for one, seals it on your machine with the cluster's public key, and grants it to every preview of the application at once, as the secret `deploy.my-app-pr-_.git.github.com`. The starter workflow it writes then deploys with `credential=true`.
+The cluster fetches each PR's commit itself, so for a private repository it needs a GitHub token that lasts longer than the workflow run. `harper preview setup credential=true` asks for one, seals it on your machine with the cluster's public key, and grants it to every preview of the application at once, as the secret `deploy.my-app-pr-_.git.github.com`. Pass `credential: true` to the action in both jobs to deploy with it; the starter workflow setup writes passes `credential=true` already.
 
 Use a token for this alone: a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with **Contents: read-only** on this repository. Not the token production deploys with. Harper uses it only to install each preview; the previews' own code cannot read it. To rotate it, run `harper deploy setup=true provider=github project='my-app-pr-*'` with the new token.
 
 ### Applications that need a build
 
-The starter workflow deploys by reference, so every node installs the PR's commit as it is in the repository. That suits an application that runs from source. Don't add a build step to the preview workflow: any step in a job that holds the identity token could use it, and a build runs the PR's code and its dependencies.
+A preview deploys by reference, so every node installs the PR's commit as it is in the repository. That suits an application that runs from source. Don't add a build step to the preview workflow: any step in a job that holds the identity token could use it, and a build runs the PR's code and its dependencies.
 
-To preview an application that needs a build, build and publish each PR's commit from a separate `pull_request` workflow, which gets no identity token, and deploy the published package from the preview job with `package=` in place of `by_ref=true ref="$SHA"`. GitHub starts both workflows at once, and the trust policies match only `pull_request_target`, so the preview job has to wait for that build itself.
+To preview an application that needs a build, build and publish each PR's commit from a separate `pull_request` workflow, which gets no identity token, and deploy the published package from the preview job, with the action's `args` input (`args: package=npm:@my-org/my-app@pr-${{ github.event.pull_request.number }}`). GitHub starts both workflows at once, and the trust policies match only `pull_request_target`, so the preview job has to wait for that build itself.
 
 ### How previews stay safe
 
