@@ -55,7 +55,7 @@ An in-place restore purges and rewrites the database's files, which requires the
 - **Online** works only when no loaded component is holding the database open. Because `restore_backup` runs as a background job, the request returns a `job_id` first; if a component is holding the database open, the check fails inside the job, so the job ends in `ERROR` (surfaced by [`get_job`](../operations-api/operations.md#get_job)) with a message telling you to restore offline — Harper cannot force a component's handles closed while the server is running, and restoring under an open instance would corrupt it. (Harper does not track which component uses which database, so it cannot selectively stop one; it can only detect that the database is still open.) The `system` database is rejected up front, before a job is created.
 - **Offline** — the same [`restore_backup`](./operations.md#restore_backup) command run from the CLI with the server stopped — works for any database, because no components are loaded and nothing holds it open. This is the required path for the `system` database and for any database a component keeps open.
 
-Online restore always restores in place. To restore into a new database instead of overwriting the source, run `restore_backup` with `target_database` from the CLI with the server stopped.
+To restore into a new database instead of overwriting the source, pass `target_database` to `restore_backup`. As of v5.4.0 this works with the server running; before v5.4.0 it required the CLI with the server stopped.
 
 ## Example: incremental backups and restore
 
