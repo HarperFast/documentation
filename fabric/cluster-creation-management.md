@@ -81,7 +81,7 @@ Clusters are provisioned in real time, as soon as selections are complete
 
 ## Connecting the Harper CLI to a Cluster
 
-The cluster's **Config → Overview** page exposes its **Application URL** — the hostname the Harper CLI and SDKs target. Pass it to `harper login` to authenticate; the CLI stores the token so subsequent commands don't need credentials repeated. If the current directory already has a `.env` file that sets no target, it also appends `HARPER_CLI_TARGET` to it.
+The cluster's **Config → Overview** page exposes its **Application URL** — the hostname the Harper CLI and SDKs target. Pass it to `harper login` to authenticate; the CLI stores the token so subsequent commands don't need credentials repeated. It also saves the URL as the CLI's default target. From v5.4.0, the CLI stops with an error if a `.env` file in the current directory sets `HARPER_CLI_TARGET`, so remove that line. See [Project `.env` files](/reference/v5/cli/authentication#project-env-files).
 
 ```bash
 harper login <Application URL>
