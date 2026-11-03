@@ -63,7 +63,7 @@ To change Harper's configuration, set it in the [configuration file](../configur
 :::note
 <VersionBadge type="changed" version="v5.4.0" />
 
-The `harper` CLI reads a `.env` file in the current directory separately from `loadEnv`, and stops with an error if it sets the CLI's target, credentials, or a TLS or proxy name such as `HTTPS_PROXY`. `loadEnv` still loads those names at runtime, but commands such as `harper deploy` fail from that directory. Set them in the process environment, or keep them in a differently named file listed under `files`. See [Project `.env` files](../cli/authentication.md#project-env-files).
+The `harper` CLI reads a `.env` file in the current directory separately from `loadEnv`, and stops with an error if it sets the CLI's target, credentials, or a TLS or proxy name such as `HTTPS_PROXY`, unless the environment already sets that name. `loadEnv` still loads those names at runtime, but commands such as `harper deploy` fail from that directory. Set them in the process environment, or keep them in a differently named file listed under `files`. See [Project `.env` files](../cli/authentication.md#project-env-files).
 :::
 
 ## Managing `.env` Files Remotely

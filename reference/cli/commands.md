@@ -492,7 +492,7 @@ Log in to a Harper instance to store authentication tokens locally. Once logged 
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-`harper login` writes only to `~/.harperdb/credentials.json`, and no longer appends `HARPER_CLI_TARGET` to a project `.env`. It stops with an error if a `.env` file in the current directory sets the CLI's target or credentials. See [Project `.env` files](./authentication.md#project-env-files).
+`harper login` writes only to `~/.harperdb/credentials.json`, and no longer appends `HARPER_CLI_TARGET` to a project `.env`. It stops with an error if a `.env` file in the current directory sets a name the CLI refuses, such as its target, credentials or a proxy setting, and your environment does not. See [Project `.env` files](./authentication.md#project-env-files).
 
 ```bash
 harper login <URL>

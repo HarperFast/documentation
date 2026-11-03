@@ -24,7 +24,7 @@ harper get_components
 harper set_configuration logging_level=info
 ```
 
-When no `target` parameter is specified, the CLI falls back to the target saved by a previous `harper login` if there is one, and only otherwise to the local domain socket connection, which gives authenticated access to the local Harper instance. See [Authentication Precedence](#authentication-precedence) for what that means on a shared machine.
+When no `target` parameter is specified, the CLI falls back to a target set in the environment, then to the target saved by a previous `harper login` if there is one, and only otherwise to the local domain socket connection, which gives authenticated access to the local Harper instance. See [How the CLI Picks a Target](#how-the-cli-picks-a-target), and [Authentication Precedence](#authentication-precedence) for what that means on a shared machine.
 
 ## Remote Operations
 
@@ -186,7 +186,7 @@ harper add_user \
 
 A `.env` or `.env.vault` file in the current directory cannot configure the CLI's target, credentials or connection trust. That directory is often a cloned project, and a file it ships must not decide where your credentials go ([harper#4001: Refuse a project .env CLI target or credential](https://github.com/HarperFast/harper/pull/4001)).
 
-Operations API commands, including `harper deploy`, as well as `harper login` and the backup commands, read the file first. If it sets one of these names and the shell or CI environment does not, the command stops with an error naming the keys. It stops before contacting a server or touching a file, for local operations too:
+Every Operations API command, including `harper deploy` and `harper preview`, as well as `harper login` and the backup commands, reads the file first. If it sets one of these names and the shell or CI environment does not, the command stops with an error naming the keys. It stops before contacting a server or touching a file, for local operations too:
 
 | Purpose              | Names, in any letter case                                                                                                                                     |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -207,7 +207,7 @@ error: HARPER_CLI_TARGET must not come from a .env or .env.vault file in /path/t
 - **Other keys still load.** A file with none of these names is applied as before, and `.env.example` and `.env.local` are not read at all.
 - **Applications are unaffected.** `.env` handling in `harper run`, `harper dev` and a component's [`loadEnv`](../environment-variables/overview.md) is unchanged. `harper status`, `harper version`, `harper logout`, `harper agent` and `harper mcp` do not read the file.
 
-To migrate a project, remove the `HARPER_CLI_*` and `CLI_TARGET*` lines from its `.env`. `npm create harper@latest` writes `HARPER_CLI_TARGET` there, and `harper login` before v5.4.0 could append it. Then choose where the target comes from:
+To migrate a project, remove the listed names from its `.env`. Other names with these prefixes, such as `HARPER_CLI_TIMEOUT_MS`, still load. `npm create harper@latest` writes `HARPER_CLI_TARGET` there, and `harper login` before v5.4.0 could append it. Then choose where the target comes from:
 
 | Route                                        | Scope                                                                                                                                                                    |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

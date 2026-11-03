@@ -81,7 +81,7 @@ cp deploy.config.yaml deploy/config.yaml
 (cd deploy && harper deploy project=my-app restart=true)
 ```
 
-The subshell inherits `HARPER_CLI_TARGET`, so the staged directory needs no `.env`. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
+The subshell inherits `HARPER_CLI_TARGET`, so the CLI needs no `.env` in the staged directory. If your release configuration keeps `loadEnv`, copy only the application's keys to `deploy/`, under a file name its `files` lists. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
 
 ### Deploy from GitHub Actions
 
