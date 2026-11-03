@@ -80,11 +80,13 @@ function resolveSource({ repo, pathEnv, refEnv }, fetch) {
 	return { repo, ref, sha, docsTree, docsDir: path.join(checkout, 'docs'), local: false };
 }
 
-function walk(dir, base = dir) {
+// Relative paths use `/` on every platform: they are doc ids and URLs as well as file paths.
+function walk(dir, prefix = '') {
 	if (!fs.existsSync(dir)) return [];
 	return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-		const full = path.join(dir, entry.name);
-		return entry.isDirectory() ? walk(full, base) : [path.relative(base, full)];
+		if (entry.name.startsWith('.')) return [];
+		const rel = prefix + entry.name;
+		return entry.isDirectory() ? walk(path.join(dir, entry.name), rel + '/') : [rel];
 	});
 }
 
@@ -141,7 +143,7 @@ function assembleReleaseNotes(resolved, manifest) {
 	for (const source of resolved) {
 		const srcRoot = path.join(source.docsDir, 'release-notes');
 		for (const rel of walk(srcRoot)) {
-			const parts = rel.split(path.sep);
+			const parts = rel.split('/');
 			if (parts.length !== 3 || !rel.endsWith('.md')) {
 				throw new Error(`unexpected release-notes file ${source.repo}/docs/release-notes/${rel}`);
 			}
