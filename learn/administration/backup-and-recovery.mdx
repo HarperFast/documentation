@@ -168,7 +168,7 @@ Also include these constraints in the restore procedure:
 
 ## Restoring in a replicated cluster
 
-A restored node may be behind peers that have continued accepting writes. Peers can replay newer writes, including the destructive mutations you intended to undo. If peers have purged history its saved replication position would replay, [copies run](/reference/v5/replication/overview#when-a-peer-forces-a-base-copy) in both directions and can bring deleted rows back onto peers. Follow the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) before reconnecting. Restoring one node does not make its backup authoritative; choose which data to preserve or repair and rehearse the re-entry policy before reconnecting it.
+A restored node may be behind peers that have continued accepting writes. Peers can replay newer writes, including the destructive mutations you intended to undo. If peers have purged history that its saved replication position would replay, [copies run](/reference/v5/replication/overview#when-a-peer-forces-a-base-copy) in both directions and can bring deleted rows back onto peers. Follow the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) before reconnecting. Restoring one node does not make its backup authoritative; choose which data to preserve or repair and rehearse the re-entry policy before reconnecting it.
 
 ```mermaid
 flowchart TD
