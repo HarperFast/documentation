@@ -286,6 +286,9 @@ replication:
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
 - `threads` — Worker threads dedicated to replication, which then own the replication port and every subscription and load no application code; requires `port` or `securePort`; see [Dedicated Replication Threads](../replication/overview.md#dedicated-replication-threads); _Default_: `0` (replication runs on the HTTP worker threads) (Added in: v5.4.0)
 - `enableRootCAs` — Verify against Node.js Mozilla CA store; _Default_: `true`
+- `pingInterval` — Interval between replication keep-alive pings (ms); _Default_: `30000`
+- `pingTimeout` — Time without received socket activity before a replication connection is considered dead (ms); _Default_: twice `pingInterval`.
+- `confirmationTimeout` — Timeout in milliseconds for explicit `replicatedConfirmation`, read when a waiter starts. _Default_: `900000`, or `blobTimeout` when greater. An explicitly configured value overrides that fallback, including a smaller value. Range: `1`–`2147483647`. (Added in: v5.4.0)
 - `blobTimeout` — Blob transfer timeout (ms); _Default_: `120000`
 - `blobGapReconnectMs` — Interval (ms) for the blob-gap watchdog: when a transient blob save failure pins a replication resume cursor, the connection is forced to reconnect on this cadence so the gapped blob is re-streamed and, during a bulk copy, the copy resumes from the last banked cursor. Lower values heal gaps faster at the cost of more reconnects on a link whose faults never heal; _Default_: the `blobTimeout` value
 - `copyCursorFlushBytes` — Bytes of applied bulk-copy data between durable flushes of the copy resume cursor (RocksDB); _Default_: `67108864`
@@ -293,6 +296,7 @@ replication:
 - `blobSendDrainTimeout` — Maximum time (ms) a worker waits for in-flight replication blob **sends** to finish before shutting down during a restart, so a rolling restart (e.g., a component deploy reload) doesn't interrupt a transfer in progress. Only sends that are still making progress are waited on; `0` disables draining; _Default_: `600000`
 - `failOver` — Failover to alternate node if peer unreachable; _Default_: `true`
 - `shard` — Shard ID for traffic routing; see [Sharding](../replication/sharding.md)
+- `shards` — Complete array of unique shard IDs, integers `0`–`65535`; order does not matter. Required for a declarative database with no installed map; custom-map conversion can omit it. All peers must agree, and the local `shard` must be included when configured. Changing it never recomputes an installed map; see [Complete shard-id set](../replication/sharding.md#complete-shard-id-set). (Added in: v5.4.0)
 - `mtls.certificateVerification` — Certificate revocation checking (CRL/OCSP) for replication connections; see [Certificate Verification](../security/certificate-verification.md)
 - `logging` — Replication event logging; sub-options: `path`, `level`, `tag`, `stdStreams`. See [Logging Configuration](../logging/configuration.md)
 
@@ -335,7 +339,7 @@ storage:
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)
 - `compactOnStartKeepBackup` — Retain compaction backups; _Default_: `false`
-- `maxTransactionQueueTime` — Per-thread write-commit duration threshold for HTTP 503 backpressure; see [Storage Tuning](../database/storage-tuning.md#storagemaxtransactionqueuetime); _Default_: `45s`
+- `maxTransactionQueueTime` — Per-thread write-commit duration threshold for HTTP 503 backpressure, and the limit on how long a write keeps retrying conflicts with other writes (a separate 503, code `TRANSACTION_COMMIT_CONFLICT_TIMEOUT`); see [Storage Tuning](../database/storage-tuning.md#storagemaxtransactionqueuetime); _Default_: `45s`
 - `noReadAhead` — Advise OS against read-ahead; _Default_: `false`
 - `prefetchWrites` — Prefetch before write transactions; _Default_: `true`
 - `randomAccessFields` <VersionBadge version="v5.1.0" /> — Encode records as typed random-access structures, so a single field can be read without decoding the whole record. Best for tables whose records have a stable set of fields with stable types; leave off for wide, sparse, or variably typed schemas. Read by each table when its store opens, so a change applies to existing tables on restart, and ignored entirely by tables declaring the [`@table(randomAccessFields:)`](../database/schema.md#randomaccessfields) directive; _Default_: `false`. See [Storage Tuning — Record Encoding](../database/storage-tuning.md#storagerandomaccessfields)
@@ -350,6 +354,8 @@ storage:
 - `rocks.writeBufferManagerSize` — Process-wide cap (bytes) on RocksDB memtable memory across all databases. `0` disables; _Default_: one third of `blockCacheSize` (enabled). See [Storage Tuning — RocksDB Memory](../database/storage-tuning.md#rocksdb-memory) (Added in: v5.1.0)
 - `rocks.writeBufferManagerCostToCache` — When enabled, memtable memory and the block cache share a single, unified memory pool. During heavy write bursts, the block cache dynamically shrinks to give memtables more room. Once those memtables flush to disk, the block cache automatically reclaims that memory space. _Default_: `true`. Has no effect when `writeBufferManagerSize` is `0`. (Added in: v5.1.0)
 - `rocks.writeBufferManagerAllowStall` — Stall writes when memtable memory exceeds `writeBufferManagerSize` (hard cap) instead of allowing brief overshoot with more aggressive flushing (soft cap); _Default_: `true`. (Added in: v5.1.0)
+- `rocks.transactionLogAbortMarkers` <VersionBadge version="v5.4.0" /> — Mark the transaction-log entry of a transaction that fails after logging as aborted, so replication, subscriptions, `read_audit_log` and crash replay skip it, and give up on a write that keeps conflicting instead of retrying it without limit. `false` keeps the 5.3 behavior. Read once per process: a change takes effect after a [`restart`](../operations-api/operations.md#restart), not `restart_service`. Harper 5.3.4 and earlier cannot read the markers. _Default_: `true`. See [Storage Tuning — RocksDB Transaction Log](../database/storage-tuning.md#storagerockstransactionlogabortmarkers)
+- `rocks.transactionLogWriteIntents` <VersionBadge version="v5.4.0" /> — Make a commit that would conflict with an older, still-open transaction wait for that transaction to finish, usually before writing its transaction-log entry. Shortens the longest waits under heavy write contention, at the cost of more retries and lower throughput when transactions are large or contention is low. No effect when `rocks.transactionLogAbortMarkers` is `false`. Read once per process: a change takes effect after a [`restart`](../operations-api/operations.md#restart), not `restart_service`. _Default_: `false`. See [Storage Tuning — RocksDB Transaction Log](../database/storage-tuning.md#storagerockstransactionlogwriteintents)
 
 ---
 

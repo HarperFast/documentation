@@ -625,7 +625,7 @@ Does not require prior authentication when called with `username`/`password`. Re
 }
 ```
 
-With `role` as an inline role object, instead mints a single **scoped token** whose bearer is limited to the embedded permissions — requires an authenticated `super_user` caller; `username` is attribution only and must not name an existing user (defaults to `scoped:<minter>`); no refresh token is issued and the token cannot be revoked before expiry. See [JWT Authentication / Scoped Tokens](../security/jwt-authentication.md#scoped-tokens-inline-role).
+With `role` as an inline role object, instead mints a single **scoped token** whose bearer is limited to the embedded permissions — requires an authenticated `super_user` caller, and refuses one authenticated by a component's [Bearer validator](../http/api.md#serverregisterbearervalidatorvalidator-options); `username` is attribution only and must not name an existing user (defaults to `scoped:<minter>`); no refresh token is issued and the token cannot be revoked before expiry. See [JWT Authentication / Scoped Tokens](../security/jwt-authentication.md#scoped-tokens-inline-role).
 
 ```json
 {
@@ -1780,16 +1780,18 @@ Operations for configuring and managing Harper cluster replication.
 
 Detailed documentation: [Replication & Clustering](../replication/clustering.md)
 
-| Operation               | Description                                                     | Role Required |
-| ----------------------- | --------------------------------------------------------------- | ------------- |
-| `add_node`              | Adds a Harper instance to the cluster                           | super_user    |
-| `update_node`           | Modifies an existing node's subscriptions                       | super_user    |
-| `remove_node`           | Removes a node from the cluster                                 | super_user    |
-| `cluster_status`        | Returns current cluster connection status                       | super_user    |
-| `configure_cluster`     | Bulk-creates/resets cluster subscriptions across multiple nodes | super_user    |
-| `cluster_set_routes`    | Adds routes to the replication routes config (PATCH/upsert)     | super_user    |
-| `cluster_get_routes`    | Returns the current replication routes config                   | super_user    |
-| `cluster_delete_routes` | Removes routes from the replication routes config               | super_user    |
+| Operation               | Description                                                      | Role Required |
+| ----------------------- | ---------------------------------------------------------------- | ------------- |
+| `add_node`              | Adds a Harper instance to the cluster                            | super_user    |
+| `update_node`           | Modifies an existing node's subscriptions                        | super_user    |
+| `remove_node`           | Removes a node from the cluster                                  | super_user    |
+| `initialize_shard_map`  | Installs a custom database slot map without moving records       | super_user    |
+| `verify_shard_map`      | Compares a legacy placement function with a proposed slot policy | super_user    |
+| `cluster_status`        | Returns current cluster connection status                        | super_user    |
+| `configure_cluster`     | Bulk-creates/resets cluster subscriptions across multiple nodes  | super_user    |
+| `cluster_set_routes`    | Adds routes to the replication routes config (PATCH/upsert)      | super_user    |
+| `cluster_get_routes`    | Returns the current replication routes config                    | super_user    |
+| `cluster_delete_routes` | Removes routes from the replication routes config                | super_user    |
 
 ### `add_node`
 
@@ -1804,9 +1806,23 @@ Adds a remote Harper node to the cluster. If `subscriptions` are not provided, a
 }
 ```
 
+### `initialize_shard_map`
+
+<VersionBadge version="v5.4.0" />
+
+POST; requires `super_user` and a RocksDB database. Takes `database`, `slots` and complete nonoverlapping `ranges` (`start`, exclusive `end`, `shard`). Returns the installed versioned snapshot. Installs metadata only and refuses changes to active slot assignments. See [Installed maps](../replication/residency.md#installed-maps).
+
+For a legacy conversion, call with `database`, `existing_owner: true` and `expected_digest` instead. This records the operator's assertion that this local owning node has complete bodies for its slots; Harper does not verify completeness. It requires an already-installed map with exactly that digest, rejects `slots` or `ranges` in the same call, and does not declare a sharded table. The receipt is local to the captured root generations and tables. Assert on each owning node, with legacy writers paused until activation is ready throughout the cluster. See [Converting an existing table](../replication/residency.md#convert-an-existing-by-id-table-without-moving-records).
+
+### `verify_shard_map`
+
+<VersionBadge version="v5.4.0" />
+
+POST; requires `super_user`. Takes `database`, `table` and a proposed key-derived `policy` (`slots`). The existing application worker must still run its legacy function, and a custom map must be installed. Returns `checked`, `mismatches`, bounded samples, observed slots, departed node names (stored legacy owners absent from the current known-node list) and map identity. It neither rewrites records nor activates the policy. See [Compare placement](../replication/residency.md#3-compare-placement-on-every-node).
+
 ### `cluster_status`
 
-Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`).
+Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`). Its top-level `sharding` object reports per-database map identity and placement blockers; see [Sharding Status](../replication/clustering.md#sharding-status).
 
 ```json
 { "operation": "cluster_status" }
@@ -1845,7 +1861,7 @@ Detailed documentation: [Configuration Overview](../configuration/overview.md)
 
 Updates configuration parameters in `harper-config.yaml`. Most changes require a restart (`restart` or `restart_service`) to take effect. See [Set Configuration](../configuration/operations.md#set-configuration) for full-text restart requirements.
 
-Supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply the same change to all cluster nodes in one call; per-node outcomes are returned in the response's `replicated` array. Only send cluster-appropriate parameters when replicating — node-local parameters (ports, `node.hostname`, file paths, TLS material, `replication.hostname`/`url`/`routes`) would overwrite every peer's local values. To apply the change cluster-wide, follow with `restart_service` using `"replicated": true` (which restarts nodes one at a time); `restart_service` restarts only worker threads, though, so changes to [`threads.v8Flags`](../configuration/options.md#applying-v8-flags), `storage.fullText.query.*` or `storage.fullText.runtime.*` take effect only after a `restart` sent to each node in turn (`restart` does not replicate). See [Configuration Operations](../configuration/operations.md#set-configuration) for details.
+Supports `"replicated": true` <VersionBadge version="v5.2.0" /> to apply the same change to all cluster nodes in one call; per-node outcomes are returned in the response's `replicated` array. Only send cluster-appropriate parameters when replicating — node-local parameters (ports, `node.hostname`, file paths, TLS material, `replication.hostname`/`url`/`routes`) would overwrite every peer's local values. To apply the change cluster-wide, follow with `restart_service` using `"replicated": true` (which restarts nodes one at a time); `restart_service` restarts only worker threads, though, so changes to [`threads.v8Flags`](../configuration/options.md#applying-v8-flags), `storage.fullText.query.*`, `storage.fullText.runtime.*`, [`storage.rocks.transactionLogAbortMarkers`](../database/storage-tuning.md#storagerockstransactionlogabortmarkers) or [`storage.rocks.transactionLogWriteIntents`](../database/storage-tuning.md#storagerockstransactionlogwriteintents) take effect only after a `restart` sent to each node in turn (`restart` does not replicate). See [Configuration Operations](../configuration/operations.md#set-configuration) for details.
 
 ```json
 {

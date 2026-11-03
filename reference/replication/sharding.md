@@ -12,21 +12,27 @@ title: Sharding
 
 <VersionBadge type="changed" version="v4.5.0" /> — expanded sharding functionality: Harper now honors write requests with residency information that will not be stored on the local node, and nodes can be declaratively configured as part of a shard.
 
-Harper's replication system supports sharding — storing different data across different subsets of nodes — while still allowing data to be accessed from any node in the cluster. This enables horizontal scalability for storage and write performance, while maintaining optimal data locality and consistency.
+Harper's replication system supports sharding — storing different data across different subsets of nodes. Single-key reads can fetch records from their owners across shards. Sharding distributes storage and write work across nodes.
 
-When sharding is configured, requests for records that don't reside on the handling node are automatically forwarded to the appropriate node transparently. Clients do not need to know where data is stored.
+A key read for a record not held locally can fetch its body from an owner. This does not provide cross-shard query fan-out or write forwarding. With [schema-defined sharding](./residency.md#ownership-reads-and-writes), a non-owner write commits locally and replicates the complete body to its owners through the configured replication routes.
 
 By default (without sharding), Harper replicates all data to all nodes.
 
-## Approaches to Sharding
+## Schema-defined sharding
 
-There are two main approaches:
+In v5.4, [`@sharded`](./residency.md) hashes primary keys to fixed slots on every worker. Slot counts and the installed slot map belong to the database. Attribute-derived policies and custom expressions are refused pending [concurrent-move design (#1178)](https://github.com/HarperFast/harper-pro/issues/1178).
+
+## Older per-record mechanisms
+
+The `setResidency`, `setResidencyById`, `getResidency` and residency-list APIs below retain their names. They are the older mechanism, with two approaches:
 
 **Dynamic sharding** — the location (residency) of records is determined dynamically based on where the record was written, the record's data, or a custom function. Records can be relocated dynamically based on where they are accessed. Residency information is specific to each record.
 
 **Static sharding** — each node is assigned to a specific numbered shard, and each record is replicated to the nodes in that shard based on the primary key, regardless of where the data was written or accessed. More predictable than dynamic sharding: data location is always determinable from the primary key.
 
 ## Dynamic Sharding
+
+The configuration, REST, Operations API and programmatic `replicateTo` examples below control legacy residency. On `@sharded` tables, `replicateTo` does not override the installed map: only the map determines owners. See [ownership, reads, and writes](./residency.md#ownership-reads-and-writes).
 
 ### Replication Count
 
@@ -42,6 +48,8 @@ This ensures each record is stored on three nodes total (the node that first sto
 ### Replication Control via REST Header
 
 With the REST interface, you can specify replication targets and confirmation requirements per request using the `X-Replicate-To` header:
+
+<VersionBadge type="changed" version="v5.4.0" /> — Only a principal with the `super_user` permission can send `X-Replicate-To`. Other callers receive HTTP 403 whenever the header has a value, including on read requests and for values such as `0`, a node list, or `*`. Application code can still set replication options on a trusted context; see [Programmatic Replication Control](#programmatic-replication-control).
 
 ```http
 PUT /MyTable/3
@@ -63,6 +71,8 @@ The `confirm` parameter can be combined with explicit node lists.
 ### Replication Control via Operations API
 
 Specify `replicateTo` and `replicatedConfirmation` in the operation body:
+
+<VersionBadge type="changed" version="v5.4.0" /> — These operation fields require the `super_user` permission. For operations that accept these fields, a non-super-user caller receives HTTP 403 when either field has a non-null value, including `replicateTo: 0` and an empty node list. Application code can still set them; see [Programmatic Replication Control](#programmatic-replication-control).
 
 ```json
 {
@@ -90,18 +100,67 @@ Or specify explicit nodes:
 
 ### Programmatic Replication Control
 
-Set `replicateTo` and `replicatedConfirmation` programmatically in a resource method:
+Set `replicateTo` on the context in a resource method. It applies to the writes made after you set it. Here the application, not the client, decides how widely an order is replicated:
 
 ```javascript
-class MyTable extends tables.MyTable {
+export class Order extends tables.Order {
 	put(record) {
 		const context = this.getContext();
-		context.replicateTo = 2; // or an array of node names
-		context.replicatedConfirmation = 1;
+		context.replicateTo = record.total >= 10000 ? 3 : 1; // or an array of node names
 		return super.put(record);
 	}
 }
 ```
+
+`replicatedConfirmation` is read when a transaction starts. A request's transaction has already started when your resource method runs, so setting `replicatedConfirmation` on its context there has no effect. To wait for peer confirmation from code, pass it in a new context object to [`transaction()`](../database/api.md#transactioncontext-callback). Do not pass the request's context, or a copy of it: it already holds the request's transaction, so `transaction()` joins that transaction and the count is ignored.
+
+```javascript
+import { tables, transaction } from 'harper';
+
+await transaction({ replicatedConfirmation: 1, replicateTo: 2 }, async (txn) => {
+	await tables.Order.put(order, txn);
+});
+```
+
+That transaction commits on its own, separately from any request transaction that is running: if the request fails afterwards, this write stays committed. Set `replicateTo` on the same object when you need both.
+
+Values your code sets on a context apply for every caller, including users without the `super_user` permission. Derive them from application logic, not from request input such as headers, query parameters, or the record body: copying a client-supplied value into `replicateTo` or `replicatedConfirmation` gives that client the control the `super_user` check removes.
+
+On `@sharded` tables, `replicateTo` does not change placement; the database map determines owners. Explicit `replicatedConfirmation` counts acknowledgments from other owners for each affected owner set in the first written database. A local temporary replica cannot satisfy it. See [ownership, reads, and writes](./residency.md#ownership-reads-and-writes).
+
+### Confirmation outcomes
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+LMDB now waits for requested peer confirmation, as RocksDB does. This can add peer latency to existing LMDB applications that use `confirm` or `replicatedConfirmation`. Explicit confirmation still applies only to the first database written by the transaction.
+
+### Confirmation Failure After a Local Commit
+
+<VersionBadge version="v5.4.0" />
+
+A replication confirmation failure can occur after the write has committed locally. When that happens, the rejected commit error and the REST or operations API error body include `replicationUnconfirmed: true` and `retryable: false`. Terminal JSON, NDJSON, and SSE stream error records also carry these fields. Every local database write in that commit's linked transaction has finished committing, but the requested peer confirmation was not obtained. This provides the same local durability as a successful write response; it does not add an fsync guarantee.
+
+For example, a REST error for a confirmation timeout can contain:
+
+```json
+{
+	"type": "error:ServerError",
+	"code": "ServerError",
+	"title": "Timed out after 900000ms waiting for replication confirmation from 2 node(s) for database \"data\" (received 1)",
+	"status": 504,
+	"instance": "/MyTable/3",
+	"replicationUnconfirmed": true,
+	"retryable": false
+}
+```
+
+The existing error status, code, and message remain available. An operations error has its usual `error` field plus `code`, `replicationUnconfirmed: true`, and `retryable: false`. Programmatic errors wrap the original rejection in `cause`; text-only protocol errors use the new `ReplicationConfirmationError` class name. Check this flag before compensating or retrying a non-idempotent write, because replaying the request could repeat an insert or apply an update twice. The flag does not return auto-generated record keys; use client-selected identifiers and apply the application's concurrency controls when you need to inspect the written records after a failed response.
+
+The flag covers writes issued to the reported commit, not later application steps that were never reached after its rejection. If an enclosing scope rolls back its pending writes, its error omits the flag while preserving `retryable: false` because an independent inner write may already have committed.
+
+Pre-commit refusals, including a confirmation count that cannot be met, do not carry this flag. Its absence does not establish that nothing was written: independent database commits can fail partially. A rejected commit ends its transaction scope; start a fresh transaction for subsequent writes.
+
+Confirmation currently applies to the first database a transaction writes to. This outcome flag covers the linked local commits; it does not enable confirmation for later databases.
 
 ## Static Sharding
 
@@ -114,7 +173,29 @@ replication:
   shard: 1
 ```
 
-Or assign shards per route:
+### Complete shard-id set
+
+<VersionBadge version="v5.4.0" />
+
+For the first default map of a new [schema-defined sharding](./residency.md) table, configure `replication.shards` next to `replication.shard`:
+
+```yaml
+replication:
+  shard: 0
+  shards: [0, 1]
+```
+
+`replication.shards` is the complete set of shard IDs available to the deployment: unique integers from `0` through `65535`. Every node uses the same set; order does not matter. Its own `replication.shard` must be in the list.
+
+The list is required only for a database that has declarative tables and no installed slot map. First activation computes the default map solely from the slot count and the sorted list and installs it as a versioned snapshot. Concurrent installers with equal inputs produce the same snapshot and digest. A database converted with a custom map does not need the list.
+
+Once installed, the snapshot is authoritative. Changing the list never recomputes placement. Adding an ID only makes that shard available for future reassignment; it moves no records.
+
+Setup exchanges include a digest of the list. Nodes with different lists refuse declarative writes on both sides, even after a map is installed. A configured list on one peer and no list on another also differs. A node whose own shard is outside its list, or which needs an initial map but has no list, also refuses placement. The condition appears in `cluster_status.sharding` and is logged once. Plan for this write refusal during a rolling list change.
+
+### Other shard configuration
+
+Shards can also be assigned per route:
 
 ```yaml
 replication:
@@ -135,7 +216,7 @@ Or dynamically via the operations API by including `shard` in an `add_node` or `
 }
 ```
 
-Once shards are configured, use `setResidency` or `setResidencyById` (described below) to assign records to specific shards.
+Once shards are configured, use [schema-defined sharding](./residency.md) for a schema policy applied on every thread, or the function APIs below for legacy application-controlled placement.
 
 ## Custom Sharding
 
@@ -189,7 +270,7 @@ MyTable.setResidencyById((id) => {
 
 ## Disabling Cross-Node Access
 
-By default, sharding allows data stored on specific nodes to be accessed from any node — requests are forwarded transparently. To disable this and only return data stored on the local node (including a replica it currently holds), set `replicateFrom` to `false`.
+By default, a key read for a record not stored locally fetches it from a node that holds it. To disable this and only return data stored on the local node (including a replica it currently holds), set `replicateFrom` to `false`.
 
 Via the operations API:
 
@@ -211,5 +292,6 @@ X-Replicate-From: none
 
 ## See Also
 
+- [Schema-defined sharding](./residency.md) — Fixed slot policies and authoritative database maps
 - [Replication Overview](./overview.md) — How Harper's replication system works
 - [Clustering Operations](./clustering.md) — Operations API for managing cluster nodes

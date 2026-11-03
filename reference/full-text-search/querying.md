@@ -91,7 +91,9 @@ Full-text queries cannot provide an exact total after authorization, structured 
 
 The server setting `storage.fullText.query.maxFuzzyDistance` accepts integers from `0` to `2`, defaults to `1`, and caps accepted distances. With a cap of `0`, a fuzzy condition must explicitly set `fuzzyDistance: 0`. Omitting it still defaults to `1` and returns HTTP 400. Distance `2` requires a cap of `2`.
 
-Qualify the selected fuzzy distance and fuzzy-prefix workload against the actual corpus and concurrency before exposing them to callers. See [full-text configuration](../configuration/options.md#storage) for the surrounding request budgets.
+Fuzzy edits apply only to eligible analyzed surface terms: at least four characters, alphabetic content, and no numeric characters, hyphens, underscores or slashes. Other terms receive no fuzzy expansion; fuzzy controls do not override native eligibility or the normal final-term prefix behavior.
+
+Distance two and fuzzy-prefix are preview features. Qualify the selected fuzzy distance and fuzzy-prefix workload against the actual corpus and concurrency before exposing them to callers. See [full-text configuration](../configuration/options.md#storage) for the surrounding request budgets.
 
 ## Query-time relevance controls
 
@@ -280,6 +282,14 @@ For example, `offset: 100` and `limit: 10` skip the first 100 eligible records a
 `storage.fullText.maxRawHitsPerRequest`, `storage.fullText.maxResultsPerRequest` and `storage.fullText.requestBudgetMilliseconds` bound fetched work, retained results and execution time. Replayed or rejected hits consume raw work; a request can exhaust that budget before reaching its result target. The execution budget is not a hard response-time guarantee; reader acquisition and some native work can take additional time. See [storage configuration](../configuration/options.md#storage) for the controls and [REST paging and counts](../rest/querying.md#pagination-and-total-count) for URL syntax and count behavior.
 
 Each offset request runs a new query and revisits earlier matches, so deeper offsets increase fetched work and source reads. Prefer narrower filters and a bounded maximum offset over repeatedly raising budgets. Each query can see changed records, permissions or index contents. Pages can therefore repeat or omit records during concurrent changes. There are no continuation tokens, close operations or retained searches across requests.
+
+## Host query capacity
+
+<VersionBadge version="v5.4.0" />
+
+The default native policy allows 64 analyzed terms per text condition and 256 compiled clauses per query. Operators can configure `storage.fullText.query.maxQueryTerms` (1-1,024) and `storage.fullText.query.maxQueryClauses` (1-4,096), within the loaded native runtime's ceilings. Boolean groups, NOT, field expansion, fuzzy branches and prefix expansion also consume clause capacity. Raising fetched-hit or retained-result budgets does not raise these limits.
+
+The host policy is captured once for the full Harper process, inherited by workers and applied to reader handles, including reopened readers. A full process restart is required; a worker-only restart does not apply changes. Requests cannot raise the policy. Overflow rejects the query rather than executing a truncated one. Query-capacity validation failures return `400` before the response starts. If an operations JSON stream has already started, it instead aborts and may include an error diagnostic; treat an incomplete response as failed and discard its rows. Other depth, byte, phrase/fuzzy construction, queue, response and deadline safeguards continue to apply. Native deadlines are cooperative; they cannot interrupt every construction step immediately. Fuzzy queries still have fixed native limits of 16 eligible terms and 256 construction-work units; distance two costs four times as much construction work per term and field as distance one. Raising term or clause policy does not raise those limits. Raised-policy handles also route non-ASCII text and larger ASCII queries through expensive-search admission, which can increase busy rejections under concurrency. See [storage configuration](../configuration/options.md#storage) and the [native limits](https://github.com/HarperFast/fulltext/blob/v0.9.0/docs/limits.md#query-capacity-policy).
 
 ## REST
 
