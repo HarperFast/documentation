@@ -1,0 +1,228 @@
+#!/usr/bin/env node
+/**
+ * Assembles the current (v5) reference and the open release notes from the repos that own them.
+ *
+ * The reference and release-note docs for code in HarperFast/harper and HarperFast/harper-pro
+ * live in each repo's `docs/` directory, so a code PR carries its own docs. This script builds
+ * the site's content from those trees:
+ *
+ *   <repo>/docs/reference/**                        → reference/** (both repos overlaid; a path
+ *                                                     provided by two repos is an error)
+ *   <repo>/docs/reference/_redirects.json           → client redirects (array of {from, to})
+ *   <repo>/docs/release-notes/<codename>/<minor>/*  → release-notes/<codename>/<minor>.generated.md
+ *
+ * Release notes for a minor are fragments, one per change, so PRs do not conflict on a shared
+ * file. `_index.md` (in exactly one repo) holds the page title, the section order, and the text
+ * above the first section. Every other file is a fragment:
+ *
+ *   ---
+ *   section: Replication      # the `##` heading the fragment goes under
+ *   order: 20                 # optional; ordered fragments come first, then by file name
+ *   ---
+ *
+ *   ### Sharding
+ *   ...
+ *
+ * Sources:
+ *   HARPER_DOCS_PATH / HARPER_PRO_DOCS_PATH  a local checkout to read instead of fetching
+ *                                            (code-repo CI overlays the PR this way)
+ *   HARPER_DOCS_REF / HARPER_PRO_DOCS_REF    the git ref to fetch (default: main)
+ *
+ * Usage:
+ *   node scripts/assemble-content.mjs           assemble once (predev/prebuild)
+ *   node scripts/assemble-content.mjs --watch   re-assemble when a local source changes, reusing the
+ *                                               fetched checkouts (npm run dev runs it beside the server)
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import yaml from 'js-yaml';
+
+const siteRoot = path.join(import.meta.dirname, '..');
+const cacheDir = path.join(siteRoot, '.content');
+const manifestPath = path.join(cacheDir, 'manifest.json');
+
+const sources = [
+	{ repo: 'harper', pathEnv: 'HARPER_DOCS_PATH', refEnv: 'HARPER_DOCS_REF' },
+	{ repo: 'harper-pro', pathEnv: 'HARPER_PRO_DOCS_PATH', refEnv: 'HARPER_PRO_DOCS_REF' },
+];
+
+function git(cwd, ...args) {
+	return execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'inherit'] })
+		.toString()
+		.trim();
+}
+
+function resolveSource({ repo, pathEnv, refEnv }, fetch) {
+	const local = process.env[pathEnv];
+	if (local) {
+		const root = path.resolve(local);
+		const docsDir = path.join(root, 'docs');
+		if (!fs.existsSync(docsDir)) throw new Error(`${pathEnv}=${local} has no docs/ directory`);
+		return { repo, ref: null, docsDir, local: true };
+	}
+	const ref = process.env[refEnv] || 'main';
+	const checkout = path.join(cacheDir, repo);
+	if (!fetch) return { repo, ref, docsDir: path.join(checkout, 'docs'), local: false };
+	if (!fs.existsSync(path.join(checkout, '.git'))) {
+		fs.mkdirSync(checkout, { recursive: true });
+		git(checkout, 'init', '--quiet');
+		git(checkout, 'remote', 'add', 'origin', `https://github.com/HarperFast/${repo}.git`);
+		git(checkout, 'sparse-checkout', 'set', '--no-cone', '/docs/');
+	}
+	git(checkout, 'fetch', '--quiet', '--depth', '1', '--filter=blob:none', 'origin', ref);
+	git(checkout, 'checkout', '--quiet', '--force', 'FETCH_HEAD');
+	if (!fs.existsSync(path.join(checkout, 'docs'))) throw new Error(`${repo}@${ref} has no docs/ directory`);
+	const sha = git(checkout, 'rev-parse', 'HEAD');
+	const docsTree = git(checkout, 'rev-parse', 'HEAD:docs');
+	console.log(`Fetched ${repo}@${ref} (${sha.slice(0, 10)})`);
+	return { repo, ref, sha, docsTree, docsDir: path.join(checkout, 'docs'), local: false };
+}
+
+function walk(dir, base = dir) {
+	if (!fs.existsSync(dir)) return [];
+	return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		const full = path.join(dir, entry.name);
+		return entry.isDirectory() ? walk(full, base) : [path.relative(base, full)];
+	});
+}
+
+function splitFrontMatter(file) {
+	const text = fs.readFileSync(file, 'utf8');
+	const match = text.match(/^---\n([\s\S]*?)\n---\n?/);
+	if (!match) return { data: {}, body: text };
+	return { data: yaml.load(match[1]) ?? {}, body: text.slice(match[0].length) };
+}
+
+// Writes only what changed and removes what is gone, so a watching dev server reloads only the
+// pages that were edited.
+function syncFiles(outDir, files, isOwned) {
+	for (const [rel, content] of files) {
+		const out = path.join(outDir, rel);
+		if (fs.existsSync(out) && fs.readFileSync(out).equals(content)) continue;
+		fs.mkdirSync(path.dirname(out), { recursive: true });
+		fs.writeFileSync(out, content);
+	}
+	for (const rel of walk(outDir)) {
+		if (isOwned(rel) && !files.has(rel)) fs.rmSync(path.join(outDir, rel));
+	}
+}
+
+function assembleReference(resolved, manifest) {
+	const files = new Map();
+	const owners = new Map();
+	const redirects = [];
+	for (const source of resolved) {
+		const srcDir = path.join(source.docsDir, 'reference');
+		for (const rel of walk(srcDir)) {
+			if (rel === '_redirects.json') {
+				redirects.push(...JSON.parse(fs.readFileSync(path.join(srcDir, rel), 'utf8')));
+				continue;
+			}
+			if (owners.has(rel)) {
+				throw new Error(`reference/${rel} is provided by both ${owners.get(rel)} and ${source.repo}`);
+			}
+			owners.set(rel, source.repo);
+			files.set(rel, fs.readFileSync(path.join(srcDir, rel)));
+			manifest.reference[rel] = { repo: source.repo };
+		}
+	}
+	if (owners.size === 0) throw new Error('no reference content found in any source');
+	syncFiles(path.join(siteRoot, 'reference'), files, () => true);
+	manifest.redirects = redirects;
+}
+
+function assembleReleaseNotes(resolved, manifest) {
+	const outRoot = path.join(siteRoot, 'release-notes');
+	const files = new Map();
+	// `${codename}/${minor}` → { index, fragments }
+	const minors = new Map();
+	for (const source of resolved) {
+		const srcRoot = path.join(source.docsDir, 'release-notes');
+		for (const rel of walk(srcRoot)) {
+			const parts = rel.split(path.sep);
+			if (parts.length !== 3 || !rel.endsWith('.md')) {
+				throw new Error(`unexpected release-notes file ${source.repo}/docs/release-notes/${rel}`);
+			}
+			const key = `${parts[0]}/${parts[1]}`;
+			if (!minors.has(key)) minors.set(key, { index: null, fragments: [] });
+			const minor = minors.get(key);
+			const entry = { ...splitFrontMatter(path.join(srcRoot, rel)), name: parts[2], source };
+			if (parts[2] === '_index.md') {
+				if (minor.index) {
+					throw new Error(`${key}/_index.md is provided by both ${minor.index.source.repo} and ${source.repo}`);
+				}
+				minor.index = entry;
+			} else {
+				if (!entry.data.section) throw new Error(`${source.repo}/docs/release-notes/${rel} has no section`);
+				minor.fragments.push(entry);
+			}
+		}
+	}
+	for (const [key, { index, fragments }] of minors) {
+		if (!index) throw new Error(`release notes ${key} have fragments but no _index.md`);
+		const [codename, minorVersion] = key.split('/');
+		const committed = path.join(outRoot, codename, `${minorVersion}.md`);
+		if (fs.existsSync(committed)) {
+			throw new Error(`release-notes/${codename}/${minorVersion}.md is committed here and also assembled`);
+		}
+		const listed = index.data.sections ?? [];
+		const bySection = Map.groupBy(fragments, (f) => f.data.section);
+		const unlisted = [...bySection.keys()].filter((s) => !listed.includes(s)).sort();
+		const byOrder = (a, b) => (a.data.order ?? Infinity) - (b.data.order ?? Infinity) || a.name.localeCompare(b.name);
+		const sections = [...listed, ...unlisted]
+			.filter((section) => bySection.has(section))
+			.map((section) => {
+				const bodies = bySection
+					.get(section)
+					.sort(byOrder)
+					.map((f) => f.body.trim());
+				return `## ${section}\n\n${bodies.join('\n\n')}`;
+			});
+		const pageData = { ...index.data, id: minorVersion };
+		delete pageData.sections;
+		const frontMatter = yaml.dump(pageData);
+		const page = `---\n${frontMatter}---\n\n${index.body.trim()}\n\n${sections.join('\n\n')}\n`;
+		files.set(path.join(codename, `${minorVersion}.generated.md`), Buffer.from(page));
+		manifest.releaseNotes[`${codename}/${minorVersion}`] = { repo: index.source.repo };
+	}
+	syncFiles(outRoot, files, (rel) => rel.endsWith('.generated.md'));
+}
+
+function assemble(resolved) {
+	const manifest = { reference: {}, releaseNotes: {}, redirects: [] };
+	assembleReference(resolved, manifest);
+	assembleReleaseNotes(resolved, manifest);
+	fs.mkdirSync(path.join(cacheDir, 'public'), { recursive: true });
+	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t') + '\n');
+	// Published with the site; the deploy workflow redeploys when a repo's docs/ tree differs from this.
+	const published = Object.fromEntries(
+		resolved.map(({ repo, ref, sha, docsTree }) => [repo, { ref, sha: sha ?? null, docsTree: docsTree ?? null }])
+	);
+	fs.writeFileSync(path.join(cacheDir, 'public', 'content-sources.json'), JSON.stringify(published) + '\n');
+	console.log(
+		`Assembled ${Object.keys(manifest.reference).length} reference files and ${Object.keys(manifest.releaseNotes).length} release-note pages`
+	);
+}
+
+const watch = process.argv.includes('--watch');
+const resolved = sources.map((source) => resolveSource(source, !watch));
+if (!watch) {
+	assemble(resolved);
+} else {
+	let timer;
+	for (const { docsDir } of resolved.filter((source) => source.local)) {
+		fs.watch(docsDir, { recursive: true }, () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				try {
+					assemble(resolved);
+				} catch (error) {
+					console.error(error.message);
+				}
+			}, 200);
+		});
+		console.log(`Watching ${docsDir}`);
+	}
+}

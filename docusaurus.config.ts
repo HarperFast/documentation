@@ -1,6 +1,7 @@
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import { readFileSync } from 'node:fs';
 import { redirects, createRedirects } from './redirects';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -29,6 +30,11 @@ const url = process.env.DOCUSAURUS_URL || 'https://docs.harper.fast';
 // Always log configuration at build time
 console.log('Docusaurus URL config:', { url, baseUrl, routeBasePath });
 
+// Written by scripts/assemble-content.mjs (the prebuild/predev step): which repo each assembled
+// reference page and release-notes page came from, and the redirects those repos declare.
+const content = JSON.parse(readFileSync('.content/manifest.json', 'utf8'));
+const contentEditUrl = (repo: string, path: string) => `https://github.com/HarperFast/${repo}/blob/main/docs/${path}`;
+
 const config: Config = {
 	title: 'Harper Docs',
 	tagline:
@@ -47,7 +53,9 @@ const config: Config = {
 	// Remove trailing slashes - GitHub Pages handles this fine and makes relative paths intuitive
 	trailingSlash: false,
 
-	staticDirectories: ['static'],
+	// .content/public holds content-sources.json, which the deploy workflow compares to decide
+	// whether harper or harper-pro docs changed since the last deploy.
+	staticDirectories: ['static', '.content/public'],
 
 	// GitHub pages deployment config.
 	// If you aren't using GitHub pages, you don't need these.
@@ -88,9 +96,8 @@ const config: Config = {
 					// For current docs: versionDocsDirPath is 'reference'
 					if (versionDocsDirPath.startsWith('reference_versioned_docs')) {
 						return `https://github.com/HarperFast/documentation/blob/main/${versionDocsDirPath}/${docPath}`;
-					} else {
-						return `https://github.com/HarperFast/documentation/blob/main/reference/${docPath}`;
 					}
+					return contentEditUrl(content.reference[docPath].repo, `reference/${docPath}`);
 				},
 				lastVersion: 'current',
 				includeCurrentVersion: false,
@@ -111,7 +118,13 @@ const config: Config = {
 				path: 'release-notes',
 				routeBasePath: 'release-notes',
 				sidebarPath: './sidebarsReleaseNotes.ts',
-				editUrl: 'https://github.com/HarperFast/documentation/blob/main/',
+				editUrl: ({ docPath }) => {
+					const assembled = content.releaseNotes[docPath.replace(/\.generated\.md$/, '')];
+					if (assembled) {
+						return contentEditUrl(assembled.repo, `release-notes/${docPath.replace(/\.generated\.md$/, '/_index.md')}`);
+					}
+					return `https://github.com/HarperFast/documentation/blob/main/release-notes/${docPath}`;
+				},
 				// Sort by semantic version and filter out index files from sidebar
 				async sidebarItemsGenerator({ defaultSidebarItemsGenerator, ...args }) {
 					const sidebarItems = await defaultSidebarItemsGenerator(args);
@@ -167,7 +180,7 @@ const config: Config = {
 		[
 			'@docusaurus/plugin-client-redirects',
 			{
-				redirects,
+				redirects: [...redirects, ...content.redirects],
 				createRedirects,
 			},
 		],
