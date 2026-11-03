@@ -2257,7 +2257,7 @@ Returns the agent configuration in effect: the startup-only keys as resolved at 
 }
 ```
 
-A `tools` value reflects what the agent resolved, so a malformed setting shows as the groups it turned off.
+A `tools` value reflects what the agent resolved, so a malformed setting shows as the groups it turned off. `provider`, `model`, `componentsScope`, `configScope`, `maxSessionTokens`, `maxCostUsd` and `systemPromptAppend` appear only when they are set.
 
 ### MCP access
 
