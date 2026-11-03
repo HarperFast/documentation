@@ -274,7 +274,7 @@ See [`deploy_component` credentials](../operations-api/operations.md#deploy-cred
 
 <VersionBadge version="v5.4.0" />
 
-`harper deploy setup=true provider=github-actions` sets a cluster up so a GitHub Actions workflow can deploy with its [OIDC identity token](./authentication.md#workload-identity-oidc) instead of a stored credential. Run it once, signed in to the cluster as a `super_user` (`harper login`), from the project's checkout:
+`harper deploy setup=true provider=github-actions` sets a cluster up so a GitHub Actions workflow can deploy with its [OIDC identity token](./authentication.md#workload-identity-oidc) instead of a stored credential. Run it once, signed in to the cluster as a `super_user` (`harper login`), from the project's checkout. Remove any `HARPER_CLI_TARGET` line from that checkout's `.env` first; see [Project `.env` files](./authentication.md#project-env-files):
 
 ```bash
 harper deploy setup=true provider=github-actions project=my-app
@@ -312,7 +312,7 @@ A preview of the application `my-app` for PR `42` is the [isolated application](
 
 #### `harper preview setup`
 
-Enables previews of one application on the cluster, and sets up the GitHub side. Run it once, signed in to the cluster as a `super_user` (`harper login`), from a checkout of the application's repository:
+Enables previews of one application on the cluster, and sets up the GitHub side. Run it once, signed in to the cluster as a `super_user` (`harper login`), from a checkout of the application's repository. Remove any `HARPER_CLI_TARGET` line from that checkout's `.env` first; see [Project `.env` files](./authentication.md#project-env-files):
 
 ```bash
 harper preview setup app=my-app target=https://my-cluster.example.com:9925
