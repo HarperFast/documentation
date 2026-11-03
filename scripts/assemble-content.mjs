@@ -91,7 +91,7 @@ function walk(dir, prefix = '') {
 }
 
 function splitFrontMatter(file) {
-	const text = fs.readFileSync(file, 'utf8');
+	const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 	const match = text.match(/^---\n([\s\S]*?)\n---\n?/);
 	if (!match) return { data: {}, body: text };
 	return { data: yaml.load(match[1]) ?? {}, body: text.slice(match[0].length) };
@@ -131,8 +131,8 @@ function assembleReference(resolved, manifest) {
 		}
 	}
 	if (owners.size === 0) throw new Error('no reference content found in any source');
-	syncFiles(path.join(siteRoot, 'reference'), files, () => true);
 	manifest.redirects = redirects;
+	return files;
 }
 
 function assembleReleaseNotes(resolved, manifest) {
@@ -188,13 +188,17 @@ function assembleReleaseNotes(resolved, manifest) {
 		files.set(path.join(codename, `${minorVersion}.generated.md`), Buffer.from(page));
 		manifest.releaseNotes[`${codename}/${minorVersion}`] = { repo: index.source.repo };
 	}
-	syncFiles(outRoot, files, (rel) => rel.endsWith('.generated.md'));
+	return files;
 }
 
 function assemble(resolved) {
 	const manifest = { reference: {}, releaseNotes: {}, redirects: [] };
-	assembleReference(resolved, manifest);
-	assembleReleaseNotes(resolved, manifest);
+	// Both are built before either is written, so a failure leaves the last assembly intact and
+	// consistent with its manifest.
+	const reference = assembleReference(resolved, manifest);
+	const releaseNotes = assembleReleaseNotes(resolved, manifest);
+	syncFiles(path.join(siteRoot, 'reference'), reference, () => true);
+	syncFiles(path.join(siteRoot, 'release-notes'), releaseNotes, (rel) => rel.endsWith('.generated.md'));
 	fs.mkdirSync(path.join(cacheDir, 'public'), { recursive: true });
 	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t') + '\n');
 	// Published with the site; the deploy workflow redeploys when a repo's docs/ tree differs from this.
@@ -224,7 +228,7 @@ if (!watch) {
 } else {
 	let timer;
 	for (const { docsDir } of resolved.filter((source) => source.local)) {
-		fs.watch(docsDir, { recursive: true }, () => {
+		const watcher = fs.watch(docsDir, { recursive: true }, () => {
 			clearTimeout(timer);
 			timer = setTimeout(() => {
 				try {
@@ -235,6 +239,7 @@ if (!watch) {
 				}
 			}, 200);
 		});
+		watcher.on('error', (error) => console.error(`Stopped watching ${docsDir}: ${error.message}`));
 		console.log(`Watching ${docsDir}`);
 	}
 	const server = spawn('docusaurus', ['start', ...process.argv.slice(process.argv.indexOf('--watch') + 1)], {
