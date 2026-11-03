@@ -1,15 +1,19 @@
 name: Content Check
 
 # The v5 reference and the open release notes are assembled from docs/ in HarperFast/harper and
-# HarperFast/harper-pro (scripts/assemble-content.mjs) at their latest release, and neither a
-# merge nor a release there can trigger this repo's workflows. This redeploys both sites when the
-# docs/ trees the script would assemble now differ from the ones the live site was built from
-# (/content-sources.json). A separate workflow, so checks that find nothing to do never join the
-# deploy concurrency groups.
+# HarperFast/harper-pro (scripts/assemble-content.mjs) at harper-pro's latest published release.
+# This redeploys both sites when the docs/ trees the script would assemble now differ from the ones
+# the live site was built from (/content-sources.json). A separate workflow, so checks that find
+# nothing to do never join the deploy concurrency groups.
+#
+# harper-pro dispatches docs-source-changed when it publishes a release or pushes a docs/ tag
+# (publish-docs.yaml there); the schedule catches a dispatch that failed.
 
 on:
+  repository_dispatch:
+    types: [docs-source-changed]
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions:

@@ -26,10 +26,13 @@
  * Sources:
  *   HARPER_DOCS_PATH / HARPER_PRO_DOCS_PATH  a local checkout to read instead of fetching
  *                                            (code-repo CI overlays the PR this way)
- *   HARPER_DOCS_REF / HARPER_PRO_DOCS_REF    the git ref to fetch (default: the latest release)
+ *   HARPER_DOCS_REF / HARPER_PRO_DOCS_REF    the git ref to fetch
  *
- * The site publishes the latest stable release (the highest vX.Y.Z tag of harper-pro; harper
- * carries the same tag), so docs merged with unreleased code appear when that code ships.
+ * By default the site publishes harper-pro's latest published stable release, or the highest
+ * docs/<release>-<n> tag of it (a docs correction between releases), so docs merged with
+ * unreleased code appear when that code ships. harper's docs come from the commit harper-pro's
+ * core submodule points to, the harper that harper-pro was built from; with a local harper-pro
+ * checkout, from its core/ when that is checked out.
  *
  * Usage:
  *   node scripts/assemble-content.mjs           assemble once (predev/prebuild)
@@ -48,15 +51,14 @@ const siteRoot = path.join(import.meta.dirname, '..');
 const cacheDir = path.join(siteRoot, '.content');
 const manifestPath = path.join(cacheDir, 'manifest.json');
 
-const sources = [
-	{ repo: 'harper', pathEnv: 'HARPER_DOCS_PATH', refEnv: 'HARPER_DOCS_REF' },
-	{ repo: 'harper-pro', pathEnv: 'HARPER_PRO_DOCS_PATH', refEnv: 'HARPER_PRO_DOCS_REF' },
-];
-
 function git(cwd, ...args) {
 	return execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'inherit'] })
 		.toString()
 		.trim();
+}
+
+function missing(message) {
+	throw new Error(message);
 }
 
 function fetchDocs(repo, ref) {
@@ -76,33 +78,77 @@ function fetchDocs(repo, ref) {
 	return { repo, ref, sha, docsTree, docsDir: path.join(checkout, 'docs'), local: false };
 }
 
-function latestRelease() {
-	const versions = git(siteRoot, 'ls-remote', '--tags', '--refs', 'https://github.com/HarperFast/harper-pro.git', 'v*')
-		.split('\n')
-		.map((line) => line.match(/refs\/tags\/(v(\d+)\.(\d+)\.(\d+))$/))
+async function latestRelease() {
+	const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+	const response = await fetch('https://api.github.com/repos/HarperFast/harper-pro/releases?per_page=100', {
+		headers: token ? { authorization: `Bearer ${token}` } : {},
+	});
+	if (!response.ok) {
+		throw new Error(`Listing HarperFast/harper-pro releases failed: ${response.status} ${await response.text()}`);
+	}
+	// A release's tag is pushed before the release is approved, so the tags alone would publish an
+	// unapproved release.
+	const versions = (await response.json())
+		.filter((release) => !release.draft && !release.prerelease)
+		.map((release) => release.tag_name.match(/^v(\d+)\.(\d+)\.(\d+)$/))
 		.filter(Boolean)
-		.sort((a, b) => b[2] - a[2] || b[3] - a[3] || b[4] - a[4]);
-	if (versions.length === 0) throw new Error('HarperFast/harper-pro has no release tags');
-	const release = versions[0][1];
-	// Releases cut before docs/ moved into the code repos have none to publish.
-	if (fetchDocs('harper-pro', release)) return release;
-	console.error(`${release} predates docs/ in the code repos; publishing main until a release carries it`);
-	return 'main';
+		.sort((a, b) => b[1] - a[1] || b[2] - a[2] || b[3] - a[3]);
+	if (versions.length === 0) throw new Error('HarperFast/harper-pro has no published releases');
+	const release = versions[0][0];
+	const patch = new RegExp(`^refs/tags/(docs/${release.replaceAll('.', '\\.')}-(\\d+))$`);
+	const patches = git(
+		siteRoot,
+		'ls-remote',
+		'--tags',
+		'--refs',
+		'https://github.com/HarperFast/harper-pro.git',
+		`docs/${release}-*`
+	)
+		.split('\n')
+		.map((line) => line.split('\t')[1]?.match(patch))
+		.filter(Boolean)
+		.sort((a, b) => b[2] - a[2]);
+	return patches[0]?.[1] ?? release;
 }
 
-function resolveSource({ repo, pathEnv, refEnv }, fetch, release) {
-	const local = process.env[pathEnv];
+function localSource(repo, root) {
+	const docsDir = path.join(root, 'docs');
+	return fs.existsSync(docsDir) ? { repo, ref: null, root, docsDir, local: true } : null;
+}
+
+// Watch mode reuses the last fetched checkout rather than fetching again.
+function cachedSource(repo) {
+	return { repo, ref: null, docsDir: path.join(cacheDir, repo, 'docs'), local: false };
+}
+
+async function resolvePro(fetch) {
+	const local = process.env.HARPER_PRO_DOCS_PATH;
 	if (local) {
-		const root = path.resolve(local);
-		const docsDir = path.join(root, 'docs');
-		if (!fs.existsSync(docsDir)) throw new Error(`${pathEnv}=${local} has no docs/ directory`);
-		return { repo, ref: null, docsDir, local: true };
+		return (
+			localSource('harper-pro', path.resolve(local)) ?? missing(`HARPER_PRO_DOCS_PATH=${local} has no docs/ directory`)
+		);
 	}
-	if (!fetch) return { repo, ref: null, docsDir: path.join(cacheDir, repo, 'docs'), local: false };
-	const ref = process.env[refEnv] || release();
-	const source = fetchDocs(repo, ref);
-	if (!source) throw new Error(`${repo}@${ref} has no docs/ directory`);
-	return source;
+	if (!fetch) return cachedSource('harper-pro');
+	const explicit = process.env.HARPER_PRO_DOCS_REF;
+	const ref = explicit || (await latestRelease());
+	const source = fetchDocs('harper-pro', ref);
+	if (source || explicit) return source ?? missing(`harper-pro@${ref} has no docs/ directory`);
+	// Releases cut before docs/ moved into the code repos have none to publish.
+	console.error(`${ref} predates docs/ in the code repos; publishing main until a release carries it`);
+	return fetchDocs('harper-pro', 'main') ?? missing('harper-pro@main has no docs/ directory');
+}
+
+function resolveHarper(pro, fetch) {
+	const local = process.env.HARPER_DOCS_PATH;
+	if (local) {
+		return localSource('harper', path.resolve(local)) ?? missing(`HARPER_DOCS_PATH=${local} has no docs/ directory`);
+	}
+	const explicit = process.env.HARPER_DOCS_REF;
+	const core = !explicit && pro.local && localSource('harper', path.join(pro.root, 'core'));
+	if (core) return core;
+	if (!fetch) return cachedSource('harper');
+	const ref = explicit || git(pro.local ? pro.root : path.join(cacheDir, 'harper-pro'), 'rev-parse', 'HEAD:core');
+	return fetchDocs('harper', ref) ?? missing(`harper@${ref} has no docs/ directory`);
 }
 
 // Relative paths use `/` on every platform: they are doc ids and URLs as well as file paths.
@@ -253,9 +299,8 @@ if (tracked) {
 }
 
 const watch = process.argv.includes('--watch');
-let release;
-const releaseOnce = () => (release ??= latestRelease());
-const resolved = sources.map((source) => resolveSource(source, !watch, releaseOnce));
+const pro = await resolvePro(!watch);
+const resolved = [resolveHarper(pro, !watch), pro];
 if (process.argv.includes('--sources')) {
 	console.log(JSON.stringify(publishedSources(resolved)));
 } else if (!watch) {

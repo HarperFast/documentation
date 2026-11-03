@@ -135,15 +135,15 @@ Fabric is non-versioned. It documents the managed cloud platform independently o
 
 The v5 reference and the open minor's release notes are written in the code repos, next to the code they describe: `docs/` in [HarperFast/harper](https://github.com/HarperFast/harper/tree/main/docs) and [HarperFast/harper-pro](https://github.com/HarperFast/harper-pro/tree/main/docs). [`scripts/assemble-content.mjs`](scripts/assemble-content.mjs) builds `reference/` and `release-notes/<codename>/<minor>.generated.md` from them before every build (both are git-ignored here). The section structure, version annotations and writing conventions are in [harper's docs/README.md](https://github.com/HarperFast/harper/blob/main/docs/README.md).
 
-The site publishes the latest stable release: the highest `vX.Y.Z` tag of harper-pro, and the same tag of harper. Docs merged with unreleased code appear when that code ships; a correction to the published docs appears with the next patch release (milestone the PR to the latest release line, so it is cherry-picked there). The site shows only the latest release, so corrections that land only on older release lines do not publish. Until a release contains `docs/`, the site publishes `main`.
+The site publishes harper-pro's latest published stable release (a release whose tag is pushed but which is still a draft does not count), with harper's docs from the commit harper-pro's `core` submodule points to there: the harper that release was built from. Docs merged with unreleased code appear when that code ships; a correction to the published docs appears with the next patch release (milestone the PR to the latest release line, so it is cherry-picked there), or sooner from a `docs/<release>-<n>` tag in harper-pro, which the site publishes in place of the release until the next release ([how to tag one](https://github.com/HarperFast/harper/blob/main/docs/README.md#when-docs-publish)). The site shows only the latest release, so corrections that land only on older release lines do not publish. Until a release contains `docs/`, the site publishes `main`.
 
-To preview a local checkout, point the build at it; a repo without a path is fetched at the latest release, or at the ref in `HARPER_DOCS_REF` / `HARPER_PRO_DOCS_REF`:
+To preview a local checkout, point the build at it. A harper-pro without a path is fetched at what the site publishes, or at the ref in `HARPER_PRO_DOCS_REF`; a harper without one comes from harper-pro's `core` (its `core/` checkout, when harper-pro is local), or from the ref in `HARPER_DOCS_REF`:
 
 ```bash
 HARPER_DOCS_PATH=../harper HARPER_PRO_DOCS_PATH=../harper-pro npm run dev
 ```
 
-The content-check workflow runs every 15 minutes: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it redeploys both sites.
+The content-check workflow runs when harper-pro publishes a release or pushes a `docs/` tag (a `docs-source-changed` repository dispatch from its `publish-docs.yaml`), and hourly in case a dispatch failed: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it redeploys both sites.
 
 ## Redirects
 

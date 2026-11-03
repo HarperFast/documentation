@@ -8,7 +8,7 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 - Use `npm run dev` to start the local development server (runs `prebuild` automatically).
 - Use `npm run build` to produce a production build (also runs `prebuild` automatically).
 - Do not edit files in `build/`; it is compiled output.
-- `scripts/prebuild.js` and `scripts/assemble-content.mjs` must run before the dev server or build — they are wired into the `predev`/`prebuild`/`prestart` hooks, so calling `npm run dev` or `npm run build` is sufficient. The assembler fetches `docs/` from the latest release of harper and harper-pro (`main` until a release contains `docs/`); set `HARPER_DOCS_PATH` / `HARPER_PRO_DOCS_PATH` to build against local checkouts (`npm run dev` then reloads on edits there).
+- `scripts/prebuild.js` and `scripts/assemble-content.mjs` must run before the dev server or build — they are wired into the `predev`/`prebuild`/`prestart` hooks, so calling `npm run dev` or `npm run build` is sufficient. The assembler fetches harper-pro's `docs/` at its latest published release or a later `docs/<release>-<n>` tag of it (`main` until a release contains `docs/`), and harper's at the commit harper-pro's `core` submodule points to there; set `HARPER_DOCS_PATH` / `HARPER_PRO_DOCS_PATH` to build against local checkouts (`npm run dev` then reloads on edits there).
 
 ## Code Style
 

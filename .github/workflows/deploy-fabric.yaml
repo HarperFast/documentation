@@ -59,6 +59,8 @@ jobs:
       # instance's root path, unlike PR previews which live under /pr-<n>.
       - name: Build Docusaurus site
         env:
+          # The assembler lists HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          GH_TOKEN: ${{ github.token }}
           DOCUSAURUS_ROUTE_BASE_PATH: ${{ vars.DOCUSAURUS_ROUTE_BASE_PATH }}
           DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
           ALGOLIA_APP_ID: ${{ secrets.ALGOLIA_APP_ID }}
