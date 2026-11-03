@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Docusaurus site
         env:
-          # The assembler lists HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
           GH_TOKEN: ${{ github.token }}
           DOCUSAURUS_ROUTE_BASE_PATH: ${{ vars.DOCUSAURUS_ROUTE_BASE_PATH }}
           DOCUSAURUS_BASE_URL: ${{ vars.DOCUSAURUS_BASE_URL }}

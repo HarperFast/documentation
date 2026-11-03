@@ -16,6 +16,10 @@ on:
     - cron: '7 * * * *'
   workflow_dispatch:
 
+# A dispatch and the schedule can arrive together; the second run then sees the first one's deploy.
+concurrency:
+  group: content-check
+
 permissions:
   actions: write
   contents: read

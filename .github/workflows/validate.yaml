@@ -47,6 +47,6 @@ jobs:
         run: npm ci
       - name: Run ${{ matrix.check }}
         env:
-          # The assembler lists HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
           GH_TOKEN: ${{ github.token }}
         run: npm run ${{ matrix.command }}

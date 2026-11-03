@@ -79,36 +79,36 @@ function fetchDocs(repo, ref) {
 }
 
 async function latestRelease() {
-	const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-	const response = await fetch('https://api.github.com/repos/HarperFast/harper-pro/releases?per_page=100', {
-		headers: token ? { authorization: `Bearer ${token}` } : {},
-	});
-	if (!response.ok) {
-		throw new Error(`Listing HarperFast/harper-pro releases failed: ${response.status} ${await response.text()}`);
-	}
-	// A release's tag is pushed before the release is approved, so the tags alone would publish an
-	// unapproved release.
-	const versions = (await response.json())
-		.filter((release) => !release.draft && !release.prerelease)
-		.map((release) => release.tag_name.match(/^v(\d+)\.(\d+)\.(\d+)$/))
+	const tags = git(siteRoot, 'ls-remote', '--tags', '--refs', 'https://github.com/HarperFast/harper-pro.git', 'v*')
+		.split('\n')
+		.map((line) => line.split('\t')[1]?.slice('refs/tags/'.length))
+		.filter(Boolean);
+	const versions = tags
+		.map((tag) => tag.match(/^v(\d+)\.(\d+)\.(\d+)$/))
 		.filter(Boolean)
 		.sort((a, b) => b[1] - a[1] || b[2] - a[2] || b[3] - a[3]);
-	if (versions.length === 0) throw new Error('HarperFast/harper-pro has no published releases');
-	const release = versions[0][0];
-	const patch = new RegExp(`^refs/tags/(docs/${release.replaceAll('.', '\\.')}-(\\d+))$`);
-	const patches = git(
-		siteRoot,
-		'ls-remote',
-		'--tags',
-		'--refs',
-		'https://github.com/HarperFast/harper-pro.git',
-		`docs/${release}-*`
-	)
-		.split('\n')
-		.map((line) => line.split('\t')[1]?.match(patch))
-		.filter(Boolean)
-		.sort((a, b) => b[2] - a[2]);
-	return patches[0]?.[1] ?? release;
+	const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+	for (const [release] of versions) {
+		const response = await fetch(`https://api.github.com/repos/HarperFast/harper-pro/releases/tags/${release}`, {
+			headers: token ? { authorization: `Bearer ${token}` } : {},
+		});
+		// A release's tag is pushed before the release is approved; until then it has no published
+		// release here.
+		if (response.status === 404) continue;
+		if (!response.ok) {
+			throw new Error(
+				`Reading the HarperFast/harper-pro ${release} release failed: ${response.status} ${await response.text()}`
+			);
+		}
+		if ((await response.json()).draft) continue;
+		const pattern = new RegExp(`^docs/${release.replaceAll('.', '\\.')}-(\\d+)$`);
+		const patches = tags
+			.map((tag) => tag.match(pattern))
+			.filter(Boolean)
+			.sort((a, b) => b[1] - a[1]);
+		return { release, ref: patches[0]?.[0] ?? release };
+	}
+	throw new Error('HarperFast/harper-pro has no published releases');
 }
 
 function localSource(repo, root) {
@@ -130,11 +130,13 @@ async function resolvePro(fetch) {
 	}
 	if (!fetch) return cachedSource('harper-pro');
 	const explicit = process.env.HARPER_PRO_DOCS_REF;
-	const ref = explicit || (await latestRelease());
+	if (explicit) return fetchDocs('harper-pro', explicit) ?? missing(`harper-pro@${explicit} has no docs/ directory`);
+	const { release, ref } = await latestRelease();
 	const source = fetchDocs('harper-pro', ref);
-	if (source || explicit) return source ?? missing(`harper-pro@${ref} has no docs/ directory`);
+	if (source) return source;
+	if (ref !== release) throw new Error(`harper-pro@${ref} has no docs/ directory`);
 	// Releases cut before docs/ moved into the code repos have none to publish.
-	console.error(`${ref} predates docs/ in the code repos; publishing main until a release carries it`);
+	console.error(`${release} predates docs/ in the code repos; publishing main until a release carries it`);
 	return fetchDocs('harper-pro', 'main') ?? missing('harper-pro@main has no docs/ directory');
 }
 
@@ -147,7 +149,10 @@ function resolveHarper(pro, fetch) {
 	const core = !explicit && pro.local && localSource('harper', path.join(pro.root, 'core'));
 	if (core) return core;
 	if (!fetch) return cachedSource('harper');
-	const ref = explicit || git(pro.local ? pro.root : path.join(cacheDir, 'harper-pro'), 'rev-parse', 'HEAD:core');
+	const ref =
+		explicit ||
+		git(pro.local ? pro.root : path.join(cacheDir, 'harper-pro'), 'ls-tree', 'HEAD', 'core').split(/\s/)[2] ||
+		missing(`harper-pro@${pro.ref ?? 'HEAD'} has no core submodule`);
 	return fetchDocs('harper', ref) ?? missing(`harper@${ref} has no docs/ directory`);
 }
 

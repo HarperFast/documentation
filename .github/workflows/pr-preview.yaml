@@ -65,8 +65,6 @@ jobs:
 
       - name: Build Docusaurus site
         env:
-          # The assembler lists HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
-          GH_TOKEN: ${{ github.token }}
           DOCUSAURUS_BASE_URL: /pr-${{ github.event.pull_request.number }}
         run: |
           echo "Building site with base URL: $DOCUSAURUS_BASE_URL"
