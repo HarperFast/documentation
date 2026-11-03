@@ -100,7 +100,8 @@ async function latestRelease() {
 				`Reading the HarperFast/harper-pro ${release} release failed: ${response.status} ${await response.text()}`
 			);
 		}
-		if ((await response.json()).draft) continue;
+		const { draft, prerelease } = await response.json();
+		if (draft || prerelease) continue;
 		const pattern = new RegExp(`^docs/${release.replaceAll('.', '\\.')}-(\\d+)$`);
 		const patches = tags
 			.map((tag) => tag.match(pattern))
