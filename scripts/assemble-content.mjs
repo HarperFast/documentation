@@ -26,12 +26,17 @@
  * Sources:
  *   HARPER_DOCS_PATH / HARPER_PRO_DOCS_PATH  a local checkout to read instead of fetching
  *                                            (code-repo CI overlays the PR this way)
- *   HARPER_DOCS_REF / HARPER_PRO_DOCS_REF    the git ref to fetch (default: main)
+ *   HARPER_DOCS_REF / HARPER_PRO_DOCS_REF    the git ref to fetch (default: the latest release)
+ *
+ * The site publishes the latest stable release (the highest vX.Y.Z tag of harper-pro; harper
+ * carries the same tag), so docs merged with unreleased code appear when that code ships.
  *
  * Usage:
  *   node scripts/assemble-content.mjs           assemble once (predev/prebuild)
  *   node scripts/assemble-content.mjs --watch   start `docusaurus start` and re-assemble when a local
  *                                               source changes, reusing the fetched checkouts (npm run dev)
+ *   node scripts/assemble-content.mjs --sources print the resolved sources as /content-sources.json
+ *                                               would name them, without assembling (content-check)
  */
 
 import fs from 'node:fs';
@@ -54,17 +59,8 @@ function git(cwd, ...args) {
 		.trim();
 }
 
-function resolveSource({ repo, pathEnv, refEnv }, fetch) {
-	const local = process.env[pathEnv];
-	if (local) {
-		const root = path.resolve(local);
-		const docsDir = path.join(root, 'docs');
-		if (!fs.existsSync(docsDir)) throw new Error(`${pathEnv}=${local} has no docs/ directory`);
-		return { repo, ref: null, docsDir, local: true };
-	}
-	const ref = process.env[refEnv] || 'main';
+function fetchDocs(repo, ref) {
 	const checkout = path.join(cacheDir, repo);
-	if (!fetch) return { repo, ref, docsDir: path.join(checkout, 'docs'), local: false };
 	if (!fs.existsSync(path.join(checkout, '.git'))) {
 		fs.mkdirSync(checkout, { recursive: true });
 		git(checkout, 'init', '--quiet');
@@ -73,11 +69,40 @@ function resolveSource({ repo, pathEnv, refEnv }, fetch) {
 	}
 	git(checkout, 'fetch', '--quiet', '--depth', '1', '--filter=blob:none', 'origin', ref);
 	git(checkout, 'checkout', '--quiet', '--force', 'FETCH_HEAD');
-	if (!fs.existsSync(path.join(checkout, 'docs'))) throw new Error(`${repo}@${ref} has no docs/ directory`);
+	if (!fs.existsSync(path.join(checkout, 'docs'))) return null;
 	const sha = git(checkout, 'rev-parse', 'HEAD');
 	const docsTree = git(checkout, 'rev-parse', 'HEAD:docs');
-	console.log(`Fetched ${repo}@${ref} (${sha.slice(0, 10)})`);
+	console.error(`Fetched ${repo}@${ref} (${sha.slice(0, 10)})`);
 	return { repo, ref, sha, docsTree, docsDir: path.join(checkout, 'docs'), local: false };
+}
+
+function latestRelease() {
+	const versions = git(siteRoot, 'ls-remote', '--tags', '--refs', 'https://github.com/HarperFast/harper-pro.git', 'v*')
+		.split('\n')
+		.map((line) => line.match(/refs\/tags\/(v(\d+)\.(\d+)\.(\d+))$/))
+		.filter(Boolean)
+		.sort((a, b) => b[2] - a[2] || b[3] - a[3] || b[4] - a[4]);
+	if (versions.length === 0) throw new Error('HarperFast/harper-pro has no release tags');
+	const release = versions[0][1];
+	// Releases cut before docs/ moved into the code repos have none to publish.
+	if (fetchDocs('harper-pro', release)) return release;
+	console.error(`${release} predates docs/ in the code repos; publishing main until a release carries it`);
+	return 'main';
+}
+
+function resolveSource({ repo, pathEnv, refEnv }, fetch, release) {
+	const local = process.env[pathEnv];
+	if (local) {
+		const root = path.resolve(local);
+		const docsDir = path.join(root, 'docs');
+		if (!fs.existsSync(docsDir)) throw new Error(`${pathEnv}=${local} has no docs/ directory`);
+		return { repo, ref: null, docsDir, local: true };
+	}
+	if (!fetch) return { repo, ref: null, docsDir: path.join(cacheDir, repo, 'docs'), local: false };
+	const ref = process.env[refEnv] || release();
+	const source = fetchDocs(repo, ref);
+	if (!source) throw new Error(`${repo}@${ref} has no docs/ directory`);
+	return source;
 }
 
 // Relative paths use `/` on every platform: they are doc ids and URLs as well as file paths.
@@ -191,6 +216,12 @@ function assembleReleaseNotes(resolved, manifest) {
 	return files;
 }
 
+function publishedSources(resolved) {
+	return Object.fromEntries(
+		resolved.map(({ repo, ref, sha, docsTree }) => [repo, { ref, sha: sha ?? null, docsTree: docsTree ?? null }])
+	);
+}
+
 function assemble(resolved) {
 	const manifest = { reference: {}, releaseNotes: {}, redirects: [] };
 	// Both are built before either is written, so a failure leaves the last assembly intact and
@@ -201,12 +232,12 @@ function assemble(resolved) {
 	syncFiles(path.join(siteRoot, 'release-notes'), releaseNotes, (rel) => rel.endsWith('.generated.md'));
 	fs.mkdirSync(path.join(cacheDir, 'public'), { recursive: true });
 	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t') + '\n');
-	// Published with the site; the deploy workflow redeploys when a repo's docs/ tree differs from this.
-	const published = Object.fromEntries(
-		resolved.map(({ repo, ref, sha, docsTree }) => [repo, { ref, sha: sha ?? null, docsTree: docsTree ?? null }])
+	// Published with the site; content-check redeploys when a repo's docs/ tree differs from this.
+	fs.writeFileSync(
+		path.join(cacheDir, 'public', 'content-sources.json'),
+		JSON.stringify(publishedSources(resolved)) + '\n'
 	);
-	fs.writeFileSync(path.join(cacheDir, 'public', 'content-sources.json'), JSON.stringify(published) + '\n');
-	console.log(
+	console.error(
 		`Assembled ${Object.keys(manifest.reference).length} reference files and ${Object.keys(manifest.releaseNotes).length} release-note pages`
 	);
 }
@@ -222,8 +253,12 @@ if (tracked) {
 }
 
 const watch = process.argv.includes('--watch');
-const resolved = sources.map((source) => resolveSource(source, !watch));
-if (!watch) {
+let release;
+const releaseOnce = () => (release ??= latestRelease());
+const resolved = sources.map((source) => resolveSource(source, !watch, releaseOnce));
+if (process.argv.includes('--sources')) {
+	console.log(JSON.stringify(publishedSources(resolved)));
+} else if (!watch) {
 	assemble(resolved);
 } else {
 	let timer;

@@ -135,13 +135,15 @@ Fabric is non-versioned. It documents the managed cloud platform independently o
 
 The v5 reference and the open minor's release notes are written in the code repos, next to the code they describe: `docs/` in [HarperFast/harper](https://github.com/HarperFast/harper/tree/main/docs) and [HarperFast/harper-pro](https://github.com/HarperFast/harper-pro/tree/main/docs). [`scripts/assemble-content.mjs`](scripts/assemble-content.mjs) builds `reference/` and `release-notes/<codename>/<minor>.generated.md` from them before every build (both are git-ignored here). The section structure, version annotations and writing conventions are in [harper's docs/README.md](https://github.com/HarperFast/harper/blob/main/docs/README.md).
 
-To preview a local checkout, point the build at it; a repo without a path is fetched from `main`:
+The site publishes the latest stable release: the highest `vX.Y.Z` tag of harper-pro, and the same tag of harper. Docs merged with unreleased code appear when that code ships; a correction to released docs appears with the next patch release of that line (milestone the PR to it, so it is cherry-picked there). Until a release contains `docs/`, the site publishes `main`.
+
+To preview a local checkout, point the build at it; a repo without a path is fetched at the latest release, or at the ref in `HARPER_DOCS_REF` / `HARPER_PRO_DOCS_REF`:
 
 ```bash
 HARPER_DOCS_PATH=../harper HARPER_PRO_DOCS_PATH=../harper-pro npm run dev
 ```
 
-The deploy workflow checks every 15 minutes whether either repo's `docs/` tree on `main` differs from the one the live site was built from (published at `/content-sources.json`), and redeploys if so.
+The content-check workflow runs every 15 minutes: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it redeploys both sites.
 
 ## Redirects
 

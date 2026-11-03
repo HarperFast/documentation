@@ -1,10 +1,11 @@
 name: Content Check
 
 # The v5 reference and the open release notes are assembled from docs/ in HarperFast/harper and
-# HarperFast/harper-pro (scripts/assemble-content.mjs), and their merges cannot trigger this
-# repo's workflows. This redeploys both sites when either repo's docs/ tree on main differs from
-# the one the live site was built from (/content-sources.json). A separate workflow, so checks
-# that find nothing to do never join the deploy concurrency groups.
+# HarperFast/harper-pro (scripts/assemble-content.mjs) at their latest release, and neither a
+# merge nor a release there can trigger this repo's workflows. This redeploys both sites when the
+# docs/ trees the script would assemble now differ from the ones the live site was built from
+# (/content-sources.json). A separate workflow, so checks that find nothing to do never join the
+# deploy concurrency groups.
 
 on:
   schedule:
@@ -20,6 +21,14 @@ jobs:
     name: Compare docs/ trees with the deployed site
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
       - name: Dispatch the deploys when a source changed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -38,12 +47,13 @@ jobs:
           done
           # The query string bypasses the Pages CDN cache, so a deploy that just finished is seen.
           deployed=$(curl -fsS "${SITE_URL%/}/content-sources.json?t=$(date +%s)" || echo '{}')
+          expected=$(node scripts/assemble-content.mjs --sources)
           changed=false
           for repo in harper harper-pro; do
-            current=$(gh api "repos/HarperFast/$repo/git/trees/main" --jq '.tree[] | select(.path == "docs") | .sha')
+            current=$(jq -r --arg repo "$repo" '.[$repo].docsTree' <<<"$expected")
             live=$(jq -r --arg repo "$repo" '.[$repo].docsTree // ""' <<<"$deployed")
             if [ "$current" != "$live" ]; then
-              echo "$repo docs/ is $current; the live site was built from ${live:-unknown}"
+              echo "$repo@$(jq -r --arg repo "$repo" '.[$repo].ref' <<<"$expected") docs/ is $current; the live site was built from ${live:-unknown}"
               changed=true
             fi
           done
