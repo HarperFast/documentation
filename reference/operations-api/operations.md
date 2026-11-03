@@ -554,7 +554,7 @@ Returns all users.
 
 ### `user_info`
 
-Returns data for the currently authenticated user.
+Returns data for the currently authenticated user. From v5.4.0, [locally trusted requests](../security/configuration.md#local-request-identity) report `username: "local"` for the built-in super user.
 
 ```json
 { "operation": "user_info" }
@@ -626,6 +626,12 @@ Does not require prior authentication when called with `username`/`password`. Re
 	"password": "my-password"
 }
 ```
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+When both `username` and `password` are omitted from a [locally trusted request](../security/configuration.md#local-request-identity), Harper issues tokens for the first active stored user, in username order, whose role has the `super_user` permission. The role need not be named `super_user`. The operation and refresh tokens carry that stored user's normal claims, and the mint replaces that user's stored refresh token, as before. No token is issued for the built-in `local` identity.
+
+If no such stored user exists, the operation fails with HTTP 409: `no user to mint a token for; create a user first`. For ordinary tokens, supplying a `username` still requires its `password`, even on a local connection.
 
 With `role` as an inline role object, instead mints a single **scoped token** whose bearer is limited to the embedded permissions — requires an authenticated `super_user` caller, and refuses one authenticated by a component's [Bearer validator](../http/api.md#serverregisterbearervalidatorvalidator-options); `username` is attribution only and must not name an existing user (defaults to `scoped:<minter>`); no refresh token is issued and the token cannot be revoked before expiry. See [JWT Authentication / Scoped Tokens](../security/jwt-authentication.md#scoped-tokens-inline-role).
 
@@ -1178,28 +1184,28 @@ Response:
 
 <VersionBadge type="changed" version="v5.3.0" />
 
-`"restart": true` requests a restart of this node's HTTP workers and waits for it before responding. A redeploy that keeps an application isolated targets only its worker; creating an isolated application or changing isolation also restarts the shared pool. Retrying an activation whose release is already live restarts every worker. After a completed restart, the workers in that scope serve the newly deployed code; a restart failure can still leave a successful deploy response, as described below. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — before this, a client that treated the immediate response as "the component is live" could be served by a worker that had never loaded it.
+`"restart": true` requests a restart of this node's HTTP workers and waits for it before responding. A redeploy that keeps an application isolated targets only its worker, and so does creating an isolated application (v5.4.0; before, that also restarted the shared pool). Turning isolation off also restarts the shared pool, and so does turning it on for an application the shared workers had loaded. Retrying an activation whose release is already live restarts every worker. After a completed restart, the workers in that scope serve the newly deployed code; a restart failure can still leave a successful deploy response, as described below. Until a worker has been replaced it is still running the previous code, and on platforms where replacements share a listening port it keeps accepting connections for the whole rolling restart — before this, a client that treated the immediate response as "the component is live" could be served by a worker that had never loaded it.
 
 The wait follows the restart's own progress rather than a fixed timeout, so a wide thread pool, a slow component install, or a worker draining in-flight work does not cut it short. That also means the response can take as long as the install plus the restart — tens of seconds on a slow install with many worker threads — so a caller with a short request timeout should use `"restart": "rolling"` and follow its record instead. If it does give up — the restart stopped reporting progress, ran past the wait's absolute ceiling, or left a worker thread that could not be replaced — the restart continues in the background and the Harper log says which of those happened. A restart that fails does not fail the deploy: the component is already installed and replicated.
 
 `"restart": "rolling"` does not restart the other nodes inline: it starts a `restart_service` job and returns its `restartJobId`. Both certify the release in a canary worker before rolling it out, except in the cases the next section lists. When the deploy's `certification` is `unavailable`, the job only restarts the other nodes, and reports each node's outcome as a [replicated `restart_service`](#restart_service-replicated) does: it ends `ERROR` if any node did not restart.
 
-`drop_component` accepts `"restart": true` and waits for the restart the same way (v5.3.0). Dropping a running isolated application stops only that application's worker; dropping an already-absent application can restart the shared workers. On Pro and Fabric it propagates to peers by default unless `replicated` is `false`. Inspect its `replicated` results for peer failures; a successful local response does not establish successful cleanup on every node.
+`drop_component` accepts `"restart": true` and waits for the restart the same way (v5.3.0). From v5.4.0, dropping an isolated application stops only that application's worker, with or without `restart`, and answers once the worker has stopped. With `restart=true`, it also restarts the shared workers when they may still have the application loaded, as after turning isolation on without a restart. The exception is an isolated application that drops itself: the node answers before stopping the worker that asked, with `workerStopped: null`. Dropping an application a node does not have restarts nothing there. Before v5.4.0, dropping an already-absent application with `restart` can restart the shared workers. On Pro and Fabric it propagates to peers by default unless `replicated` is `false`. Inspect its `replicated` results for each peer's outcome; see [`drop_component`](../components/applications.md#drop_component).
 
 #### Certifying a release in a canary worker
 
 <VersionBadge version="v5.4.0" />
 
-A deploy with `"restart": true` or `"restart": "rolling"` checks its release before rolling it out. The first worker thread started on the new release, the canary, loads every component as any worker does when it starts, but it is held out of traffic until it reports whether the deployed component loaded. It replaces the first worker thread (worker 0), so code a component runs only in that thread is part of what it checks. Until then the workers already running keep serving the release being replaced. The rollout goes on only if the release loaded, and each later replacement is checked the same way before it serves.
+A deploy with `"restart": true` or `"restart": "rolling"` checks its release before rolling it out. The first worker thread started on the new release, the canary, loads every component as any worker does when it starts, but it is held out of traffic until it reports whether the deployed component loaded. It replaces the first worker thread (worker 0), so code a component runs only in that thread is part of what it checks. For an isolated application, the canary is instead its new dedicated worker, which loads only that application. Until then the workers already running keep serving the release being replaced. The rollout goes on only if the release loaded, and each later replacement is checked the same way before it serves.
 
 A deploy that succeeds, and is not staged, reports how this went as a string in `certification`:
 
-| `certification` | Meaning                                                                                                                                                                                                                                                  |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `certified`     | The canary loaded the release, and the rollout went on.                                                                                                                                                                                                  |
-| `uncertified`   | The rollout went on unchecked: the component ran nothing as it loaded (`loadComponent: dev-only`, an absent `if-installed` component, or safe mode), or no worker was replaced.                                                                          |
-| `unavailable`   | The deploy restarted unchecked: no worker on this node loads the component, its `isolated` setting changed with this deploy, it was already live, or it was deployed from a local directory (`package: file:<dir>`), which is linked rather than copied. |
-| `not-requested` | The deploy did not restart.                                                                                                                                                                                                                              |
+| `certification` | Meaning                                                                                                                                                                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `certified`     | The canary loaded the release, and the rollout went on.                                                                                                                                                                                                                          |
+| `uncertified`   | The rollout went on unchecked: the component ran nothing as it loaded (`loadComponent: dev-only`, an absent `if-installed` component, or safe mode), or no worker was replaced.                                                                                                  |
+| `unavailable`   | The deploy restarted unchecked: no worker on this node loads the component, this deploy turned an existing component's `isolated` setting on or off, it was already live, or it was deployed from a local directory (`package: file:<dir>`), which is linked rather than copied. |
+| `not-requested` | The deploy did not restart.                                                                                                                                                                                                                                                      |
 
 A release whose canary throws while loading the component, exits, or does not report within a minute is rejected, and the deploy fails with `400`. The release the deploy replaced, when there is one, is made live again first, as in [going back to a previous release](#going-back-to-a-previous-release), so the workers that never stopped serving it continue to do so. Nothing is replicated to other nodes. The error carries the decision as an object in `certification` instead of a string, with `status` set to `rejected`, or to `interrupted` for a restart that stopped before the canary decided:
 
@@ -1217,7 +1223,7 @@ A release whose canary throws while loading the component, exits, or does not re
 }
 ```
 
-- **A release with nothing to go back to fails closed.** A rejected first deploy, or one whose previous release was not kept, stays on disk, but no worker on that node loads it, including after Harper restarts. `get_status` reports the component as failed and says why. Deploy a fixed release, or once the cause is fixed, activate the same `deployment_id` again with `restart`, which certifies it again.
+- **A release with nothing to go back to fails closed.** A rejected first deploy, or one whose previous release was not kept, stays on disk, but no worker on that node loads it, including after Harper restarts. `get_status` reports the component as failed and says why. Deploy a fixed release, or once the cause is fixed, activate the same `deployment_id` again with `restart`, which certifies it again. For an [isolated application](../components/applications.md#requirements-and-refusals), either one is refused with `409` while the application would not get a dedicated worker under `threads.maxIsolated`, or with `503` if the node cannot read which isolated applications are running or which releases are refused.
 - **Nothing else changes the component while its release rolls out.** Another deploy or a `drop_component` of it on that node is refused with `409` until the canary has decided and the rollout that follows has finished.
 - **A restart that stops before the canary decides restores the previous release.** The decision is reported with `status: "interrupted"`. If the process dies first, the next start rejects the undecided release and restores the one it replaced before it loads anything.
 - **It checks what a worker loads when it starts.** The release is on disk before the canary starts. Workers that have not been replaced yet keep running the previous release and do not react to the new files until the rollout ends, but one that first imports one of the component's modules while the canary is held gets the new release's copy of it.
@@ -1824,7 +1830,7 @@ POST; requires `super_user`. Takes `database`, `table` and a proposed key-derive
 
 ### `cluster_status`
 
-Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`). Its top-level `sharding` object reports per-database map identity and placement blockers; see [Sharding Status](../replication/clustering.md#sharding-status).
+Returns connection state for all cluster nodes, including per-database socket status and replication timing statistics (`lastCommitConfirmed`, `lastReceivedRemoteTime`, `lastReceivedLocalTime`). A socket whose base copy is not finishing also carries `stuckCopy`; see [Stuck Copies](../replication/clustering.md#stuck-copies). Its top-level `sharding` object reports per-database map identity and placement blockers; see [Sharding Status](../replication/clustering.md#sharding-status).
 
 ```json
 { "operation": "cluster_status" }

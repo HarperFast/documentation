@@ -63,12 +63,13 @@ threads:
 
 - `count` — Number of worker threads; _Default_: CPU count minus one
 - `maxHeapMemory` — Heap limit per thread (MB). When unset, each thread's limit is derived from available memory and the number of HTTP worker threads, including isolated applications' threads
-- `maxIsolated` <VersionBadge version="v5.3.0" /> — How many [isolated applications](../components/applications.md#isolated-applications) may run, each in a dedicated worker thread; _Default_: `8`. An isolated application past this limit is not loaded anywhere, and a `deploy_component` that would exceed it is refused with a `409`. `0` admits none. Dedicated threads are added to `count`, not taken from it, so a node runs up to `count` + `maxIsolated` HTTP worker threads. When `maxHeapMemory` is unset, they all count when Harper divides available memory into each thread's default heap limit. Each one lowers that limit for threads started afterward, until it reaches its 512 MB floor, after which more threads add to the total heap the node may use
+- `maxIsolated` <VersionBadge version="v5.3.0" /> <VersionBadge type="changed" version="v5.4.0" /> — How many [isolated applications](../components/applications.md#isolated-applications) may run, each in a dedicated worker thread; _Default_: `8`. Applications with a running dedicated worker keep it, and the rest are admitted in root-config order up to this limit. An isolated application past it is not loaded anywhere. A `deploy_component` of one that would not get a worker is refused with a `409`. An application whose live release [failed closed](../operations-api/operations.md#certifying-a-release-in-a-canary-worker) gets no worker and does not count. Before v5.4.0, every isolated application on disk counted, and a deploy of one that boot order would not admit could be accepted and then never start a worker. `0` admits none. Dedicated threads are added to `count`, not taken from it, so a node runs up to `count` + `maxIsolated` HTTP worker threads. When `maxHeapMemory` is unset, they all count when Harper divides available memory into each thread's default heap limit. Each one lowers that limit for threads started afterward, until it reaches its 512 MB floor, after which more threads add to the total heap the node may use
 - `heapSnapshotNearLimit` — Write a `.heapsnapshot` file when a thread nears its heap limit (loadable in Chrome DevTools Memory tab); _Default_: `false`. See [Worker Thread Debugging](./debugging.md#heap-snapshots-near-the-limit)
 - `debug` — Enable Node.js inspector; sub-options: `port`, `startingPort`, `host`, `waitForDebugger`. See [Worker Thread Debugging](./debugging.md)
 - `preload` <VersionBadge version="v5.2.0" /> — Module, or list of modules, to load via Node's `--import` before any Harper or application module on each worker thread. Intended for instrumentation and APM agents. Worker threads only (not under Bun).
 - `preloadRequire` <VersionBadge version="v5.2.0" /> — The same, but via Node's `--require` (CommonJS). Worker threads only (not under Bun).
 - `v8Flags` <VersionBadge version="v5.4.0" /> — V8 flag, or list of V8 flags, applied to the whole Harper process before its first worker thread starts. Each entry must start with `--`. Takes effect on process start. Not applied under Bun. See [Applying V8 flags](#applying-v8-flags)
+- `shutdownTimeout` <VersionBadge version="v5.4.0" /> — Longest time (ms) Harper spends shutting down after SIGTERM, SIGINT or SIGQUIT before it exits anyway; _Default_: `8000` (`30000` under `harper dev`). `0` exits as soon as the signal arrives. Takes effect when Harper restarts. See [Shutting down on a termination signal](#shutting-down-on-a-termination-signal)
 
 ### Preloading an instrumentation agent
 
@@ -124,6 +125,36 @@ The value can also be set from the environment, for example `HARPER_SET_CONFIG='
 - **When it takes effect.** Flags are read once per process. A changed value takes effect when the whole process restarts: the [`restart`](../operations-api/operations.md#restart) operation, which restarts only the node that receives it, or a process or container restart. [`restart_service`](../operations-api/operations.md#restart_service) restarts only worker threads, which keep the process's flags, so it does not apply a change, even with `"replicated": true`. To roll back, remove the setting from `HARPER_SET_CONFIG` or `HARPER_CONFIG` if it came from there, and from `harper-config.yaml` (for example `set_configuration` with `"threads_v8Flags": null`), then restart the process. A `THREADS_V8FLAGS` environment variable is written into `harper-config.yaml` at every startup, so unset it as well; unsetting the variable alone leaves the flags in the file.
 - **Expert setting.** Flags change V8's behavior for the whole process and are not validated beyond the `--` prefix. A conflicting combination can stop the process at startup. Measure memory and throughput with your workload before relying on a flag in production.
 
+### Shutting down on a termination signal
+
+<VersionBadge version="v5.4.0" />
+
+When the Harper process receives SIGTERM, SIGINT (Ctrl+C) or SIGQUIT, it shuts down in order instead of exiting at once. These are the signals [`harper stop`](../cli/commands.md#harper-stop), `docker stop`, Kubernetes and systemd send.
+
+1. Harper stops accepting new connections.
+2. Requests already in flight get a few seconds to finish (see the first note below).
+3. Component scopes close. Their [`'close'` listeners](../components/plugin-api.md#cleanup-on-shutdown) run once requests in flight have had a few seconds to finish.
+4. The process exits with code `0`.
+
+`threads.shutdownTimeout` bounds this sequence. If it has not finished in time, Harper logs `Shutdown did not finish within <n> ms (threads.shutdownTimeout)` and exits anyway. A second signal during the shutdown makes Harper exit at once; running `harper stop` again sends one. Harper exits with code `0` in all three cases, so a `0` exit status does not mean every `'close'` listener finished.
+
+```yaml
+threads:
+  shutdownTimeout: 25000 # Kubernetes' default 30-second grace period, no preStop hook
+```
+
+The environment variable is `THREADS_SHUTDOWNTIMEOUT`. Like other settings, a changed value takes effect when Harper restarts; `harper stop` reads the configuration file, so its wait uses the new value right away. `0` restores the behavior from before v5.4.0: Harper exits when the signal arrives, without draining requests or closing scopes.
+
+- **Requests get a few seconds, not the whole timeout.** After it stops accepting connections, Harper waits a few seconds for requests in flight (about 2.5 seconds on Node.js, 5 on Bun), however high `threads.shutdownTimeout` is set. A request still running then may not finish: on Node.js its connection is closed, and its handler can still be running when `'close'` listeners start. The rest of the timeout is for component cleanup.
+- **Fit it inside your orchestrator's grace period.** A container platform or service manager sends SIGTERM, waits for its grace period, then kills the process. After the shutdown above, Harper closes its databases as the process exits, and `threads.shutdownTimeout` does not limit that step. Set `threads.shutdownTimeout` a few seconds below the grace period to leave time for it. The default of 8 seconds fits Docker's default. On Kubernetes, the grace period also covers a `preStop` hook, which runs before SIGTERM, so subtract its time too.
+
+| Platform               | Grace period setting            | Default    |
+| ---------------------- | ------------------------------- | ---------- |
+| Docker (`docker stop`) | `--timeout` (`-t`)              | 10 seconds |
+| Docker Compose         | `stop_grace_period`             | 10 seconds |
+| Kubernetes             | `terminationGracePeriodSeconds` | 30 seconds |
+| systemd                | `TimeoutStopSec`                | 90 seconds |
+
 ---
 
 ## `authentication`
@@ -139,7 +170,7 @@ authentication:
   refreshTokenTimeout: 30d
 ```
 
-- `authorizeLocal` — Auto-authorize loopback requests as superuser; _Default_: `true`
+- `authorizeLocal` — Auto-authorize loopback requests as superuser; _Default_: `true`. From v5.4.0, these requests run as the built-in [`local` user](../security/configuration.md#local-request-identity).
 - `cacheTTL` — Session cache duration (ms); _Default_: `30000`
 - `enableSessions` — Cookie-based sessions; _Default_: `true`
 - `operationTokenTimeout` — Access token lifetime; _Default_: `1d`
@@ -280,7 +311,7 @@ replication:
 
 - `hostname` <VersionBadge type="changed" version="v5.3.0" /> — This instance's hostname within the cluster. Subject to the same bare hostname or IP literal requirement as [`node.hostname`](#node) — a URL, `host:port`, or non-string value fails startup. When both are set, `node.hostname` wins.
 - `url` — WebSocket URL peers use to connect to this instance
-- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name` and `sharded`
+- `databases` — Databases to replicate; _Default_: `"*"` (all). Each entry supports `name`, `replicateTo`, and `sharded`
 - `routes` — Peer nodes; URL strings or `{hostname, port, startTime, revokedCertificates}` objects
 - `port` — Replication port
 - `securePort` — Secure replication port; _Default_: `9933` (changed from `9925` in v4.5.0)
@@ -329,7 +360,7 @@ storage:
 
   The runtime budgets apply together and are not hard bounds on total process memory. See [Set Configuration](./operations.md#set-configuration) for when request and native runtime changes take effect. Use the usual underscore-separated parameter names, such as `storage_fullText_maxRawHitsPerRequest`. See [full-text query execution](../resources/query-optimization.md#full-text-search-work-and-paging) for costs; see [readiness and recovery](../resources/query-optimization.md#readiness-and-recovery) for failures.
 
-- `writeAsync` — Disable disk sync for higher throughput (**disables durability guarantees**); _Default_: `false`
+- `writeAsync` <EngineBadge engines="LMDB" /> — Disable disk sync on commit for the legacy LMDB storage engine (**disables local disk durability guarantees on LMDB**). Has no effect on RocksDB, which does not `fsync` commits; see [Storage Tuning — Durability vs. Throughput](../database/storage-tuning.md#durability-vs-throughput); _Default_: `false`
 - `caching` — In-memory record caching; _Default_: `true`
 - `compression` — LZ4 record compression; _Default_: `true` (enabled by default since v4.3.0). Sub-options: `dictionary`, `threshold`
 - `compactOnStart` — Compact all non-system databases on startup; _Default_: `false` (Added in: v4.3.0)
@@ -617,7 +648,7 @@ Controls how application modules are loaded and isolated. See [Module Loading](.
 
 ```yaml
 applications:
-  lockdown: freeze-after-load
+  lockdown: seal-after-load
   moduleLoader: vm-current-context
   dependencyLoader: auto
   allowedDirectory: app
@@ -627,7 +658,7 @@ applications:
   # allowedBuiltInModules: [] # if omitted, all Node.js built-ins are allowed
 ```
 
-- `lockdown` — Indicates if intrinsic/built-in objects should be locked down/frozen. This provides additional security and protection against prototype pollution attacks. The default is `freeze-after-load` (since v5.0.2; v5.0.0 and v5.0.1 defaulted to `freeze`), which freezes the important built-in objects once all components have loaded, so component initialization can still modify them. This can also be set to `freeze` (freeze before any application code loads), `none`, or `ses` (lockdown provided by the `ses` package, which is more strict). See [Intrinsic Lockdown](../components/module-loading.md#intrinsic-lockdown).
+- `lockdown` <VersionBadge type="changed" version="v5.4.0" /> — Whether and when Harper locks the JavaScript intrinsics (see [What is locked](../components/module-loading.md#what-is-locked)), which makes prototype pollution attacks harder. The default for new installs is `seal-after-load` (since v5.4.0), which seals them once all components have loaded, so component initialization can still extend them. Sealing blocks adding or deleting a property, but still allows assigning to an existing writable one. This can also be set to `seal` (seal before any application code loads; added in v5.4.0), `freeze-after-load` (the default from v5.0.2 through v5.3; freezes once all components have loaded, so existing properties cannot be changed either), `freeze` (freeze before any application code loads), `ses` (lockdown provided by the `ses` package, which is more strict), or `none`. An upgrade keeps the value already in `harper-config.yaml`, and with no value there Harper does not lock the intrinsics. Before downgrading an instance that uses a seal mode to v5.0.1 through v5.3, set `freeze-after-load`: those releases treat the seal modes as `freeze`. See [Intrinsic Lockdown](../components/module-loading.md#intrinsic-lockdown).
 - `moduleLoader` — The method used to load modules (and isolate the application). The default is `vm-current-context` (since v5.1.0; v5.0.x defaulted to `vm`), which uses Node's VM module loader in Harper's own context so applications share JavaScript intrinsics. This can also be set to `vm` (VM loader with a separate context and its own intrinsics per application), `native` (standard Node module loader), or `compartment`, which uses the `ses` implementation of the proposed `Compartment` functionality. See [Module Loader Modes](../components/module-loading.md#module-loader-modes).
 - `dependencyLoader` — The application module loader can be used to load packages/dependencies (installed as `dependencies` from the package.json). The default is 'auto', which only use the VM module loader if the package specifies `harper` as a dependency. This can also be set to `app` to always use the application module loader or `native` to always native module loader for packages. See [Dependency Loading](../components/module-loading.md#dependency-loading).
 - `allowedDirectory` — Added in v5.0.4. Restricts where an application may load modules from. The default is `app`, which permits only modules within the application's own directory tree; loading from outside it throws. Set to `any` to remove the restriction. Dev-mode installs default to `any`. Applies to imports the application module loader handles, so treat it as a configuration guardrail rather than a security boundary. See [Allowed Directory](../components/module-loading.md#allowed-directory).
