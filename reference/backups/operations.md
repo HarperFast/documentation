@@ -174,7 +174,7 @@ As of v5.4.0, every restore records its decision on disk before it changes anyth
 
 ### Replication peers
 
-As of v5.4.0, a restore refuses to run on a node that has replication peers, whether from `system.hdb_nodes` or `replication.routes`, because replication would either undo the restore or spread it to the cluster. Through a running server the job ends in `ERROR` with a status code 409 message; offline the command fails the same way. Peers count even when replication to them is blocked by the network. Restore on a standalone node, then add fresh peers. While a restore runs, operations that add a peer, such as `add_node` or a `set_configuration` that sets replication routes, fail with status code 409. An offline restore of the `system` database checks only `replication.routes`, since it replaces the node list itself.
+As of v5.4.0, a restore refuses to run on a node that has replication peers, whether from `system.hdb_nodes` or `replication.routes`, because replication would either undo the restore or spread it to the cluster. Through a running server the job ends in `ERROR`, with a message naming the peers; offline the command fails with the same message. Peers count even when replication to them is blocked by the network. Restore on a standalone node, then add fresh peers. While a restore runs, operations that add a peer, such as `add_node` or a `set_configuration` that sets replication routes, fail with status code 409. An offline restore of the `system` database checks only `replication.routes`, since it replaces the node list itself.
 
 ```json
 { "operation": "restore_backup", "database": "data", "backup_id": 1 }
