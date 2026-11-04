@@ -321,7 +321,7 @@ storage:
   - `maxResultsPerRequest` — Maximum retained offset plus limit. A request must also fit the separate raw-hit budget; default `10000`.
   - `requestBudgetMilliseconds` — Execution budget across native batches, source checks and highlights, capped by the native execution limit; default `5000` ms. Reader acquisition and freshness waiting have separate bounds.
   - `query.maxQueryTerms` — Maximum analyzed terms per text leaf; integer `1`–`1024`, default `64`.
-  - `query.maxFuzzyDistance` — Maximum fuzzy edit distance; integer `0`–`2`, default `1`. Distance `2` is preview and needs workload qualification; admission and deadlines are not hard process-memory bounds. With `0`, fuzzy and fuzzy-prefix conditions that omit an explicit distance `0` are rejected with HTTP 400; omitted distances remain `1`.
+  - `query.maxFuzzyDistance` — Maximum fuzzy edit distance; integer `0`–`2`, default `1`. Distance `2` is preview and needs workload qualification; admission and deadlines are not hard process-memory bounds. With `0`, fuzzy and fuzzy-prefix conditions that omit `fuzzyDistance: 0` are rejected with HTTP 400; omitted distances remain `1`.
   - `query.maxQueryClauses` — Maximum compiled clauses per query, including Boolean structure, NOT and field expansion; integer `1`–`4096`, default `256`.
 
     Query settings are captured for the process and inherited by workers. Changes require a full Harper process restart; `restart_service` alone does not apply them. Omitted values retain defaults, and request work budgets cannot raise these limits.
