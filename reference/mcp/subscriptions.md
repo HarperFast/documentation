@@ -74,13 +74,13 @@ Synthetic `harper://*` metadata URIs (`harper://about`, `harper://openapi`, `har
 
 A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 (Changed in: v5.4.0):
 
-| Answer                                                      | When                                                                           |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `-32602 permission denied: <uri>`                           | The credentials used for this subscription do not permit reading the resource. |
-| `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                          |
-| `-32603 resource subscription failed; retry the request`    | Installation failed or an overlapping request superseded this generation.      |
+| Answer                                                      | When                                                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `-32602 permission denied: <uri>`                           | The credentials used for this subscription do not permit reading the resource.  |
+| `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                           |
+| `-32603 resource subscription failed; retry the request`    | Installation failed, or another request for the same URI replaced this request. |
 
-A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential.
+A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential. Retry transient `-32603` failures with backoff. If failures repeat, have the server operator inspect the logged error and fix its cause before retrying; an invalid custom stream or a consistently failing custom gate will not be repaired by retries.
 
 `resources/list` advertised these URIs under `http(s)://` before 5.1.18 <VersionBadge type="changed" version="v5.1.18" />. A legacy `http://` or `https://` URI is still accepted by `resources/subscribe` and `resources/unsubscribe`, so a client holding an older listing keeps working; new clients should use the `harper+rest://` form the current listing returns.
 
@@ -137,12 +137,13 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid.
+Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`; return the verified token expiry as described in [Bearer validators](../http/api.md#serveraddbearervalidatorvalidator-options).
 
 To renew subscriptions after rotating credentials:
 
 1. Close the old GET stream and open `GET /mcp` for the same session with the replacement credential.
 2. Send `resources/subscribe` for each URI you want to keep watching, using the replacement credential on each POST too.
+3. Re-read each resource to catch changes made while its subscription was inactive; re-subscribing does not replay those changes.
 
 A row-backed (table) subscription can end at expiry while the GET stream stays open. An open connection alone does not mean that updates are still being delivered. Re-subscribing with the replacement credential establishes a new subscription lifetime.
 
