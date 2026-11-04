@@ -74,13 +74,15 @@ Synthetic `harper://*` metadata URIs (`harper://about`, `harper://openapi`, `har
 
 A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 (Changed in: v5.4.0):
 
-| Answer                                                      | When                                                                            |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `-32602 permission denied: <uri>`                           | The credentials used for this subscription do not permit reading the resource.  |
-| `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                           |
-| `-32603 resource subscription failed; retry the request`    | Installation failed, or another request for the same URI replaced this request. |
+| Answer                                                      | When                                                                                      |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `-32602 permission denied: <uri>`                           | The credentials used for this subscription do not permit reading the resource.            |
+| `-32603 resource subscription timed out; retry the request` | The GET worker did not acknowledge installation within the 30-second acknowledgment wait. |
+| `-32603 resource subscription failed; retry the request`    | Installation failed, or another request for the same URI replaced this request.           |
 
-A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential. Retry transient `-32603` failures with backoff. If failures repeat, have the server operator inspect the logged error and fix its cause before retrying. An invalid custom stream or a consistently failing custom gate will not be repaired by retries.
+A missing or expired session returns HTTP `404`. If requests for the same URI overlap, let them settle and retry with the current credential only if that subscription is still wanted. For other `-32603` failures, retry only transient causes, with backoff. If failures repeat, have the server operator inspect the logged error and fix its cause before retrying. An invalid custom stream or a consistently failing custom gate will not be repaired by retries.
+
+A failed or timed-out subscribe attempts to remove the state written by that request without removing a later request for the same URI. If storage prevents cleanup, the outcome is ambiguous; send `resources/unsubscribe` to abandon that URI once storage is available. If the GET closes during setup, a waiting POST can complete after reconnect, or return the timeout error if no reconnect acknowledges it. Open a replacement GET before retrying.
 
 `resources/list` advertised these URIs under `http(s)://` before 5.1.18 <VersionBadge type="changed" version="v5.1.18" />. A legacy `http://` or `https://` URI is still accepted by `resources/subscribe` and `resources/unsubscribe`, so a client holding an older listing keeps working; new clients should use the `harper+rest://` form the current listing returns.
 
@@ -127,7 +129,7 @@ Send `resources/unsubscribe` with the same URI:
 - `params.uri` is required and must be a string — otherwise `-32602` (`resources/unsubscribe requires params.uri`).
 - Unsubscribing a URI that was never subscribed is a no-op and still returns `{}`.
 
-Subscriptions are also torn down automatically when the session's GET-SSE stream closes — via explicit `DELETE /mcp`, idle-timeout eviction from `system.mcp_session`, a dropped TCP connection, or an idle-prune sweep. Credential expiry stops delivery too. A row-backed (table) subscription can end at expiry while its GET stream remains open.
+Subscriptions are also torn down automatically when the session's GET-SSE stream closes — via explicit `DELETE /mcp`, idle-timeout eviction from `system.mcp_session`, a dropped TCP connection, or an idle-prune sweep. Credential expiry stops delivery too; see [Subscription lifetime and credential rotation](#subscription-lifetime-and-credential-rotation).
 
 ## Scope and durability
 
@@ -139,6 +141,8 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`. Return the verified token expiry as described in [Bearer validators](../http/api.md#serverregisterbearervalidatorvalidator-options).
 
+MCP does not return the effective subscription expiry. Obtain credential lifetime from the issuer, such as `expires_in` or a JWT's `exp`, and renew before the earlier POST/GET expiry. For component bearer validators, the service must also communicate any shorter `authExpiresAt` lifetime, including the five-minute default; clients cannot discover that server-side cap through MCP.
+
 A subscription created with a scoped token restores only when the GET presents a scoped token with the same username and role permissions. A newly issued scoped token may have a later expiry, but restoring does not extend the original subscription expiry. An ordinary credential with the same username, such as a user created after the scoped token was issued, cannot inherit that scoped subscription; reconnecting with it removes the stored scoped entry while retaining valid ordinary subscriptions. An explicit new `resources/subscribe` POST can use its own scoped credential.
 
 To renew subscriptions after rotating credentials:
@@ -147,7 +151,7 @@ To renew subscriptions after rotating credentials:
 2. Send `resources/subscribe` for each URI you want to keep watching, using the replacement credential on each POST too.
 3. Re-read each resource to catch changes made while its subscription was inactive; re-subscribing does not replay those changes.
 
-A row-backed (table) subscription can end at expiry while the GET stream stays open. An open connection alone does not mean that updates are still being delivered. Re-subscribing with the replacement credential establishes a new subscription lifetime.
+An open GET alone does not mean that updates are still being delivered. A table or custom iterator can end at expiry while the GET stays open. Harper can also close the GET when it detects an expired credential during delivery. Renew before expiry rather than waiting for the connection to close. Re-subscribing with the replacement credential establishes a new subscription lifetime.
 
 ## Resuming a dropped stream
 
@@ -159,7 +163,7 @@ Mcp-Session-Id: 0c8f...
 Last-Event-ID: 137
 ```
 
-Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions, bounded by the original subscribing POST expiry and the current GET expiry. The GET response waits for restoration before returning HTTP `200` (Changed in: v5.4.0). Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1`. Retry the GET. An absent session returns HTTP `404`.
+Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions, bounded by the original subscribing POST expiry and the current GET expiry. The GET response waits for restoration before returning HTTP `200`. Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1` (Changed in: v5.4.0). Resend `GET /mcp` with the same `Mcp-Session-Id`, `Mcp-Protocol-Version` and, if used, `Last-Event-ID` headers, using valid authorization. A `503` alone does not require repeating `initialize` or the subscribe POSTs. An absent session returns HTTP `404`.
 
 Caveats, all best-effort by design:
 
