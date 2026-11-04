@@ -12,7 +12,7 @@ title: SQL
 <!-- Source: versioned_docs/version-4.7/developers/operations-api/sql-operations.md -->
 
 :::info Harper 5.2 introduces a new SQL engine
-As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the legacy engine's results (which [differ in a few behaviors](#behavior-changes-from-the-legacy-engine), such as `LIKE` case sensitivity) with the older full-scan cost — each fallback is logged at the `info` level (`SQL engine v2 fallback: ...`) with the reason, so you have direct visibility into which queries aren't being planned. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
+As of Harper 5.2, SQL runs on a new engine built directly on Harper's indexed storage and Resource API. Queries that can be planned against an index now execute as streaming, index-driven operations with memory bounded by the size of the result — not the size of the table. Queries the engine can't plan against an index automatically fall back to the legacy execution path, returning the legacy engine's results (which [differ from the new engine's in a few behaviors](#behavior-changes-from-the-legacy-engine), such as `LIKE` case sensitivity) with the older full-scan cost — each fallback is logged at the `info` level (`SQL engine v2 fallback: ...`) with the reason, so you have direct visibility into which queries aren't being planned. See [Query Performance](#query-performance) for how to keep your queries on the fast path.
 
 For your most performance-critical production read paths, the [REST interface](../rest/overview.md) remains the recommended choice — it provides a stable, cacheable, index-driven contract. SQL is well suited to ad-hoc investigation, administrative queries, joins, and reporting.
 :::
@@ -165,7 +165,7 @@ By default (`sql.allowFullScan: false`), the new engine does not run a query tha
 
 ### Behavior changes from the legacy engine
 
-For queries the new engine plans (the default under `auto`), a handful of non-standard legacy behaviors are corrected, so you may see different — standard-SQL-conformant — results after upgrading:
+For queries the new engine plans (the default under `auto`), `LIKE` is case-sensitive and a handful of non-standard legacy behaviors are corrected, so you may see different results after upgrading:
 
 - **Aggregates over an empty result set** return `NULL` for `SUM`, `AVG`, `MIN`, and `MAX` (and `0` for `COUNT`), per the SQL standard. The legacy engine returned `0` for `SUM` and omitted `MIN`/`MAX` from the response entirely.
 - **`MIN`/`MAX` over text columns** return the lexicographically smallest/largest value. The legacy engine produced no result for string `MIN`/`MAX`.
@@ -174,7 +174,7 @@ For queries the new engine plans (the default under `auto`), a handful of non-st
 - **`LIKE` is case-sensitive, and `[...]` in a pattern is literal text.** The legacy engine matches case-insensitively and reads `[...]` as a character class. Under `auto`, adding or removing an index, or changing the other conditions in a statement, can move it between engines, which changes the rows a `LIKE` matches, including the rows an `UPDATE` or `DELETE` changes. See [LIKE Pattern Matching](#like-pattern-matching).
 - **A `NULL`-valued expression result is returned as an explicit `null`** rather than omitted from the row. A computed column or `COALESCE` that evaluates to `NULL` — or `UPPER(<null>)` — now yields `null` (the legacy engine dropped the key, and `UPPER` of a `NULL` returned the literal string `"NULL"`).
 
-These are deliberate corrections toward standard SQL, applied when the new engine serves the query — not fallbacks. If your application depended on a legacy quirk, adjust for the standard behavior. For how `WHERE` compares `NULL` and omitted values, including the v5.4.0 change to ranges compared with `NULL`, see [NULL and Omitted Values](#null-and-omitted-values).
+These differences apply whenever the new engine serves the query — not on fallbacks. If your application depended on the legacy behavior, adjust your queries accordingly. For how `WHERE` compares `NULL` and omitted values, including the v5.4.0 change to ranges compared with `NULL`, see [NULL and Omitted Values](#null-and-omitted-values).
 
 ### Practical guidance
 
@@ -471,9 +471,9 @@ Under the default `sql.engine: auto`, the same pattern can be either, and the wh
 - `note LIKE 't0%'` alone has no index to drive it, so `auto` runs it on the legacy engine, and it is case-insensitive.
 - `note LIKE 't0%'` is case-sensitive when something else keeps the statement on the new engine: an indexed condition joined with `AND`, an `ORDER BY` on the primary key, or `sql.allowFullScan: true`.
 
-This applies to `UPDATE` and `DELETE` as well: adding an index on `note` moves `DELETE FROM dev.addr WHERE note LIKE 't0%'` to the new engine, and it stops deleting `T0b`. A statement that falls back is logged, which tells you which engine ran it (see [The fallback contract](#the-fallback-contract)).
+This applies to `UPDATE` and `DELETE` as well: adding an index on `note` moves `DELETE FROM dev.addr WHERE note LIKE 't0%'` to the new engine, and it stops deleting `T0b`. With `logging.level` set to `info`, a statement that falls back is logged, which tells you which engine ran it (see [The fallback contract](#the-fallback-contract)).
 
-To match regardless of case on both engines, lower-case the value: `LOWER(note) LIKE 't0%'`. `LOWER()` uses JavaScript's lower-casing, which treats a few non-ASCII characters differently from the legacy engine's case-insensitive matching. The index can't serve an expression, so combine it with an indexed condition using `AND`. Otherwise the statement is a full scan of the table. To keep a case-insensitive prefix search on the index, store a lower-cased copy of the value in its own indexed attribute and query that.
+To match regardless of case on both engines, lower-case both the value and the pattern: `LOWER(note) LIKE 't0%'` (write the pattern in lower case, or lower-case a user-supplied pattern before sending it). `LOWER()` uses JavaScript's lower-casing, which treats a few non-ASCII characters differently from the legacy engine's case-insensitive matching. The index can't serve an expression, so combine it with an indexed condition using `AND`. Otherwise the statement scans the whole table, or is rejected with a 400 error under `sql.engine: new` with `sql.allowFullScan: false`. To keep a case-insensitive prefix search on the index, store a lower-cased copy of the value in its own indexed attribute and query that.
 
 ### Character Classes on the Legacy Engine
 
@@ -501,7 +501,7 @@ Each segment of a pattern (the text between `%` wildcards, or the whole pattern 
 
 When the legacy engine checks the pattern, the error message omits the `SQL engine v2: ` prefix (`{"error": "LIKE pattern must not have more than 10000 characters between % wildcards"}`).
 
-On the legacy engine, a pattern with more than 64 `_` wildcards (in segments that also contain literal characters or `[...]` classes) is also rejected with a 400 error in the rare case that the pattern contains at least one code unit from every consecutive two-code-unit pair in the reserved Unicode noncharacter ranges (`U+FDD0` to `U+FDEF`, `U+FFFE` to `U+FFFF`) and Private Use Area (`U+E000` to `U+F8FF`, about 3,200 pairs in all):
+On the legacy engine, a pattern with more than 64 `_` wildcards across segments that also contain literal characters or `[...]` classes is also rejected with a 400 error in the rare case that the pattern contains at least one code unit from every consecutive two-code-unit pair in the reserved Unicode noncharacter ranges (`U+FDD0` to `U+FDEF`, `U+FFFE` to `U+FFFF`) and Private Use Area (`U+E000` to `U+F8FF`, about 3,200 pairs in all):
 
 ```json
 {
