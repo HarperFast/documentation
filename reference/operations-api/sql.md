@@ -422,12 +422,12 @@ Geospatial data must be stored using the [GeoJSON standard](https://geojson.org/
 
 | Pattern element            | Matches                                                                                                                                 |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `%`                        | Any run of characters, including none, and including line breaks.                                                                       |
-| `_`                        | Exactly one character other than a line break (`\n`, `\r`, U+2028, U+2029).                                                             |
+| `%`                        | Any run of characters, including none, and including line breaks (`\n`, `\r`, U+2028, U+2029).                                          |
+| `_`                        | Exactly one character, including a line break (`\n`, `\r`, U+2028, U+2029). <VersionBadge type="changed" version="v5.4.0" />            |
 | `[abc]`, `[a-z]`, `[^abc]` | Legacy engine only: one character in the set or range, or with `^`, one character not in it. See the list below.                        |
 | Any other character        | Itself. `*`, `\`, `^`, `$`, `.`, `?` and `+` have no special meaning on either engine. <VersionBadge type="changed" version="v5.4.0" /> |
 
-`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`.
+`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`. Before v5.4.0, `_` did not match line breaks on either engine, and `%` did not match line breaks on the new engine.
 
 ```sql
 SELECT * FROM dev.dog WHERE dog_name LIKE 'Pen%'    -- starts with "Pen"
@@ -453,7 +453,7 @@ These are rejected with a 400 error, and no rows are changed:
 - An `ESCAPE` value that is empty (`''`) or longer than one character (`'!!'`, or a character such as an emoji that takes two UTF-16 code units).
 - An `ESCAPE` value that is not a string, such as `ESCAPE 1`.
 
-When the new engine plans the statement, a pattern written in it is checked before any row is read. When the legacy engine runs it, the pattern is checked when a row is tested against it, so a statement that tests no rows does not fail.
+The new engine checks a literal pattern before any row is read (including under `auto`, unless the statement falls back earlier on an unsupported clause such as `RIGHT JOIN`). When the legacy engine checks a pattern, or when the pattern comes from an expression rather than a string literal, it is checked when a row is tested against it, so a statement that tests no rows does not fail.
 
 Before v5.4.0, `ESCAPE` was ignored, so `ip LIKE 't0!%' ESCAPE '!'` matched every value starting with `t0!`, and an `UPDATE` or `DELETE` using it changed those rows.
 
@@ -483,13 +483,31 @@ The legacy engine also reads `[...]` in a pattern as a character class, matched 
 - `[a-z]` matches one character in the range.
 - `[^abc]` matches one character that is not in the set.
 - A range written backwards, such as `[z-a]`, is rejected with a 400 error when a row is tested against it.
-- A `[` with no closing `]` is a literal.
+- A `[` with no closing `]` is a literal, as is an escaped `[` (such as `![` with `ESCAPE '!'`).
 
 The new engine has no character classes: `[` and `]` match themselves. Under `auto`, a pattern such as `'[a]%'` is a class on the legacy engine and literal text on the new engine, so avoid `[` in patterns unless you know which engine runs the statement.
 
 ### Matching Cost
 
 <VersionBadge type="changed" version="v5.4.0" /> Testing one value takes time at most proportional to the value's length times the pattern's length, for any mix of `%` and `_`. Before v5.4.0, a short pattern such as `'%_%_%_%_%_%_%_%_%_%_%_%_%_%_Z'` against a long value could block a thread. Both lengths still multiply, so a pattern thousands of characters long tested against values millions of characters long is slow. If users supply patterns, limit their length.
+
+Each segment of a pattern (the text between `%` wildcards, or the whole pattern when it has no `%`) can be at most 10,000 characters long. Each literal character, `_` wildcard, escaped character (such as `!%` with `ESCAPE '!'`), or legacy `[...]` character class counts as one character toward that limit; a pattern can have multiple segments of up to 10,000 characters separated by `%`. A pattern with a segment longer than 10,000 characters is rejected with a 400 error:
+
+```json
+{
+	"error": "SQL engine v2: LIKE pattern must not have more than 10000 characters between % wildcards"
+}
+```
+
+When the legacy engine checks the pattern, the error message omits the `SQL engine v2: ` prefix (`{"error": "LIKE pattern must not have more than 10000 characters between % wildcards"}`).
+
+On the legacy engine, a pattern with more than 64 `_` wildcards (in segments that also contain literal characters or `[...]` classes) is also rejected with a 400 error in the rare case that the pattern contains at least one code unit from every consecutive two-code-unit pair in the reserved Unicode noncharacter ranges (`U+FDD0` to `U+FDEF`, `U+FFFE` to `U+FFFF`) and Private Use Area (`U+E000` to `U+F8FF`, about 3,200 pairs in all):
+
+```json
+{
+	"error": "LIKE pattern with more than 64 _ names too many private-use characters"
+}
+```
 
 The total cost of a `LIKE` is still the number of rows it tests. On an indexed attribute, the index serves a prefix pattern, which is literal text followed by one `%` (`'abc%'`, or `'50!%%' ESCAPE '!'` for values starting with `50%`), and a pattern with no wildcards, which is an equality test. Any other `LIKE` filters the rows that the rest of the query selects, so with no indexed condition it tests every row in the table. Whether such a statement falls back to the legacy engine, scans on the new engine, or is rejected with a 400 error depends on `sql.engine`, `sql.allowFullScan` and the rest of the statement; see [The fallback contract](#the-fallback-contract) and [Query Performance](#query-performance).
 
