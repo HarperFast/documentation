@@ -378,26 +378,26 @@ You can also specify a `start_time` in the `add_node` operation to limit the ini
 
 ### When a Peer Forces a Base Copy
 
-<VersionBadge type="changed" version="v5.4.0" />
+<VersionBadge type="changed" version="v5.3.6" />
 
-The peer that would send the catch-up decides, per database, when the returning node subscribes. It logs `forcing a bounded base-copy resync` when it forces a copy. Before v5.4, a peer forced one whenever the returning node's position was older than `logging.auditRetention` or than the peer's oldest retained entry. A peer that had written nothing to a database since then therefore forced a full copy even though nothing was missed.
+The peer that would send the catch-up decides, per database, when the returning node subscribes. It logs `forcing a bounded base-copy resync` when it forces a copy. Before v5.3.6, a peer forced one whenever the returning node's position was older than `logging.auditRetention` or than the peer's oldest retained entry. A peer that had written nothing to a database since then therefore forced a full copy even though nothing was missed.
 
-From v5.4, a peer records how far each prune of its transaction logs reached. It forces a copy when the returning node's position, for a log it would replay, is below that point. A position that is old only because the peer wrote nothing to that database since, such as an idle or never-written transaction log, no longer forces a copy. A copy can still be forced although nothing was missed, in these cases:
+From v5.3.6, a peer records how far each prune of its transaction logs reached. It forces a copy when the returning node's position, for a log it would replay, is below that point. A position that is old only because the peer wrote nothing to that database since, such as an idle or never-written transaction log, no longer forces a copy. A copy can still be forced although nothing was missed, in these cases:
 
-- The peer has no trustworthy record of what it pruned. It then uses the pre-v5.4 rule.
+- The peer has no trustworthy record of what it pruned. It then uses the pre-v5.3.6 rule.
 - After [`delete_transaction_logs_before`](../database/transaction.md#delete_transaction_logs_before), a node whose position is below the point that purge reached (at most the timestamp it was given) gets a base copy, even if the peer wrote nothing to that database after that position.
-- The peer has no record of what was removed from a transaction log that was already purged empty before it ran v5.4. After the upgrade, such a log can force one more base copy of that database for each node returning with a position older than that purge.
+- The peer has no record of what was removed from a transaction log that was already purged empty before it first ran v5.3.6 or later. After that upgrade, such a log can force one more base copy of that database for each node returning with a position older than that purge.
 - On RocksDB, the storage engine also purges transaction logs on its own after three days. If the peer itself was stopped for longer than that, a node whose position is older than three days gets one base copy of the database from it.
 
 A copy that keeps failing is reported as [`stuckCopy`](./clustering.md#stuck-copies) in `cluster_status`, and its reconnects are held back instead of retried indefinitely.
 
 ### Rows From Unnamed Origins
 
-<VersionBadge version="v5.4.0" />
+<VersionBadge version="v5.3.6" />
 
-Each replicated row records its origin, the node that wrote it, as a numeric id that each node maps to a node name. A node can hold rows whose origin id has no name on that node, for example data migrated from v4, or rows from a node whose name mapping no longer exists. Before v5.4, a peer receiving such a row could not translate its origin, so a base copy that included it failed and restarted from the same position indefinitely.
+Each replicated row records its origin, the node that wrote it, as a numeric id that each node maps to a node name. A node can hold rows whose origin id has no name on that node, for example data migrated from v4, or rows from a node whose name mapping no longer exists. Before v5.3.6, a peer receiving such a row could not translate its origin, so a base copy that included it failed and restarted from the same position indefinitely.
 
-From v5.4, the sending node names that origin `unnamed-origin-<id>@<node name>`, where `<id>` is its origin id on the sending node and `<node name>` is the sending node's own name. Receivers treat it like any other origin. A v5.4 node receiving from an older node derives the same name itself and logs a warning: `<node name> sent <database> records from origin id <id>, which has no name there; applying them as origin unnamed-origin-<id>@<node name>`. It derives at most 64 new names per connection; past that, the connection closes and reconnects.
+From v5.3.6, the sending node names that origin `unnamed-origin-<id>@<node name>`, where `<id>` is its origin id on the sending node and `<node name>` is the sending node's own name. Receivers treat it like any other origin. A node on v5.3.6 or later receiving from an older node derives the same name itself and logs a warning: `<node name> sent <database> records from origin id <id>, which has no name there; applying them as origin unnamed-origin-<id>@<node name>`. It derives at most 64 new names per connection; past that, the connection closes and reconnects.
 
 In `<node name>`, each character other than ASCII letters, digits, `.` and `-` becomes `_` followed by its four-digit lowercase hexadecimal code, so `:` becomes `_003a` and `_` becomes `_005f`. These names identify where rows came from; no node by that name exists. They can appear in log lines on any node that receives or relays those rows.
 
