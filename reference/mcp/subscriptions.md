@@ -139,6 +139,8 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`. Return the verified token expiry as described in [Bearer validators](../http/api.md#serverregisterbearervalidatorvalidator-options).
 
+A subscription created with a scoped token restores only when the GET presents a scoped token with the same username and role permissions. A refreshed expiry is allowed, but does not extend the original subscription expiry. An ordinary credential with the same username cannot inherit that scoped subscription; reconnecting with it removes the stored scoped entry while retaining valid ordinary subscriptions. An explicit new `resources/subscribe` POST can use its own scoped credential.
+
 To renew subscriptions after rotating credentials:
 
 1. Close the old GET stream and open `GET /mcp` for the same session with the replacement credential.
