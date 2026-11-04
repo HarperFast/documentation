@@ -80,7 +80,7 @@ A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than 
 | `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                           |
 | `-32603 resource subscription failed; retry the request`    | Installation failed, or another request for the same URI replaced this request. |
 
-A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential. Retry transient `-32603` failures with backoff. If failures repeat, have the server operator inspect the logged error and fix its cause before retrying; an invalid custom stream or a consistently failing custom gate will not be repaired by retries.
+A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential. Retry transient `-32603` failures with backoff. If failures repeat, have the server operator inspect the logged error and fix its cause before retrying. An invalid custom stream or a consistently failing custom gate will not be repaired by retries.
 
 `resources/list` advertised these URIs under `http(s)://` before 5.1.18 <VersionBadge type="changed" version="v5.1.18" />. A legacy `http://` or `https://` URI is still accepted by `resources/subscribe` and `resources/unsubscribe`, so a client holding an older listing keeps working; new clients should use the `harper+rest://` form the current listing returns.
 
@@ -127,7 +127,7 @@ Send `resources/unsubscribe` with the same URI:
 - `params.uri` is required and must be a string — otherwise `-32602` (`resources/unsubscribe requires params.uri`).
 - Unsubscribing a URI that was never subscribed is a no-op and still returns `{}`.
 
-Subscriptions are also torn down automatically when the session's GET-SSE stream closes — via explicit `DELETE /mcp`, idle-timeout eviction from `system.mcp_session`, a dropped TCP connection, or an idle-prune sweep. Credential expiry stops delivery too; a row-backed (table) subscription can end at expiry while its GET stream remains open.
+Subscriptions are also torn down automatically when the session's GET-SSE stream closes — via explicit `DELETE /mcp`, idle-timeout eviction from `system.mcp_session`, a dropped TCP connection, or an idle-prune sweep. Credential expiry stops delivery too. A row-backed (table) subscription can end at expiry while its GET stream remains open.
 
 ## Scope and durability
 
@@ -137,7 +137,7 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`; return the verified token expiry as described in [Bearer validators](../http/api.md#serverregisterbearervalidatorvalidator-options).
+Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`. Return the verified token expiry as described in [Bearer validators](../http/api.md#serverregisterbearervalidatorvalidator-options).
 
 To renew subscriptions after rotating credentials:
 
@@ -157,7 +157,7 @@ Mcp-Session-Id: 0c8f...
 Last-Event-ID: 137
 ```
 
-Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions, bounded by the original subscribing POST expiry and the current GET expiry. The GET response waits for restoration before returning HTTP `200` (Changed in: v5.4.0). Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1`; retry the GET. An absent session returns HTTP `404`.
+Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions, bounded by the original subscribing POST expiry and the current GET expiry. The GET response waits for restoration before returning HTTP `200` (Changed in: v5.4.0). Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1`. Retry the GET. An absent session returns HTTP `404`.
 
 Caveats, all best-effort by design:
 
