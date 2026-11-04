@@ -74,13 +74,13 @@ Synthetic `harper://*` metadata URIs (`harper://about`, `harper://openapi`, `har
 
 A refused subscribe, row-backed or custom, answers a JSON-RPC error rather than an HTTP 500 (Changed in: v5.4.0):
 
-| Answer                                                      | When                                                                      |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `-32602 permission denied: <uri>`                           | The subscription principal may not read the resource.                     |
-| `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                     |
-| `-32603 resource subscription failed; retry the request`    | Installation failed or an overlapping request superseded this generation. |
+| Answer                                                      | When                                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `-32602 permission denied: <uri>`                           | The credentials used for this subscription do not permit reading the resource. |
+| `-32603 resource subscription timed out; retry the request` | Installation was not acknowledged before the timeout.                          |
+| `-32603 resource subscription failed; retry the request`    | Installation failed or an overlapping request superseded this generation.      |
 
-A missing or expired session returns HTTP `404`. A successful response from an overlapping subscribe does not prove that another request's credential was authorized.
+A missing or expired session returns HTTP `404`. If requests for the same URI overlap, retry a failed request with the current credential.
 
 `resources/list` advertised these URIs under `http(s)://` before 5.1.18 <VersionBadge type="changed" version="v5.1.18" />. A legacy `http://` or `https://` URI is still accepted by `resources/subscribe` and `resources/unsubscribe`, so a client holding an older listing keeps working; new clients should use the `harper+rest://` form the current listing returns.
 
@@ -137,7 +137,7 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while that credential is still valid.
+Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid.
 
 To renew subscriptions after rotating credentials:
 
@@ -156,7 +156,7 @@ Mcp-Session-Id: 0c8f...
 Last-Event-ID: 137
 ```
 
-Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions and their original credential expiry. The GET response waits for restoration before returning HTTP `200` (Changed in: v5.4.0). Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1`; retry the GET. An absent session returns HTTP `404`.
+Harper replays buffered frames with a higher id (exclusive) before live frames resume, subject to the per-worker limits below. On reconnect, Harper restores persisted subscriptions under the current GET permissions, bounded by the original subscribing POST expiry and the current GET expiry. The GET response waits for restoration before returning HTTP `200` (Changed in: v5.4.0). Expired, denied, or no-longer-subscribable entries are removed. A transient restoration failure retains the URI and returns HTTP `503` with `Retry-After: 1`; retry the GET. An absent session returns HTTP `404`.
 
 Caveats, all best-effort by design:
 
