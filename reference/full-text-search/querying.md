@@ -30,7 +30,7 @@ Results are ordered by BM25 relevance. The `FullText` field, not one of its sour
 | `matches_fuzzy`        | Matches terms within one edit by default, including a transposition.    | —                     |
 | `matches_fuzzy_prefix` | Combines fuzzy matching (one edit by default) with a final-term prefix. | `surfaceTerms: true`  |
 
-On a `Table.search()` fuzzy or fuzzy-prefix condition, `fuzzyDistance` accepts an integer `0`–`2` and defaults to `1`. It must not exceed `storage.fullText.query.maxFuzzyDistance`; exceeding that maximum returns HTTP 400. With a maximum of `0`, set `fuzzyDistance: 0` explicitly. Distance `2` remains preview and requires workload qualification.
+<VersionBadge version="v5.4.0" /> On a `Table.search()` fuzzy or fuzzy-prefix condition, `fuzzyDistance` accepts an integer `0`–`2` and defaults to `1`. It must not exceed `storage.fullText.query.maxFuzzyDistance`; exceeding that maximum returns HTTP 400. With a maximum of `0`, set `fuzzyDistance: 0` explicitly. Distance `2` remains preview and requires workload qualification.
 
 Every comparator also has a negated form: `not_matches`, `not_matches_all`, `not_matches_phrase`, `not_matches_prefix`, `not_matches_fuzzy`, and `not_matches_fuzzy_prefix`.
 
