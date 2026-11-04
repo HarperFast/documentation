@@ -137,7 +137,7 @@ A live subscription runs on the worker holding the session's GET-SSE stream. The
 
 <VersionBadge type="changed" version="v5.4.0" />
 
-Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`; return the verified token expiry as described in [Bearer validators](../http/api.md#serveraddbearervalidatorvalidator-options).
+Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Harper keeps the GET credential's expiry when it re-reads the user's permissions after a role change. Reconnecting can restore an unexpired subscription under the current GET permissions, but cannot extend the original POST credential's expiry. A reconnect after a network interruption does not require re-subscribing while the original subscribing POST credential is still valid. Component bearer validators that omit `authExpiresAt` default to five minutes, capped by a JWT's `exp`; return the verified token expiry as described in [Bearer validators](../http/api.md#serverregisterbearervalidatorvalidator-options).
 
 To renew subscriptions after rotating credentials:
 
