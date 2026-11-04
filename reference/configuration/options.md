@@ -351,6 +351,12 @@ storage:
   - `maxRawHitsPerRequest` — Maximum fetched hits per request, including bounded prefix replay when traversal is needed; default `10000`.
   - `maxResultsPerRequest` — Maximum retained offset plus limit. A request must also fit the separate raw-hit budget; default `10000`.
   - `requestBudgetMilliseconds` — Execution budget across native batches, source checks and highlights, capped by the native execution limit; default `5000` ms. Reader acquisition and freshness waiting have separate bounds.
+  - `query.maxQueryTerms` — Maximum analyzed terms per text leaf; integer `1`–`1024`, default `64`.
+  - `query.maxFuzzyDistance` — Maximum fuzzy edit distance; integer `0`–`2`, default `1`. Distance `2` is preview and needs workload qualification; admission and deadlines are not hard process-memory bounds. With `0`, fuzzy and fuzzy-prefix conditions that omit `fuzzyDistance: 0` are rejected with HTTP 400; omitted distances remain `1`.
+  - `query.maxQueryClauses` — Maximum compiled clauses per query, including Boolean structure, NOT and field expansion; integer `1`–`4096`, default `256`.
+
+    Query settings are captured for the process and inherited by workers. Changes require a full Harper process restart; `restart_service` alone does not apply them. Omitted values retain defaults, and request work budgets cannot raise these limits.
+
   - `runtime.maxResidentIndexes` — Maximum resident native indexes; default `128`.
   - `runtime.maxIndexingThreads` — Maximum aggregate indexing-thread reservations across resident native indexes; default `128`.
   - `runtime.maxSearchThreads` — Maximum aggregate search-thread reservations across resident native indexes; default `256`.
@@ -448,7 +454,7 @@ analytics:
 | `histograms`           | `boolean` | `false`       | Record optional latency histograms.                                                                                                                                |
 | `snapshotBytes`        | `boolean` | `false`       | Request cached reader-byte observations; enabling does not trigger index publication or reader reload.                                                             |
 
-Set `enabled: false` or remove the block to stop operator collection and export. Invalid edits retain the last valid policy. Deleting the configuration file removes the file-based `analytics.fullText` setting and reapplies `HARPER_DEFAULT_CONFIG`, `HARPER_CONFIG` and `HARPER_SET_CONFIG` overlays to an empty file; collection remains enabled if one of those overlays still requests it. An in-process override is retired if deletion changes its matching configuration value after those overlays are applied; recreating the file does not restore retired overrides. Internal implementation hooks can independently keep collection active without enabling persistence; they are not a public SDK or operator prerequisite. With operator export enabled, persisted fields reflect the union of operator and internal-consumer recording requests. A handle already closing retains its last options until close settles.
+Set `enabled: false` or remove the block to stop operator collection and export, unless environment overlays or in-process overrides still enable it. Invalid edits retain the last valid policy. A missing configuration file retains the last valid telemetry policy and in-process overrides; recreating an unchanged file preserves them. To disable collection, make a valid file edit and remove any environment or in-process setting that keeps it enabled. Valid edits retire overrides only where matching effective values change after environment overlays. Internal implementation hooks can independently keep collection active without enabling persistence; they are not a public SDK or operator prerequisite. With operator export enabled, persisted fields reflect the union of operator and internal-consumer recording requests. A handle already closing retains its last options until close settles.
 
 The interval controls periodic live sampling. Successful handle closes also collect final counters, so it does not cap total snapshot or export frequency. Qualify reader churn as well as index count and sampling cadence.
 
