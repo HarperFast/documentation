@@ -729,7 +729,7 @@ Inside the brackets:
 - Conditions combine with `&`, `|`, and parenthesized or bracketed groups. `products[name=Mouse|price=ge=100]` returns Budget Basics and Studio Gear.
 - Brackets can nest another relationship and can follow a relationship path, as [the next section](#conditions-through-several-relationships) shows.
 
-The name before the brackets must be a relationship, and the brackets must hold at least one condition; otherwise Harper returns HTTP 400. On a to-one relationship, which has one related record, brackets match the same records as separate conditions. Brackets after a relationship name inside `select()` keep their meaning as a [nested relationship query](#filtering-and-paging-each-relationship).
+The name before the brackets must be a relationship, the brackets must hold at least one condition, and no condition in them can use a full-text comparator such as `matches`; otherwise Harper returns HTTP 400. On a to-one relationship, which has one related record, brackets match the same records as separate conditions. Brackets after a relationship name inside `select()` keep their meaning as a [nested relationship query](#filtering-and-paging-each-relationship).
 
 Querying through a relationship, by a dotted path or in brackets, needs read permission on the related table and on each related attribute a condition names. Without it, Harper returns HTTP 403.
 
