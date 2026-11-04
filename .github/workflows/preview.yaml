@@ -128,7 +128,7 @@ jobs:
           EOF
 
       - if: steps.build.outputs.run-id != ''
-        uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # main after HarperFast/deploy-action#1; no v1 tag yet
+        uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # v1.0.0
         with:
           target: ${{ vars.HARPER_PREVIEW_TARGET }}
           app: docs-site
@@ -145,7 +145,7 @@ jobs:
       pull-requests: write
       deployments: write
     steps:
-      - uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # main after HarperFast/deploy-action#1; no v1 tag yet
+      - uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # v1.0.0
         with:
           target: ${{ vars.HARPER_PREVIEW_TARGET }}
           app: docs-site
