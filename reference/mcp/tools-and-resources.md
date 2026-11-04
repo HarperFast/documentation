@@ -371,6 +371,16 @@ Per-record reads go through the tools surface, where each Resource's `allow{Read
 
 Author-declared `mcpResources` entries (see [Custom `mcpResources` opt-in](#custom-mcpresources-opt-in)) appear alongside the built-in surfaces: fixed URIs in `resources/list`, templates in `resources/templates/list`. A registered custom URI always wins over the discovered surfaces on `resources/read`.
 
+### Subscription lifetime and credential rotation
+
+<VersionBadge type="changed" version="v5.4.0" />
+
+Resource subscriptions run on the worker holding the session's GET-SSE stream, even when a `resources/subscribe` POST reaches another worker. Open the GET stream before subscribing. A successful subscribe response means that the current GET worker has installed the subscription.
+
+Resource updates stop when either the subscribing POST's bearer credential or the receiving GET's bearer credential expires, whichever comes first. Reconnecting with a refreshed token can restore an unexpired subscription, but does not extend the expiry of the credential that created it. Current GET permissions still apply.
+
+After rotating credentials, open a GET stream with the replacement credential and re-issue `resources/subscribe` for each URI you want to keep watching. A native table subscription can end at expiry while the GET stream stays open, so an open connection alone does not mean that updates are still being delivered. Re-subscribing with the replacement credential establishes a new subscription lifetime.
+
 ## `notifications/*/list_changed`
 
 After the `initialize` handshake, an MCP client opens `GET /mcp` to keep an SSE channel open for server-push frames. Harper subscribes to its existing role-cache and schema-reload event channels and, whenever one fires:
