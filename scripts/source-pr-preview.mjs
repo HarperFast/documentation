@@ -13,6 +13,7 @@ const SOURCE_REPOS = new Map([
 	['HarperFast/harper-pro', 'harper-pro'],
 ]);
 export const COMMENT_MARKER = '<!-- docs-source-pr-preview -->';
+const REMOVED_MARKER = '<!-- docs-source-pr-preview: removed -->';
 export const DEPLOY_EVENT = 'docs-source-pr-preview';
 export const CLEANUP_EVENT = 'docs-source-pr-preview-cleanup';
 
@@ -87,25 +88,30 @@ export async function resolveSource(github, eventType, payload) {
 	return { ...base, action: 'deploy', harperSha: harperSha ?? '', proSha: proSha ?? '', error };
 }
 
-/** The resolve job's outputs, checked again where they are consumed. */
 export function checkOutputs({ project, headSha, harperSha, proSha, error }) {
 	if (!PROJECT.test(project)) throw new Error(`invalid project ${project}`);
 	if (!SHA.test(headSha)) throw new Error(`invalid head sha ${headSha}`);
 	if (!error && !(SHA.test(harperSha) && SHA.test(proSha))) throw new Error('invalid source shas');
 }
 
-/** Whether a side effect for `expected` still applies: the PR is still open at that head (deploy) or still closed. */
-export async function stillCurrent(github, source, action, expectedHead) {
-	const { data: pr } = await github.rest.pulls.get({
-		owner: OWNER,
-		repo: source.repo,
-		pull_number: source.number,
-	});
-	if (action === 'cleanup') return pr.state !== 'open';
-	return pr.state === 'open' && pr.head.sha === expectedHead;
+export async function readPr(github, source) {
+	const { data } = await github.rest.pulls.get({ owner: OWNER, repo: source.repo, pull_number: source.number });
+	return data;
 }
 
-/** The preview comment this App wrote on the PR, if any. A marker in someone else's comment does not count. */
+/**
+ * What the apply job does, from the PR as it is when the job starts. Apply jobs for a PR run one at a time, and a
+ * newer one can replace one still queued, so each brings the preview to the PR's current state rather than doing
+ * what its own dispatch asked: a closed PR loses its preview whichever event queued the job.
+ * `comment` is this App's preview comment; one exists from before any deploy starts, so a preview without one
+ * was never deployed.
+ */
+export function decide({ action, pr, builtHead, buildResult, resolveError, comment }) {
+	if (pr.state !== 'open') return comment && !comment.body.includes(REMOVED_MARKER) ? 'remove' : 'skip';
+	if (action !== 'deploy' || pr.head.sha !== builtHead) return 'skip';
+	return resolveError || buildResult !== 'success' ? 'fail' : 'deploy';
+}
+
 export async function findComment(github, source, botLogin) {
 	const comments = await github.paginate(github.rest.issues.listComments, {
 		owner: OWNER,
@@ -113,20 +119,29 @@ export async function findComment(github, source, botLogin) {
 		issue_number: source.number,
 		per_page: 100,
 	});
+	// A marker quoted in someone else's comment does not count.
 	return comments.find((comment) => comment.user?.login === botLogin && comment.body?.includes(COMMENT_MARKER));
 }
 
-export async function upsertComment(github, source, botLogin, body) {
-	const existing = await findComment(github, source, botLogin);
+export async function upsertComment(github, source, existing, body) {
 	const params = { owner: OWNER, repo: source.repo, body };
 	if (existing) {
-		await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
-	} else {
-		await github.rest.issues.createComment({ ...params, issue_number: source.number });
+		const { data } = await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+		return data;
 	}
+	const { data } = await github.rest.issues.createComment({ ...params, issue_number: source.number });
+	return data;
 }
 
 const short = (sha) => `\`${sha.slice(0, 10)}\``;
+
+export function deployingBody({ headSha, runUrl }) {
+	return `${COMMENT_MARKER}
+### 📖 Docs preview
+
+Deploying ${short(headSha)} ([build](${runUrl}))…
+`;
+}
 
 export function readyBody({ url, harperSha, proSha, runUrl }) {
 	return `${COMMENT_MARKER}
@@ -138,16 +153,17 @@ Built from harper ${short(harperSha)} and harper-pro ${short(proSha)} ([build]($
 `;
 }
 
-export function failedBody({ headSha, error, runUrl }) {
+export function failedBody({ headSha, reason, url, runUrl }) {
 	return `${COMMENT_MARKER}
 ### 📖 Docs preview failed
 
-The documentation site did not build from ${short(headSha)}: ${error || 'see the build log'} ([build](${runUrl})). The next push to this PR tries again.
+${short(headSha)} was not previewed: ${reason} ([build](${runUrl})). ${url} keeps the last preview that deployed, if any. The next push to this PR tries again.
 `;
 }
 
 export function removedBody() {
 	return `${COMMENT_MARKER}
+${REMOVED_MARKER}
 ### 📖 Docs preview removed
 
 The preview was removed when this PR closed.

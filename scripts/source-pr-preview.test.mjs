@@ -8,11 +8,13 @@ import {
 	COMMENT_MARKER,
 	DEPLOY_EVENT,
 	checkOutputs,
+	decide,
+	failedBody,
 	findComment,
 	parsePayload,
 	readyBody,
+	removedBody,
 	resolveSource,
-	stillCurrent,
 	upsertComment,
 } from './source-pr-preview.mjs';
 
@@ -65,8 +67,6 @@ function pr({ state = 'open', head = sha('a'), base = 'main', headRepo = 'Harper
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
 
-// Payload validation
-
 test('accepts the two source repos with a positive integer', () => {
 	assert.deepEqual(parsePayload({ repo: 'HarperFast/harper', number: 12 }), {
 		owner: 'HarperFast',
@@ -98,8 +98,6 @@ test('rejects numbers that are not positive integers', () => {
 	}
 	assert.throws(() => parsePayload(undefined), /client_payload/);
 });
-
-// Resolution
 
 test('harper PR builds its head with harper-pro at the branch named like its base', async () => {
 	const github = fakeGithub({
@@ -183,18 +181,42 @@ test('outputs are checked again where they are consumed', () => {
 	checkOutputs({ ...good, proSha: '', error: 'no branch' });
 });
 
-test('a side effect applies only while the PR is still at the built head', async () => {
-	const source = { repo: 'harper', number: 5 };
-	const github = fakeGithub({ prs: { 'HarperFast/harper#5': pr({ head: sha('a') }) } });
-	assert.equal(await stillCurrent(github, source, 'deploy', sha('a')), true);
-	assert.equal(await stillCurrent(github, source, 'deploy', sha('b')), false);
-	assert.equal(await stillCurrent(github, source, 'cleanup'), false);
-	const closed = fakeGithub({ prs: { 'HarperFast/harper#5': pr({ state: 'closed', head: sha('a') }) } });
-	assert.equal(await stillCurrent(closed, source, 'deploy', sha('a')), false);
-	assert.equal(await stillCurrent(closed, source, 'cleanup'), true);
+const removed = { id: 4, body: removedBody() };
+const live = { id: 4, body: readyBody({ url: 'U', harperSha: sha('a'), proSha: sha('b'), runUrl: 'R' }) };
+const decision = (overrides) =>
+	decide({ action: 'deploy', pr: pr(), builtHead: sha('a'), buildResult: 'success', resolveError: '', ...overrides });
+
+test('an open PR at the built head deploys, or reports why it cannot', () => {
+	assert.equal(decision({}), 'deploy');
+	assert.equal(decision({ buildResult: 'failure' }), 'fail');
+	assert.equal(decision({ buildResult: 'skipped', resolveError: 'no branch' }), 'fail');
 });
 
-// Comments
+test('a job for a head the PR has moved past, or a cleanup of an open PR, does nothing', () => {
+	assert.equal(decision({ builtHead: sha('b') }), 'skip');
+	assert.equal(decision({ builtHead: sha('b'), buildResult: 'failure' }), 'skip');
+	assert.equal(decision({ action: 'cleanup', builtHead: '', buildResult: 'skipped', comment: live }), 'skip');
+});
+
+test('a closed PR loses its preview whichever event queued the job', () => {
+	const closed = pr({ state: 'closed' });
+	assert.equal(decision({ pr: closed, comment: live }), 'remove');
+	assert.equal(decision({ pr: closed, action: 'cleanup', buildResult: 'skipped', comment: live }), 'remove');
+	assert.equal(decision({ pr: closed, builtHead: sha('b'), buildResult: 'failure', comment: live }), 'remove');
+});
+
+test('a closed PR with no comment never deployed, and one already removed needs nothing', () => {
+	const closed = pr({ state: 'closed' });
+	assert.equal(decision({ pr: closed, action: 'cleanup', comment: undefined }), 'skip');
+	assert.equal(decision({ pr: closed, action: 'cleanup', comment: removed }), 'skip');
+	assert.equal(
+		decision({
+			pr: closed,
+			comment: { id: 4, body: failedBody({ headSha: sha('a'), reason: 'r', url: 'U', runUrl: 'R' }) },
+		}),
+		'remove'
+	);
+});
 
 const BOT = 'harperfastaibot[bot]';
 const source = { repo: 'harper', number: 5 };
@@ -206,7 +228,9 @@ test('creates the comment when this App has none', async () => {
 			{ id: 2, user: { login: BOT }, body: 'an unrelated comment' },
 		],
 	});
-	await upsertComment(github, source, BOT, 'new body');
+	const existing = await findComment(github, source, BOT);
+	assert.equal(existing, undefined);
+	await upsertComment(github, source, existing, 'new body');
 	const [list, create] = github.calls;
 	assert.deepEqual(list[1], { owner: 'HarperFast', repo: 'harper', issue_number: 5, per_page: 100 });
 	assert.deepEqual(create, ['create', { owner: 'HarperFast', repo: 'harper', body: 'new body', issue_number: 5 }]);
@@ -219,8 +243,9 @@ test("updates this App's marked comment in place", async () => {
 			{ id: 3, user: { login: BOT }, body: `${COMMENT_MARKER}\nold` },
 		],
 	});
-	assert.equal((await findComment(github, source, BOT)).id, 3);
-	await upsertComment(github, source, BOT, 'new body');
+	const existing = await findComment(github, source, BOT);
+	assert.equal(existing.id, 3);
+	await upsertComment(github, source, existing, 'new body');
 	assert.deepEqual(github.calls.at(-1), [
 		'update',
 		{ owner: 'HarperFast', repo: 'harper', body: 'new body', comment_id: 3 },
@@ -233,8 +258,6 @@ test('comment bodies carry the marker, the link and both shas', () => {
 	assert(body.includes('https://p.example/harper-pr-5/'));
 	assert(body.includes(sha('a').slice(0, 10)) && body.includes(sha('b').slice(0, 10)));
 });
-
-// The workflow's security settings
 
 const workflow = yaml.load(
 	readFileSync(new URL('../.github/workflows/source-pr-preview.yaml', import.meta.url), 'utf8')
@@ -261,15 +284,18 @@ test('the build holds no secret, gates forks, and keeps no git credentials', () 
 	assert(!build.steps.some((step) => step.uses?.startsWith('actions/setup-node@') && step.with?.cache));
 });
 
-test('jobs holding credentials never install or build the site', () => {
-	for (const name of ['publish', 'cleanup']) {
-		const job = workflow.jobs[name];
-		for (const step of job.steps) {
-			assert(!/npm (ci|run)|npm install(?! -g harper)/.test(step.run ?? ''), `${name}: ${step.run}`);
-		}
-		assert.equal(job.concurrency.group, 'source-pr-preview-${{ needs.resolve.outputs.project }}');
-		assert.equal(job.concurrency['cancel-in-progress'], false);
+test('only apply holds secrets, and it never installs or builds the site', () => {
+	const secretJobs = Object.entries(workflow.jobs).filter(([, job]) => JSON.stringify(job).includes('secrets.'));
+	assert.deepEqual(
+		secretJobs.map(([name]) => name),
+		['apply']
+	);
+	const { apply } = workflow.jobs;
+	for (const step of apply.steps) {
+		assert(!/npm (ci|run)|npm install(?! -g harper$)/m.test(step.run ?? ''), step.run);
 	}
+	assert.equal(apply.concurrency.group, 'source-pr-preview-${{ needs.resolve.outputs.project }}');
+	assert.equal(apply.concurrency['cancel-in-progress'], false);
 });
 
 test('payload-derived values reach scripts only through validated outputs and env', () => {
