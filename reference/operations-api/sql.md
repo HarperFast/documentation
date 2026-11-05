@@ -427,7 +427,7 @@ Geospatial data must be stored using the [GeoJSON standard](https://geojson.org/
 | `[abc]`, `[a-z]`, `[^abc]` | Legacy engine only: one character in the set or range, or with `^`, one character not in it. See the list below.                                                    |
 | Any other character        | Itself. `.`, `?` and `+` have no special meaning on either engine; since v5.4.0, neither do `*`, `\`, `^` and `$`. <VersionBadge type="changed" version="v5.4.0" /> |
 
-`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`. Before v5.4.0, `_` did not match line breaks on either engine, and `%` did not match line breaks on the new engine, except in a pattern that is a literal prefix followed by one trailing `%`, such as `'a%'`, which was already matched as a prefix.
+`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`. Before v5.4.0, `_` did not match line breaks on either engine, and `%` did not match line breaks on the new engine, except in a pattern that is a literal prefix followed by one trailing `%`, such as `'a%'`, when an index on the attribute served it as a prefix scan.
 
 ```sql
 SELECT * FROM dev.dog WHERE dog_name LIKE 'Pen%'    -- starts with "Pen"
