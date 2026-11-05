@@ -1,0 +1,261 @@
+name: Source PR Preview
+
+# Deploys a preview of this site built from a HarperFast/harper or HarperFast/harper-pro PR that
+# changes docs/, and keeps one comment on that PR with its link. The source repos' docs-preview.yaml
+# dispatches here on each push and on close; logic is in scripts/source-pr-preview.mjs.
+#
+# The PR's docs are MDX, which runs JavaScript at build time. So `build` holds no secret and no
+# write token, cannot write caches (cache-mode), and waits for 'preview' environment approval when
+# the PR is from a fork. `publish` and `cleanup` hold the deploy and comment credentials and run only
+# this repo's default branch and the built static files.
+
+on:
+  repository_dispatch:
+    types: [docs-source-pr-preview, docs-source-pr-preview-cleanup]
+
+cache-mode: none
+
+permissions: {}
+
+jobs:
+  resolve:
+    name: Resolve the source PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      action: ${{ steps.resolve.outputs.action }}
+      repo: ${{ steps.resolve.outputs.repo }}
+      number: ${{ steps.resolve.outputs.number }}
+      project: ${{ steps.resolve.outputs.project }}
+      fork: ${{ steps.resolve.outputs.fork }}
+      head-sha: ${{ steps.resolve.outputs.headSha }}
+      harper-sha: ${{ steps.resolve.outputs.harperSha }}
+      pro-sha: ${{ steps.resolve.outputs.proSha }}
+      error: ${{ steps.resolve.outputs.error }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      - id: resolve
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { resolveSource, checkOutputs } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/source-pr-preview.mjs`);
+            const resolved = await resolveSource(github, context.payload.action, context.payload.client_payload);
+            if (resolved.action === 'deploy') checkOutputs(resolved);
+            for (const [key, value] of Object.entries(resolved)) core.setOutput(key, String(value));
+            core.info(JSON.stringify(resolved));
+
+  build:
+    name: Build the site
+    needs: resolve
+    if: needs.resolve.outputs.action == 'deploy' && needs.resolve.outputs.error == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ needs.resolve.outputs.fork == 'true' && 'preview' || null }}
+    concurrency:
+      group: source-pr-preview-build-${{ needs.resolve.outputs.project }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Build
+        env:
+          HARPER_DOCS_REF: ${{ needs.resolve.outputs.harper-sha }}
+          HARPER_PRO_DOCS_REF: ${{ needs.resolve.outputs.pro-sha }}
+          DOCUSAURUS_BASE_URL: /${{ needs.resolve.outputs.project }}
+        run: npm run build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: site
+          path: build/
+          retention-days: 7
+
+  # Deploys and comments, or reports the failure. Shares one queue per PR with cleanup and is never
+  # cancelled, so a deploy cannot land after the close that should remove it.
+  publish:
+    name: Deploy and comment
+    needs: [resolve, build]
+    if: always() && needs.resolve.outputs.action == 'deploy' && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: source-pr-preview-${{ needs.resolve.outputs.project }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      PROJECT: ${{ needs.resolve.outputs.project }}
+      SOURCE_REPO: ${{ needs.resolve.outputs.repo }}
+      SOURCE_NUMBER: ${{ needs.resolve.outputs.number }}
+      HEAD_SHA: ${{ needs.resolve.outputs.head-sha }}
+      HARPER_SHA: ${{ needs.resolve.outputs.harper-sha }}
+      PRO_SHA: ${{ needs.resolve.outputs.pro-sha }}
+      RESOLVE_ERROR: ${{ needs.resolve.outputs.error }}
+      BUILD_RESULT: ${{ needs.build.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      - name: Check the PR is still at the built head
+        id: current
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { checkOutputs, stillCurrent } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/source-pr-preview.mjs`);
+            const { PROJECT: project, HEAD_SHA: headSha, HARPER_SHA: harperSha, PRO_SHA: proSha, RESOLVE_ERROR: error } = process.env;
+            checkOutputs({ project, headSha, harperSha, proSha, error });
+            const source = { repo: process.env.SOURCE_REPO, number: Number(process.env.SOURCE_NUMBER) };
+            const current = await stillCurrent(github, source, 'deploy', headSha);
+            if (!current) core.info('The PR has closed or moved on; a newer run handles it.');
+            core.setOutput('current', String(current));
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.current.outputs.current == 'true' && env.BUILD_RESULT == 'success'
+        with:
+          name: site
+          path: ${{ env.PROJECT }}/build
+      - name: Write the component config
+        if: steps.current.outputs.current == 'true' && env.BUILD_RESULT == 'success'
+        run: |
+          if [ -n "$(find "$PROJECT/build" -type l)" ]; then
+            echo "::error::the built site contains symlinks"
+            exit 1
+          fi
+          cat > "$PROJECT/config.yaml" <<EOF
+          static:
+            files: 'build/**'
+            urlPath: '$PROJECT'
+            extensions: ['html']
+            index: true
+          EOF
+      - name: Deploy to the preview server
+        if: steps.current.outputs.current == 'true' && env.BUILD_RESULT == 'success'
+        working-directory: ${{ env.PROJECT }}
+        env:
+          HARPER_PREVIEW_TARGET: ${{ secrets.HARPER_PREVIEW_TARGET }}
+          HARPER_PREVIEW_USERNAME: ${{ secrets.HARPER_PREVIEW_USERNAME }}
+          HARPER_PREVIEW_PASSWORD: ${{ secrets.HARPER_PREVIEW_PASSWORD }}
+        run: |
+          npm install -g harper
+          harper deploy \
+            target=${HARPER_PREVIEW_TARGET}:9925 \
+            username=$HARPER_PREVIEW_USERNAME \
+            password=$HARPER_PREVIEW_PASSWORD \
+            project=$PROJECT \
+            restart=true \
+            replicated=true
+      - name: Generate the comment token
+        id: app-token
+        if: always() && steps.current.outputs.current == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.HARPERFAST_AI_CLIENT_ID }}
+          private-key: ${{ secrets.HARPERFAST_AI_APP_PRIVATE_KEY }}
+          owner: HarperFast
+          repositories: ${{ env.SOURCE_REPO }}
+          permission-pull-requests: write
+      - name: Comment on the source PR
+        if: always() && steps.app-token.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          HARPER_PREVIEW_TARGET: ${{ secrets.HARPER_PREVIEW_TARGET }}
+          BOT_LOGIN: ${{ steps.app-token.outputs.app-slug }}[bot]
+          DEPLOYED: ${{ env.BUILD_RESULT == 'success' && job.status == 'success' }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { upsertComment, readyBody, failedBody } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/source-pr-preview.mjs`);
+            const env = process.env;
+            const source = { repo: env.SOURCE_REPO, number: Number(env.SOURCE_NUMBER) };
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body =
+              env.DEPLOYED === 'true'
+                ? readyBody({ url: `${env.HARPER_PREVIEW_TARGET}/${env.PROJECT}/`, harperSha: env.HARPER_SHA, proSha: env.PRO_SHA, runUrl })
+                : failedBody({ headSha: env.HEAD_SHA, error: env.RESOLVE_ERROR, runUrl });
+            await upsertComment(github, source, env.BOT_LOGIN, body);
+      - name: Fail when the preview did not deploy
+        if: steps.current.outputs.current == 'true' && env.BUILD_RESULT != 'success'
+        run: |
+          echo "::error::${RESOLVE_ERROR:-the site build failed}"
+          exit 1
+
+  cleanup:
+    name: Remove the preview
+    needs: resolve
+    if: needs.resolve.outputs.action == 'cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: source-pr-preview-${{ needs.resolve.outputs.project }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      PROJECT: ${{ needs.resolve.outputs.project }}
+      SOURCE_REPO: ${{ needs.resolve.outputs.repo }}
+      SOURCE_NUMBER: ${{ needs.resolve.outputs.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      - name: Generate the comment token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.HARPERFAST_AI_CLIENT_ID }}
+          private-key: ${{ secrets.HARPERFAST_AI_APP_PRIVATE_KEY }}
+          owner: HarperFast
+          repositories: ${{ env.SOURCE_REPO }}
+          permission-pull-requests: write
+      # Every closed source PR dispatches here; only one this workflow commented on has a preview.
+      - name: Find the preview
+        id: preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BOT_LOGIN: ${{ steps.app-token.outputs.app-slug }}[bot]
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { findComment, stillCurrent } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/source-pr-preview.mjs`);
+            const source = { repo: process.env.SOURCE_REPO, number: Number(process.env.SOURCE_NUMBER) };
+            const closed = await stillCurrent(github, source, 'cleanup');
+            const comment = closed && (await findComment(github, source, process.env.BOT_LOGIN));
+            core.setOutput('exists', String(Boolean(comment)));
+      - name: Drop the component
+        if: steps.preview.outputs.exists == 'true'
+        env:
+          HARPER_PREVIEW_TARGET: ${{ secrets.HARPER_PREVIEW_TARGET }}
+          HARPER_PREVIEW_USERNAME: ${{ secrets.HARPER_PREVIEW_USERNAME }}
+          HARPER_PREVIEW_PASSWORD: ${{ secrets.HARPER_PREVIEW_PASSWORD }}
+        run: |
+          npm install -g harper
+          harper drop_component \
+            target=${HARPER_PREVIEW_TARGET}:9925 \
+            username=$HARPER_PREVIEW_USERNAME \
+            password=$HARPER_PREVIEW_PASSWORD \
+            project=$PROJECT \
+            replicated=true \
+            restart=true
+      - name: Mark the comment removed
+        if: steps.preview.outputs.exists == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BOT_LOGIN: ${{ steps.app-token.outputs.app-slug }}[bot]
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { upsertComment, removedBody } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/source-pr-preview.mjs`);
+            const source = { repo: process.env.SOURCE_REPO, number: Number(process.env.SOURCE_NUMBER) };
+            await upsertComment(github, source, process.env.BOT_LOGIN, removedBody());
