@@ -4,10 +4,11 @@
 	"private": true,
 	"scripts": {
 		"docusaurus": "docusaurus",
+		"prestart": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
 		"start": "docusaurus start",
-		"predev": "node scripts/prebuild.js",
-		"dev": "docusaurus start",
-		"prebuild": "node scripts/prebuild.js",
+		"predev": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
+		"dev": "node scripts/assemble-content.mjs --watch",
+		"prebuild": "node scripts/prebuild.js && node scripts/assemble-content.mjs",
 		"build": "docusaurus build",
 		"version": "docusaurus docs:version",
 		"swizzle": "docusaurus swizzle",
@@ -20,7 +21,6 @@
 		"format:write": "npm run format -- --write",
 		"lint": "oxlint --deny-warnings .",
 		"preview:pr": "node scripts/preview-pr.mjs",
-		"test:examples": "node --test scripts/nested-relationship-examples.test.mjs scripts/github-fixture-fetch.test.mjs",
 		"test:workflows": "node scripts/companion-check.test.mjs"
 	},
 	"devDependencies": {
@@ -39,6 +39,7 @@
 		"@mdx-js/react": "3.1.1",
 		"@signalwire/docusaurus-plugin-llms-txt": "1.2.2",
 		"clsx": "2.1.1",
+		"js-yaml": "4.1.0",
 		"oxlint": "1.31.0",
 		"prettier": "3.8.1",
 		"prism-react-renderer": "2.4.1",

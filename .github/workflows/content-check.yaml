@@ -1,0 +1,71 @@
+name: Content Check
+
+# The v5 reference and the open release notes are assembled from docs/ in HarperFast/harper and
+# HarperFast/harper-pro (scripts/assemble-content.mjs) at harper-pro's latest published release.
+# This redeploys both sites when the docs/ trees the script would assemble now differ from the ones
+# the live site was built from (/content-sources.json). A separate workflow, so checks that find
+# nothing to do never join the deploy concurrency groups.
+#
+# harper-pro dispatches docs-source-changed when it publishes a release or pushes a docs/ tag
+# (publish-docs.yaml there); the schedule catches a dispatch that failed.
+
+on:
+  repository_dispatch:
+    types: [docs-source-changed]
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+# A dispatch and the schedule can arrive together; the second run then sees the first one's deploy.
+concurrency:
+  group: content-check
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  check:
+    name: Compare docs/ trees with the deployed site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: Dispatch the deploys when a source changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}${{ vars.DOCUSAURUS_BASE_URL || '/' }}
+        run: |
+          set -euo pipefail
+          # Until a running deploy publishes, the live manifest still names the old trees; dispatching
+          # again would cancel it (deploy.yaml cancels in progress) and could never let one finish.
+          for workflow in deploy.yaml deploy-fabric.yaml; do
+            unfinished=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 \
+              --json status --jq '[.[] | select(.status != "completed")] | length')
+            if [ "$unfinished" != 0 ]; then
+              echo "$workflow has $unfinished unfinished run(s); checking again next tick"
+              exit 0
+            fi
+          done
+          # The query string bypasses the Pages CDN cache, so a deploy that just finished is seen.
+          deployed=$(curl -fsS "${SITE_URL%/}/content-sources.json?t=$(date +%s)" || echo '{}')
+          expected=$(node scripts/assemble-content.mjs --sources)
+          changed=false
+          for repo in harper harper-pro; do
+            current=$(jq -r --arg repo "$repo" '.[$repo].docsTree' <<<"$expected")
+            live=$(jq -r --arg repo "$repo" '.[$repo].docsTree // ""' <<<"$deployed")
+            if [ "$current" != "$live" ]; then
+              echo "$repo@$(jq -r --arg repo "$repo" '.[$repo].ref' <<<"$expected") docs/ is $current; the live site was built from ${live:-unknown}"
+              changed=true
+            fi
+          done
+          if [ "$changed" = true ]; then
+            gh workflow run deploy.yaml --repo "$GITHUB_REPOSITORY" --ref main
+            gh workflow run deploy-fabric.yaml --repo "$GITHUB_REPOSITORY" --ref main
+          fi

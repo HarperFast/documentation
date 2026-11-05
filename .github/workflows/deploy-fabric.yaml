@@ -10,7 +10,6 @@ on:
     branches:
       - main
     paths:
-      - 'reference/**'
       - 'reference_versioned_docs/**'
       - 'reference_versioned_sidebars/**'
       - 'reference_versions.json'
@@ -29,6 +28,7 @@ on:
       - 'redirects.ts'
       - 'sidebars*.ts'
       - 'versions.json'
+      - 'scripts/assemble-content.mjs'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -56,9 +56,11 @@ jobs:
         run: npm ci
 
       # No DOCUSAURUS_BASE_URL override: the site is served from the fabric
-      # instance's root path, unlike PR previews which live under /pr-<n>.
+      # instance's root path, and each PR preview from its own host's root.
       - name: Build Docusaurus site
         env:
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          GH_TOKEN: ${{ github.token }}
           DOCUSAURUS_ROUTE_BASE_PATH: ${{ vars.DOCUSAURUS_ROUTE_BASE_PATH }}
           DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
           ALGOLIA_APP_ID: ${{ secrets.ALGOLIA_APP_ID }}

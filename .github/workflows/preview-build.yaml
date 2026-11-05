@@ -15,7 +15,6 @@ on:
     types: [opened, synchronize, reopened]
     branches: [main]
     paths:
-      - 'reference/**'
       - 'reference_versioned_docs/**'
       - 'reference_versioned_sidebars/**'
       - 'reference_versions.json'
@@ -34,6 +33,7 @@ on:
       - 'redirects.ts'
       - 'sidebars*.ts'
       - 'versions.json'
+      - 'scripts/assemble-content.mjs'
 
 permissions:
   contents: read
@@ -69,6 +69,9 @@ jobs:
       # The preview serves the site from its own host's root, so the default
       # base URL (/) applies.
       - name: Build Docusaurus site
+        env:
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          GH_TOKEN: ${{ github.token }}
         run: npm run build
 
       - name: Upload build artifact

@@ -163,8 +163,9 @@ This can release user database handles held by application components so an onli
 
 Also include these constraints in the restore procedure:
 
-- **`target_database` requires the server stopped.** Restoring into a separate database rather than overwriting the source is CLI-only with Harper down. The target must not already exist or must be an empty directory.
-- **An interrupted restore leaves the database unloadable.** On a crash or power loss mid-restore, Harper marks the database as incompletely restored and refuses to load it on the next start. Recover by rerunning `restore_backup` for the same database and `backup_id`. Do not try to load or hand-repair the directory.
+- **`target_database` restores into a separate database.** The target must not already exist or must be an empty directory. As of v5.4.0 this works online too; before v5.4.0 it required the CLI with Harper down.
+- **An interrupted restore leaves the database as it was, restored, or blocked.** As of v5.4.0, a restore that stopped before replacing anything is discarded at the next start, and one proven before the crash is finished. A crash or power loss while files are being replaced leaves the database marked as incompletely restored, and Harper refuses to load it. Recover by rerunning `restore_backup` for the same database and `backup_id`. Do not try to load or hand-repair the directory.
+- **A restore refuses to run on a node with replication peers.** As of v5.4.0, peers in `system.hdb_nodes` or `replication.routes` block it, even when replication to them is blocked by the network. See the procedure below.
 
 ## Restoring in a replicated cluster
 
@@ -187,7 +188,7 @@ flowchart TD
 For an in-place recovery:
 
 1. Take the node out of rotation with the availability flag, per [Health Checks and Traffic Admission](./health-checks-and-traffic-admission.mdx). Never restore a node that is serving traffic.
-2. **Isolate replication separately.** For example, use a network policy that blocks peer replication in both directions and closes existing peer connections. Keep it effective across restarts, and verify that transactions cannot cross the boundary. Removing a node from the load balancer or setting `"replicated": false` on one operation does not isolate replication.
+2. **Isolate replication separately.** For example, use a network policy that blocks peer replication in both directions and closes existing peer connections. Keep it effective across restarts, and verify that transactions cannot cross the boundary. Removing a node from the load balancer or setting `"replicated": false` on one operation does not isolate replication. As of v5.4.0, `restore_backup` also refuses to run while this node lists any peer, so remove the node's peers (its `system.hdb_nodes` rows other than itself, and any `replication.routes`) before restoring; the network policy still matters, because a peer that still lists this node can reconnect to it.
 3. Confirm the data authority and replay policy: which writes to preserve, repair, or reapply, and how peers will converge.
 4. For an online managed restore allowed by the table above, use its `backup_id` (`1` here) and poll the returned job on the same node:
 
@@ -198,7 +199,7 @@ For an in-place recovery:
    For an offline restore, use the [local CLI procedure](/reference/v5/backups/operations#running-backup-operations-from-the-cli). For a `get_backup` file, follow the [manual restore procedure](/reference/v5/backups/overview#example-download-a-snapshot-and-restore-it-manually) with Harper stopped and its process exited, including the blob roots.
 
 5. Verify data expectations locally before any peer sees the node.
-6. Reconnect replication under the policy you proved in an isolated multi-node drill. Verify convergence, then complete the traffic-admission checks before restoring traffic. If peers still hold the data this restore was meant to undo, do not reconnect this node to them. Rebuild the peers from it, as the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) describes for an authoritative node: once it passes the traffic-admission checks, it returns to rotation, still isolated, as the peers leave, and only the peers wait for convergence.
+6. Add the peers back, and reconnect replication under the policy you proved in an isolated multi-node drill. Verify convergence, then complete the traffic-admission checks before restoring traffic. If peers still hold the data this restore was meant to undo, do not reconnect this node to them. Rebuild the peers from it, as the [long-absent node policy](./operating-replication.mdx#what-moves-automatically-and-what-does-not) describes for an authoritative node: once it passes the traffic-admission checks, it returns to rotation, still isolated, as the peers leave, and only the peers wait for convergence.
 
 :::danger
 **Draining traffic does not stop replication.** A drained node continues exchanging transactions with peers. An offline restore stops that exchange while Harper is down, but configured routes can reconnect as soon as it starts. Keep replication isolated until validation is complete and you are ready to execute the re-entry policy.
