@@ -88,7 +88,7 @@ cp .env deploy/.env
 (cd deploy && harper deploy project=my-app restart=true)
 ```
 
-The CLI reads `.env` from the directory it runs in, so the staged directory needs this copy to find the target. It holds only the target URL, so shipping it is harmless. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
+The CLI reads `.env` from the directory it runs in, so the staged directory needs this copy to find the target. The copy ships to every node, which is harmless while the file holds only the target URL. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
 
 ### Deploy from GitHub Actions
 
