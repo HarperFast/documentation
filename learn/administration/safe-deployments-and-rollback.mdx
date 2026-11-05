@@ -47,7 +47,7 @@ Press Enter to accept the `.env` value at the **Cluster Target URL** prompt, the
 
 The CLI loads `.env` from the directory you run it in. Commands such as `harper deploy`, `harper list_deployments`, and `harper get_job` then need no `target=`. Pinning the target here keeps this project's commands from falling back to the last cluster you logged in to. An existing environment variable wins over `.env`, so CI can still set `HARPER_CLI_TARGET` from a repository variable. See [authentication](/reference/v5/cli/authentication) for the full precedence rules.
 
-The target URL is not a secret. To share it with your team, remove `.env` from the template's `.gitignore` and commit the file, or force-add it. Templates ignore `.env` and `.env.*`, except `.env.example`. Keep credentials such as `HARPER_CLI_USERNAME` and `HARPER_CLI_PASSWORD` out of it: the deploy upload includes `.env`, so its contents reach every node.
+The target URL is not a secret. To share it with your team, remove `.env` from the template's `.gitignore` and commit the file, or force-add it. Templates ignore `.env` and `.env.*`, except `.env.example`. Keep credentials such as `HARPER_CLI_USERNAME` and `HARPER_CLI_PASSWORD` out of it. The deploy upload includes `.env`, so its contents reach every node.
 
 ### A Harper backend
 
