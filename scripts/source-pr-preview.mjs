@@ -1,7 +1,6 @@
 /**
  * Previews of this site built from a HarperFast/harper or HarperFast/harper-pro PR that changes docs/.
- * Called from .github/workflows/source-pr-preview.yaml through actions/github-script; `github` is its
- * Octokit client. Tested by scripts/source-pr-preview.test.mjs.
+ * `github` is the Octokit client actions/github-script provides.
  *
  * The dispatch payload is only a hint of which PR to look at: everything else (state, head, fork,
  * the refs to build) is read from the GitHub API here.
@@ -55,6 +54,16 @@ async function coreGitlink(github, ref) {
 	}
 }
 
+async function commitExists(github, repo, ref) {
+	try {
+		await github.rest.repos.getCommit({ owner: OWNER, repo, ref });
+		return true;
+	} catch (error) {
+		if (isNotFound(error) || error?.status === 422) return false;
+		throw error;
+	}
+}
+
 /**
  * What a dispatch asks for, judged against the PR as it is now. A deploy of a closed PR or a cleanup of an
  * open one is a `skip`. `error` is a reason the PR cannot be previewed that its author should see.
@@ -84,6 +93,9 @@ export async function resolveSource(github, eventType, payload) {
 		// A harper-pro PR's core pointer names the harper commit it is built and tested with.
 		harperSha = await coreGitlink(github, pr.head.sha);
 		if (!harperSha) error = `\`core\` is not a submodule at ${pr.head.sha.slice(0, 10)}`;
+		else if (!(await commitExists(github, 'harper', harperSha))) {
+			error = `\`core\` points to ${harperSha.slice(0, 10)}, which is not in HarperFast/harper; push it there`;
+		}
 	}
 	return { ...base, action: 'deploy', harperSha: harperSha ?? '', proSha: proSha ?? '', error };
 }
@@ -100,11 +112,9 @@ export async function readPr(github, source) {
 }
 
 /**
- * What the apply job does, from the PR as it is when the job starts. Apply jobs for a PR run one at a time, and a
- * newer one can replace one still queued, so each brings the preview to the PR's current state rather than doing
- * what its own dispatch asked: a closed PR loses its preview whichever event queued the job.
- * `comment` is this App's preview comment; one exists from before any deploy starts, so a preview without one
- * was never deployed.
+ * Acts on the PR's current state rather than on what the job's own dispatch asked, since a queued apply job can
+ * be replaced by a newer one. The comment is written before any deploy starts, so a closed PR without one never
+ * had a preview.
  */
 export function decide({ action, pr, builtHead, buildResult, resolveError, comment }) {
 	if (pr.state !== 'open') return comment && !comment.body.includes(REMOVED_MARKER) ? 'remove' : 'skip';

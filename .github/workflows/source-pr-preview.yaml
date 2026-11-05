@@ -217,7 +217,7 @@ jobs:
             const source = { repo: env.SOURCE_REPO, number: Number(env.SOURCE_NUMBER) };
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const url = `${env.HARPER_PREVIEW_TARGET}/${env.PROJECT}/`;
-            // A failed drop leaves the comment as it was, so the next close tries again.
+            // A failed drop leaves the comment as it was; re-running this job retries the drop.
             if (env.MODE === 'remove' && env.SUCCEEDED !== 'true') return;
             const body =
               env.MODE === 'remove'

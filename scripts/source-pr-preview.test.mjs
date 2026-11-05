@@ -1,5 +1,3 @@
-// Tests for scripts/source-pr-preview.mjs and the security settings of the workflow that runs it.
-// Usage: node scripts/source-pr-preview.test.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import yaml from 'js-yaml';
@@ -21,7 +19,7 @@ import {
 const sha = (c) => c.repeat(40);
 const notFound = () => Object.assign(new Error('Not Found'), { status: 404 });
 
-function fakeGithub({ prs = {}, branches = {}, gitlinks = {}, comments = [] } = {}) {
+function fakeGithub({ prs = {}, branches = {}, gitlinks = {}, commits = [], comments = [] } = {}) {
 	const calls = [];
 	const github = {
 		calls,
@@ -38,6 +36,10 @@ function fakeGithub({ prs = {}, branches = {}, gitlinks = {}, comments = [] } = 
 					const commit = branches[`${repo}:${branch}`];
 					if (!commit) throw notFound();
 					return { data: { commit: { sha: commit } } };
+				},
+				getCommit: async ({ repo, ref }) => {
+					if (!commits.includes(`${repo}:${ref}`)) throw notFound();
+					return { data: { sha: ref } };
 				},
 				getContent: async ({ repo, path, ref }) => {
 					const link = gitlinks[`${repo}:${ref}:${path}`];
@@ -125,8 +127,10 @@ test('harper-pro PR builds its head with harper at its core gitlink', async () =
 	const github = fakeGithub({
 		prs: { 'HarperFast/harper-pro#9': pr({ head: sha('c'), headRepo: 'HarperFast/harper-pro' }) },
 		gitlinks: { [`harper-pro:${sha('c')}:core`]: { type: 'submodule', sha: sha('d') } },
+		commits: [`harper:${sha('d')}`],
 	});
 	const resolved = await resolveSource(github, DEPLOY_EVENT, { repo: 'HarperFast/harper-pro', number: 9 });
+	assert.equal(resolved.error, '');
 	assert.equal(resolved.proSha, sha('c'));
 	assert.equal(resolved.harperSha, sha('d'));
 	assert.equal(resolved.project, 'harper-pro-pr-9');
@@ -141,6 +145,15 @@ test('harper-pro PR without a core submodule reports why', async () => {
 		const resolved = await resolveSource(github, DEPLOY_EVENT, { repo: 'HarperFast/harper-pro', number: 9 });
 		assert.match(resolved.error, /`core` is not a submodule/);
 	}
+});
+
+test('harper-pro PR whose core commit is not in harper reports why', async () => {
+	const github = fakeGithub({
+		prs: { 'HarperFast/harper-pro#9': pr({ head: sha('c'), headRepo: 'HarperFast/harper-pro' }) },
+		gitlinks: { [`harper-pro:${sha('c')}:core`]: { type: 'submodule', sha: sha('d') } },
+	});
+	const resolved = await resolveSource(github, DEPLOY_EVENT, { repo: 'HarperFast/harper-pro', number: 9 });
+	assert.match(resolved.error, /not in HarperFast\/harper/);
 });
 
 test('a fork, or a deleted head repo, counts as a fork', async () => {
@@ -296,6 +309,18 @@ test('only apply holds secrets, and it never installs or builds the site', () =>
 	}
 	assert.equal(apply.concurrency.group, 'source-pr-preview-${{ needs.resolve.outputs.project }}');
 	assert.equal(apply.concurrency['cancel-in-progress'], false);
+});
+
+test('every resolve output names a key resolveSource returns', async () => {
+	const github = fakeGithub({
+		prs: { 'HarperFast/harper#5': pr() },
+		branches: { 'harper-pro:main': sha('b') },
+	});
+	const keys = Object.keys(await resolveSource(github, DEPLOY_EVENT, { repo: 'HarperFast/harper', number: 5 }));
+	for (const [name, value] of Object.entries(workflow.jobs.resolve.outputs)) {
+		const key = value.match(/^\$\{\{ steps\.resolve\.outputs\.(\w+) \}\}$/)?.[1];
+		assert(keys.includes(key), `output ${name} reads ${key}`);
+	}
 });
 
 test('payload-derived values reach scripts only through validated outputs and env', () => {
