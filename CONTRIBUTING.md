@@ -145,6 +145,8 @@ HARPER_DOCS_PATH=../harper HARPER_PRO_DOCS_PATH=../harper-pro npm run dev
 
 The content-check workflow runs when harper-pro publishes a release or pushes a `docs/` tag (a `docs-source-changed` repository dispatch from its `publish-docs.yaml`), and hourly in case a dispatch failed: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it redeploys both sites.
 
+A harper or harper-pro PR that changes `docs/` gets a preview of this site built from it. Its `docs-preview.yaml` sends a `docs-source-pr-preview` repository dispatch on each push (`docs-source-pr-preview-cleanup` on close), and [`source-pr-preview.yaml`](.github/workflows/source-pr-preview.yaml) here builds the PR's head (a harper PR with harper-pro at the branch named like its base; a harper-pro PR with harper at its `core` pointer), deploys it as `harper-pr-<n>` or `harper-pro-pr-<n>`, and keeps one comment with the link on the PR. The build runs the PR's MDX, so it holds no secrets and, for a fork's PR, waits for approval in the `preview` environment.
+
 ## Redirects
 
 The site is hosted as a static build on GitHub Pages, so there is no server-side router that can rewrite incoming URLs. All redirect handling is therefore done **client-side** by the [`@docusaurus/plugin-client-redirects`](https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-client-redirects) plugin: at build time it emits a small HTML page for every `from` path that immediately navigates the browser to the `to` path. Because the redirect HTML is generated per-path, every redirect must be enumerated explicitly — there is no pattern, prefix, or wildcard support.
