@@ -28,20 +28,26 @@ This guide deploys a Harper application to a cluster, waits until every node run
 
 ### Log in
 
-Set the cluster's Operations API URL in your shell, then log in:
+Set the cluster's Operations API URL in your project's `.env`:
 
 ```bash
-export HARPER_CLI_TARGET='https://my-cluster.example.com:9925'
-harper login "$HARPER_CLI_TARGET"
+# .env
+HARPER_CLI_TARGET='https://my-cluster.example.com:9925'
 ```
 
-Enter the cluster's admin username and password. The CLI saves a token in `~/.harperdb/credentials.json`.
+`npm create harper@latest` asks for your cluster URL and writes it here, adding `https://` if you omit the scheme and port `9925` if you omit the port. If you skipped the prompt, replace the placeholder. From the project directory, log in:
 
-Commands such as `harper deploy`, `harper list_deployments`, and `harper get_job` then need no `target=`. The export keeps this shell's commands from falling back to the last cluster you logged in to from any project, so set it again in each new shell. CI sets the same variable from a repository variable. See [how the CLI picks a target](/reference/v5/cli/authentication#how-the-cli-picks-a-target).
+```bash
+harper login
+```
 
-<VersionBadge type="changed" version="v5.4.0" />
+Press Enter to accept the `.env` value at the **Cluster Target URL** prompt, then enter the cluster's admin username and password. The CLI saves a token in `~/.harperdb/credentials.json`, not in `.env`.
 
-Remove any `HARPER_CLI_TARGET` line from your project's `.env`. `npm create harper@latest` writes one there. From v5.4.0, the CLI stops with an error while the file sets it and your environment does not. To share the target with your team, pass `target=` in a `package.json` script. See [Project `.env` files](/reference/v5/cli/authentication#project-env-files).
+<VersionBadge version="v5.1.0" />
+
+The CLI loads `.env` from the directory you run it in. Commands such as `harper deploy`, `harper list_deployments`, and `harper get_job` then need no `target=`. Pinning the target here keeps this project's commands from falling back to the last cluster you logged in to. An existing environment variable wins over `.env`, so CI can still set `HARPER_CLI_TARGET` from a repository variable. See [authentication](/reference/v5/cli/authentication) for the full precedence rules.
+
+The target URL is not a secret. To share it with your team, remove `.env` from the template's `.gitignore` and commit the file, or force-add it. Templates ignore `.env` and `.env.*`, except `.env.example`. Keep credentials such as `HARPER_CLI_USERNAME` and `HARPER_CLI_PASSWORD` out of it: the deploy upload includes `.env`, so its contents reach every node.
 
 ### A Harper backend
 
@@ -78,10 +84,11 @@ npm run build
 rm -rf deploy && mkdir deploy
 cp -R dist schemas resources deploy/
 cp deploy.config.yaml deploy/config.yaml
+cp .env deploy/.env
 (cd deploy && harper deploy project=my-app restart=true)
 ```
 
-The subshell inherits `HARPER_CLI_TARGET`, so the CLI needs no `.env` in the staged directory. If your release configuration keeps `loadEnv`, copy only the application's keys to `deploy/`, under a file name its `files` lists. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
+The CLI reads `.env` from the directory it runs in, so the staged directory needs this copy to find the target. It holds only the target URL, so shipping it is harmless. The staged directory has no `package.json`, so the nodes skip the install step. If your resources import npm packages, add a `package.json` to `deploy/` that lists only those runtime dependencies. Harper Studio [deploys itself this way](https://github.com/HarperFast/studio/blob/stage/.github/actions/studio-deploy/action.yaml).
 
 ### Deploy from GitHub Actions
 
@@ -201,7 +208,7 @@ harper deploy project=my-app restart=rolling target=https://node-1.example.com:9
 )
 ```
 
-Jobs are not replicated, so the script deploys to and polls one node rather than the load-balanced cluster URL in `HARPER_CLI_TARGET`, where a poll can reach a node that never saw the job. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). Without certification, including before v5.4.0, a `COMPLETE` job can still leave a node it could not reach on the old release. Check the serving version on every node afterwards.
+Jobs are not replicated, so the script deploys to and polls one node rather than the load-balanced cluster URL in `.env`, where a poll can reach a node that never saw the job. See [the job lives on one node](../developers/deploying-from-ci.mdx#path-a-deploy-a-tagged-release-from-your-repository). Without certification, including before v5.4.0, a `COMPLETE` job can still leave a node it could not reach on the old release. Check the serving version on every node afterwards.
 
 Two deploy parameters control replication failures:
 
