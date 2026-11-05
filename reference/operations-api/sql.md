@@ -420,14 +420,14 @@ Geospatial data must be stored using the [GeoJSON standard](https://geojson.org/
 
 `value LIKE pattern` is true when the whole value matches the pattern, and `NOT LIKE` negates it. The value is matched as a string. The pattern can contain these elements:
 
-| Pattern element            | Matches                                                                                                                                 |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `%`                        | Any run of characters, including none, and including line breaks (`\n`, `\r`, U+2028, U+2029).                                          |
-| `_`                        | Exactly one character, including a line break (`\n`, `\r`, U+2028, U+2029). <VersionBadge type="changed" version="v5.4.0" />            |
-| `[abc]`, `[a-z]`, `[^abc]` | Legacy engine only: one character in the set or range, or with `^`, one character not in it. See the list below.                        |
-| Any other character        | Itself. `*`, `\`, `^`, `$`, `.`, `?` and `+` have no special meaning on either engine. <VersionBadge type="changed" version="v5.4.0" /> |
+| Pattern element            | Matches                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `%`                        | Any run of characters, including none, and including line breaks (`\n`, `\r`, U+2028, U+2029).                                                                      |
+| `_`                        | Exactly one character, including a line break (`\n`, `\r`, U+2028, U+2029). <VersionBadge type="changed" version="v5.4.0" />                                        |
+| `[abc]`, `[a-z]`, `[^abc]` | Legacy engine only: one character in the set or range, or with `^`, one character not in it. See the list below.                                                    |
+| Any other character        | Itself. `.`, `?` and `+` have no special meaning on either engine; since v5.4.0, neither do `*`, `\`, `^` and `$`. <VersionBadge type="changed" version="v5.4.0" /> |
 
-`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`. Before v5.4.0, `_` did not match line breaks on either engine, and `%` did not match line breaks on the new engine.
+`_` matches one UTF-16 code unit, so a character outside the Basic Multilingual Plane, such as most emoji, takes two: `__`. Before v5.4.0, `_` did not match line breaks on either engine, and `%` did not match line breaks on the new engine, except in a pattern that is a literal prefix followed by one trailing `%`, such as `'a%'`, which was already matched as a prefix.
 
 ```sql
 SELECT * FROM dev.dog WHERE dog_name LIKE 'Pen%'    -- starts with "Pen"
@@ -453,7 +453,7 @@ These are rejected with a 400 error, and no rows are changed:
 - An `ESCAPE` value that is empty (`''`) or longer than one character (`'!!'`, or a character such as an emoji that takes two UTF-16 code units).
 - An `ESCAPE` value that is not a string, such as `ESCAPE 1`.
 
-The new engine checks a literal pattern before any row is read (including under `auto`, unless the statement falls back earlier on an unsupported clause such as `RIGHT JOIN`). When the legacy engine checks a pattern, or when the pattern comes from an expression rather than a string literal, it is checked when a row is tested against it, so a statement that tests no rows does not fail.
+The new engine checks a literal pattern before any row is read (including under `auto`, unless the statement falls back earlier on an unsupported clause such as `RIGHT JOIN`). When the legacy engine checks a pattern, or when the pattern comes from an expression rather than a string literal, it is checked when a row is tested against it, so a statement that tests no rows does not fail. The new engine accepts only a string literal as the `ESCAPE` value; a column or expression there is unsupported, so under `auto` the statement runs on the legacy engine, which checks the value when it tests a row.
 
 Before v5.4.0, `ESCAPE` was ignored, so `ip LIKE 't0!%' ESCAPE '!'` matched every value starting with `t0!`, and an `UPDATE` or `DELETE` using it changed those rows.
 
