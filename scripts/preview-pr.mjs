@@ -95,10 +95,11 @@ async function main() {
 
 		console.log(`\n✓ PR branch: ${prInfo.headRefName}`);
 
-		// Get the workflow run for this PR (using sanitized branch name)
+		// The newest successful build of this PR's branch (using sanitized branch name). The API lists a
+		// workflow's runs newest first, so one run is enough; `{}` when there is none.
 		const runs = JSON.parse(
 			execSync(
-				`gh api repos/HarperFast/documentation/actions/runs --paginate -X GET -f branch=${sanitizedBranch} --jq '.workflow_runs | map(select(.conclusion == "success" and .name == "Build PR Preview")) | sort_by(.created_at) | reverse | .[0]'`,
+				`gh api repos/HarperFast/documentation/actions/workflows/preview-build.yaml/runs -X GET -f branch=${sanitizedBranch} -f status=success -f per_page=1 --jq '.workflow_runs[0] // {}'`,
 				{ encoding: 'utf-8' }
 			)
 		);
