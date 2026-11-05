@@ -42,3 +42,8 @@ Thumbs.db
 site/
 
 .claude/
+
+# Assembled from HarperFast/harper and HarperFast/harper-pro by scripts/assemble-content.mjs
+/reference/
+/release-notes/**/*.generated.md
+/.content/
