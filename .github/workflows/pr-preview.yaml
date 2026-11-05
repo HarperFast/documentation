@@ -4,7 +4,6 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, closed]
     paths:
-      - 'reference/**'
       - 'reference_versioned_docs/**'
       - 'reference_versioned_sidebars/**'
       - 'reference_versions.json'
@@ -23,6 +22,7 @@ on:
       - 'redirects.ts'
       - 'sidebars*.ts'
       - 'versions.json'
+      - 'scripts/assemble-content.mjs'
 
 # Cancel previous runs when new commits are pushed to the PR
 concurrency:

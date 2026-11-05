@@ -9,6 +9,9 @@ concurrency:
   group: validate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: ${{ matrix.check }}
@@ -20,6 +23,7 @@ jobs:
           - Lint Check
           - Format Check
           - Workflow Tests
+          - Site Build
         include:
           - check: TypeScript Check
             command: typecheck
@@ -29,6 +33,9 @@ jobs:
             command: format:check
           - check: Workflow Tests
             command: test:workflows
+          # Assembles the reference from harper and harper-pro (see scripts/assemble-content.mjs) and fails on broken links.
+          - check: Site Build
+            command: build
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -39,4 +46,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run ${{ matrix.check }}
+        env:
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          GH_TOKEN: ${{ github.token }}
         run: npm run ${{ matrix.command }}

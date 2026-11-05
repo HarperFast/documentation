@@ -358,6 +358,7 @@ const currentRedirects: RedirectRule[] = [
 
 	// ── Learn ─────────────────────────────────────────────────────────────────
 	{ from: '/learn/developers/coming-soon', to: '/learn' },
+	{ from: '/learn/administration/coming-soon', to: '/learn/administration/how-harper-runs-in-production' },
 
 	// ── Fabric ────────────────────────────────────────────────────────────────
 	{ from: '/fabric/rest-api', to: '/fabric' },

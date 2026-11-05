@@ -1,1 +1,1 @@
-!function(){var e,t,n;e="6565c3e84c377ad",t=function(){Reo.init({clientID:"6565c3e84c377ad"})},(n=document.createElement("script")).src="https://static.reo.dev/"+e+"/reo.js",n.async=!0,n.onload=t,document.head.appendChild(n)}();
+!function(){var e,t,n;e="6565c3e84c377ad",t=function(){Reo.init({clientID:"6565c3e84c377ad", enableThirdPartyTracking: true})},(n=document.createElement("script")).src="https://static.reo.dev/"+e+"/reo.js",n.defer=!0,n.onload=t,document.head.appendChild(n)}();
