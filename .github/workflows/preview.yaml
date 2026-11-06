@@ -1,0 +1,152 @@
+name: Preview
+
+# Deploys each pull request from this repository as its own Harper preview, at
+# https://<branch>.app.<cluster domain>/, with HarperFast/deploy-action, and
+# drops the preview when the PR closes. Fork PRs get no preview.
+#
+# GitHub runs pull_request_target from main, so a PR cannot change what runs
+# with the preview identity, and nothing here checks out or runs a PR's code.
+# preview-build.yaml builds the site in an unprivileged pull_request run; the
+# deploy job waits for that run and deploys its artifact.
+#
+# The cluster trusts this file by name: `harper preview setup app=docs-site`,
+# run from a checkout of main, wrote the trust policies and set the
+# HARPER_PREVIEW_TARGET variable. Authentication is OIDC only. See
+# https://github.com/HarperFast/deploy-action#pull-request-previews
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed]
+    branches: [main]
+    # Keep the same as in preview-build.yaml.
+    paths:
+      - 'reference_versioned_docs/**'
+      - 'reference_versioned_sidebars/**'
+      - 'reference_versions.json'
+      - 'docs/**'
+      - 'fabric/**'
+      - 'learn/**'
+      - 'release-notes/**'
+      - 'src/**'
+      - 'static/**'
+      - 'versioned_docs/**'
+      - 'versioned_sidebars/**'
+      - 'docusaurus.config.ts'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'historic-redirects.ts'
+      - 'redirects.ts'
+      - 'sidebars*.ts'
+      - 'versions.json'
+      - 'scripts/assemble-content.mjs'
+
+permissions: {}
+
+jobs:
+  deploy:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: preview
+    permissions:
+      id-token: write
+      pull-requests: write
+      deployments: write
+      # Reading preview-build.yaml's runs and downloading their artifacts.
+      actions: read
+    concurrency:
+      group: harper-preview-${{ github.event.pull_request.number }}
+    steps:
+      # GitHub starts both workflows at once, and the trust policy matches only
+      # pull_request_target runs, so this job waits for the build itself. Only a
+      # run from a branch of this repository counts.
+      - name: Wait for the build of this commit
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          BUILD_WORKFLOW: preview-build.yaml
+        run: |
+          short=${SHA:0:7}
+          superseded() {
+            local pr state head
+            pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '.state + " " + .head.sha') || return 1
+            read -r state head <<<"$pr"
+            [ "$state" = open ] && [ "$head" = "$SHA" ] && return 1
+            echo "::notice::Not deploying $short: PR #$PR is $state at ${head:0:7}."
+          }
+          start=$SECONDS
+          while :; do
+            if superseded; then exit 0; fi
+            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$BUILD_WORKFLOW/runs?event=pull_request&head_sha=$SHA" \
+              --jq '[.workflow_runs[] | select(.head_repository.full_name == env.GITHUB_REPOSITORY)] | max_by(.run_number) | select(.) | "\(.id) \(.status) \(.conclusion)"') || run=
+            elapsed=$((SECONDS - start))
+            if [ -n "$run" ]; then
+              read -r id status conclusion <<<"$run"
+              if [ "$status" = completed ]; then
+                if [ "$conclusion" = success ]; then
+                  echo "Deploying the build from $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
+                  echo "run-id=$id" >>"$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                if superseded; then exit 0; fi
+                echo "::error::The build of $short ended $conclusion: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
+                exit 1
+              fi
+            elif [ "$elapsed" -ge 600 ]; then
+              echo "::error::No $BUILD_WORKFLOW run for $short started in 10 minutes. GitHub starts no pull_request run while a PR has merge conflicts."
+              exit 1
+            fi
+            if [ "$elapsed" -ge 1800 ]; then
+              echo "::error::The build of $short did not finish in 30 minutes."
+              exit 1
+            fi
+            sleep 20
+          done
+
+      - name: Download the build
+        if: steps.build.outputs.run-id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pr-${{ github.event.pull_request.number }}-build
+          path: site/build
+          run-id: ${{ steps.build.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      # The configuration comes from this file, not from the PR: the artifact
+      # lands in site/build, and only the static plugin reads it.
+      - name: Serve the build as a Harper application
+        if: steps.build.outputs.run-id != ''
+        run: |
+          cat > site/config.yaml << 'EOF'
+          static:
+            files: 'build/**'
+            urlPath: '/'
+            extensions: ['html']
+            index: true
+          EOF
+
+      - if: steps.build.outputs.run-id != ''
+        uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # v1.0.0
+        with:
+          target: ${{ vars.HARPER_PREVIEW_TARGET }}
+          app: docs-site
+          preview: true
+          by_ref: false
+          path: site
+
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: preview-cleanup
+    permissions:
+      id-token: write
+      pull-requests: write
+      deployments: write
+    steps:
+      - uses: HarperFast/deploy-action@45fa59b6157eabb72b7a74922309238671f2a37d # v1.0.0
+        with:
+          target: ${{ vars.HARPER_PREVIEW_TARGET }}
+          app: docs-site
+          preview: true

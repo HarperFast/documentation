@@ -95,10 +95,11 @@ async function main() {
 
 		console.log(`\n✓ PR branch: ${prInfo.headRefName}`);
 
-		// Get the workflow run for this PR (using sanitized branch name)
+		// The newest successful build of this PR's branch (using sanitized branch name). The API lists a
+		// workflow's runs newest first, so one run is enough; `{}` when there is none.
 		const runs = JSON.parse(
 			execSync(
-				`gh api repos/HarperFast/documentation/actions/runs --paginate -X GET -f branch=${sanitizedBranch} --jq '.workflow_runs | map(select(.conclusion == "success" and .name == "Deploy PR Preview")) | sort_by(.created_at) | reverse | .[0]'`,
+				`gh api repos/HarperFast/documentation/actions/workflows/preview-build.yaml/runs -X GET -f branch=${sanitizedBranch} -f status=success -f per_page=1 --jq '.workflow_runs[0] // {}'`,
 				{ encoding: 'utf-8' }
 			)
 		);
@@ -200,9 +201,10 @@ async function main() {
 		console.log(`\n🚀 Starting preview server...\n`);
 
 		// Start the server with quoted path to prevent injection
+		// Previews build with the default base URL (/), so serve with it too.
 		execSync(`npm run serve -- --dir "${BUILD_DIR}"`, {
 			stdio: 'inherit',
-			env: { ...process.env, DOCUSAURUS_BASE_URL: `pr-${PR_NUMBER}` },
+			env: { ...process.env, DOCUSAURUS_BASE_URL: '/' },
 		});
 	} catch (error) {
 		console.error('\n❌ Error:', error.message);
