@@ -63,7 +63,7 @@ async function main() {
 	try {
 		// Get the PR's branch name and author info
 		const prInfo = JSON.parse(
-			execSync(`gh pr view ${PR_NUMBER} --json headRefName,author,title,url,isDraft`, { encoding: 'utf-8' })
+			execSync(`gh pr view ${PR_NUMBER} --json headRefName,author,title,url,isDraft,commits`, { encoding: 'utf-8' })
 		);
 
 		if (!prInfo.headRefName) {
@@ -95,16 +95,17 @@ async function main() {
 
 		console.log(`\n✓ PR branch: ${prInfo.headRefName}`);
 
-		// The newest successful build of this PR's branch (using sanitized branch name). The API lists a
-		// workflow's runs newest first, so one run is enough; `{}` when there is none.
-		const runs = JSON.parse(
+		// The newest successful build of this PR's branch (using sanitized branch name) at one of its
+		// commits: a later PR can reuse the branch name. The API lists a workflow's runs newest first.
+		const prCommits = new Set(prInfo.commits.map((commit) => commit.oid));
+		const run = JSON.parse(
 			execSync(
-				`gh api repos/HarperFast/documentation/actions/workflows/preview-build.yaml/runs -X GET -f branch=${sanitizedBranch} -f status=success -f per_page=1 --jq '.workflow_runs[0] // {}'`,
+				`gh api repos/HarperFast/documentation/actions/workflows/preview-build.yaml/runs -X GET -f branch=${sanitizedBranch} -f status=success -f per_page=100 --jq '[.workflow_runs[] | {id, head_sha}]'`,
 				{ encoding: 'utf-8' }
 			)
-		);
+		).find((candidate) => prCommits.has(candidate.head_sha));
 
-		if (!runs || !runs.id) {
+		if (!run) {
 			console.error(`❌ No successful workflow run found for PR #${PR_NUMBER}`);
 			console.log('\nMake sure:');
 			console.log('  1. The PR number is correct');
@@ -113,16 +114,16 @@ async function main() {
 			process.exit(1);
 		}
 
-		console.log(`✓ Found workflow run: ${runs.id}`);
+		console.log(`✓ Found workflow run: ${run.id}`);
 
 		// Validate workflow run ID is numeric
-		if (!/^\d+$/.test(String(runs.id))) {
+		if (!/^\d+$/.test(String(run.id))) {
 			throw new Error('Invalid workflow run ID format');
 		}
 
 		// Get the artifacts for this run
 		const artifacts = JSON.parse(
-			execSync(`gh api repos/HarperFast/documentation/actions/runs/${runs.id}/artifacts --jq '.artifacts'`, {
+			execSync(`gh api repos/HarperFast/documentation/actions/runs/${run.id}/artifacts --jq '.artifacts'`, {
 				encoding: 'utf-8',
 			})
 		);

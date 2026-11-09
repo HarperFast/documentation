@@ -59,13 +59,15 @@ jobs:
     steps:
       # GitHub starts both workflows at once, and the trust policy matches only
       # pull_request_target runs, so this job waits for the build itself. Only a
-      # run from a branch of this repository counts.
+      # run from this PR's branch of this repository counts: another PR can be
+      # at the same commit, and a branch has one open PR into main at a time.
       - name: Wait for the build of this commit
         id: build
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BUILD_WORKFLOW: preview-build.yaml
         run: |
           short=${SHA:0:7}
@@ -80,7 +82,7 @@ jobs:
           while :; do
             if superseded; then exit 0; fi
             run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$BUILD_WORKFLOW/runs?event=pull_request&head_sha=$SHA" \
-              --jq '[.workflow_runs[] | select(.head_repository.full_name == env.GITHUB_REPOSITORY)] | max_by(.run_number) | select(.) | "\(.id) \(.status) \(.conclusion)"') || run=
+              --jq '[.workflow_runs[] | select(.head_repository.full_name == env.GITHUB_REPOSITORY and .head_branch == env.HEAD_REF)] | max_by(.run_number) | select(.) | "\(.id) \(.status) \(.conclusion)"') || run=
             elapsed=$((SECONDS - start))
             if [ -n "$run" ]; then
               read -r id status conclusion <<<"$run"
