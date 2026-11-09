@@ -31,14 +31,12 @@ export function parsePayload(payload) {
 	return { owner: OWNER, repo: short, fullName, number, project: `${short}-pr-${number}` };
 }
 
-/** A PR has a preview only while it is open and carries the opt-in label. */
 export function wantsPreview(pr) {
 	return (
 		pr.state === 'open' && Array.isArray(pr.labels) && pr.labels.some((label) => label?.name === DOCS_PREVIEW_LABEL)
 	);
 }
 
-/** Why a PR that does not want a preview lost it. */
 export function removalReason(pr) {
 	return pr.state === 'open' ? 'unlabeled' : 'closed';
 }
