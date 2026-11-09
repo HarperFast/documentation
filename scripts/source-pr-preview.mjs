@@ -178,7 +178,7 @@ export function failedBody({ headSha, reason, url, runUrl }) {
 	return `${COMMENT_MARKER}
 ### 📖 Docs preview failed
 
-${short(headSha)} was not previewed: ${reason} ([build](${runUrl})). ${url} keeps the last preview that deployed, if any. The next push to this PR tries again.
+${short(headSha)} was not previewed: ${reason} ([build](${runUrl})). ${url} keeps the last preview that deployed, if any. The next push to this PR while it has the \`${DOCS_PREVIEW_LABEL}\` label tries again.
 `;
 }
 
