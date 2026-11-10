@@ -25,10 +25,11 @@ wrong line of code.
   `reference_versioned_docs/`.
 - **Redirects**: Docusaurus client redirects keep old URLs alive. Renaming or
   moving a page without a redirect breaks external links. Add the rule to
-  `redirects.ts` for a page this repo owns (Learn, Fabric), or to
+  `redirects.ts` for a page this repo owns (Learn, Fabric, release notes), or to
   `docs/reference/_redirects.json` in harper or harper-pro for a v5 reference
-  page. `historic-redirects.ts` is a frozen set of legacy `/docs/4.X/*` rules:
-  new rules do not belong there.
+  page. `historic-redirects.ts` is a frozen, append-only set of legacy
+  `/docs/4.X/*` rules: add to it only for a missed legacy path that analytics
+  surfaced, never for a renamed page.
 - **Tooling**: `npm run typecheck` (tsc) and `format:check` (prettier).
   `npm run lint` runs oxlint with warnings treated as errors. The v5 reference
   and the open release notes are not in this repo: they are assembled at build
