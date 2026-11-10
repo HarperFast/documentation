@@ -23,6 +23,8 @@ A cluster is a group of instances managed together to run applications and servi
 5. \*Confirm or replace the preferred payment method. Add a new card if necessary
 6. Cluster will begin provisioning as soon as you complete your selections.
 
+Studio cannot create a [sharded cluster](#sharded-clusters) yet; create one with the Fabric API.
+
 ## Editing a Cluster
 
 To edit an existing cluster:
@@ -35,6 +37,77 @@ To edit an existing cluster:
    - Modifying the Region location and Estimated P90 Latency
    - Adding or removing additional regions.
 5. Click the "Save Changes" or "Confirm Payment Details" button to summarize and apply your modifications.
+
+On a sharded cluster, a change that removes instances must leave every shard enough running instances. See [Scaling a Sharded Cluster](#scaling-a-sharded-cluster).
+
+## Sharded Clusters
+
+A sharded cluster splits the records of its `@sharded` tables among groups of instances called shards. Each instance belongs to one shard and stores that shard's records in full. Fabric gives every instance its shard and refuses changes that would leave a shard with too few instances. Which tables are sharded is up to your application's schema: see [Schema-defined sharding](/reference/v5/replication/residency) for the `@sharded` directive and what it requires.
+
+Sharded clusters run Harper 5.4.0-beta.3 or later, on Colocated or Dedicated deployments. A Self-hosted cluster cannot be sharded.
+
+### Creating a Sharded Cluster
+
+Studio does not offer sharding yet ([studio#2084](https://github.com/HarperFast/studio/issues/2084)), so create the cluster with the Fabric API at `https://fabric.harper.fast`:
+
+1. Sign in with `POST /Login/` and the body `{ "email": "<email>", "password": "<password>" }`, using the email and password you use for Studio, not a cluster's username and password. The account must be able to create clusters in the organization. The response sets a session cookie: send it with the requests that follow.
+2. Create the cluster with `POST /Cluster/` and a body like this:
+
+```json
+{
+	"name": "orders",
+	"abbreviatedName": "orders",
+	"organizationId": "<organization id>",
+	"version": "<Harper version>",
+	"regionPlans": [{ "regionId": "<region id>", "planId": "<plan id>" }],
+	"sharding": { "shards": 2, "minOwners": 2 }
+}
+```
+
+`sharding` is the only field specific to a sharded cluster:
+
+- `shards` is the number of shards: a whole number from 2 to 256, sent as a JSON number.
+- `minOwners` is the fewest running instances each shard must keep: a whole number, at least 1. It defaults to 2.
+
+The other fields create any hosted cluster. `abbreviatedName` gives the cluster its host name, `<abbreviatedName>.<organization subdomain>.harperfabric.com`. The organization ID is the first part of Studio's address after `#/` on any of the organization's pages. `GET /Region/?organizationId=<organization id>` lists the regions the organization can use, each with its `instanceCount`, and `GET /Plan/?organizationId=<organization id>` lists its plans.
+
+Fabric refuses the request with 400, before creating anything, unless:
+
+- `regionPlans` gives the cluster at least `shards` multiplied by `minOwners` instances. Each region plan adds its region's `instanceCount`. The example needs four: two shards of two instances each.
+- `version` is 5.4.0-beta.3 or later. Without `version`, Fabric uses its default Harper version, and refuses the request if that is earlier.
+
+`sharding` cannot change once the cluster exists: `PUT /Cluster/<cluster id>/` refuses it with 400. A later version change cannot go below 5.4.0-beta.3.
+
+With `minOwners: 1`, a shard can be left with a single instance. While that instance is down, the shard has no running instance to read its records from, and if the instance's data is lost, those records can come back only from a backup. See [Recovery sources](/reference/v5/replication/residency#recovery-sources).
+
+### How Fabric Assigns Shards
+
+- **A shard is permanent.** Fabric picks an instance's shard when it creates the instance and never changes it. When Fabric replaces an instance, for example to move it to a new host after a plan change, the new instance takes the old one's shard.
+- **New instances keep shards balanced.** Each new instance joins the shard with the fewest instances. Among equally small shards, Fabric picks the one whose nearest instance is farthest from the new instance, so each shard's instances tend to be spread across locations. That spread is a tendency, not a guarantee.
+- **Fabric configures the shard.** It writes [`replication.shard` and `replication.shards`](/reference/v5/replication/residency#configuration) into each instance's configuration, and a new instance [joins](/reference/v5/replication/residency#cloning-a-node-into-a-sharded-cluster) with its shard already chosen. Do not set or change these yourself: a shard is part of an instance's identity, and Fabric relies on the one it assigned.
+
+An instance stores a sharded record in full only if the record is in its own shard. Any other instance that reads it fetches it from an instance in that shard, which may be in another region; see [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region can hold every shard only if it has at least as many instances as there are shards.
+
+To see the shards, send Harper's [`cluster_status`](/reference/v5/replication/clustering#sharding-status) operation to the cluster. Its top-level `shard` is the shard of the instance that answers. Once a `@sharded` table is active, `sharding.<database>.shards` lists every shard and its instances.
+
+### Scaling a Sharded Cluster
+
+Adding instances works as on any cluster, and each new instance joins the shard with the fewest instances.
+
+Removing instances, from Studio's Edit page or with `PUT /Cluster/<cluster id>/`, must leave every shard at least `minOwners` running instances:
+
+- Only running instances count. An instance still copying its data, or in an error state, does not.
+- When a change removes some of a region's instances rather than the whole region, Fabric chooses which ones go, keeping enough in every shard.
+- A change that would leave a shard short fails with 400 and changes nothing. The error names the shard and how many running instances it has now.
+- `regionPlans` in a `PUT` lists every region the cluster keeps, and a region left out is removed. If the cluster's regions change after Fabric reads them for your request, the request fails with 409 and changes nothing. Read the cluster again with `GET /Cluster/<cluster id>/`, apply your change to its current regions, and send that. Resending the old body could remove a region someone else just added.
+
+Fabric checks this only when you remove instances. An instance that fails still leaves its shard short until it recovers.
+
+### Not Yet Supported
+
+- Sharding an existing cluster: choose sharding when you create the cluster.
+- Changing the number of shards. That needs Harper to move records between shards ([harper-pro#1053](https://github.com/HarperFast/harper-pro/issues/1053)).
+- Creating a sharded cluster in Studio ([studio#2084](https://github.com/HarperFast/studio/issues/2084)).
 
 ## Preview Hosts
 
