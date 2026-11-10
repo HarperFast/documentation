@@ -54,4 +54,4 @@ While Fabric Studio is web based and hosted by us, all database interactions are
 
 <a id="what-can-i-manage"></a>
 
-Fabric Studio manages both clusters Harper hosts for you and clusters you host yourself, from a single UI. Harper itself behaves the same on both. Custom domains and Fabric's load balancing apply only to clusters Harper hosts.
+Fabric Studio manages both clusters Harper hosts for you and clusters you host yourself, from a single UI. Harper itself behaves the same on both. Custom domains, Fabric's load balancing, [sharded clusters](/fabric/cluster-creation-management#sharded-clusters), and [preview hosts](/fabric/cluster-creation-management#preview-hosts) apply only to clusters Harper hosts.
