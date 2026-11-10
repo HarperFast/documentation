@@ -89,7 +89,7 @@ With `minOwners: 1`, a shard can be left with a single instance. While that inst
 
 The instances of a record's shard are its owners. Another instance that reads the record fetches it from an owner, which may be in another region, and can keep a temporary copy of it; see [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region has an owner of every shard only if it has at least as many instances as there are shards.
 
-To see an instance's shard, send Harper's [`get_configuration`](/reference/v5/configuration/operations#get-configuration) operation to it: `replication.shard` in its answer is the instance's shard. Once a `@sharded` table is active, [`cluster_status`](/reference/v5/replication/clustering#sharding-status) lists every shard's instances in `sharding.<database>.shards`.
+To see a shard, send Harper's [`get_configuration`](/reference/v5/configuration/operations#get-configuration) operation to the cluster: `replication.shard` in the answer is the shard of the instance that answered, and `replication.shards` lists every shard.
 
 ### Scaling a Sharded Cluster
 
