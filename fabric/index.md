@@ -18,4 +18,4 @@ While Fabric Studio is web based and hosted by us, all database interactions are
 
 ## What can I manage?
 
-Fabric Studio enables users to manage both Harper Cloud clusters and privately hosted clusters all from a single UI. All Harper clusters feature identical behavior whether they are hosted by us or by you.
+Fabric Studio enables users to manage both Harper Cloud clusters and privately hosted clusters all from a single UI. All Harper clusters feature identical behavior whether they are hosted by us or by you. Some Fabric features, such as [sharded clusters](/fabric/cluster-creation-management#sharded-clusters) and [preview hosts](/fabric/cluster-creation-management#preview-hosts), are available only on clusters Fabric hosts.

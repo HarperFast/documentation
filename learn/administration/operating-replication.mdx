@@ -259,7 +259,7 @@ On a non-production cluster under write load:
 
 - **mTLS is required on the secure replication port and cannot be disabled.** Certificate expiry is therefore a replication outage, so treat certificate lifetime as an operational deadline with its own alert. See [certificate management](/reference/v5/security/certificate-management).
 - **Gossip discovery means one route can join a whole cluster.** A node that connects to one peer discovers the rest. That is convenient and it means an accidental route can widen your topology more than you intended.
-- **Sharding is a separate scope control.** If you use [sharding](/reference/v5/replication/sharding), not every node holds every record, so "this node is converged" and "this node can answer this query locally" become different questions.
+- **Sharding is a separate scope control.** If you use [sharding](/reference/v5/replication/sharding), including [`@sharded` tables](/reference/v5/replication/residency), not every node holds every record, so "this node is converged" and "this node can answer this query locally" become different questions.
 - **Analytics data has its own replication setting.** See `analytics.replicate` in the [analytics configuration](/reference/v5/analytics/overview#analytics-configuration) before you build dashboards that assume metrics are or are not cluster-wide.
 - **Keep node-local operational state out of scope.** Availability flags, maintenance markers, and anything else that describes one node rather than the cluster should not replicate, or a routine drain propagates to peers.
 
@@ -282,6 +282,7 @@ On a non-production cluster under write load:
 - [Replication overview](/reference/v5/replication/overview) for routes, scope, controlled flow, and securing connections
 - [Clustering operations](/reference/v5/replication/clustering) for `add_node`, `set_node`, and the `cluster_status` response in full
 - [Sharding](/reference/v5/replication/sharding) for controlling how many nodes hold a given record
+- [Schema-defined sharding](/reference/v5/replication/residency) for `@sharded` tables, and [Sharded Clusters](/fabric/cluster-creation-management#sharded-clusters) for running them on Fabric
 - [Replication metrics](/reference/v5/analytics/overview#replication-metrics) for `replication-latency` and byte counters
 - [Certificate management](/reference/v5/security/certificate-management) and [certificate verification](/reference/v5/security/certificate-verification)
 - [Database schema](/reference/v5/database/schema) for the `replicate` table directive

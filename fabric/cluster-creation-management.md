@@ -10,6 +10,8 @@ A cluster is a group of instances managed together to run applications and servi
 
 ## Creating a Cluster
 
+To create a [sharded cluster](#sharded-clusters), use the Fabric API instead: Studio cannot create one yet.
+
 1. Navigate to your organization page.
 2. Click the "+ New Cluster" button in the upper right of the sub-menu.
 3. Enter the required fields:
@@ -22,8 +24,6 @@ A cluster is a group of instances managed together to run applications and servi
 4. Click the "Confirm Payment Details" or "Create New Cluster"(if you chose the free tier) button on the bottom right of the page.
 5. \*Confirm or replace the preferred payment method. Add a new card if necessary
 6. Cluster will begin provisioning as soon as you complete your selections.
-
-Studio cannot create a [sharded cluster](#sharded-clusters) yet; create one with the Fabric API.
 
 ## Editing a Cluster
 
@@ -42,7 +42,7 @@ On a sharded cluster, a change that removes instances must leave every shard eno
 
 ## Sharded Clusters
 
-A sharded cluster splits the records of its `@sharded` tables among groups of instances called shards. Each instance belongs to one shard and stores that shard's records in full. Fabric gives every instance its shard and refuses changes that would leave a shard with too few instances. Which tables are sharded is up to your application's schema: see [Schema-defined sharding](/reference/v5/replication/residency) for the `@sharded` directive and what it requires.
+A sharded cluster splits the records of its `@sharded` tables among groups of instances called shards. Each instance belongs to one shard and keeps every record of that shard. Fabric gives every instance its shard and refuses changes that would leave a shard with too few instances. Which tables are sharded is up to your application's schema: see [Schema-defined sharding](/reference/v5/replication/residency) for the `@sharded` directive and what it requires.
 
 Sharded clusters run Harper 5.4.0-beta.3 or later, on Colocated or Dedicated deployments. A Self-hosted cluster cannot be sharded.
 
@@ -73,6 +73,7 @@ The other fields create any hosted cluster. `abbreviatedName` gives the cluster 
 
 Fabric refuses the request with 400, before creating anything, unless:
 
+- the cluster is Colocated or Dedicated, and the request has `regionPlans`.
 - `regionPlans` gives the cluster at least `shards` multiplied by `minOwners` instances. Each region plan adds its region's `instanceCount`. The example needs four: two shards of two instances each.
 - `version` is 5.4.0-beta.3 or later. Without `version`, Fabric uses its default Harper version, and refuses the request if that is earlier.
 
@@ -86,9 +87,9 @@ With `minOwners: 1`, a shard can be left with a single instance. While that inst
 - **New instances keep shards balanced.** Each new instance joins the shard with the fewest instances. Among equally small shards, Fabric picks the one whose nearest instance is farthest from the new instance, so each shard's instances tend to be spread across locations. That spread is a tendency, not a guarantee.
 - **Fabric configures the shard.** It writes [`replication.shard` and `replication.shards`](/reference/v5/replication/residency#configuration) into each instance's configuration, and a new instance [joins](/reference/v5/replication/residency#cloning-a-node-into-a-sharded-cluster) with its shard already chosen. Do not set or change these yourself: a shard is part of an instance's identity, and Fabric relies on the one it assigned.
 
-An instance stores a sharded record in full only if the record is in its own shard. Any other instance that reads it fetches it from an instance in that shard, which may be in another region; see [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region can hold every shard only if it has at least as many instances as there are shards.
+The instances of a record's shard are its owners. Another instance that reads the record fetches it from an owner, which may be in another region, and can keep a temporary copy of it; see [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region has an owner of every shard only if it has at least as many instances as there are shards.
 
-To see the shards, send Harper's [`cluster_status`](/reference/v5/replication/clustering#sharding-status) operation to the cluster. Its top-level `shard` is the shard of the instance that answers. Once a `@sharded` table is active, `sharding.<database>.shards` lists every shard and its instances.
+To see an instance's shard, send Harper's [`get_configuration`](/reference/v5/configuration/operations#get-configuration) operation to it: `replication.shard` in its answer is the instance's shard. Once a `@sharded` table is active, [`cluster_status`](/reference/v5/replication/clustering#sharding-status) lists every shard's instances in `sharding.<database>.shards`.
 
 ### Scaling a Sharded Cluster
 
@@ -99,7 +100,7 @@ Removing instances, from Studio's Edit page or with `PUT /Cluster/<cluster id>/`
 - Only running instances count. An instance still copying its data, or in an error state, does not.
 - When a change removes some of a region's instances rather than the whole region, Fabric chooses which ones go, keeping enough in every shard.
 - A change that would leave a shard short fails with 400 and changes nothing. The error names the shard and how many running instances it has now.
-- `regionPlans` in a `PUT` lists every region the cluster keeps, and a region left out is removed. If the cluster's regions change after Fabric reads them for your request, the request fails with 409 and changes nothing. Read the cluster again with `GET /Cluster/<cluster id>/`, apply your change to its current regions, and send that. Resending the old body could remove a region someone else just added.
+- `regionPlans` in a `PUT` lists every region the cluster keeps, and a region left out is removed, so build each `PUT` from a fresh `GET /Cluster/<cluster id>/`: a body built from an older read can undo someone else's change. Fabric detects one such conflict. If a region your change removes instances from was changed after Fabric read the cluster for your request, the request fails with 409 and changes nothing. Read the cluster again and apply your change to what it returns.
 
 Fabric checks this only when you remove instances. An instance that fails still leaves its shard short until it recovers.
 
