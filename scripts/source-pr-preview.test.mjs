@@ -5,15 +5,18 @@ import {
 	CLEANUP_EVENT,
 	COMMENT_MARKER,
 	DEPLOY_EVENT,
+	DOCS_PREVIEW_LABEL,
 	checkOutputs,
 	decide,
 	failedBody,
 	findComment,
 	parsePayload,
 	readyBody,
+	removalReason,
 	removedBody,
 	resolveSource,
 	upsertComment,
+	wantsPreview,
 } from './source-pr-preview.mjs';
 
 const sha = (c) => c.repeat(40);
@@ -62,8 +65,12 @@ function fakeGithub({ prs = {}, branches = {}, gitlinks = {}, commits = [], comm
 	return github;
 }
 
-function pr({ state = 'open', head = sha('a'), base = 'main', headRepo = 'HarperFast/harper' } = {}) {
-	return { state, head: { sha: head, repo: headRepo ? { full_name: headRepo } : null }, base: { ref: base } };
+const LABELED = [{ name: 'bug' }, { name: DOCS_PREVIEW_LABEL }];
+
+function pr(overrides = {}) {
+	const { state = 'open', head = sha('a'), base = 'main', headRepo = 'HarperFast/harper' } = overrides;
+	const labels = 'labels' in overrides ? overrides.labels : LABELED;
+	return { state, labels, head: { sha: head, repo: headRepo ? { full_name: headRepo } : null }, base: { ref: base } };
 }
 
 const tests = [];
@@ -167,15 +174,46 @@ test('a fork, or a deleted head repo, counts as a fork', async () => {
 	}
 });
 
-test('deploy of a closed PR and cleanup of an open one are skipped', async () => {
-	const closed = fakeGithub({ prs: { 'HarperFast/harper#5': pr({ state: 'closed' }) } });
-	assert.equal((await resolveSource(closed, DEPLOY_EVENT, { repo: 'HarperFast/harper', number: 5 })).action, 'skip');
-	assert.equal(
-		(await resolveSource(closed, CLEANUP_EVENT, { repo: 'HarperFast/harper', number: 5 })).action,
-		'cleanup'
-	);
-	const open = fakeGithub({ prs: { 'HarperFast/harper#5': pr() } });
-	assert.equal((await resolveSource(open, CLEANUP_EVENT, { repo: 'HarperFast/harper', number: 5 })).action, 'skip');
+const UNLABELED = [{ name: 'bug' }, { name: 'docs-preview-not' }];
+
+test('only an open PR with the label wants a preview', () => {
+	assert.equal(wantsPreview(pr()), true);
+	assert.equal(wantsPreview(pr({ state: 'closed' })), false);
+	for (const labels of [[], UNLABELED, undefined, null, 'docs-preview', [null, undefined, {}]]) {
+		assert.equal(wantsPreview(pr({ labels })), false, JSON.stringify(labels));
+	}
+	assert.equal(wantsPreview(pr({ labels: [null, { name: DOCS_PREVIEW_LABEL }] })), true);
+	assert.equal(removalReason(pr({ labels: [] })), 'unlabeled');
+	assert.equal(removalReason(pr({ state: 'closed' })), 'closed');
+});
+
+test('cleanup removes the preview of a PR that is closed or lost its label, and leaves a labeled one', async () => {
+	const payload = { repo: 'HarperFast/harper', number: 5 };
+	const action = async (overrides) => {
+		const github = fakeGithub({ prs: { 'HarperFast/harper#5': pr(overrides) } });
+		return (await resolveSource(github, CLEANUP_EVENT, payload)).action;
+	};
+	assert.equal(await action({ state: 'closed' }), 'cleanup');
+	assert.equal(await action({ state: 'closed', labels: [] }), 'cleanup');
+	assert.equal(await action({ labels: [] }), 'cleanup');
+	assert.equal(await action({ labels: UNLABELED }), 'cleanup');
+	assert.equal(await action({}), 'skip');
+});
+
+test('deploy of a PR that is closed or unlabeled is skipped before any source lookup', async () => {
+	for (const repo of ['harper', 'harper-pro']) {
+		for (const overrides of [{ state: 'closed' }, { labels: [] }, { labels: UNLABELED }]) {
+			const github = fakeGithub({ prs: { [`HarperFast/${repo}#5`]: pr(overrides) } });
+			const lookups = [];
+			for (const method of ['getBranch', 'getContent', 'getCommit']) {
+				const original = github.rest.repos[method];
+				github.rest.repos[method] = (params) => (lookups.push(method), original(params));
+			}
+			const resolved = await resolveSource(github, DEPLOY_EVENT, { repo: `HarperFast/${repo}`, number: 5 });
+			assert.equal(resolved.action, 'skip', `${repo} ${JSON.stringify(overrides)}`);
+			assert.deepEqual(lookups, []);
+		}
+	}
 });
 
 test('an unknown event or PR fails', async () => {
@@ -194,7 +232,7 @@ test('outputs are checked again where they are consumed', () => {
 	checkOutputs({ ...good, proSha: '', error: 'no branch' });
 });
 
-const removed = { id: 4, body: removedBody() };
+const removed = { id: 4, body: removedBody('closed') };
 const live = { id: 4, body: readyBody({ url: 'U', harperSha: sha('a'), proSha: sha('b'), runUrl: 'R' }) };
 const decision = (overrides) =>
 	decide({ action: 'deploy', pr: pr(), builtHead: sha('a'), buildResult: 'success', resolveError: '', ...overrides });
@@ -205,10 +243,36 @@ test('an open PR at the built head deploys, or reports why it cannot', () => {
 	assert.equal(decision({ buildResult: 'skipped', resolveError: 'no branch' }), 'fail');
 });
 
-test('a job for a head the PR has moved past, or a cleanup of an open PR, does nothing', () => {
+test('a job for a head the PR has moved past, or a cleanup of a labeled PR, does nothing', () => {
 	assert.equal(decision({ builtHead: sha('b') }), 'skip');
 	assert.equal(decision({ builtHead: sha('b'), buildResult: 'failure' }), 'skip');
 	assert.equal(decision({ action: 'cleanup', builtHead: '', buildResult: 'skipped', comment: live }), 'skip');
+});
+
+test('an open PR without the label loses its preview whichever event queued the job', () => {
+	const unlabeled = pr({ labels: [] });
+	assert.equal(
+		decision({ pr: unlabeled, action: 'cleanup', builtHead: '', buildResult: 'skipped', comment: live }),
+		'remove'
+	);
+	assert.equal(decision({ pr: unlabeled, comment: live }), 'remove');
+	assert.equal(decision({ pr: unlabeled, builtHead: sha('b'), buildResult: 'failure', comment: live }), 'remove');
+	assert.equal(decision({ pr: unlabeled, resolveError: 'no branch', buildResult: 'skipped', comment: live }), 'remove');
+	assert.equal(decision({ pr: pr({ labels: undefined }), comment: live }), 'remove');
+});
+
+test('a late build for an unlabeled PR does not deploy, and one with no comment never had a preview', () => {
+	const unlabeled = pr({ labels: UNLABELED });
+	assert.equal(decision({ pr: unlabeled, comment: undefined }), 'skip');
+	assert.equal(decision({ pr: unlabeled, buildResult: 'failure', comment: undefined }), 'skip');
+	assert.equal(decision({ pr: unlabeled, comment: removed }), 'skip');
+});
+
+test('relabeling brings a removed preview back, and a PR unlabeled then closed is removed once', () => {
+	assert.equal(decision({ comment: removed }), 'deploy');
+	assert.equal(decision({ action: 'cleanup', buildResult: 'skipped', comment: removed }), 'skip');
+	const afterUnlabel = { id: 4, body: removedBody('unlabeled') };
+	assert.equal(decision({ pr: pr({ state: 'closed', labels: [] }), action: 'cleanup', comment: afterUnlabel }), 'skip');
 });
 
 test('a closed PR loses its preview whichever event queued the job', () => {
@@ -263,6 +327,13 @@ test("updates this App's marked comment in place", async () => {
 		'update',
 		{ owner: 'HarperFast', repo: 'harper', body: 'new body', comment_id: 3 },
 	]);
+});
+
+test('the removed comment says why the preview went', () => {
+	assert.match(removedBody('unlabeled'), /because the `docs-preview` label was removed/);
+	assert.match(removedBody('closed'), /because this PR closed/);
+	assert.match(removedBody(), /because this PR closed/);
+	assert.match(readyBody({ url: 'U', harperSha: sha('a'), proSha: sha('b'), runUrl: 'R' }), /`docs-preview` label/);
 });
 
 test('comment bodies carry the marker, the link and both shas', () => {

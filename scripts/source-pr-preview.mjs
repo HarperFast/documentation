@@ -15,6 +15,7 @@ export const COMMENT_MARKER = '<!-- docs-source-pr-preview -->';
 const REMOVED_MARKER = '<!-- docs-source-pr-preview: removed -->';
 export const DEPLOY_EVENT = 'docs-source-pr-preview';
 export const CLEANUP_EVENT = 'docs-source-pr-preview-cleanup';
+export const DOCS_PREVIEW_LABEL = 'docs-preview';
 
 const SHA = /^[0-9a-f]{40}$/;
 const PROJECT = /^(harper|harper-pro)-pr-[1-9][0-9]*$/;
@@ -28,6 +29,16 @@ export function parsePayload(payload) {
 		throw new Error('client_payload.number must be a positive integer');
 	}
 	return { owner: OWNER, repo: short, fullName, number, project: `${short}-pr-${number}` };
+}
+
+export function wantsPreview(pr) {
+	return (
+		pr.state === 'open' && Array.isArray(pr.labels) && pr.labels.some((label) => label?.name === DOCS_PREVIEW_LABEL)
+	);
+}
+
+export function removalReason(pr) {
+	return pr.state === 'open' ? 'unlabeled' : 'closed';
 }
 
 function isNotFound(error) {
@@ -65,8 +76,8 @@ async function commitExists(github, repo, ref) {
 }
 
 /**
- * What a dispatch asks for, judged against the PR as it is now. A deploy of a closed PR or a cleanup of an
- * open one is a `skip`. `error` is a reason the PR cannot be previewed that its author should see.
+ * What a dispatch asks for, judged against the PR as it is now. A deploy of a PR that does not want a preview
+ * or a cleanup of one that does is a `skip`. `error` is a reason the PR cannot be previewed that its author should see.
  */
 export async function resolveSource(github, eventType, payload) {
 	const source = parsePayload(payload);
@@ -75,11 +86,11 @@ export async function resolveSource(github, eventType, payload) {
 		repo: source.repo,
 		pull_number: source.number,
 	});
-	const open = pr.state === 'open';
+	const wanted = wantsPreview(pr);
 	const base = { ...source, headSha: pr.head.sha, fork: pr.head.repo?.full_name !== source.fullName };
-	if (eventType === CLEANUP_EVENT) return { ...base, action: open ? 'skip' : 'cleanup' };
+	if (eventType === CLEANUP_EVENT) return { ...base, action: wanted ? 'skip' : 'cleanup' };
 	if (eventType !== DEPLOY_EVENT) throw new Error(`unexpected event ${eventType}`);
-	if (!open) return { ...base, action: 'skip' };
+	if (!wanted) return { ...base, action: 'skip' };
 	let harperSha;
 	let proSha;
 	let error = '';
@@ -113,11 +124,11 @@ export async function readPr(github, source) {
 
 /**
  * Acts on the PR's current state rather than on what the job's own dispatch asked, since a queued apply job can
- * be replaced by a newer one. The comment is written before any deploy starts, so a closed PR without one never
- * had a preview.
+ * be replaced by a newer one. The comment is written before any deploy starts, so a PR without one never had a
+ * preview.
  */
 export function decide({ action, pr, builtHead, buildResult, resolveError, comment }) {
-	if (pr.state !== 'open') return comment && !comment.body.includes(REMOVED_MARKER) ? 'remove' : 'skip';
+	if (!wantsPreview(pr)) return comment && !comment.body.includes(REMOVED_MARKER) ? 'remove' : 'skip';
 	if (action !== 'deploy' || pr.head.sha !== builtHead) return 'skip';
 	return resolveError || buildResult !== 'success' ? 'fail' : 'deploy';
 }
@@ -159,7 +170,7 @@ export function readyBody({ url, harperSha, proSha, runUrl }) {
 
 ${url}
 
-Built from harper ${short(harperSha)} and harper-pro ${short(proSha)} ([build](${runUrl})). Updates on each push to this PR; removed when it closes.
+Built from harper ${short(harperSha)} and harper-pro ${short(proSha)} ([build](${runUrl})). Updates on each push to this PR while it has the \`${DOCS_PREVIEW_LABEL}\` label; removed when the label is removed or the PR closes.
 `;
 }
 
@@ -167,15 +178,16 @@ export function failedBody({ headSha, reason, url, runUrl }) {
 	return `${COMMENT_MARKER}
 ### 📖 Docs preview failed
 
-${short(headSha)} was not previewed: ${reason} ([build](${runUrl})). ${url} keeps the last preview that deployed, if any. The next push to this PR tries again.
+${short(headSha)} was not previewed: ${reason} ([build](${runUrl})). ${url} keeps the last preview that deployed, if any. The next push to this PR while it has the \`${DOCS_PREVIEW_LABEL}\` label tries again.
 `;
 }
 
-export function removedBody() {
+export function removedBody(reason = 'closed') {
+	const why = reason === 'unlabeled' ? `the \`${DOCS_PREVIEW_LABEL}\` label was removed` : 'this PR closed';
 	return `${COMMENT_MARKER}
 ${REMOVED_MARKER}
 ### 📖 Docs preview removed
 
-The preview was removed when this PR closed.
+The preview was removed because ${why}.
 `;
 }
