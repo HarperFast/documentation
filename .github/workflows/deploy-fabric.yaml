@@ -56,7 +56,7 @@ jobs:
         run: npm ci
 
       # No DOCUSAURUS_BASE_URL override: the site is served from the fabric
-      # instance's root path, unlike PR previews which live under /pr-<n>.
+      # instance's root path, and each PR preview from its own host's root.
       - name: Build Docusaurus site
         env:
           # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.

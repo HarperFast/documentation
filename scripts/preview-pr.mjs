@@ -63,7 +63,7 @@ async function main() {
 	try {
 		// Get the PR's branch name and author info
 		const prInfo = JSON.parse(
-			execSync(`gh pr view ${PR_NUMBER} --json headRefName,author,title,url,isDraft`, { encoding: 'utf-8' })
+			execSync(`gh pr view ${PR_NUMBER} --json headRefName,author,title,url,isDraft,commits`, { encoding: 'utf-8' })
 		);
 
 		if (!prInfo.headRefName) {
@@ -95,15 +95,17 @@ async function main() {
 
 		console.log(`\n✓ PR branch: ${prInfo.headRefName}`);
 
-		// Get the workflow run for this PR (using sanitized branch name)
-		const runs = JSON.parse(
+		// The newest successful build of this PR's branch (using sanitized branch name) at one of its
+		// commits: a later PR can reuse the branch name. The API lists a workflow's runs newest first.
+		const prCommits = new Set(prInfo.commits.map((commit) => commit.oid));
+		const run = JSON.parse(
 			execSync(
-				`gh api repos/HarperFast/documentation/actions/runs --paginate -X GET -f branch=${sanitizedBranch} --jq '.workflow_runs | map(select(.conclusion == "success" and .name == "Deploy PR Preview")) | sort_by(.created_at) | reverse | .[0]'`,
+				`gh api repos/HarperFast/documentation/actions/workflows/preview-build.yaml/runs -X GET -f branch=${sanitizedBranch} -f status=success -f per_page=100 --jq '[.workflow_runs[] | {id, head_sha}]'`,
 				{ encoding: 'utf-8' }
 			)
-		);
+		).find((candidate) => prCommits.has(candidate.head_sha));
 
-		if (!runs || !runs.id) {
+		if (!run) {
 			console.error(`❌ No successful workflow run found for PR #${PR_NUMBER}`);
 			console.log('\nMake sure:');
 			console.log('  1. The PR number is correct');
@@ -112,16 +114,16 @@ async function main() {
 			process.exit(1);
 		}
 
-		console.log(`✓ Found workflow run: ${runs.id}`);
+		console.log(`✓ Found workflow run: ${run.id}`);
 
 		// Validate workflow run ID is numeric
-		if (!/^\d+$/.test(String(runs.id))) {
+		if (!/^\d+$/.test(String(run.id))) {
 			throw new Error('Invalid workflow run ID format');
 		}
 
 		// Get the artifacts for this run
 		const artifacts = JSON.parse(
-			execSync(`gh api repos/HarperFast/documentation/actions/runs/${runs.id}/artifacts --jq '.artifacts'`, {
+			execSync(`gh api repos/HarperFast/documentation/actions/runs/${run.id}/artifacts --jq '.artifacts'`, {
 				encoding: 'utf-8',
 			})
 		);
@@ -200,9 +202,10 @@ async function main() {
 		console.log(`\n🚀 Starting preview server...\n`);
 
 		// Start the server with quoted path to prevent injection
+		// Previews build with the default base URL (/), so serve with it too.
 		execSync(`npm run serve -- --dir "${BUILD_DIR}"`, {
 			stdio: 'inherit',
-			env: { ...process.env, DOCUSAURUS_BASE_URL: `pr-${PR_NUMBER}` },
+			env: { ...process.env, DOCUSAURUS_BASE_URL: '/' },
 		});
 	} catch (error) {
 		console.error('\n❌ Error:', error.message);
