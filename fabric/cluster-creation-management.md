@@ -10,8 +10,6 @@ A cluster is a group of instances managed together to run applications and servi
 
 ## Creating a Cluster
 
-To create a [sharded cluster](#sharded-clusters), use the Fabric API instead: Studio cannot create one yet.
-
 1. Navigate to your organization page.
 2. Click the "+ New Cluster" button in the upper right of the sub-menu.
 3. Enter the required fields:
@@ -48,36 +46,20 @@ Sharded clusters run Harper 5.4.0-beta.3 or later, on Colocated or Dedicated dep
 
 ### Creating a Sharded Cluster
 
-Studio does not offer sharding yet ([studio#2084](https://github.com/HarperFast/studio/issues/2084)), so create the cluster with the Fabric API at `https://fabric.harper.fast`:
+Sharding is chosen when the cluster is created, with two settings:
 
-1. Sign in with `POST /Login/` and the body `{ "email": "<email>", "password": "<password>" }`, using the email and password you use for Studio, not a cluster's username and password. The account must be able to create clusters in the organization. The response sets a session cookie: send it with the requests that follow.
-2. Create the cluster with `POST /Cluster/` and a body like this:
+- the number of shards (`shards`): a whole number from 2 to 256.
+- the owners per shard (`minOwners`): the fewest running instances each shard must keep, a whole number of at least 1. It defaults to 2.
 
-```json
-{
-	"name": "orders",
-	"abbreviatedName": "orders",
-	"organizationId": "<organization id>",
-	"version": "<Harper version>",
-	"regionPlans": [{ "regionId": "<region id>", "planId": "<plan id>" }],
-	"sharding": { "shards": 2, "minOwners": 2 }
-}
-```
+Fabric refuses to create the cluster, and creates nothing, unless:
 
-`sharding` is the only field specific to a sharded cluster:
+- the cluster is Colocated or Dedicated.
+- its regions give it at least `shards` multiplied by `minOwners` instances. Two shards with two owners each need four instances.
+- it runs Harper 5.4.0-beta.3 or later.
 
-- `shards` is the number of shards: a whole number from 2 to 256, sent as a JSON number.
-- `minOwners` is the fewest running instances each shard must keep: a whole number, at least 1. It defaults to 2.
+Neither setting can change once the cluster exists, and the cluster's Harper version cannot later go below 5.4.0-beta.3.
 
-The other fields create any hosted cluster. `abbreviatedName` gives the cluster its host name, `<abbreviatedName>.<organization subdomain>.harperfabric.com`. The organization ID is the first part of Studio's address after `#/` on any of the organization's pages. `GET /Region/?organizationId=<organization id>` lists the regions the organization can use, each with its `instanceCount`, and `GET /Plan/?organizationId=<organization id>` lists its plans.
-
-Fabric refuses the request with 400, before creating anything, unless:
-
-- the cluster is Colocated or Dedicated, and the request has `regionPlans`.
-- `regionPlans` gives the cluster at least `shards` multiplied by `minOwners` instances. Each region plan adds its region's `instanceCount`. The example needs four: two shards of two instances each.
-- `version` is 5.4.0-beta.3 or later. Without `version`, Fabric uses its default Harper version, and refuses the request if that is earlier.
-
-`sharding` cannot change once the cluster exists: `PUT /Cluster/<cluster id>/` refuses it with 400. A later version change cannot go below 5.4.0-beta.3.
+With the Fabric API at `https://fabric.harper.fast`, send the settings as `"sharding": { "shards": 2, "minOwners": 2 }` in the `POST /Cluster/` body. A request Fabric refuses gets 400, and `PUT /Cluster/<cluster id>/` refuses a `sharding` change with 400.
 
 With `minOwners: 1`, a shard can be left with a single instance. While that instance is down, the shard has no running instance to read its records from, and if the instance's data is lost, those records can come back only from a backup. See [Recovery sources](/reference/v5/replication/residency#recovery-sources).
 
@@ -108,7 +90,6 @@ Fabric checks this only when you remove instances. An instance that fails still 
 
 - Sharding an existing cluster: choose sharding when you create the cluster.
 - Changing the number of shards. That needs Harper to move records between shards ([harper-pro#1053](https://github.com/HarperFast/harper-pro/issues/1053)).
-- Creating a sharded cluster in Studio ([studio#2084](https://github.com/HarperFast/studio/issues/2084)).
 
 ## Preview Hosts
 
