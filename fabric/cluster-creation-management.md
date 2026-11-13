@@ -36,6 +36,62 @@ To edit an existing cluster:
    - Adding or removing additional regions.
 5. Click the "Save Changes" or "Confirm Payment Details" button to summarize and apply your modifications.
 
+On a sharded cluster, a change that removes instances must leave every shard enough running instances. See [Scaling a Sharded Cluster](#scaling-a-sharded-cluster).
+
+## Sharded Clusters
+
+A sharded cluster splits the records of its `@sharded` tables among groups of instances called shards. Each instance belongs to one shard and keeps every record of that shard. Fabric gives every instance its shard and refuses changes that would leave a shard with too few instances. Which tables are sharded is up to your application's schema: see [Schema-defined sharding](/reference/v5/replication/residency) for the `@sharded` directive and what it requires.
+
+Sharded clusters run Harper 5.4.0-beta.3 or later, on Colocated or Dedicated deployments. A Self-hosted cluster cannot be sharded.
+
+### Creating a Sharded Cluster
+
+Sharding is chosen when the cluster is created, with two settings:
+
+- the number of shards (`shards`): a whole number from 2 to 256.
+- the owners per shard (`minOwners`): the fewest running instances each shard must keep, a whole number of at least 1. It defaults to 2.
+
+Fabric refuses to create the cluster, and creates nothing, unless:
+
+- the cluster is Colocated or Dedicated.
+- its regions give it at least `shards` multiplied by `minOwners` instances. Two shards with two owners each need four instances.
+- it runs Harper 5.4.0-beta.3 or later.
+
+Neither setting can change once the cluster exists, and the cluster's Harper version cannot later go below 5.4.0-beta.3.
+
+With the Fabric API at `https://fabric.harper.fast`, send the settings as `"sharding": { "shards": 2, "minOwners": 2 }` in the `POST /Cluster/` body. A request Fabric refuses gets 400. `PUT /Cluster/<cluster id>/` also answers 400 to any body that includes `sharding`, even one with the cluster's current values.
+
+With `minOwners: 1`, a shard can be left with a single instance. While that instance is down, the shard has no running instance to read its records from. If the instance's data is lost, those records are gone: Harper can rebuild a lost shard only from a complete backup ([Recovery sources](/reference/v5/replication/residency#recovery-sources)), and Fabric has no backup to restore one from.
+
+### How Fabric Assigns Shards
+
+- **A shard is permanent.** Fabric picks an instance's shard when it creates the instance and never changes it. When Fabric replaces an instance, for example to move it to a new host after a plan change, the new instance takes the old one's shard.
+- **New instances keep shards balanced.** Each new instance joins the shard with the fewest instances. Among equally small shards, Fabric picks the one whose nearest instance is farthest from the new instance, so each shard's instances tend to be spread across locations. That spread is a tendency, not a guarantee.
+- **Fabric configures the shard.** It writes [`replication.shard` and `replication.shards`](/reference/v5/replication/residency#configuration) into each instance's configuration, and a new instance [joins](/reference/v5/replication/residency#cloning-a-node-into-a-sharded-cluster) with its shard already chosen. Do not set or change these yourself: a shard is part of an instance's identity, and Fabric relies on the one it assigned.
+
+The instances of a record's shard are its owners. Another instance that reads the record fetches it from an owner, which may be in another region, and can keep a temporary copy of it; see [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region has an owner of every shard only if it has at least as many instances as there are shards.
+
+To see an instance's shard, send Harper's [`get_configuration`](/reference/v5/configuration/operations#get-configuration) operation to the instance's own hostname, as when [taking a node out of rotation](/fabric/load-balancing#taking-a-node-out-of-rotation): `replication.shard` in its answer is that instance's shard, and `replication.shards` lists every shard. Sent to the cluster hostname, it answers for whichever instance the load balancer picks.
+
+### Scaling a Sharded Cluster
+
+Adding instances works as on any cluster, and each new instance joins the shard with the fewest instances.
+
+Removing instances, from Studio's Edit page or with `PUT /Cluster/<cluster id>/`, must leave every shard at least `minOwners` running instances:
+
+- Only running instances count. An instance still copying its data, or in an error state, does not.
+- When a change removes some of a region's instances rather than the whole region, Fabric chooses which ones go, keeping enough in every shard.
+- A change that would leave a shard short fails with 400 and changes nothing. The error names the shard and how many running instances it has now.
+- Fabric answers before it removes anything, and counts again just before the removal. If an instance stopped running in between and the removal would now leave a shard short, Fabric removes nothing: a change that only removes instances puts the cluster back as it was, and one that also adds or moves instances fails and leaves the cluster marked failed. Read the cluster again to see which happened. A cluster marked failed refuses every later change, from Studio or `PUT`, until Harper repairs it. Ask for help on [Discord](https://harper.fast/discord), and don't restart the cluster to clear the state: its stored `plans` may still list the refused change rather than the instances it has.
+- `regionPlans` in a `PUT` lists every region the cluster keeps, and a region left out is removed, so build each `PUT` from a fresh `GET /Cluster/<cluster id>/`, sending the read's `plans` as `regionPlans` and leaving out its `sharding`: a body built from an older read can undo someone else's change. Fabric detects one such conflict. If a region your change removes instances from was changed after Fabric read the cluster for your request, the request fails with 409 and changes nothing. Read the cluster again and apply your change to what it returns.
+
+Fabric checks this only when you remove instances. An instance that fails still leaves its shard short until it recovers.
+
+### Not Yet Supported
+
+- Sharding an existing cluster: choose sharding when you create the cluster.
+- Changing the number of shards. That needs Harper to move records between shards ([harper-pro#1053](https://github.com/HarperFast/harper-pro/issues/1053)).
+
 ## Preview Hosts
 
 Colocated and Dedicated clusters can serve short-lived copies of an application, such as one per pull request, under their own host name. A name one label below `app.` and the cluster's full host name reaches the [isolated application](/reference/v5/components/applications#isolated-applications) deployed with that name as its `host`:
