@@ -4,7 +4,7 @@ title: API Documentation
 
 # API Documentation
 
-Harper provides automatically generated API documentation page via [Swagger UI](https://github.com/swagger-api/swagger-ui) integration. This page allows developers to explore and test the various API endpoints available in your Harper instance/cluster. The clusters themselves are created and changed through a separate API, the Fabric API at `https://fabric.harper.fast`; see [Creating a Sharded Cluster](/fabric/cluster-creation-management#creating-a-sharded-cluster) for an example.
+Harper provides automatically generated API documentation page via [Swagger UI](https://github.com/swagger-api/swagger-ui) integration. This page allows developers to explore and test the various API endpoints available in your Harper instance/cluster.
 
 ## Accessing the API Documentation
 
