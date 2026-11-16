@@ -11,7 +11,6 @@
 //   /reference/  — new section, no old paths point here
 //   /learn/       — existing redirects for /getting-started/* and /foundations/*
 //   /release-notes/ — static rules below cover all paths seen in analytics
-//   /fabric/      — new section, no old paths
 
 import { historicRedirects } from './historic-redirects';
 
@@ -363,6 +362,7 @@ const currentRedirects: RedirectRule[] = [
 	// ── Fabric ────────────────────────────────────────────────────────────────
 	{ from: '/fabric/rest-api', to: '/fabric' },
 	{ from: '/fabric/functions', to: '/fabric' },
+	{ from: '/fabric/api-documentation', to: '/fabric/cluster-api-explorer' },
 ];
 
 export const redirects: RedirectRule[] = [...currentRedirects, ...historicRedirects];

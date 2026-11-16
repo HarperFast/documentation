@@ -1,14 +1,14 @@
 ---
-title: API Documentation
+title: Cluster API Explorer
 ---
 
-# API Documentation
+# Cluster API Explorer
 
-Harper provides automatically generated API documentation page via [Swagger UI](https://github.com/swagger-api/swagger-ui) integration. This page allows developers to explore and test the various API endpoints available in your Harper instance/cluster.
+Each Harper cluster generates documentation for its own APIs, shown in Fabric Studio through a [Swagger UI](https://github.com/swagger-api/swagger-ui) integration. Use it to explore and test the endpoints your cluster serves, including the ones your applications define.
 
-## Accessing the API Documentation
+This page covers the APIs inside a cluster. To create and manage organizations and clusters themselves, see the [Fabric API Reference](./api-reference.md).
 
-To access the API documentation, navigate to the following URL in your web browser:
+## Opening the API Explorer
 
 1. Sign in to your Harper Fabric Studio.
 2. Select your Organization and Cluster.
