@@ -49,7 +49,7 @@ npm run format:write
 
 ## Formatting
 
-**Every contribution must be formatted before it is committed.** This applies to _all_ files in the repository — content (`.md`/`.mdx`), TypeScript, config, and anything else under `plans/`, `scripts/`, etc. — not just docs content.
+**Every contribution must be formatted before it is committed.** This applies to _all_ files in the repository — content (`.md`/`.mdx`), TypeScript, config, and anything else under `scripts/`, etc. — not just docs content.
 
 ```bash
 # Format everything (run before committing):

@@ -38,9 +38,6 @@ yarn-error.log*
 # OS files
 Thumbs.db
 
-# Old site directory (cleanup)
-site/
-
 .claude/
 
 # Assembled from HarperFast/harper and HarperFast/harper-pro by scripts/assemble-content.mjs

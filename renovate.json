@@ -32,7 +32,7 @@
 			"automerge": true
 		},
 		{
-			"description": "For 0.x releases a minor bump is a breaking change under semver, so require review. Currently affects @easyops-cn/docusaurus-search-local and @harperfast/code-guidelines.",
+			"description": "For 0.x releases a minor bump is a breaking change under semver, so require review. Currently affects @harperfast/code-guidelines.",
 			"matchCurrentVersion": "/^0\\./",
 			"matchUpdateTypes": ["minor"],
 			"automerge": false

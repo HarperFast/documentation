@@ -298,7 +298,7 @@ const config: Config = {
 	],
 
 	themes: [
-		// Use Algolia search in production when env vars are set, otherwise use local search
+		// Use Algolia search in production when env vars are set. Other builds have no search.
 		...(process.env.NODE_ENV === 'production' && process.env.ALGOLIA_APP_ID && process.env.ALGOLIA_SEARCH_KEY
 			? ['@docusaurus/theme-search-algolia']
 			: []),
