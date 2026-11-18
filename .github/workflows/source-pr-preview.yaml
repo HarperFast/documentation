@@ -6,9 +6,11 @@ name: Source PR Preview
 # is in scripts/source-pr-preview.mjs.
 #
 # The PR's docs are MDX, which runs JavaScript at build time. So `build` holds no secret and no
-# write token, cannot write caches (cache-mode), and waits for 'preview' environment approval when
-# the PR is from a fork. `apply` holds the deploy and comment credentials and runs only this repo's
-# default branch and the built static files.
+# write token, cannot write caches (cache-mode), and waits for approval in the 'preview-fork'
+# environment when the PR is from a fork. That environment must keep its required reviewers and hold
+# no secrets or variables; a PR from the source repo itself builds without approval. `apply` holds
+# the deploy and comment credentials and runs only this repo's default branch and the built static
+# files.
 
 on:
   repository_dispatch:
@@ -56,7 +58,7 @@ jobs:
     if: needs.resolve.outputs.action == 'deploy' && needs.resolve.outputs.error == ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: ${{ needs.resolve.outputs.fork == 'true' && 'preview' || null }}
+    environment: ${{ needs.resolve.outputs.fork == 'true' && 'preview-fork' || null }}
     concurrency:
       group: source-pr-preview-build-${{ needs.resolve.outputs.project }}
       cancel-in-progress: true
