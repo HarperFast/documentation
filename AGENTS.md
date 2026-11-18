@@ -15,7 +15,7 @@ Review `README.md` and `CONTRIBUTING.md` for all relevant repository information
 - TypeScript (config files and scripts), MDX/Markdown (content).
 - Prettier is configured via `@harperfast/code-guidelines/prettier` (see `package.json`).
 - **Required before every commit/PR:** run `npm run format:write`, then confirm `npm run format:check` is clean. This is a hard gate, not advisory — CI fails any unformatted PR (see [CI](#ci)).
-- Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `plans/`, `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
+- Formatting applies to **every file in the repo**, not just content. Prettier runs against the whole tree (`prettier .`) — `.ts`, `.md`, `.mdx`, `.json`, and files under `scripts/`, etc. Do not assume a directory is exempt because it is not user-facing docs.
 - `npm run lint` runs oxlint over JavaScript and TypeScript with warnings treated as errors.
 
 ## Content Structure
