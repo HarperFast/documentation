@@ -61,7 +61,7 @@ Fabric refuses to create the cluster, and creates nothing, unless:
 
 The sharding settings, including the number of spare shards, are fixed at creation. Sharded clusters must stay on Harper 5.4.0-beta.3 or later, or 5.4.0 or later if they have spare shards.
 
-With the Fabric API at `https://fabric.harper.fast`, send the settings as `"sharding": { "shards": 2, "minOwners": 2 }` in the `POST /Cluster/` body. A request Fabric refuses gets 400. `PUT /Cluster/<cluster id>/` also answers 400 to any body that includes `sharding`, even one with the cluster's current values.
+With the Fabric API at `https://fabric.harper.fast`, send the settings as `"sharding": { "shards": 2, "minOwners": 2 }` in the `POST /Cluster/` body. Invalid sharding settings return 400. After an accepted request, check the cluster's `status` for the provisioning outcome. `PUT /Cluster/<cluster id>/` also answers 400 to any body that includes `sharding`, even one with the cluster's current values.
 
 With `minOwners: 1`, a shard can be left with one owner. While that owner is down, the shard has no running owner to read its records from. At any `minOwners`, losing the data on every owner loses the shard's records. Harper can rebuild a lost shard from a complete backup, and Fabric has no full-backup restore. See [Recovery sources](/reference/v5/replication/residency#recovery-sources).
 
@@ -71,7 +71,7 @@ With `minOwners: 1`, a shard can be left with one owner. While that owner is dow
 - **New owners keep shards balanced.** Each new owner joins the owning shard with the fewest owners. Among equally small shards, Fabric picks the one whose nearest owner is farthest from the new owner, so each shard's owners tend to be spread across locations.
 - **Fabric configures the shard.** It writes [`replication.shard` and `replication.shards`](/reference/v5/replication/residency#configuration) into each instance's configuration, and a new instance [joins](/reference/v5/replication/residency#cloning-a-node-into-a-sharded-cluster) with its shard already chosen. Do not set or change these yourself: a shard is part of an instance's identity, and Fabric relies on the one it assigned.
 
-The members of a record's owning shard are its owners. Another instance that reads the record fetches it from an owner, which may be in another region, and can keep a temporary copy of it. See [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). A region needs at least as many owners as owning shards to have an owner of every shard.
+The members of a record's owning shard are its owners. Another instance that reads the record fetches it from an owner, which may be in another region, and can keep a temporary copy of it. See [Ownership, reads, and writes](/reference/v5/replication/residency#ownership-reads-and-writes). Check the shard of each owner before relying on a region to read every shard locally.
 
 To see an instance's shard, send Harper's [`get_configuration`](/reference/v5/configuration/operations#get-configuration) operation to the instance's own hostname, as when [taking a node out of rotation](/fabric/load-balancing#taking-a-node-out-of-rotation): `replication.shard` in its answer is that instance's shard, and `replication.shards` lists every shard. Sent to the cluster hostname, it answers for whichever instance the load balancer picks.
 
@@ -84,10 +84,11 @@ Removing instances from Studio's Edit page or with `PUT /Cluster/<cluster id>/` 
 - Fabric counts the owners it records as running. Owners still copying data or in an error state are excluded. It can take a few seconds to record a host failure. If an owner is failing, wait for its shard to recover before scaling in.
 - When a change removes some of a region's instances rather than the whole region, Fabric chooses which ones go, keeping enough in every shard.
 - A change that would leave a shard short fails with 400 and changes nothing. The error names the shard and how many running owners it has now.
+- Removing replicas requires a Harper release that drains their accepted writes to owners before removal. See the replica scaling limits in the [Fabric API Reference](./api-reference.md).
 - Fabric answers before it removes anything and rechecks the recorded owner count just before removal. If the recount finds too few owners, Fabric removes nothing. A removal-only update returns the cluster to `RUNNING` with its old plans. An update that also adds or moves instances leaves the cluster `FAILED`. Poll the cluster until it finishes updating, then check its `status` and `plans`.
 - A cluster with `status: FAILED` refuses further edits from Studio or `PUT` until Harper support repairs it. Ask for help on [Discord](https://harper.fast/discord) and keep the cluster in its current state. A restart can clear the failed status while the stored `plans` still describe the refused change.
-- `regionPlans` in a `PUT` lists every region the cluster keeps. A region left out is removed. Build each `PUT` from a fresh `GET /Cluster/<cluster id>/`, sending its `plans` as `regionPlans` and leaving out `sharding`. A body built from an older read can undo someone else's change.
-- During a scale-in, Fabric rechecks the plan for each region losing instances against the plan it read at the start of that `PUT`. If a plan changed in that window, the request fails with 409 and changes nothing. Read the cluster again and apply your change to what it returns.
+- `regionPlans` in a `PUT` lists every region the cluster keeps. A region left out is removed. Build the writable `regionPlans` entries from a fresh `GET /Cluster/<cluster id>/` and its `plans` field. Include the required fields for each plan and leave out `sharding`. A body built from an older read can undo someone else's change.
+- During a scale-in, Fabric rechecks the stored region ID for each region losing instances against the ID it read at the start of that `PUT`. A mismatch returns 409 before applying the change. Read the cluster again and apply your change to what it returns.
 
 Fabric checks this only when you remove instances. If an owner fails and its shard drops below the minimum, the shard stays short until an owner recovers or another joins the shard.
 
