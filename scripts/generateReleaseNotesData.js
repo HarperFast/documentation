@@ -9,13 +9,14 @@ const pupNames = {
 	1: 'Alby',
 };
 
+// v4 and older notes are per patch ("4.6.8"); v5 notes are per minor ("5.3").
 function parseVersion(version) {
-	const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+	const match = version.match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
 	if (!match) return null;
 
 	const major = parseInt(match[1], 10);
 	const minor = parseInt(match[2], 10);
-	const patch = parseInt(match[3], 10);
+	const patch = match[3] === undefined ? 0 : parseInt(match[3], 10);
 
 	return {
 		version,
@@ -47,8 +48,8 @@ function getReleaseNotes() {
 		const files = fs.readdirSync(subdirPath);
 
 		files.forEach((file) => {
-			// Match version pattern in filename (e.g., "4.6.8.md")
-			const match = file.match(/^(\d+\.\d+\.\d+)\.md$/);
+			// Match "4.6.8.md", "5.3.md", or "5.4.generated.md" (assembled from harper and harper-pro)
+			const match = file.match(/^(\d+\.\d+(?:\.\d+)?)(?:\.generated)?\.md$/);
 			if (match) {
 				const version = parseVersion(match[1]);
 				if (version) {
