@@ -1,0 +1,83 @@
+name: Build PR Preview
+
+# Builds each pull request's head commit and uploads the site as the
+# `pr-<number>-build` artifact. This workflow runs the PR's code, so it has a
+# read-only token, no secrets and no identity token.
+#
+# preview.yaml waits for this run, downloads the artifact and deploys it as the
+# PR's preview. `npm run preview:pr <number>` serves the same artifact locally.
+#
+# Keep `branches` and `paths` the same as in preview.yaml: its deploy job waits
+# for a run of this workflow, and fails if none starts.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - 'reference_versioned_docs/**'
+      - 'reference_versioned_sidebars/**'
+      - 'reference_versions.json'
+      - 'docs/**'
+      - 'fabric/**'
+      - 'learn/**'
+      - 'release-notes/**'
+      - 'src/**'
+      - 'static/**'
+      - 'versioned_docs/**'
+      - 'versioned_sidebars/**'
+      - 'docusaurus.config.ts'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'historic-redirects.ts'
+      - 'redirects.ts'
+      - 'sidebars*.ts'
+      - 'versions.json'
+      - 'scripts/assemble-content.mjs'
+
+permissions:
+  contents: read
+
+# A newer push cancels the build of the commit it replaces; that commit's
+# preview run then stops waiting and deploys nothing.
+concurrency:
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build PR Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The head commit, not the merge commit: the preview records this SHA.
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The preview serves the site from its own host's root, so the default
+      # base URL (/) applies.
+      - name: Build Docusaurus site
+        env:
+          # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
+          GH_TOKEN: ${{ github.token }}
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-${{ github.event.pull_request.number }}-build
+          path: build/
+          if-no-files-found: error
+          retention-days: 30
