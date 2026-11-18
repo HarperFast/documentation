@@ -8,7 +8,7 @@ Fabric Studio is the web-based GUI for Harper. Studio enables you to administer,
 
 [Sign up for free!](https://fabric.harper.fast/#/sign-up)
 
-Harper includes a simplified local Studio that is packaged with all Harper installations and served directly from the cluster. It can be enabled in the [configuration file](/reference/v4/configuration/options#localstudio). This section is dedicated to the hosted Studio accessed at [fabric.harper.fast](https://fabric.harper.fast/).
+Harper also bundles a simplified [Local Studio](/reference/v5/studio/overview) with every installation, served directly from the instance. This section is dedicated to the hosted Studio accessed at [fabric.harper.fast](https://fabric.harper.fast/).
 
 ## Where to Start
 
@@ -20,7 +20,7 @@ These pages follow the path from a new account to a monitored app in production.
 2. [Create an organization](./create-organization.md) to hold your clusters, team, and billing.
 3. [Create a cluster](./cluster-creation-management.md), the environment your applications run in.
 4. [Invite your team](./organization-management.md) and give each person a role.
-5. [Use search](./search.md) to jump to any organization, cluster, or cluster page.
+5. [Use search](./search.md) to jump to any of your organizations or clusters, and to the pages of the cluster you're signed in to.
 
 ### Build
 
@@ -29,6 +29,8 @@ These pages follow the path from a new account to a monitored app in production.
 - [Explore your APIs](./cluster-api-explorer.md) and send test requests to them.
 
 ### Go Live
+
+These pages cover clusters Harper hosts. For a self-hosted cluster, you manage its domains and load balancing yourself.
 
 - [Serve your cluster on your own domain](./custom-domains.md).
 - [Control which nodes receive traffic](./load-balancing.md), and take a node out of rotation for maintenance.
@@ -46,4 +48,6 @@ These pages follow the path from a new account to a monitored app in production.
 
 While Fabric Studio is web based and hosted by us, all database interactions are performed on the Harper cluster the studio is connected to. The Harper Studio loads in your browser, at which point you login to your Harper clusters. Credentials are stored in your browser cache and are not transmitted back to Harper. All database interactions are made via the Harper Operations API directly from your browser to your cluster.
 
-Fabric Studio manages both clusters Harper hosts for you and clusters you host yourself, from a single UI. All Harper clusters behave the same whether they are hosted by us or by you.
+<a id="what-can-i-manage"></a>
+
+Fabric Studio manages both clusters Harper hosts for you and clusters you host yourself, from a single UI. Harper itself behaves the same on both. Custom domains and Fabric's load balancing apply only to clusters Harper hosts.
