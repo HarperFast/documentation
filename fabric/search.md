@@ -27,9 +27,13 @@ Choosing an organization opens its page, and choosing a cluster opens that clust
 
 ### Pages in Your Cluster
 
-Once you sign in to a cluster, search also finds the pages inside it. For example, typing `domain` finds that cluster's **Config** > **Domains** page, where you manage its [custom domains](./custom-domains.md).
+While you're working in a cluster you've signed in to, search also finds that cluster's pages: **Applications**, **Databases**, **APIs**, **Operations**, **Status**, **Logs**, and the pages under **Config** that you can open. Each page result shows where it lives, such as **Config › Infrastructure** for **Domains**.
 
-Choosing a page opens it directly.
+You can find a page by its name or by the name of its group. A few pages also match related words. For example, `domain name` or `hostname` finds **Config** > **Domains**, where you manage the cluster's [custom domains](./custom-domains.md). So does any domain attached to the cluster, such as `api.example.com`.
+
+Choosing a page opens it directly. With nothing typed, search lists the cluster's pages first, in menu order.
+
+Page results appear only while you're inside the cluster. Leave it, for example to return to your organization's page, and search goes back to finding organizations and clusters.
 
 ## Choosing a Result
 
