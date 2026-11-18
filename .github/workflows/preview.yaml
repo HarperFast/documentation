@@ -4,6 +4,11 @@ name: Preview
 # https://<branch>.app.<cluster domain>/, with HarperFast/deploy-action, and
 # drops the preview when the PR closes. Fork PRs get no preview.
 #
+# Only people with write access to this repository can open a PR from one of
+# its branches, so the `preview` environment has no required reviewers and
+# these previews deploy without approval. A fork PR's code never reaches this
+# job: deploy-action and the `if:` below both skip forks.
+#
 # GitHub runs pull_request_target from main, so a PR cannot change what runs
 # with the preview identity, and nothing here checks out or runs a PR's code.
 # preview-build.yaml builds the site in an unprivileged pull_request run; the

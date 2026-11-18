@@ -361,7 +361,7 @@ test('no job can write caches, and the workflow grants nothing by default', () =
 test('the build holds no secret, gates forks, and keeps no git credentials', () => {
 	const build = workflow.jobs.build;
 	assert(!JSON.stringify(build).includes('secrets.'), 'build references a secret');
-	assert.match(build.environment, /fork == 'true' && 'preview'/);
+	assert.match(build.environment, /fork == 'true' && 'preview-fork'/);
 	const checkout = build.steps.find((step) => step.uses?.startsWith('actions/checkout@'));
 	assert.equal(checkout.with['persist-credentials'], false);
 	assert.equal(checkout.with.ref, undefined, 'build checks out something other than this repo at the dispatch');
