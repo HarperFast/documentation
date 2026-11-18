@@ -24,6 +24,11 @@ const sidebarsFabric: SidebarsConfig = {
 		},
 		{
 			type: 'doc',
+			id: 'search',
+			label: 'Search',
+		},
+		{
+			type: 'doc',
 			id: 'cluster-creation-management',
 			label: 'Cluster Creation & Management',
 		},
