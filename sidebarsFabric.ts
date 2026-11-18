@@ -103,6 +103,22 @@ const sidebarsFabric: SidebarsConfig = {
 		},
 		{
 			type: 'category',
+			label: 'Administer',
+			collapsible: false,
+			className: 'learn-category-header',
+			items: [
+				// The same page as Get Started's "Invite Your Team", listed again for people
+				// managing an existing organization. A link item, so previous/next and the
+				// active highlight stay with the Get Started entry.
+				{
+					type: 'link',
+					href: '/fabric/organization-management',
+					label: 'Users & Roles',
+				},
+			],
+		},
+		{
+			type: 'category',
 			label: 'Automate',
 			collapsible: false,
 			className: 'learn-category-header',

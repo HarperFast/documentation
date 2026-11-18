@@ -40,6 +40,10 @@ These pages cover clusters Harper hosts. For a self-hosted cluster, you manage i
 - [Read and filter your cluster's logs](./logging.md).
 - [Connect Grafana](./grafana-integration.md) to chart your cluster in your own dashboards.
 
+### Administer
+
+- [Manage users and roles](./organization-management.md): add people to your organization, and create roles that set what each person can do.
+
 ### Automate
 
 - [Use the Fabric API](./api-reference.md) to script cluster and domain changes you would otherwise make in Studio.
