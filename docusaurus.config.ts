@@ -20,15 +20,11 @@ if (process.env.NODE_ENV === 'production') {
 // Can also be set via command line: npm run build -- --base-url /documentation/
 const baseUrl = process.env.DOCUSAURUS_BASE_URL || '/';
 
-// Determine route base path for docs
-// Default is '/' to serve docs at the root
-const routeBasePath = process.env.DOCUSAURUS_ROUTE_BASE_PATH; // matching the production URL structure since this will currently affect some relative links in the docs
-
 // URL can also be overridden if needed
 const url = process.env.DOCUSAURUS_URL || 'https://docs.harper.fast';
 
 // Always log configuration at build time
-console.log('Docusaurus URL config:', { url, baseUrl, routeBasePath });
+console.log('Docusaurus URL config:', { url, baseUrl });
 
 // Written by scripts/assemble-content.mjs (the prebuild/predev step): which repo each assembled
 // reference page and release-notes page came from, and the redirects those repos declare. Read

@@ -58,7 +58,6 @@ jobs:
         env:
           # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
           GH_TOKEN: ${{ github.token }}
-          DOCUSAURUS_ROUTE_BASE_PATH: ${{ vars.DOCUSAURUS_ROUTE_BASE_PATH }}
           DOCUSAURUS_BASE_URL: ${{ vars.DOCUSAURUS_BASE_URL }}
           DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
           ALGOLIA_APP_ID: ${{ secrets.ALGOLIA_APP_ID }}
@@ -67,7 +66,6 @@ jobs:
           GA4_TRACKING_ID: ${{ secrets.GA4_TRACKING_ID }}
         run: |
           echo "Building Docusaurus site..."
-          echo "Using DOCUSAURUS_ROUTE_BASE_PATH: $DOCUSAURUS_ROUTE_BASE_PATH"
           echo "Using DOCUSAURUS_BASE_URL: $DOCUSAURUS_BASE_URL"
           echo "Using DOCUSAURUS_URL: $DOCUSAURUS_URL"
           npm run build || (echo "Site build failed" && exit 1)

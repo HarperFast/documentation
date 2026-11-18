@@ -11,9 +11,6 @@ build
 .docusaurus
 .cache-loader
 
-# Root index page is conditionally generated if docs is not at the root
-/src/pages/index.tsx
-
 # Generated release notes data
 release-notes-data.json
 
