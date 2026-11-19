@@ -259,4 +259,4 @@ Where a release note goes depends on its version:
 - **Overview page:** `/release-notes` lists every version from `release-notes-data.json`. [`scripts/generateReleaseNotesData.js`](scripts/generateReleaseNotesData.js) writes it during the `prebuild`, `predev` and `prestart` hooks, after assembly, from files named `X.Y.Z.md`, `X.Y.md` or `X.Y.generated.md`. `npm run dev` rewrites it after each reassembly.
 - **Latest patch links:** `<LatestPatchLink>` in `release-notes/v4-tucker/index.mdx` links each 4.x minor to its newest patch file.
 
-The major-version index pages (`release-notes/<codename>/index.mdx`) are written by hand.
+The major-version index pages (`release-notes/<codename>/index.md` or `index.mdx`) are written by hand.

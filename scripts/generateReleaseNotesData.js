@@ -56,11 +56,12 @@ function getReleaseNotes() {
 					const major = version.major;
 					if (!versionsByMajor[major]) {
 						const pupName = pupNames[major] || 'Unknown';
+						const pup = pupName.toLowerCase();
 						versionsByMajor[major] = {
 							pupName,
 							// From v4 the pup has its own page ("v4-tucker/tucker.md") and the index page is the
 							// release summary. Earlier majors put the pup on the index page.
-							hasProfilePage: files.includes(`${pupName.toLowerCase()}.md`),
+							hasProfilePage: files.includes(`${pup}.md`) || files.includes(`${pup}.mdx`),
 							versions: [],
 						};
 					}
