@@ -9,13 +9,14 @@ const pupNames = {
 	1: 'Alby',
 };
 
+// v4 and older notes are per patch ("4.6.8"); v5 notes are per minor ("5.3").
 function parseVersion(version) {
-	const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+	const match = version.match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
 	if (!match) return null;
 
 	const major = parseInt(match[1], 10);
 	const minor = parseInt(match[2], 10);
-	const patch = parseInt(match[3], 10);
+	const patch = match[3] === undefined ? 0 : parseInt(match[3], 10);
 
 	return {
 		version,
@@ -47,15 +48,20 @@ function getReleaseNotes() {
 		const files = fs.readdirSync(subdirPath);
 
 		files.forEach((file) => {
-			// Match version pattern in filename (e.g., "4.6.8.md")
-			const match = file.match(/^(\d+\.\d+\.\d+)\.md$/);
+			// Match "4.6.8.md", "5.3.md", or "5.4.generated.md" (assembled from harper and harper-pro)
+			const match = file.match(/^(\d+\.\d+(?:\.\d+)?)(?:\.generated)?\.md$/);
 			if (match) {
 				const version = parseVersion(match[1]);
 				if (version) {
 					const major = version.major;
 					if (!versionsByMajor[major]) {
+						const pupName = pupNames[major] || 'Unknown';
+						const pup = pupName.toLowerCase();
 						versionsByMajor[major] = {
-							pupName: pupNames[major] || 'Unknown',
+							pupName,
+							// From v4 the pup has its own page ("v4-tucker/tucker.md") and the index page is the
+							// release summary. Earlier majors put the pup on the index page.
+							hasProfilePage: files.includes(`${pup}.md`) || files.includes(`${pup}.mdx`),
 							versions: [],
 						};
 					}
@@ -76,8 +82,13 @@ function getReleaseNotes() {
 function generateReleaseNotesData() {
 	const data = getReleaseNotes();
 	const outputPath = path.join(__dirname, '..', 'release-notes-data.json');
+	const json = JSON.stringify(data, null, 2);
 
-	fs.writeFileSync(outputPath, JSON.stringify(data, null, 2));
+	// `npm run dev` regenerates after every reassembly. Rewriting identical data would still make
+	// the dev server rebuild the pages that import it.
+	if (fs.existsSync(outputPath) && fs.readFileSync(outputPath, 'utf8') === json) return data;
+
+	fs.writeFileSync(outputPath, json);
 	console.log(`Generated release notes data at ${outputPath}`);
 	console.log(`Found ${Object.keys(data).length} major versions`);
 

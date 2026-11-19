@@ -46,6 +46,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import yaml from 'js-yaml';
+import generateReleaseNotesData from './generateReleaseNotesData.js';
 
 const siteRoot = path.join(import.meta.dirname, '..');
 const cacheDir = path.join(siteRoot, '.content');
@@ -322,6 +323,8 @@ if (process.argv.includes('--sources')) {
 				timer = setTimeout(() => {
 					try {
 						assemble(resolved);
+						// The /release-notes overview lists assembled minors, so an added or removed one changes it.
+						generateReleaseNotesData();
 					} catch (error) {
 						// Keep serving the last good assembly while the source is mid-edit.
 						console.error(error.message);
