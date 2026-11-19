@@ -55,8 +55,12 @@ function getReleaseNotes() {
 				if (version) {
 					const major = version.major;
 					if (!versionsByMajor[major]) {
+						const pupName = pupNames[major] || 'Unknown';
 						versionsByMajor[major] = {
-							pupName: pupNames[major] || 'Unknown',
+							pupName,
+							// From v4 the pup has its own page ("v4-tucker/tucker.md") and the index page is the
+							// release summary. Earlier majors put the pup on the index page.
+							hasProfilePage: files.includes(`${pupName.toLowerCase()}.md`),
 							versions: [],
 						};
 					}
@@ -77,8 +81,13 @@ function getReleaseNotes() {
 function generateReleaseNotesData() {
 	const data = getReleaseNotes();
 	const outputPath = path.join(__dirname, '..', 'release-notes-data.json');
+	const json = JSON.stringify(data, null, 2);
 
-	fs.writeFileSync(outputPath, JSON.stringify(data, null, 2));
+	// `npm run dev` regenerates after every reassembly. Rewriting identical data would still make
+	// the dev server rebuild the pages that import it.
+	if (fs.existsSync(outputPath) && fs.readFileSync(outputPath, 'utf8') === json) return data;
+
+	fs.writeFileSync(outputPath, json);
 	console.log(`Generated release notes data at ${outputPath}`);
 	console.log(`Found ${Object.keys(data).length} major versions`);
 
