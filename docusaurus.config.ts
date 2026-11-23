@@ -69,6 +69,7 @@ const config: Config = {
 	projectName: 'documentation', // Usually your repo name.
 
 	onBrokenLinks: 'throw',
+	onBrokenAnchors: 'throw',
 
 	plugins: [
 		[
