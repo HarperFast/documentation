@@ -490,7 +490,7 @@ Once enforced, GitHub's default policy blocks `pull_request_target` runs in a pu
 
 **In the repository UI** (available to repository administrators on any public repository, including personal-account repositories): open **Settings > Actions > Policies** and create a new policy:
 
-1. Give the policy a name and set **Enforcement status** to **Active** (a disabled policy is not evaluated, so GitHub's default block still applies).
+1. Give the policy a name and set **Enforcement status** to **Active** (a disabled policy is not evaluated, so it does not lift GitHub's default block).
 2. Under **Target workflows**, add `.github/workflows/preview.yaml` (or the path of your preview workflow if renamed).
 3. Turn on **Restrict events**, and add `pull_request_target` to **Allowed events**.
 4. Click **Create**.
@@ -499,10 +499,10 @@ Once enforced, GitHub's default policy blocks `pull_request_target` runs in a pu
 
 **At the organization level**, an organization owner can create one policy in the organization's **Settings > Actions > Policies** that targets selected repositories (by name, ID, or custom property) and `.github/workflows/preview.yaml`. Policies layer across repository, organization, and enterprise levels, so an organization or enterprise policy can still block the event even when a repository policy allows it. In either repository or organization settings, check **Settings > Actions > Policy insights** to see workflow runs that were blocked (or would be blocked while a policy is in evaluate mode). See [Control workflow execution](https://docs.github.com/en/actions/how-tos/administer/control-workflow-execution).
 
-**With the REST API or `gh` CLI**, a repository administrator (using `gh auth login` with `repo` scope, or a fine-grained token or GitHub App with repository **Administration: write** permission) can create the same policy from a checkout of the repository via `POST /repos/{owner}/{repo}/actions/policies` (`gh api` fills in `{owner}` and `{repo}` from the checkout; change `include` if your preview workflow uses another path):
+**With the REST API or `gh` CLI**, a repository administrator (using `gh auth login` with `repo` scope, or a fine-grained token or GitHub App with repository **Administration: write** permission) can create the same policy via `POST /repos/{owner}/{repo}/actions/policies` (replace `my-org/my-app` with your repository, and change `include` if your preview workflow uses another path):
 
 ```bash
-gh api --method POST 'repos/{owner}/{repo}/actions/policies' \
+gh api --method POST 'repos/my-org/my-app/actions/policies' \
   -H 'X-GitHub-Api-Version: 2026-03-10' \
   --input - <<'EOF'
 {
