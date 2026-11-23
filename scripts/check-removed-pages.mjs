@@ -19,10 +19,12 @@ const IGNORED = new Set(['/search']);
 
 // Sitemap URLs carry the site's base path; the build output does not.
 export function sitemapPaths(xml, basePath = '/') {
-	const base = basePath.replace(/\/$/, '');
+	const base = basePath.replace(/\/{2,}/g, '/').replace(/\/$/, '');
 	return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => {
 		const pathname = new URL(match[1].trim()).pathname;
-		return base && pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname;
+		if (!base) return pathname;
+		if (pathname === base) return '/';
+		return pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname;
 	});
 }
 
@@ -60,7 +62,7 @@ async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	// Without repository variables (a fork PR), SITE_URL is just the base path.
 	const site = new URL(String(args.site || process.env.SITE_URL || '/'), 'https://docs.harperdb.io/');
-	if (!site.pathname.endsWith('/')) site.pathname += '/';
+	site.pathname = `${site.pathname}/`.replace(/\/{2,}/g, '/');
 	const sitemapUrl = new URL('sitemap.xml', site).href;
 	const buildDir = path.resolve(String(args.build || 'build'));
 

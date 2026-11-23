@@ -32,6 +32,14 @@ try {
 		'strips the base path'
 	);
 	assert.deepStrictEqual(
+		sitemapPaths(
+			xml('https://example.com/documentation', 'https://example.com/documentation/learn'),
+			'//documentation/'
+		),
+		['/', '/learn'],
+		'handles a root URL without its trailing slash and a doubled slash in the base path'
+	);
+	assert.deepStrictEqual(
 		sitemapPaths(xml('https://example.com/documentation-old/learn'), '/documentation/'),
 		['/documentation-old/learn'],
 		'strips only a whole base path segment'
