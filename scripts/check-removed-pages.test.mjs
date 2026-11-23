@@ -1,5 +1,3 @@
-// Tests for scripts/check-removed-pages.mjs.
-// Usage: node scripts/check-removed-pages.test.mjs
 import assert from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,21 +8,33 @@ const buildDir = mkdtempSync(path.join(tmpdir(), 'removed-pages-'));
 try {
 	for (const file of [
 		'index.html',
-		'learn.html', // a page
-		'release-notes/v4-tucker/4.6.8.html', // a nested page
-		'release-notes/v5-lincoln/index.html', // a category index page
-		'docs/getting-started/index.html', // a client redirect
+		'learn.html',
+		'release-notes/v4-tucker/4.6.8.html',
+		'release-notes/v5-lincoln/index.html',
+		'docs/getting-started/index.html',
 		'reference/v5/rest/overview.html',
 	]) {
 		mkdirSync(path.dirname(path.join(buildDir, file)), { recursive: true });
 		writeFileSync(path.join(buildDir, file), '');
 	}
 
+	const xml = (...urls) => `<urlset>${urls.map((url) => `<url><loc>${url}</loc></url>`).join('')}</urlset>`;
+	assert.deepStrictEqual(sitemapPaths(xml('https://docs.harperdb.io/', 'https://docs.harperdb.io/learn')), [
+		'/',
+		'/learn',
+	]);
 	assert.deepStrictEqual(
 		sitemapPaths(
-			'<urlset><url><loc>https://docs.harperdb.io/</loc></url><url><loc>https://docs.harperdb.io/learn</loc></url></urlset>'
+			xml('https://example.com/documentation/', 'https://example.com/documentation/learn'),
+			'/documentation/'
 		),
-		['/', '/learn']
+		['/', '/learn'],
+		'strips the base path'
+	);
+	assert.deepStrictEqual(
+		sitemapPaths(xml('https://example.com/documentation-old/learn'), '/documentation/'),
+		['/documentation-old/learn'],
+		'strips only a whole base path segment'
 	);
 
 	assert(isBuilt(buildDir, '/'), 'the root page');
