@@ -204,6 +204,16 @@ Common flags:
 
 Run it after editing either redirect file, after large Reference reorganizations, or as part of a periodic check.
 
+### Removed pages check
+
+The Site Build check in `validate.yaml` also runs [scripts/check-removed-pages.mjs](scripts/check-removed-pages.mjs). It reads the live site's `sitemap.xml` and fails if the PR's build no longer serves one of those pages, as either the page or a redirect. When it fails, add a redirect for each listed path: in `redirects.ts`, or for a `/reference/v5/*` page, in `docs/reference/_redirects.json` of the harper or harper-pro repo that owns it. To run it locally after `npm run build`:
+
+```bash
+npm run check:removed-pages
+```
+
+The check skips `/search`, which a build only includes when the Algolia credentials are set. If the live sitemap can't be fetched, it prints a warning and passes.
+
 ### Future work
 
 The current setup is the most we can do under static hosting: every redirect is an enumerated rule that compiles to its own HTML stub. This has two notable limitations:
