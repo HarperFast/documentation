@@ -98,6 +98,13 @@ jobs:
           fi
           echo "✓ Flat-markdown export verified"
 
+      # Keeps the live site when the build drops a page that no redirect covers, such as a
+      # harper-pro release that removed a reference page without a _redirects.json entry.
+      - name: Check for removed pages
+        env:
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}
+        run: npm run check:removed-pages
+
       - name: Upload npm logs on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
