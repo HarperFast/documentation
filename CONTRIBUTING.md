@@ -143,13 +143,13 @@ To preview a local checkout, point the build at it. A harper-pro without a path 
 HARPER_DOCS_PATH=../harper HARPER_PRO_DOCS_PATH=../harper-pro npm run dev
 ```
 
-The content-check workflow runs when harper-pro publishes a release or pushes a `docs/` tag (a `docs-source-changed` repository dispatch from its `publish-docs.yaml`), and hourly in case a dispatch failed: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it redeploys both sites.
+The content-check workflow runs when harper-pro publishes a release or pushes a `docs/` tag (a `docs-source-changed` repository dispatch from its `publish-docs.yaml`), and hourly in case a dispatch failed: when either repo's `docs/` tree at the ref the site would publish (`node scripts/assemble-content.mjs --sources`) differs from the one the live site was built from (published at `/content-sources.json`), it runs [Deploy](#deployment).
 
 A harper or harper-pro PR that changes `docs/` gets a preview of this site built from it once someone adds the `docs-preview` label. Its `docs-preview.yaml` sends a `docs-source-pr-preview` repository dispatch when the label is added and on each push while it stays (`docs-source-pr-preview-cleanup` when the label is removed, or the PR closes with it), and [`source-pr-preview.yaml`](.github/workflows/source-pr-preview.yaml) here builds the PR's head (a harper PR with harper-pro at the branch named like its base; a harper-pro PR with harper at its `core` pointer), deploys it as `harper-pr-<n>` or `harper-pro-pr-<n>`, and keeps one comment with the link on the PR. The preview is up only while the PR is open and labeled: removing the label or closing the PR takes it down, and a build whose apply job starts after that is not deployed. Removal depends on the source repo sending that cleanup dispatch; if one is lost, re-add and remove the label, or drop the `harper-pr-<n>` or `harper-pro-pr-<n>` component by hand. The build runs the PR's MDX, so it holds no secrets and, for a fork's PR, waits for approval in the `preview-fork` environment.
 
 ## Redirects
 
-The site is hosted as a static build on GitHub Pages, so there is no server-side router that can rewrite incoming URLs. All redirect handling is therefore done **client-side** by the [`@docusaurus/plugin-client-redirects`](https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-client-redirects) plugin: at build time it emits a small HTML page for every `from` path that immediately navigates the browser to the `to` path. Because the redirect HTML is generated per-path, every redirect must be enumerated explicitly — there is no pattern, prefix, or wildcard support.
+Both [hosts](#deployment) serve the static build as is, with no server-side router that can rewrite incoming URLs. All redirect handling is therefore done **client-side** by the [`@docusaurus/plugin-client-redirects`](https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-client-redirects) plugin: at build time it emits a small HTML page for every `from` path that immediately navigates the browser to the `to` path. Because the redirect HTML is generated per-path, every redirect must be enumerated explicitly — there is no pattern, prefix, or wildcard support.
 
 ### `redirects.ts` vs. `historic-redirects.ts`
 
@@ -231,6 +231,88 @@ If the site is eventually re-hosted on a platform with a real request lifecycle 
 - Optionally emit redirect metrics (which legacy paths still receive traffic) directly from the router rather than relying on GA exports.
 
 Until then, every new redirect goes in `redirects.ts` (or, for historical paths discovered later, `historic-redirects.ts`) as an explicit rule.
+
+## Deployment
+
+[`deploy.yaml`](.github/workflows/deploy.yaml) builds the site once and deploys that build to two hosts. It runs on each push to `main` that changes the site, and when the content-check workflow dispatches it.
+
+| Host                                                                  | Role    | Domain                   |
+| --------------------------------------------------------------------- | ------- | ------------------------ |
+| Harper Fabric: cluster `production` in the `harper-documentation` org | Primary | `docs.harper.fast`       |
+| GitHub Pages                                                          | Standby | `pages.docs.harper.fast` |
+
+- The `DOCUSAURUS_URL` repository variable sets the canonical domain in every page, the sitemap and `llms.txt`. So the standby's pages point search engines at the primary.
+- The Pages job marks every page `noindex` unless the Pages custom domain is the canonical domain. So the standby stays out of search results, and a Pages deploy during a failover leaves the marker out.
+- `docs.harperdb.io` redirects to `docs.harper.fast`, keeping the path.
+- DNS for `harper.fast` and `harperdb.io` is in Route 53.
+- To deploy one host only, run Deploy by hand with `target` set to `fabric` or `pages`.
+
+Until the move to `docs.harper.fast` is finished, Pages serves `docs.harperdb.io` instead of `pages.docs.harper.fast`.
+
+### If docs.harper.fast is down
+
+First check which host is failing. Use GET, not `curl -I`: Harper's static plugin answers only GET.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://production.harper-documentation.harperfabric.com/learn
+```
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://pages.docs.harper.fast/learn
+```
+
+If Fabric fails and Pages returns `200`, fail over to Pages. If both fail, look at the latest Deploy run first. Both hosts serve the same build, so a bad build breaks both, and reverting it on `main` is the fix.
+
+### Failing over to GitHub Pages
+
+You need admin access to this repository and to the `harper.fast` zone in Route 53. Do the steps in order, so `docs.harper.fast` never points at a host that doesn't answer for it.
+
+1. Give Pages the production domain. In **Settings > Pages**, set the custom domain to `docs.harper.fast`, or run:
+
+   ```bash
+   gh api -X PUT repos/HarperFast/documentation/pages -f cname=docs.harper.fast
+   ```
+
+2. Run Deploy by hand with `target: pages`. Now that Pages has the canonical domain, this deploy leaves out the standby's `noindex` marker.
+3. In Route 53, change the `docs.harper.fast` CNAME from `production.harper-documentation.harperfabric.com` to `harperfast.github.io`. The record's TTL is 300 seconds.
+4. Wait until **Settings > Pages** shows that the certificate for `docs.harper.fast` is issued. HTTPS requests fail until then. Then enforce HTTPS:
+
+   ```bash
+   gh api -X PUT repos/HarperFast/documentation/pages -F https_enforced=true
+   ```
+
+5. Confirm that Pages serves the domain. The `server` header is `GitHub.com`:
+
+   ```bash
+   curl -s -D - -o /dev/null https://docs.harper.fast/learn | grep -i '^server'
+   ```
+
+   Then confirm that the page has no `noindex` marker. This prints `0`:
+
+   ```bash
+   curl -s https://docs.harper.fast/learn | grep -c 'content="noindex"'
+   ```
+
+While Fabric is down, the Fabric job in each Deploy run fails and the Pages job still deploys. To skip Fabric, run Deploy by hand with `target: pages`.
+
+### Failing back to Fabric
+
+1. Run Deploy by hand with `target: fabric`, so Fabric serves the latest build. Its smoke test checks the site root and the 404 page.
+2. In Route 53, change the `docs.harper.fast` CNAME back to `production.harper-documentation.harperfabric.com`.
+3. After the TTL passes, confirm that the `server` header is no longer `GitHub.com`, using the first `curl` command from step 5 above.
+4. Give Pages its standby domain back:
+
+   ```bash
+   gh api -X PUT repos/HarperFast/documentation/pages -f cname=pages.docs.harper.fast
+   ```
+
+5. Wait until **Settings > Pages** shows that the certificate for `pages.docs.harper.fast` is issued, then enforce HTTPS again:
+
+   ```bash
+   gh api -X PUT repos/HarperFast/documentation/pages -F https_enforced=true
+   ```
+
+6. Run Deploy by hand with `target: pages`, so the standby is marked `noindex` again.
 
 ## Known Issues
 

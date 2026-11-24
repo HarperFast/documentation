@@ -34,8 +34,14 @@ on:
       - 'scripts/generateReleaseNotesData.js'
       - 'scripts/prebuild.js'
       - 'scripts/rehype-docusaurus-to-llms.mjs'
-  # Allows you to run this workflow manually from the Actions tab
+      - '.github/workflows/deploy.yaml'
   workflow_dispatch:
+    inputs:
+      target:
+        description: Where to deploy. Use `pages` while Fabric is down (CONTRIBUTING.md#deployment).
+        type: choice
+        options: [both, fabric, pages]
+        default: both
 
 permissions: {}
 
@@ -131,6 +137,7 @@ jobs:
   fabric:
     needs: build
     name: Deploy to Harper Fabric
+    if: inputs.target != 'pages'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
@@ -153,12 +160,18 @@ jobs:
         run: |
           mkdir -p site/build
           tar -xf artifact.tar -C site/build
+          # `after: 'rest'` lets any endpoint the cluster serves answer before the 404 fallback.
           cat > site/config.yaml << 'EOF'
           static:
             files: 'build/**'
             urlPath: '/'
             extensions: ['html']
             index: true
+            after: 'rest'
+            fallthrough: false
+            notFound:
+              file: 'build/404.html'
+              statusCode: 404
           EOF
 
       # Restarts the cluster's nodes one at a time and waits until every node has taken the release.
@@ -168,18 +181,31 @@ jobs:
           app: docs-site
           path: site
 
+      # Tests the cluster's own host name: during a failover, DOCUSAURUS_URL points at Pages.
       - name: Smoke-test deployment
         env:
-          SITE_URL: ${{ vars.DOCUSAURUS_URL }}
+          HARPER_CLI_TARGET: ${{ vars.HARPER_CLI_TARGET }}
         run: |
-          curl --silent --fail --show-error --location \
+          set -euo pipefail
+          site=$(printf '%s' "$HARPER_CLI_TARGET" | sed -E 's#^(https?://[^/:]+).*#\1#')
+          curl --silent --fail --show-error --location --output root.html \
             --retry 10 --retry-delay 6 --retry-all-errors \
-            "$SITE_URL/" | grep -qi '<html' \
-            && echo "✓ Site root responding with HTML"
+            "$site/"
+          grep -qi '<html' root.html
+          echo "✓ $site responds with HTML"
+          status=$(curl --silent --show-error --output missing.html --write-out '%{http_code}' \
+            --retry 10 --retry-delay 6 --retry-all-errors \
+            "$site/this-page-does-not-exist")
+          if [ "$status" != 404 ] || ! grep -q 'Page Not Found' missing.html; then
+            echo "::error::A missing page returned $status without the site's 404 page"
+            exit 1
+          fi
+          echo "✓ Missing pages return the site's 404 page"
 
   pages:
     needs: build
     name: Deploy to GitHub Pages
+    if: inputs.target != 'fabric'
     runs-on: ubuntu-latest
     concurrency:
       group: pages-deploy
@@ -191,9 +217,50 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: github-pages
+
+      # The standby's host name stays out of search results. During a failover Pages serves the
+      # canonical domain, which must stay indexable, so the custom domain decides.
+      - name: Mark the standby noindex
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
+        run: |
+          set -euo pipefail
+          mkdir site
+          tar -xf artifact.tar -C site
+          # The build falls back to this URL too (docusaurus.config.ts).
+          canonical=${DOCUSAURUS_URL:-https://docs.harper.fast}
+          canonical=${canonical#*://}
+          canonical=${canonical%%/*}
+          domain=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.cname // ""')
+          if [ -n "$domain" ] && [ "$domain" = "$canonical" ]; then
+            echo "Pages serves $canonical, so its pages stay indexable"
+            exit 0
+          fi
+          find site -name '*.html' -exec perl -0pi -e 's/<head\b[^>]*>\K/<meta name="robots" content="noindex">/i' {} +
+          total=$(find site -name '*.html' | wc -l)
+          marked=$({ grep -rl --include='*.html' '<meta name="robots" content="noindex">' site || true; } | wc -l)
+          if [ "$marked" -ne "$total" ]; then
+            echo "::error::Only $marked of $total HTML files have a <head> to mark noindex"
+            exit 1
+          fi
+          echo "Marked $total HTML files noindex for ${domain:-the github.io host}"
+
+      - name: Upload the standby site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: github-pages-standby-${{ github.run_attempt }}
+          path: site
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+        with:
+          artifact_name: github-pages-standby-${{ github.run_attempt }}
 
   # Notify the skills repo that docs changed, so it can regenerate its
   # docs-driven rules against the just-deployed content. See the
@@ -209,6 +276,8 @@ jobs:
   notify-skills:
     needs: [fabric, pages]
     name: Notify skills repo
+    # One host is enough: during a failover only Pages deploys.
+    if: ${{ !cancelled() && contains(needs.*.result, 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Mint app token for skills
