@@ -11,7 +11,7 @@ body:
     attributes:
       label: Page or URL
       description: Where is the problem? (optional, but it helps a lot)
-      placeholder: https://docs.harper.fast/... or the page title
+      placeholder: https://docs.harperdb.io/... or the page title
     validations:
       required: false
   - type: textarea

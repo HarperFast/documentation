@@ -3,7 +3,7 @@
 /**
  * Fails when the build no longer serves a page from the live sitemap, as the page or a redirect.
  *
- * Usage: node scripts/check-removed-pages.mjs [--site=https://docs.harper.fast/] [--build=build]
+ * Usage: node scripts/check-removed-pages.mjs [--site=https://docs.harperdb.io/] [--build=build]
  *
  * Exit codes:
  *   0 — every live page is still served, or the sitemap couldn't be fetched (printed as a warning)
@@ -61,7 +61,7 @@ function parseArgs(argv) {
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	// Without repository variables (a fork PR), SITE_URL is just the base path.
-	const site = new URL(String(args.site || process.env.SITE_URL || '/'), 'https://docs.harper.fast/');
+	const site = new URL(String(args.site || process.env.SITE_URL || '/'), 'https://docs.harperdb.io/');
 	site.pathname = `${site.pathname}/`.replace(/\/{2,}/g, '/');
 	const sitemapUrl = new URL('sitemap.xml', site).href;
 	const buildDir = path.resolve(String(args.build || 'build'));

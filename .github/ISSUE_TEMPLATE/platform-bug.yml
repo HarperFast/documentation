@@ -18,6 +18,6 @@ body:
     attributes:
       label: Page URL
       description: Where did it happen? (optional)
-      placeholder: https://docs.harper.fast/...
+      placeholder: https://docs.harperdb.io/...
     validations:
       required: false

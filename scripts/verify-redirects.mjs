@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Verify that every configured redirect path on docs.harper.fast does not 404.
+ * Verify that every configured redirect path on docs.harperdb.io does not 404.
  *
  * Reads `redirects.ts` and `historic-redirects.ts` from the project root,
  * extracts every `from` path (string or string[]), then issues a fetch against
  * the live docs site for each one and asserts the final response is not 404.
  *
- * Usage: node scripts/verify-redirects.mjs [--host=https://docs.harper.fast] [--concurrency=20]
+ * Usage: node scripts/verify-redirects.mjs [--host=https://docs.harperdb.io] [--concurrency=20]
  *
  * Exit codes:
  *   0 — every redirect resolved to a non-404 response
@@ -28,7 +28,7 @@ const args = Object.fromEntries(
 	})
 );
 
-const HOST = (args.host || 'https://docs.harper.fast').replace(/\/$/, '');
+const HOST = (args.host || 'https://docs.harperdb.io').replace(/\/$/, '');
 const CONCURRENCY = Number(args.concurrency) || 20;
 const TIMEOUT_MS = Number(args.timeout) || 15000;
 

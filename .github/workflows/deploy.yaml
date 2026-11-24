@@ -1,15 +1,15 @@
 name: Deploy
 
-# Builds the site from main and deploys it to the production Harper Fabric cluster, which serves
-# https://docs.harper.fast, with HarperFast/deploy-action.
+# Builds the site from main once and deploys that build to the production Harper Fabric cluster, which
+# serves https://docs.harper.fast, and to GitHub Pages.
 #
-# Authentication is OIDC only. `harper deploy setup=true provider=github-actions project=docs-site`,
-# run as a super_user from a checkout of this repository, wrote the trust policy
-# `github-actions-docs-site`, which matches only this file on main in the `production` environment,
-# and set the HARPER_CLI_TARGET variable. See https://github.com/HarperFast/deploy-action#deploy-on-merge
+# The Fabric deploy uses HarperFast/deploy-action and authenticates with OIDC only.
+# `harper deploy setup=true provider=github-actions project=docs-site`, run as a super_user from a
+# checkout of this repository, wrote the trust policy `github-actions-docs-site`, which matches only
+# this file on main in the `production` environment, and set the HARPER_CLI_TARGET variable. See https://github.com/HarperFast/deploy-action#deploy-on-merge
 #
 # The build runs MDX assembled from harper and harper-pro, so it runs in a job with no identity
-# token. The deploy job runs none of the repository's code: it deploys the build's artifact.
+# token. The deploy jobs run none of the repository's code: they deploy the build's artifact.
 
 on:
   push:
@@ -61,19 +61,25 @@ jobs:
           cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies from $(pwd)"
+          npm ci || (echo "npm ci failed, uploading logs" && exit 1)
 
-      # No DOCUSAURUS_BASE_URL: the site is served from the cluster's root path.
       - name: Build Docusaurus site
         env:
           # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
           GH_TOKEN: ${{ github.token }}
+          DOCUSAURUS_BASE_URL: ${{ vars.DOCUSAURUS_BASE_URL }}
           DOCUSAURUS_URL: ${{ vars.DOCUSAURUS_URL }}
           ALGOLIA_APP_ID: ${{ secrets.ALGOLIA_APP_ID }}
           ALGOLIA_SEARCH_KEY: ${{ secrets.ALGOLIA_SEARCH_KEY }}
           ALGOLIA_INDEX_NAME: ${{ secrets.ALGOLIA_INDEX_NAME }}
           GA4_TRACKING_ID: ${{ secrets.GA4_TRACKING_ID }}
-        run: npm run build
+        run: |
+          echo "Building Docusaurus site..."
+          echo "Using DOCUSAURUS_BASE_URL: $DOCUSAURUS_BASE_URL"
+          echo "Using DOCUSAURUS_URL: $DOCUSAURUS_URL"
+          npm run build || (echo "Site build failed" && exit 1)
 
       - name: Verify flat-markdown export
         run: |
@@ -106,7 +112,7 @@ jobs:
       # A harper or harper-pro release deploys without a PR here, so this is its only check.
       - name: Check for removed pages
         env:
-          SITE_URL: ${{ vars.DOCUSAURUS_URL }}/
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}${{ vars.DOCUSAURUS_BASE_URL || '/' }}
         run: npm run check:removed-pages
 
       - name: Upload npm logs on failure
@@ -117,14 +123,12 @@ jobs:
           path: |
             ~/.npm/_logs/
 
-      - name: Upload the build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Upload Build Artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          name: site
-          path: build/
-          retention-days: 7
+          path: build
 
-  deploy:
+  fabric:
     needs: build
     name: Deploy to Harper Fabric
     runs-on: ubuntu-latest
@@ -142,11 +146,13 @@ jobs:
       - name: Download the build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: site
-          path: site/build
+          name: github-pages
 
+      # upload-pages-artifact stores the site as artifact.tar.
       - name: Serve the build as a Harper application
         run: |
+          mkdir -p site/build
+          tar -xf artifact.tar -C site/build
           cat > site/config.yaml << 'EOF'
           static:
             files: 'build/**'
@@ -171,9 +177,28 @@ jobs:
             "$SITE_URL/" | grep -qi '<html' \
             && echo "✓ Site root responding with HTML"
 
+  pages:
+    needs: build
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+
   # Notify the skills repo that docs changed, so it can regenerate its
   # docs-driven rules against the just-deployed content. See the
-  # generate.yaml workflow in HarperFast/skills.
+  # generate.yaml workflow in HarperFast/skills (Phase 2 of the
+  # docs-driven-skills plan).
   #
   # Authenticates as the org-owned "harper-skills-sync" GitHub App, minting
   # a token scoped to HarperFast/skills (the default GITHUB_TOKEN is scoped
@@ -182,7 +207,7 @@ jobs:
   # SKILLS_SYNC_APP_PRIVATE_KEY secrets. If the App is ever removed, the
   # skills repo's weekly cron is the safety net.
   notify-skills:
-    needs: deploy
+    needs: [fabric, pages]
     name: Notify skills repo
     runs-on: ubuntu-latest
     steps:
@@ -198,8 +223,7 @@ jobs:
       - name: Dispatch docs-updated to HarperFast/skills
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SHA: ${{ github.sha }}
         run: |
           gh api repos/HarperFast/skills/dispatches \
             -f event_type=docs-updated \
-            -f "client_payload[sha]=$SHA"
+            -F client_payload[sha]=${{ github.sha }}
