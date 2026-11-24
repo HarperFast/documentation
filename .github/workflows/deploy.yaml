@@ -188,15 +188,13 @@ jobs:
         run: |
           set -euo pipefail
           site=$(printf '%s' "$HARPER_CLI_TARGET" | sed -E 's#^(https?://[^/:]+).*#\1#')
-          # --retry-all-errors covers connection refusals while the restart completes.
           curl --silent --fail --show-error --location --output root.html \
             --retry 10 --retry-delay 6 --retry-all-errors \
             "$site/"
           grep -qi '<html' root.html
           echo "✓ $site responds with HTML"
-          # Without --fail, a 404 is a result rather than a retry; a node still restarting is retried.
           status=$(curl --silent --show-error --output missing.html --write-out '%{http_code}' \
-            --retry 10 --retry-delay 6 --retry-connrefused \
+            --retry 10 --retry-delay 6 --retry-all-errors \
             "$site/this-page-does-not-exist")
           if [ "$status" != 404 ] || ! grep -q 'Page Not Found' missing.html; then
             echo "::error::A missing page returned $status without the site's 404 page"
@@ -255,14 +253,14 @@ jobs:
       - name: Upload the standby site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          name: github-pages-standby
+          name: github-pages-standby-${{ github.run_attempt }}
           path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
         with:
-          artifact_name: github-pages-standby
+          artifact_name: github-pages-standby-${{ github.run_attempt }}
 
   # Notify the skills repo that docs changed, so it can regenerate its
   # docs-driven rules against the just-deployed content. See the
