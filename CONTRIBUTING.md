@@ -212,7 +212,7 @@ The Site Build check in `validate.yaml` also runs [scripts/check-removed-pages.m
 npm run check:removed-pages
 ```
 
-`deploy.yaml` and `deploy-fabric.yaml` run the same check before deploying, so a harper or harper-pro release that removes a reference page without a redirect doesn't take it off the live site. The `Docs` workflow in harper and harper-pro runs it on their PRs. If a deploy fails this check, add the redirect to `redirects.ts`. That's faster than waiting for the next release to carry a `_redirects.json` entry.
+`deploy.yaml` runs the same check before deploying, so a harper or harper-pro release that removes a reference page without a redirect doesn't take it off the live site. The `Docs` workflow in harper and harper-pro runs it on their PRs. If a deploy fails this check, add the redirect to `redirects.ts`. That's faster than waiting for the next release to carry a `_redirects.json` entry.
 
 The check skips `/search`, which a build only includes when the Algolia credentials are set. If the live sitemap can't be fetched, it prints a warning and passes.
 
