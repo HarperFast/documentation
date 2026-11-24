@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 import GeneralPrerequisites from '../../src/components/learn/general-prerequisites.mdx';
 
-One of Harper's primary goals since day one was to be easy to install and get started with. The core Harper application itself is just a Node.js application with some native module dependencies. The simplest and easiest way to get started using Harper is by installing it using npm (or any npm compatible Node.js package manager). In addition to installing Harper directly to your local development environment, the Harper team provides a Docker image ([`harperfast/harper`](https://hub.docker.com/r/harper/harper)), and most recently a platform service called [Harper Fabric](https://fabric.harper.fast).
+One of Harper's primary goals since day one was to be easy to install and get started with. The core Harper application itself is just a Node.js application with some native module dependencies. The simplest and easiest way to get started using Harper is by installing it using npm (or any npm compatible Node.js package manager). In addition to installing Harper directly to your local development environment, the Harper team provides a Docker image ([`harperfast/harper`](https://hub.docker.com/r/harperfast/harper)), and most recently a platform service called [Harper Fabric](https://fabric.harper.fast).
 
 This guide will demonstrate all three ways to get started as well as introduce some basic Harper features such as the CLI and our built in health endpoint.
 
@@ -20,7 +20,7 @@ This guide will demonstrate all three ways to get started as well as introduce s
 
 ## Prerequisites
 
-Like the [Welcome](../) page stated, all guide pages require a set of system prerequisites such as command line access, HTTP client, and an up-to-date Node.js version. This guide is no different, and uniquely _only_ requires those prerequisites. They are repeated here for your convenience, but future guides will not include them.
+Like the [Welcome](../index.mdx) page stated, all guide pages require a set of system prerequisites such as command line access, HTTP client, and an up-to-date Node.js version. This guide is no different, and uniquely _only_ requires those prerequisites. They are repeated here for your convenience, but future guides will not include them.
 
 <GeneralPrerequisites />
 
@@ -81,7 +81,7 @@ HarperDB installation was successful.
   </TabItem>
   <TabItem value="docker" label="Docker">
 
-Harper is readily available as a Docker image [`harperfast/harper`](https://hub.docker.com/r/harper/harper).
+Harper is readily available as a Docker image [`harperfast/harper`](https://hub.docker.com/r/harperfast/harper).
 
 The image is based off of a Node.js image and the default tag is always published using the latest Harper version and latest Node.js Active LTS version.
 
@@ -121,10 +121,10 @@ After completing the installation step, Harper should now be running in the acti
 
 As long as the `logging.stdStream` configuration option is set to `true` (which is the default when using the `dev` default mode), Harper will also stream all logs to the `stdout` and `stderr` streams too.
 
-If all is working correctly, you should see the following output in your command line:
+If all is working correctly, your command line output should start with:
 
 ```
-Starting HarperDB...
+Starting Harper...
 
                ▒▒▒▓▓▓▓▓▓▓▓▓▓▓▒▒
            ▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒▒▒▒▒▒▒▒▒▒▒
@@ -146,31 +146,7 @@ Starting HarperDB...
                       ▒▒▒▒▒▒▒
 
                     HarperDB, Inc. Denver, CO.
-
-[main/0] [info]: HarperDB PID <pid>
-[main/0] [info]: Checking if HDB software has been updated
-Debugger listening on ws://127.0.0.1:9229/<inspector-id>
-For help, see: https://nodejs.org/en/docs/inspector
-[main/0] [info]: All root applications loaded
-[http/1] [info]: Domain socket listening on <rootpath>/harper/operations-server
-HarperDB 4.y.z successfully started
-[main/0] [notify]: HarperDB successfully started.
-
-Hostname:           localhost
-Worker Threads:     1
-Root Path:          <rootpath>/harper
-Debugging:          enabled: true
-Logging:            level: info, location: <rootpath>/harper/log/hdb.log, stdout/err
-Default:            HTTP (and WS): 9926, CORS: enabled for *
-Operations API:     HTTP: 9925, CORS: enabled for *, unix socket: <rootpath>/harper/operations-server
-MQTT:               TCP: 1883, TLS: 8883, WS: 9926
-Replication:        WS: 9925, WSS: 9933
-
-Note that log messages are being sent to the console (stdout and stderr) in addition to the log file <rootpath>/harper/log/hdb.log. This can be disabled by setting logging.stdStreams to false, and the log file can be directly monitored/tailed.
-This server does not have valid usage licenses, this should only be used for educational and development purposes.
 ```
-
-This initial output contains a lot of helpful information. After the ASCII logo, there are a number of important log lines displaying the application process ID, the debugger endpoint, the domain socket path, and the Harper application version. Log lines are always prepended with the thread name, number, and log level. `[main/0]` is the main thread. `[http/1]` is the singular, additional worker thread. `[info]` is the default log level. After the log lines is specific application configuration information. It shows the application hostname, the number of worker threads, where Harper was installed, is the debugger enabled, logging level and location followed by ports, CORS, and socket path details for various networking protocols. We'll explain all of these in due time.
 
 Interrupting the process (`CTRL/CMD + C`) will shut down Harper.
 
