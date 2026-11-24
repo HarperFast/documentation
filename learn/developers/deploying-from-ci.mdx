@@ -460,11 +460,11 @@ harper preview setup app=my-app
    - the trust policy `github-actions-my-app-preview`, for jobs in the `preview` environment;
    - the trust policy `github-actions-my-app-preview-cleanup`, for jobs in the `preview-cleanup` environment, whose token can only drop.
 4. It sets the repository variable `HARPER_PREVIEW_TARGET` to the cluster's URL.
-5. In a public repository, it offers to create the Actions event policy that lets the workflow run on `pull_request_target`, if your `gh` account is a repository admin; without a terminal, pass `actions_policy=true` <VersionBadge type="changed" version="v5.4.2" />. See [Public repositories: allow `pull_request_target`](#public-repositories-allow-pull_request_target).
+5. In a public repository, it creates the Actions event policy that lets the workflow run on `pull_request_target`, if your `gh` account is a repository admin and you agreed when it checked the GitHub side; without a terminal, pass `actions_policy=true` <VersionBadge type="changed" version="v5.4.2" />. See [Public repositories: allow `pull_request_target`](#public-repositories-allow-pull_request_target).
 
 Commit the workflow to the default branch. GitHub runs a `pull_request_target` workflow from there, not from the PR.
 
-A few options change what setup enables. [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) lists them all, and three need the matching action input in both jobs:
+A few options change what setup enables, and three need the matching action input in both jobs. The CLI reference describes [`harper preview setup`](/reference/v5/cli/commands#harper-preview-setup) itself.
 
 | `harper preview setup` | What it does                                                                                                                                                                        | Action input                |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
@@ -490,7 +490,7 @@ From December 2, 2026, GitHub enforces a default Actions event policy that block
 
 Once enforced, GitHub's default policy blocks `pull_request_target` runs in a public repository before any job starts or token is issued. Switching the workflow to `pull_request` is not an option: Harper's preview trust model relies on the workflow running from the default branch, and its trust policies pin `event_name: pull_request_target`. Instead, allow `pull_request_target` for the preview workflow alone.
 
-**With `harper preview setup`** <VersionBadge type="changed" version="v5.4.2" />: in a public repository, setup reads the repository's Actions policies and, if none allows the event for the workflow, offers to create one: Active, targeting only the workflow file, and allowing exactly the events that file runs on. Without a terminal, pass `actions_policy=true` to let it. It never changes an existing policy; one that blocks the event, or one for the workflow that is turned off, is reported with what to change. When it cannot create the policy, for example because your `gh` account is not a repository admin, it prints the steps below and the `gh api` command to run. A repository set up earlier can get the policy by running setup again with the same arguments. The steps below create the policy by hand.
+**With `harper preview setup`** <VersionBadge type="changed" version="v5.4.2" />: in a public repository, setup reads the repository's Actions policies and, if none allows the event for the workflow, offers to create one: Active, targeting only the workflow file, and allowing exactly the events that file runs on. Without a terminal, pass `actions_policy=true` to let it. It never changes an existing policy; one that blocks the event, or one for the workflow that is turned off, is reported with what to change. When it cannot create the policy, for example because your `gh` account is not a repository admin, it prints the steps below, and the `gh api` command when it knows no policy was created. A repository set up earlier can get the policy by running setup again with the same arguments. The steps below create the policy by hand.
 
 **In the repository UI** (available to repository administrators on any public repository, including personal-account repositories): open **Settings > Actions > Policies** and create a new policy:
 
