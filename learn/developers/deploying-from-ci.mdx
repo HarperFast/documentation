@@ -459,8 +459,8 @@ harper preview setup app=my-app
    - the role and user `my-app-ci-preview`, whose role can deploy, drop and read only `my-app-pr-<n>` previews, and run the version check `harper` makes before it deploys;
    - the trust policy `github-actions-my-app-preview`, for jobs in the `preview` environment;
    - the trust policy `github-actions-my-app-preview-cleanup`, for jobs in the `preview-cleanup` environment, whose token can only drop.
-4. In a public repository, it offers to create the Actions event policy that lets the workflow run on `pull_request_target`, if your `gh` account is a repository admin; without a terminal, pass `actions_policy=true` <VersionBadge type="changed" version="v5.4.2" />. See [Public repositories: allow `pull_request_target`](#public-repositories-allow-pull_request_target).
-5. It sets the repository variable `HARPER_PREVIEW_TARGET` to the cluster's URL.
+4. It sets the repository variable `HARPER_PREVIEW_TARGET` to the cluster's URL.
+5. In a public repository, it offers to create the Actions event policy that lets the workflow run on `pull_request_target`, if your `gh` account is a repository admin; without a terminal, pass `actions_policy=true` <VersionBadge type="changed" version="v5.4.2" />. See [Public repositories: allow `pull_request_target`](#public-repositories-allow-pull_request_target).
 
 Commit the workflow to the default branch. GitHub runs a `pull_request_target` workflow from there, not from the PR.
 
