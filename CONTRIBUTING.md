@@ -198,7 +198,7 @@ The script parses both redirect files, extracts every unique `from` path, then i
 
 Common flags:
 
-- `--host=<url>` — target a different host. Defaults to `https://docs.harperdb.io`. Useful for testing a staging or preview deployment.
+- `--host=<url>` — target a different host. Defaults to `https://docs.harper.fast`. Useful for testing a staging or preview deployment.
 - `--concurrency=<N>` — number of parallel requests. Defaults to `20`.
 - `--timeout=<ms>` — per-request timeout. Defaults to `15000`.
 
@@ -246,8 +246,6 @@ Until then, every new redirect goes in `redirects.ts` (or, for historical paths 
 - `docs.harperdb.io` redirects to `docs.harper.fast`, keeping the path.
 - DNS for `harper.fast` and `harperdb.io` is in Route 53.
 - To deploy one host only, run Deploy by hand with `target` set to `fabric` or `pages`.
-
-Until the move to `docs.harper.fast` is finished, Pages serves `docs.harperdb.io` instead of `pages.docs.harper.fast`.
 
 ### If docs.harper.fast is down
 

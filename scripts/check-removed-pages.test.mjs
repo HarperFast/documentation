@@ -19,7 +19,7 @@ try {
 	}
 
 	const xml = (...urls) => `<urlset>${urls.map((url) => `<url><loc>${url}</loc></url>`).join('')}</urlset>`;
-	assert.deepStrictEqual(sitemapPaths(xml('https://docs.harperdb.io/', 'https://docs.harperdb.io/learn')), [
+	assert.deepStrictEqual(sitemapPaths(xml('https://docs.harper.fast/', 'https://docs.harper.fast/learn')), [
 		'/',
 		'/learn',
 	]);
