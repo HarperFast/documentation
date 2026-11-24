@@ -67,6 +67,12 @@ jobs:
           GA4_TRACKING_ID: ${{ secrets.GA4_TRACKING_ID }}
         run: npm run build
 
+      # A harper or harper-pro release deploys without a PR here, so this is its only check.
+      - name: Check for removed pages
+        env:
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}${{ vars.DOCUSAURUS_BASE_URL || '/' }}
+        run: npm run check:removed-pages
+
       - name: Upload npm logs on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

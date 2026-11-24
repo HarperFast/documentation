@@ -50,3 +50,8 @@ jobs:
           # The assembler reads HarperFast/harper-pro releases; unauthenticated calls share a per-IP limit.
           GH_TOKEN: ${{ github.token }}
         run: npm run ${{ matrix.command }}
+      - name: Check for removed pages
+        if: matrix.command == 'build'
+        env:
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}${{ vars.DOCUSAURUS_BASE_URL || '/' }}
+        run: npm run check:removed-pages
