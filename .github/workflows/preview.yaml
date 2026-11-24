@@ -132,6 +132,11 @@ jobs:
             urlPath: '/'
             extensions: ['html']
             index: true
+            after: 'rest'
+            fallthrough: false
+            notFound:
+              file: 'build/404.html'
+              statusCode: 404
           EOF
 
       - if: steps.build.outputs.run-id != ''
