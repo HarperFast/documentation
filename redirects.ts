@@ -33,6 +33,7 @@ const currentRedirects: RedirectRule[] = [
 	{ from: '/docs/getting-started/quickstart', to: '/learn' },
 	{ from: '/docs/getting-started/installation', to: '/learn/getting-started/install-and-connect-harper' },
 	{ from: '/docs/getting-started/install-harper', to: '/learn/getting-started/install-and-connect-harper' },
+	{ from: '/docs/getting-started/install-and-connect-harper', to: '/learn/getting-started/install-and-connect-harper' },
 	{ from: '/docs/getting-started/what-is-harper', to: '/learn' },
 	{ from: '/docs/getting-started/harper-concepts', to: '/learn' },
 	{ from: '/docs/getting-started/first-harper-app', to: '/learn' },
@@ -189,8 +190,14 @@ const currentRedirects: RedirectRule[] = [
 	// ── Install / Upgrade (no equivalent page in /reference/) ─────────────────
 	{ from: '/docs/deployments/install-harper', to: '/learn/getting-started/install-and-connect-harper' },
 	{ from: '/docs/deployments/install-harper/linux', to: '/learn/getting-started/install-and-connect-harper' },
+	{ from: '/docs/deployments/install-harperdb', to: '/learn/getting-started/install-and-connect-harper' },
+	{ from: '/docs/install-harper', to: '/learn/getting-started/install-and-connect-harper' },
+	{ from: '/docs/install-harperdb', to: '/learn/getting-started/install-and-connect-harper' },
 	{ from: '/docs/deployments/upgrade-hdb-instance', to: '/learn' },
 	{ from: '/docs/administration/upgrade-hdb-instance', to: '/learn' },
+
+	// ── Fabric ──────────────────────────────────────────────────────────────────
+	{ from: '/docs/fabric/managing-applications', to: '/fabric/managing-applications' },
 
 	// ── Harper Cloud → Legacy (v4 only, no v5 equivalent) ─────────────────────
 	{ from: '/docs/deployments/harper-cloud', to: '/reference/v4/legacy/cloud' },
