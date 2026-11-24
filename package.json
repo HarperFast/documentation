@@ -22,7 +22,7 @@
 		"lint": "oxlint --deny-warnings .",
 		"preview:pr": "node scripts/preview-pr.mjs",
 		"check:removed-pages": "node scripts/check-removed-pages.mjs",
-		"test:workflows": "node scripts/companion-check.test.mjs && node scripts/source-pr-preview.test.mjs && node scripts/check-removed-pages.test.mjs"
+		"test:workflows": "node scripts/companion-check.test.mjs && node scripts/source-pr-preview.test.mjs && node scripts/check-removed-pages.test.mjs && node scripts/pages-redirect-site.test.mjs"
 	},
 	"devDependencies": {
 		"@docusaurus/core": "3.9.2",

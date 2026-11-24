@@ -2,7 +2,7 @@ name: Content Check
 
 # The v5 reference and the open release notes are assembled from docs/ in HarperFast/harper and
 # HarperFast/harper-pro (scripts/assemble-content.mjs) at harper-pro's latest published release.
-# This redeploys both sites when the docs/ trees the script would assemble now differ from the ones
+# This redeploys the site when the docs/ trees the script would assemble now differ from the ones
 # the live site was built from (/content-sources.json). A separate workflow, so checks that find
 # nothing to do never join the deploy concurrency groups.
 #
@@ -37,23 +37,21 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci --ignore-scripts
-      - name: Dispatch the deploys when a source changed
+      - name: Dispatch the deploy when a source changed
         env:
           GH_TOKEN: ${{ github.token }}
           SITE_URL: ${{ vars.DOCUSAURUS_URL }}${{ vars.DOCUSAURUS_BASE_URL || '/' }}
         run: |
           set -euo pipefail
           # Until a running deploy publishes, the live manifest still names the old trees; dispatching
-          # again would cancel it (deploy.yaml cancels in progress) and could never let one finish.
-          for workflow in deploy.yaml deploy-fabric.yaml; do
-            unfinished=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 \
-              --json status --jq '[.[] | select(.status != "completed")] | length')
-            if [ "$unfinished" != 0 ]; then
-              echo "$workflow has $unfinished unfinished run(s); checking again next tick"
-              exit 0
-            fi
-          done
-          # The query string bypasses the Pages CDN cache, so a deploy that just finished is seen.
+          # again would cancel its build (deploy.yaml cancels a build in progress) and could never let one finish.
+          unfinished=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yaml --limit 20 \
+            --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$unfinished" != 0 ]; then
+            echo "deploy.yaml has $unfinished unfinished run(s); checking again next tick"
+            exit 0
+          fi
+          # The query string bypasses any cache, so a deploy that just finished is seen.
           deployed=$(curl -fsS "${SITE_URL%/}/content-sources.json?t=$(date +%s)" || echo '{}')
           expected=$(node scripts/assemble-content.mjs --sources)
           changed=false
@@ -67,5 +65,4 @@ jobs:
           done
           if [ "$changed" = true ]; then
             gh workflow run deploy.yaml --repo "$GITHUB_REPOSITORY" --ref main
-            gh workflow run deploy-fabric.yaml --repo "$GITHUB_REPOSITORY" --ref main
           fi

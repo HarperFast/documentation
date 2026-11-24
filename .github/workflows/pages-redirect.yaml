@@ -1,0 +1,63 @@
+name: Redirect docs.harperdb.io
+
+# GitHub Pages serves docs.harperdb.io, an older host name for the site. This publishes a site there
+# that sends each URL to the same path on docs.harper.fast (scripts/pages-redirect-site.mjs): an
+# HTML file with a meta refresh for each page in the docs.harper.fast sitemap, and a 404.html that
+# redirects every other path with a script.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pages-redirect.yaml'
+      - 'scripts/pages-redirect-site.mjs'
+      - 'scripts/check-removed-pages.mjs'
+  # Run it again to add redirects for pages published since.
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages-redirect
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Write the redirects
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Write a redirect for each page on docs.harper.fast
+        env:
+          SITE_URL: ${{ vars.DOCUSAURUS_URL }}/
+        run: node scripts/pages-redirect-site.mjs --to="$SITE_URL" --out=pages-redirect
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: pages-redirect
+
+  deploy:
+    needs: build
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
