@@ -105,7 +105,11 @@ There is one socket per database per peer, so the sockets present in the respons
 Measure incremental catch-up and full synchronization separately. Peers retain transaction history for [`logging.auditRetention`](/reference/v5/logging/configuration#loggingauditretention) (default `3d`), but purge it sooner under disk pressure. When a peer has purged history that the saved position would replay, it logs `forcing a bounded base-copy resync` and sends its current rows as writes. <VersionBadge type="changed" version="v5.3.6" /> A database that the peer has not written to since then no longer forces a copy; see [when a peer forces a base copy](/reference/v5/replication/overview#when-a-peer-forces-a-base-copy) for the cases that still do. Incremental replay resumes from the copy's start time. The copy never clears tables or deletes rows: purged tombstones are absent, and retained tombstones arrive as writes without values that the receiver skips. It also runs in reverse. The returning node sends its rows to peers, including writes only it took. A copied row wins where it is newer; where a peer has purged a deletion's tombstone, the deleted row can reappear.
 
 :::danger
-**A long-absent node must not reconnect with its existing data.** If it was disconnected longer than its peers retain history, or you cannot show otherwise, keep it out of rotation and isolate replication before Harper starts. Then rebuild whichever side does not hold the authoritative data:
+**A long-absent node must not reconnect with its existing data.** If it was disconnected longer than its peers retain history, or you cannot show otherwise, keep it out of rotation and isolate replication before Harper starts.
+
+For [schema-defined sharding](/reference/v5/replication/residency) <VersionBadge version="v5.4.0" />, keep the node isolated. Preserve any writes it accepted that may exist only on that node and plan how to reconcile them before clearing data. Verify a complete same-shard peer or backup for each affected shard. Use [Recovering a lost node](/reference/v5/replication/residency#recovering-a-lost-node) to choose between restoring a backup that preserves the original node's history and joining with a fresh node name.
+
+For clusters without schema-defined sharding, use the steps below after verifying that the recovery source holds all the records the nodes being rebuilt need.
 
 - **Peers are authoritative.** Export any writes only this node has. [Remove the node](/reference/v5/replication/clustering#remove-node), reinstall it with empty databases, and [add it as a new node](/reference/v5/replication/clustering#add-node). After synchronization, reapply the exported writes through your application.
 - **This node is authoritative**, as when you [restored it](./backup-and-recovery.mdx#restoring-in-a-replicated-cluster) to undo a destructive write. Rebuild the peers from it, and never let a rebuilt peer reach one that still holds the old data:
@@ -259,7 +263,7 @@ On a non-production cluster under write load:
 
 - **mTLS is required on the secure replication port and cannot be disabled.** Certificate expiry is therefore a replication outage, so treat certificate lifetime as an operational deadline with its own alert. See [certificate management](/reference/v5/security/certificate-management).
 - **Gossip discovery means one route can join a whole cluster.** A node that connects to one peer discovers the rest. That is convenient and it means an accidental route can widen your topology more than you intended.
-- **Sharding is a separate scope control.** If you use [sharding](/reference/v5/replication/sharding), not every node holds every record, so "this node is converged" and "this node can answer this query locally" become different questions.
+- **Sharding is a separate scope control.** If you use [sharding](/reference/v5/replication/sharding), including [`@sharded` tables](/reference/v5/replication/residency) <VersionBadge version="v5.4.0" />, not every node holds every record, so "this node is converged" and "this node can answer this query locally" become different questions.
 - **Analytics data has its own replication setting.** See `analytics.replicate` in the [analytics configuration](/reference/v5/analytics/overview#analytics-configuration) before you build dashboards that assume metrics are or are not cluster-wide.
 - **Keep node-local operational state out of scope.** Availability flags, maintenance markers, and anything else that describes one node rather than the cluster should not replicate, or a routine drain propagates to peers.
 
@@ -274,14 +278,15 @@ On a non-production cluster under write load:
 - [ ] Alerts configured on missing peers, sustained latency growth, stalled commit progress during writes, and stale sentinel values
 - [ ] Non-commutative operations identified and given an owner, a serialization point, or an external coordinator
 - [ ] Replication certificate expiry dates tracked with an alert
-- [ ] Long-absent node policy decided in advance: isolate replication and rebuild this node from empty when peers are authoritative, or rebuild the peers from it when it is
+- [ ] Long-absent node policy identifies which nodes to isolate and rebuild for each authoritative source and how to verify a complete source for each shard before reinstalling
 - [ ] Replication interruption and recovery exercise completed and dated
 
 ## Additional Resources
 
 - [Replication overview](/reference/v5/replication/overview) for routes, scope, controlled flow, and securing connections
 - [Clustering operations](/reference/v5/replication/clustering) for `add_node`, `set_node`, and the `cluster_status` response in full
-- [Sharding](/reference/v5/replication/sharding) for controlling how many nodes hold a given record
+- [Sharding](/reference/v5/replication/sharding) for shard topology and legacy record placement controls
+- [Schema-defined sharding](/reference/v5/replication/residency) <VersionBadge version="v5.4.0" /> for `@sharded` tables, and [Sharded Clusters](/fabric/cluster-creation-management#sharded-clusters) for running them on Fabric
 - [Replication metrics](/reference/v5/analytics/overview#replication-metrics) for `replication-latency` and byte counters
 - [Certificate management](/reference/v5/security/certificate-management) and [certificate verification](/reference/v5/security/certificate-verification)
 - [Database schema](/reference/v5/database/schema) for the `replicate` table directive
