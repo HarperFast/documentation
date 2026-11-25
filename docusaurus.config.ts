@@ -270,6 +270,17 @@ const config: Config = {
 						description:
 							'Marketing site with positioning and use cases; companion llms.txt at https://www.harper.fast/llms.txt',
 					},
+					{
+						title: 'Harper source code (GitHub)',
+						url: 'https://github.com/HarperFast/harper',
+						description: 'The open-source (Apache 2.0) Harper core: source, issues, and contributions',
+					},
+					{
+						title: 'Harper Pro source code (GitHub)',
+						url: 'https://github.com/HarperFast/harper-pro',
+						description:
+							'Source-available (Elastic License 2.0) Harper Pro: replication, certificate management, and more on top of the core',
+					},
 				],
 				content: {
 					// Defaults: enableMarkdownFiles: true, includeDocs: true,
