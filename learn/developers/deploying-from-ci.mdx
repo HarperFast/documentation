@@ -705,6 +705,10 @@ A preview deploys by reference, so every node installs the PR's commit as it is 
 
 To preview an application that needs a build, build and publish each PR's commit from a separate `pull_request` workflow, which gets no identity token, and deploy the published package from the preview job, with the action's `args` input (`args: package=npm:@my-org/my-app@pr-${{ github.event.pull_request.number }}`). GitHub starts both workflows at once, and the trust policies match only `pull_request_target`, so the preview job has to wait for that build itself.
 
+The build can also be a workflow artifact: the preview job waits for the `pull_request` build run of the PR's head commit, downloads its artifact, and deploys the directory with the action's `path` and `by_ref: false`. Look the run up by its head commit and branch, accept only a successful run whose head repository is this one, so that a fork's run of the same commit is never deployed, and download its artifact by name. Listing runs and downloading another run's artifact need `actions: read` in the preview job's permissions. This site's own [preview workflow](https://github.com/HarperFast/documentation/blob/main/.github/workflows/preview.yaml) takes this route.
+
+A Next.js application takes this route. It can't build on the cluster, so it is deployed with `prebuilt: true` and its `.next` folder. [HarperFast/nextjs-example](https://github.com/HarperFast/nextjs-example) has the two workflows, and the `@harperfast/nextjs` plugin's [Pull request previews](https://github.com/HarperFast/nextjs#pull-request-previews) section covers what a Next.js preview needs: shared data and its cache, server actions behind a proxy, `basePath`, and what is not supported.
+
 ### How previews stay safe
 
 - **The workflow is trusted, not the PR.** The workflow runs on `pull_request_target`, from the default branch, and never runs the PR's code on the runner. The trust policies pin its `workflow_ref` to the default branch, `event_name` to `pull_request_target`, and its environment, so a PR that edits the workflow cannot change what runs with the identity: its edits take effect only once it merges.
@@ -720,6 +724,7 @@ With the default `dataMode=branched`, the cluster refuses a preview deploy that 
 - **The `system` database**, users and roles, cannot be branched. Roles a preview declares apply to the whole cluster.
 - **A database created after the preview loads** is not branched.
 - **Work outside the database**, such as calls to other services, or files written outside the application's own directory, happens once per preview.
+- **Bundled server code that imports `harper`**, such as a Next.js server bundle, reached the cluster's databases rather than the preview's copy before <VersionBadge version="v5.4.2" />, and still can when something imported `harper` before the preview loaded ([harper#4593](https://github.com/HarperFast/harper/issues/4593)). Use the bare `tables` and `databases` globals in such code: they reach the copy on every v5.4 release.
 
 With `dataMode=shared`, previews read and write the cluster's databases, the ones production uses if it runs on the same cluster. A preview's writes, schema changes and startup work then change production's data. Use it only for an application whose data a preview may change, or on a cluster for previews alone.
 
