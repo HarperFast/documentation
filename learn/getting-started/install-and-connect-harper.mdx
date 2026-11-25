@@ -62,20 +62,18 @@ Do not actually enter `$HOME` in the destination prompt; it should automatically
 :::
 
 ```
-Starting HarperDB install...
+Harper not found, starting install process.
 
-Terms & Conditions can be found at https://harperdb.io/legal/end-user-license-agreement
-and can be viewed by typing or copying and pasting the URL into your web browser.
-I agree to the HarperDB Terms and Conditions: (yes/no) yes
-Please enter a destination for HarperDB: $HOME/harper
+Starting Harper install...
+
+[main/0] [notify]: Starting Harper install...
+Please enter a destination for Harper: $HOME/harper
 Please enter a username for the administrative user: HDB_ADMIN
-Please enter a password for the administrative user: [hidden]
+Please enter a password for the administrative user: [input is masked]
+Please enter the hostname for the Harper instance: localhost
 Default Config - dev (easy access/debugging) or prod (security/performance): (dev/prod) dev
-Please enter the hostname for this server: localhost
-
-HarperDB installation was successful.
-
-[main/0] [notify]: HarperDB installation was successful.
+Installing ...
+Harper installation was successful.
 ```
 
   </TabItem>
@@ -119,7 +117,7 @@ This is not limited to installation: any option in Harper's own `harper-config.y
 
 After completing the installation step, Harper should now be running in the active process.
 
-As long as the `logging.stdStream` configuration option is set to `true` (which is the default when using the `dev` default mode), Harper will also stream all logs to the `stdout` and `stderr` streams too.
+As long as the `logging.stdStreams` configuration option is set to `true` (which is the default when using the `dev` default mode), Harper will also stream all logs to the `stdout` and `stderr` streams too.
 
 If all is working correctly, your command line output should start with:
 
@@ -198,7 +196,7 @@ console.log(text);
 
 </Tabs>
 
-If you see `HarperDB is running.`, fantastic work! You've successfully installed and setup Harper. Continue on to the next part of the Getting Started section, [creating your first Harper application](./create-your-first-application).
+If you see `Harper is running.`, fantastic work! You've successfully installed and setup Harper. Continue on to the next part of the Getting Started section, [creating your first Harper application](./create-your-first-application).
 
 ## Additional Resources
 
